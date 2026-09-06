@@ -1,4 +1,4 @@
-export type NodeType = 'capacity' | 'branch' | 'intraface' | 'interface'
+export type NodeType = 'capacity' | 'reservoir' | 'constant'
 
 export interface GraphNode {
   id: string;
@@ -13,10 +13,26 @@ export interface NodeTypeDef {
   label: string
   fill: string
   stroke: string
+  ontologyUri: string
 }
+
+export type ArcType = 'flow' | 'state'
 
 export interface Arc {
   id: string;
   sourceId: string;
   targetId: string;
+  arcType: ArcType
+}
+
+export interface ArcTypeDef {
+  id: ArcType
+  label: string
+  stroke: string
+}
+
+export interface ConnectionRule {
+  sourceType: NodeType
+  targetType: NodeType
+  arcType: ArcType
 }

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Stage, Layer, Circle, Line, Text, Group } from 'react-konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
-import type { GraphNode, Arc, NodeType, NodeTypeDef } from './types'
+import type { GraphNode, Arc, NodeType, NodeTypeDef, ArcType, ArcTypeDef, ConnectionRule } from './types'
 
 const NODE_RADIUS = 24
 const STROKE_WIDTH = 2
@@ -31,10 +31,23 @@ function arrowPoints(x: number, y: number, angleRad: number) {
 }
 
 const NODE_TYPES: NodeTypeDef[] = [
-  { id: 'capacity', label: 'Capacity', fill: '#e8f4fd', stroke: '#2980b9' },
-  { id: 'branch', label: 'Branch', fill: '#fdf2e8', stroke: '#d35400' },
-  { id: 'intraface', label: 'Intraface', fill: '#eafaf1', stroke: '#27ae60' },
-  { id: 'interface', label: 'Interface', fill: '#f5eef8', stroke: '#8e44ad' },
+  { id: 'capacity', label: 'Capacity', fill: '#e8f4fd', stroke: '#2980b9', ontologyUri: 'promo:Capacity' },
+  { id: 'reservoir', label: 'Reservoir', fill: '#d4edda', stroke: '#155724', ontologyUri: 'promo:ReservoirCapacity' },
+  { id: 'constant', label: 'Constant', fill: '#fff3cd', stroke: '#856404', ontologyUri: 'promo:ConstantCapacity' },
+]
+
+const ARC_TYPES: ArcTypeDef[] = [
+  { id: 'flow', label: 'Flow', stroke: '#333' },
+  { id: 'state', label: 'State', stroke: '#888' },
+]
+
+const CONNECTION_RULES: ConnectionRule[] = [
+  { sourceType: 'capacity', targetType: 'capacity', arcType: 'flow' },
+  { sourceType: 'capacity', targetType: 'capacity', arcType: 'state' },
+  { sourceType: 'reservoir', targetType: 'capacity', arcType: 'flow' },
+  { sourceType: 'reservoir', targetType: 'constant', arcType: 'flow' },
+  { sourceType: 'capacity', targetType: 'constant', arcType: 'state' },
+  { sourceType: 'constant', targetType: 'capacity', arcType: 'state' },
 ]
 
 export default function App() {
@@ -86,6 +99,12 @@ export default function App() {
     [createNode]
   )
 
+  function getValidArcTypes(sourceType: NodeType, targetType: NodeType): ArcType[] {
+    return CONNECTION_RULES
+      .filter((r) => r.sourceType === sourceType && r.targetType === targetType)
+      .map((r) => r.arcType)
+  }
+
   const handleNodeClick = useCallback(
     (nodeId: string) => (e: KonvaEventObject<MouseEvent>) => {
       e.cancelBubble = true
@@ -94,15 +113,23 @@ export default function App() {
       if (selectedNodeId === nodeId) {
         setSelectedNodeId(null)
       } else if (selectedNodeId && selectedNodeId !== nodeId) {
+        const sourceNode = nodes.find((n) => n.id === selectedNodeId)
+        const targetNode = nodes.find((n) => n.id === nodeId)
+        if (!sourceNode || !targetNode) {
+          setSelectedNodeId(null)
+          return
+        }
+
+        const validArcTypes = getValidArcTypes(sourceNode.nodeType, targetNode.nodeType)
         const exists = arcs.some(
-          (a) =>
-            (a.sourceId === selectedNodeId && a.targetId === nodeId) ||
-            (a.sourceId === nodeId && a.targetId === selectedNodeId)
+          (a) => a.sourceId === selectedNodeId && a.targetId === nodeId
         )
-        if (!exists) {
+
+        if (!exists && validArcTypes.length > 0) {
+          const arcType = validArcTypes[0]
           const arcId = `a${nextId}`
           setNextId((prev) => prev + 1)
-          setArcs((prev) => [...prev, { id: arcId, sourceId: selectedNodeId, targetId: nodeId }])
+          setArcs((prev) => [...prev, { id: arcId, sourceId: selectedNodeId, targetId: nodeId, arcType }])
         }
         setSelectedNodeId(null)
       } else {
@@ -110,7 +137,7 @@ export default function App() {
         setSelectedArcId(null)
       }
     },
-    [selectedNodeId, arcs, nextId]
+    [selectedNodeId, arcs, nextId, nodes]
   )
 
   const handleNodeDragMove = useCallback(
@@ -167,6 +194,7 @@ export default function App() {
   }
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
+  const selectedArc = arcs.find((a) => a.id === selectedArcId)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
@@ -263,6 +291,8 @@ export default function App() {
               const geom = getArcGeometry(arc)
               if (!geom) return null
               const isSelected = arc.id === selectedArcId
+              const arcTypeDef = ARC_TYPES.find((t) => t.id === arc.arcType) ?? ARC_TYPES[0]
+              const colour = isSelected ? '#e74c3c' : arcTypeDef.stroke
               const aPoints = arrowPoints(geom.arrowX, geom.arrowY, geom.arrowAngle)
               return (
                 <Group key={arc.id} onClick={handleArcClick(arc.id)}>
@@ -274,14 +304,15 @@ export default function App() {
                   />
                   <Line
                     points={geom.points}
-                    stroke={isSelected ? '#e74c3c' : '#333'}
+                    stroke={colour}
                     strokeWidth={isSelected ? 3 : 2}
+                    dash={arc.arcType === 'state' ? [6, 4] : undefined}
                   />
                   <Line
                     points={aPoints}
                     closed
-                    fill={isSelected ? '#e74c3c' : '#333'}
-                    stroke={isSelected ? '#e74c3c' : '#333'}
+                    fill={colour}
+                    stroke={colour}
                     strokeWidth={isSelected ? 3 : 2}
                   />
                 </Group>
@@ -357,6 +388,14 @@ export default function App() {
               <div>y: {selectedNode.y.toFixed(1)}</div>
             </div>
           )}
+          {selectedArc && (
+            <div style={{ fontSize: 11 }}>
+              <div>ID: {selectedArc.id}</div>
+              <div>Type: {selectedArc.arcType}</div>
+              <div>From: {selectedArc.sourceId}</div>
+              <div>To: {selectedArc.targetId}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -375,7 +414,7 @@ export default function App() {
       >
         <span style={{ color: '#555' }}>
           {selectedNodeId
-            ? `Node ${selectedNodeId} selected — click another node to connect`
+            ? `Node ${selectedNodeId} selected — click target to connect (rules enforced)`
             : selectedArcId
               ? `Arc ${selectedArcId} selected`
               : 'Click canvas to add node — click node to select — Delete to remove'}
