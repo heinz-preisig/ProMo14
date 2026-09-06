@@ -31,23 +31,22 @@ function arrowPoints(x: number, y: number, angleRad: number) {
 }
 
 const NODE_TYPES: NodeTypeDef[] = [
-  { id: 'capacity', label: 'Capacity', fill: '#e8f4fd', stroke: '#2980b9', ontologyUri: 'promo:Capacity' },
-  { id: 'reservoir', label: 'Reservoir', fill: '#d4edda', stroke: '#155724', ontologyUri: 'promo:ReservoirCapacity' },
-  { id: 'constant', label: 'Constant', fill: '#fff3cd', stroke: '#856404', ontologyUri: 'promo:ConstantCapacity' },
+  { id: 'TypeA', label: 'Type A', fill: '#e8f4fd', stroke: '#2980b9', ontologyUri: 'promo:TypeA' },
+  { id: 'TypeB', label: 'Type B', fill: '#d4edda', stroke: '#155724', ontologyUri: 'promo:TypeB' },
+  { id: 'TypeC', label: 'Type C', fill: '#fff3cd', stroke: '#856404', ontologyUri: 'promo:TypeC' },
 ]
 
 const ARC_TYPES: ArcTypeDef[] = [
-  { id: 'flow', label: 'Flow', stroke: '#333' },
-  { id: 'state', label: 'State', stroke: '#888' },
+  { id: 'ArcType1', label: 'Arc Type 1', stroke: '#333' },
+  { id: 'ArcType2', label: 'Arc Type 2', stroke: '#888', dash: [6, 4] },
 ]
 
 const CONNECTION_RULES: ConnectionRule[] = [
-  { sourceType: 'capacity', targetType: 'capacity', arcType: 'flow' },
-  { sourceType: 'capacity', targetType: 'capacity', arcType: 'state' },
-  { sourceType: 'reservoir', targetType: 'capacity', arcType: 'flow' },
-  { sourceType: 'reservoir', targetType: 'constant', arcType: 'flow' },
-  { sourceType: 'capacity', targetType: 'constant', arcType: 'state' },
-  { sourceType: 'constant', targetType: 'capacity', arcType: 'state' },
+  { sourceType: 'TypeA', targetType: 'TypeA', arcType: 'ArcType1' },
+  { sourceType: 'TypeA', targetType: 'TypeA', arcType: 'ArcType2' },
+  { sourceType: 'TypeA', targetType: 'TypeB', arcType: 'ArcType1' },
+  { sourceType: 'TypeB', targetType: 'TypeC', arcType: 'ArcType1' },
+  { sourceType: 'TypeC', targetType: 'TypeA', arcType: 'ArcType2' },
 ]
 
 export default function App() {
@@ -55,7 +54,7 @@ export default function App() {
   const [arcs, setArcs] = useState<Arc[]>([])
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedArcId, setSelectedArcId] = useState<string | null>(null)
-  const [activeNodeType, setActiveNodeType] = useState<NodeType>('capacity')
+  const [activeNodeType, setActiveNodeType] = useState<NodeType>('TypeA')
   const [nextId, setNextId] = useState(1)
   const [stageSize, setStageSize] = useState({
     width: window.innerWidth - PALETTE_WIDTH * 2,
@@ -129,7 +128,10 @@ export default function App() {
           const arcType = validArcTypes[0]
           const arcId = `a${nextId}`
           setNextId((prev) => prev + 1)
-          setArcs((prev) => [...prev, { id: arcId, sourceId: selectedNodeId, targetId: nodeId, arcType }])
+          setArcs((prev) => [
+            ...prev,
+            { id: arcId, sourceId: selectedNodeId, targetId: nodeId, arcType, knots: [] },
+          ])
         }
         setSelectedNodeId(null)
       } else {
@@ -187,10 +189,28 @@ export default function App() {
     const src = nodes.find((n) => n.id === arc.sourceId)
     const tgt = nodes.find((n) => n.id === arc.targetId)
     if (!src || !tgt) return null
-    const p1 = rimPoint(src.x, src.y, tgt.x, tgt.y, NODE_RADIUS)
-    const p2 = rimPoint(tgt.x, tgt.y, src.x, src.y, NODE_RADIUS)
-    const angle = Math.atan2(tgt.y - src.y, tgt.x - src.x)
-    return { points: [p1.x, p1.y, p2.x, p2.y], arrowAngle: angle, arrowX: p2.x, arrowY: p2.y }
+
+    // Build polyline: source rim -> knots -> target rim
+    const pts: number[] = []
+
+    const k0 = arc.knots.length > 0 ? arc.knots[0] : tgt
+    const pStart = rimPoint(src.x, src.y, k0.x, k0.y, NODE_RADIUS)
+    pts.push(pStart.x, pStart.y)
+
+    for (const k of arc.knots) {
+      pts.push(k.x, k.y)
+    }
+
+    const kLast = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1] : src
+    const pEnd = rimPoint(tgt.x, tgt.y, kLast.x, kLast.y, NODE_RADIUS)
+    pts.push(pEnd.x, pEnd.y)
+
+    // Arrow angle derived from last segment
+    const prevX = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].x : src.x
+    const prevY = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].y : src.y
+    const angle = Math.atan2(pEnd.y - prevY, pEnd.x - prevX)
+
+    return { points: pts, arrowAngle: angle, arrowX: pEnd.x, arrowY: pEnd.y }
   }
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
@@ -306,7 +326,7 @@ export default function App() {
                     points={geom.points}
                     stroke={colour}
                     strokeWidth={isSelected ? 3 : 2}
-                    dash={arc.arcType === 'state' ? [6, 4] : undefined}
+                    dash={arcTypeDef.dash}
                   />
                   <Line
                     points={aPoints}
@@ -394,6 +414,7 @@ export default function App() {
               <div>Type: {selectedArc.arcType}</div>
               <div>From: {selectedArc.sourceId}</div>
               <div>To: {selectedArc.targetId}</div>
+              <div>Knots: {selectedArc.knots.length}</div>
             </div>
           )}
         </div>
