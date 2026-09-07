@@ -58,3 +58,20 @@ export interface ConnectionRule {
   targetType: NodeType
   arcType: ArcType
 }
+
+// ---------------------------------------------------------------------------
+// Re-export hierarchical types (three-layer architecture).
+// See docs/ADR-001-hierarchy.md for design rationale.
+// ---------------------------------------------------------------------------
+export type {
+  ModelNode,
+  ModelArc,
+  TreeNode,
+  Tree,
+  VisibleNode,
+  VisibleArc,
+  VisibleArcType,
+  VisibleEntityType,
+  GraphView,
+  ModelState,
+} from './hierarchy'

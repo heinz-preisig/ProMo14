@@ -1,0 +1,62 @@
+ProMo14 — Session Progress (2026-09-07)
+======================================
+
+ARCHITECTURE (Command Automaton)
+----------------------------------
+Single useReducer in App.tsx. All state changes go through one door:
+
+  Event → Command → applyCommand(state, cmd) → new State
+
+Commands are a discriminated union in src/state/ModelState.ts:
+  insertNode | deleteNode | insertArc | deleteArc | moveNode
+  setView | selectNode | selectArc | groupNodes | convertLeafToComposite | reset
+
+New commands added by extending Command union + applyCommand switch case.
+
+MODULES
+-------
+src/state/ModelState.ts      — AppState, Command, applyCommand reducer
+src/model/ModelGraph.ts      — ModelGraphOps (insert/delete node/arc, arc counter)
+src/tree/Tree.ts             — TreeOps (addChild, removeNode, moveID, getAncestors, getSiblings)
+src/tree/computeGraphView.ts — Compute visible nodes/arcs from tree + model + layout
+src/types/hierarchy.ts     — TypeScript interfaces for all three layers
+
+CURRENTLY WORKING
+-----------------
+- Canvas click creates leaf node at cursor position (centered coords)
+- Nodes render with correct palette type colors (TypeA blue, TypeB green, TypeC yellow)
+- Three-panel layout: ancestors (left), children (center), siblings (right), connector (top)
+- Coordinate system centered: (0,0) is canvas center via wrapping Konva Group
+- Arc creation between leaves (select source, click target)
+- Node selection, arc selection, delete (key or button)
+- Double-click composite → zoom into (setView)
+- Double-click leaf → convert to composite (adds Detail child)
+- Group selected leaf into composite
+- Reset all button
+- 14 unit tests passing (TreeOps)
+- TypeScript compiles clean
+
+PENDING / KNOWN ISSUES
+----------------------
+- No save/load persistence yet
+- No reconnectArc command (change arc endpoint)
+- No insertModelIntoModel (compose one model into another)
+- Arc rendering may clip at canvas edges (arcs layer separate from nodes layer)
+- No drag-to-create-arc (only click-to-connect)
+- No connection rules enforcement (any leaf can connect to any leaf)
+- Group button only groups a single selected node (logic: graphView.nodes.filter n.id === selected)
+
+START DEV SERVER
+----------------
+cd /home/heinz/1_Gits/CAM13/ProMo14
+node node_modules/.bin/vite --port 3000 --host
+
+Or run: ./run-dev.sh
+
+NEXT STEPS (suggested)
+----------------------
+1. Add save/load commands + JSON serialization of AppState
+2. Add insertModelIntoModel (compose)
+3. Add reconnectArc command
+4. Add connection rules / ontology validation
+5. Write tests for ModelGraphOps and applyCommand
