@@ -74,4 +74,5 @@ export type {
   VisibleEntityType,
   GraphView,
   ModelState,
+  OpenArc,
 } from './hierarchy'

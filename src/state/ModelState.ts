@@ -1,4 +1,4 @@
-import type { Tree, ModelNode, ModelArc, NodeType, ArcType } from '../types'
+import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc } from '../types'
 import { createTree, TreeOps } from '../tree/Tree'
 import { ModelGraphOps } from '../model/ModelGraph'
 
@@ -8,6 +8,7 @@ export interface AppState {
   modelArcs: Map<string, ModelArc>
   tree: Tree
   layoutStore: Map<number, Map<string, { x: number; y: number }>>
+  openArcs: Map<number, OpenArc[]> // keyed by composite tree node id
   currentViewNodeId: number
   selectedVisibleNodeId: string | null
   selectedModelArcIri: string | null
@@ -19,6 +20,7 @@ export const initialState: AppState = {
   modelArcs: new Map(),
   tree: createTree('Root'),
   layoutStore: new Map(),
+  openArcs: new Map(),
   currentViewNodeId: 0,
   selectedVisibleNodeId: null,
   selectedModelArcIri: null,
@@ -36,8 +38,15 @@ export type Command =
   | { type: 'selectNode'; id: string | null }
   | { type: 'selectArc'; iri: string | null }
   | { type: 'groupNodes'; parentViewNodeId: number; treeNodeIds: number[] }
-  | { type: 'convertLeafToComposite'; treeNodeId: number; stageWidth: number; stageHeight: number }
+  | { type: 'reconnectOpenArc'; openArcIri: string; newModelNodeIri: string }
   | { type: 'reset' }
+
+function findCompositeForOpenArc(openArcs: Map<number, OpenArc[]>, iri: string): number | undefined {
+  for (const [compositeId, list] of openArcs) {
+    if (list.some((a) => a.iri === iri)) return compositeId
+  }
+  return undefined
+}
 
 // ─── Pure reducer ───
 export function applyCommand(state: AppState, cmd: Command): AppState {
@@ -47,7 +56,28 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       modelGraph.insertNode(cmd.iri, cmd.entityType, cmd.label)
 
       const nextTree = new TreeOps(state.tree)
+      const parent = nextTree.getState().nodes.get(cmd.parentViewNodeId)
+      const oldParentIri = parent?.iri
+
+      const openForView: OpenArc[] = []
+      if (oldParentIri) {
+        for (const arc of modelGraph.getConnectedArcs(oldParentIri)) {
+          const isSource = arc.sourceIri === oldParentIri
+          openForView.push({
+            iri: arc.iri,
+            externalIri: isSource ? arc.targetIri : arc.sourceIri,
+            arcType: arc.arcType,
+            isSource,
+          })
+        }
+        modelGraph.deleteNode(oldParentIri)
+      }
+
       nextTree.addChild(cmd.parentViewNodeId, cmd.label, cmd.iri, cmd.id)
+      if (parent) parent.iri = undefined
+
+      const nextOpenArcs = new Map(state.openArcs)
+      if (oldParentIri) nextOpenArcs.set(cmd.parentViewNodeId, openForView)
 
       const nextLayouts = new Map(state.layoutStore)
       const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
@@ -60,6 +90,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         modelArcs: modelGraph.getArcs(),
         tree: nextTree.getState(),
         layoutStore: nextLayouts,
+        openArcs: nextOpenArcs,
         selectedVisibleNodeId: String(cmd.id),
         selectedModelArcIri: null,
       }
@@ -140,29 +171,32 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       return { ...state, tree: nextTree.getState(), selectedVisibleNodeId: null }
     }
 
-    case 'convertLeafToComposite': {
-      const nextTree = new TreeOps(state.tree)
-      const node = state.tree.nodes.get(cmd.treeNodeId)
-      if (!node || node.children.length > 0) return state
+    case 'reconnectOpenArc': {
+      const compositeId = findCompositeForOpenArc(state.openArcs, cmd.openArcIri)
+      if (!compositeId) return state
+      const openForView = state.openArcs.get(compositeId)!
+      const openArc = openForView.find((a) => a.iri === cmd.openArcIri)
+      if (!openArc) return state
+      if (!state.modelNodes.has(cmd.newModelNodeIri)) return state
 
-      const newChildId = nextTree.addChild(cmd.treeNodeId, 'Detail', undefined)
-      const nextTreeState = nextTree.getState()
+      const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
+      const sourceIri = openArc.isSource ? cmd.newModelNodeIri : openArc.externalIri
+      const targetIri = openArc.isSource ? openArc.externalIri : cmd.newModelNodeIri
+      modelGraph.insertArc(openArc.iri, sourceIri, targetIri, openArc.arcType as ArcType)
 
-      const nextLayouts = new Map(state.layoutStore)
-      const viewLayouts = new Map(nextLayouts.get(cmd.treeNodeId) ?? [])
-      viewLayouts.set(String(newChildId), {
-        x: cmd.stageWidth / 2,
-        y: cmd.stageHeight / 2,
-      })
-      nextLayouts.set(cmd.treeNodeId, viewLayouts)
+      const nextOpenArcs = new Map(state.openArcs)
+      const remaining = openForView.filter((a) => a.iri !== cmd.openArcIri)
+      if (remaining.length > 0) nextOpenArcs.set(compositeId, remaining)
+      else nextOpenArcs.delete(compositeId)
 
       return {
         ...state,
-        tree: nextTreeState,
-        layoutStore: nextLayouts,
-        currentViewNodeId: cmd.treeNodeId,
+        modelNodes: modelGraph.getNodes(),
+        modelArcs: modelGraph.getArcs(),
+        arcCounter: modelGraph.getArcCounter(),
+        openArcs: nextOpenArcs,
         selectedVisibleNodeId: null,
-        selectedModelArcIri: null,
+        selectedModelArcIri: openArc.iri,
       }
     }
 

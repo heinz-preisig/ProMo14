@@ -1,4 +1,4 @@
-ProMo14 — Session Progress (2026-09-07)
+ProMo14 — Session Progress (2026-09-08)
 ======================================
 
 ARCHITECTURE (Command Automaton)
@@ -9,7 +9,7 @@ Single useReducer in App.tsx. All state changes go through one door:
 
 Commands are a discriminated union in src/state/ModelState.ts:
   insertNode | deleteNode | insertArc | deleteArc | moveNode
-  setView | selectNode | selectArc | groupNodes | convertLeafToComposite | reset
+  setView | selectNode | selectArc | groupNodes | convertLeafToComposite | reconnectOpenArc | reset
 
 New commands added by extending Command union + applyCommand switch case.
 
@@ -30,16 +30,17 @@ CURRENTLY WORKING
 - Arc creation between leaves (select source, click target)
 - Node selection, arc selection, delete (key or button)
 - Double-click composite → zoom into (setView)
-- Double-click leaf → convert to composite (adds Detail child)
+- Double-click leaf → zoom into leaf view; click empty canvas to add child and convert leaf into composite
 - Group selected leaf into composite
+- Open-arc reconnection via red drag handle
 - Reset all button
-- 14 unit tests passing (TreeOps)
+- 15 unit tests passing (TreeOps + ModelState)
 - TypeScript compiles clean
 
 PENDING / KNOWN ISSUES
 ----------------------
 - No save/load persistence yet
-- No reconnectArc command (change arc endpoint)
+- reconnectOpenArc implemented for dangling ends created by leaf-to-composite conversion
 - No insertModelIntoModel (compose one model into another)
 - Arc rendering may clip at canvas edges (arcs layer separate from nodes layer)
 - No drag-to-create-arc (only click-to-connect)
@@ -48,15 +49,16 @@ PENDING / KNOWN ISSUES
 
 START DEV SERVER
 ----------------
-cd /home/heinz/1_Gits/CAM13/ProMo14
-node node_modules/.bin/vite --port 3000 --host
+cd /home/heinz/1_Gits/CAM14/ProMo14
+/home/heinz/.nvm/versions/node/v24.19.0/bin/node node_modules/.bin/vite --port 3000 --host
 
 Or run: ./run-dev.sh
 
 NEXT STEPS (suggested)
 ----------------------
-1. Add save/load commands + JSON serialization of AppState
-2. Add insertModelIntoModel (compose)
-3. Add reconnectArc command
-4. Add connection rules / ontology validation
-5. Write tests for ModelGraphOps and applyCommand
+1. Scene-object / interaction abstraction for graphical objects (handles, arcs, nodes, hit-areas, hover)
+2. Add save/load commands + JSON serialization of AppState
+3. Add insertModelIntoModel (compose)
+4. Add full reconnectArc command (change any arc endpoint)
+5. Add connection rules / ontology validation
+6. Expand tests for ModelGraphOps and applyCommand

@@ -78,7 +78,7 @@ export interface VisibleNode {
 }
 
 /** Arc type as determined by endpoint classes in the old ProMo __redrawScene. */
-export type VisibleArcType = 'connection' | 'leftArc' | 'rightArc'
+export type VisibleArcType = 'connection' | 'leftArc' | 'rightArc' | 'open'
 
 /** An arc visible in a GraphView — computed by projection from flat model arcs. */
 export interface VisibleArc {
@@ -86,8 +86,15 @@ export interface VisibleArc {
   modelArcIri: string
   sourceId: string   // References VisibleNode.id
   targetId: string   // References VisibleNode.id
+  /** Visual category used for rendering (connection, leftArc, rightArc, open). */
   arcType: VisibleArcType
+  /** Original ontology arc type string (e.g. ArcType1, ArcType2). */
+  modelArcType: string
   knots: Knot[]
+  /** For arcType === 'open': the visible node id of the composite/connector that owns the open end. */
+  openEndId?: string
+  /** For arcType === 'open': the tree node id of the composite that owns the open end. */
+  openEndTreeNodeId?: number
 }
 
 /** A computed GraphView for a specific tree node. Regenerated on demand. */
@@ -95,6 +102,20 @@ export interface GraphView {
   treeNodeId: number
   nodes: VisibleNode[]
   arcs: VisibleArc[]
+  openArcs: VisibleArc[]
+}
+
+// ===========================================================================
+// Open arcs: dangling connections left when a leaf is converted to a composite
+// ===========================================================================
+
+/** An open arc is an arc whose endpoint was removed when its owning leaf became a composite.
+ *  The open end attaches to the connector node of the composite view until reconnected. */
+export interface OpenArc {
+  iri: string           // Original model arc IRI (preserved for reconnection)
+  externalIri: string   // Model node IRI that still exists on the other side
+  arcType: string       // Ontology arc type
+  isSource: boolean     // True if the removed leaf was the source (connector now acts as source)
 }
 
 // ===========================================================================

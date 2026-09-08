@@ -1,4 +1,4 @@
-import type { Tree, ModelNode, ModelArc, GraphView, VisibleNode, VisibleArc, VisibleArcType } from '../types'
+import type { Tree, ModelNode, ModelArc, GraphView, VisibleNode, VisibleArc, VisibleArcType, OpenArc } from '../types'
 import { TreeOps } from './Tree'
 
 /**
@@ -13,15 +13,23 @@ export function computeGraphView(
   tree: Tree,
   modelNodes: Map<string, ModelNode>,
   modelArcs: Map<string, ModelArc>,
-  layoutStore: Map<number, Map<string, { x: number; y: number }>>
+  layoutStore: Map<number, Map<string, { x: number; y: number }>>,
+  openArcs: Map<number, OpenArc[]>,
+  stageWidth: number,
+  stageHeight: number
 ): GraphView {
   const ops = new TreeOps(tree)
   const viewNode = tree.nodes.get(viewNodeId)
-  if (!viewNode) return { treeNodeId: viewNodeId, nodes: [], arcs: [] }
+  if (!viewNode) return { treeNodeId: viewNodeId, nodes: [], arcs: [], openArcs: [] }
 
   const nodes: VisibleNode[] = []
   const arcs: VisibleArc[] = []
+  const openArcsOut: VisibleArc[] = []
   const nodeMap = new Map<string, VisibleNode>() // id -> VisibleNode
+
+  const leftEdge = -stageWidth / 2 + 40
+  const rightEdge = stageWidth / 2 - 40
+  const topEdge = -stageHeight / 2 + 40
 
   // Helper to get position from layout store or auto-layout
   function getPosition(viewId: number, entityId: string, defaultX: number, defaultY: number) {
@@ -38,10 +46,10 @@ export function computeGraphView(
   const centerStartX = -((children.length - 1) * 100) / 2
   children.forEach((childId: number, i: number) => {
     const child = tree.nodes.get(childId)!
-    const isLeaf = child.children.length === 0
+    const isLeaf = child.iri !== undefined
     const id = String(childId)
     const pos = getPosition(viewNodeId, id, centerStartX + i * 100, 0)
-    const modelNode = isLeaf && child.iri ? modelNodes.get(child.iri) : undefined
+    const modelNode = isLeaf ? modelNodes.get(child.iri!) : undefined
     const visibleNode: VisibleNode = {
       id,
       type: isLeaf ? 'leaf' : 'composite',
@@ -49,7 +57,7 @@ export function computeGraphView(
       y: pos.y,
       label: child.label,
       treeNodeId: childId,
-      ...(isLeaf && child.iri ? { modelNodeIri: child.iri } : {}),
+      ...(isLeaf ? { modelNodeIri: child.iri } : {}),
       ...(modelNode ? { entityType: modelNode.entityType } : {}),
     }
     nodes.push(visibleNode)
@@ -63,7 +71,7 @@ export function computeGraphView(
   ancestors.forEach((ancestorId: number, i: number) => {
     const ancestor = tree.nodes.get(ancestorId)!
     const id = `ancestor-${ancestorId}`
-    const pos = getPosition(viewNodeId, id, -200, -150 + ancestorOffset + i * ancestorSpacing)
+    const pos = getPosition(viewNodeId, id, leftEdge, topEdge + 40 + ancestorOffset + i * ancestorSpacing)
     const visibleNode: VisibleNode = {
       id,
       type: 'ancestor',
@@ -83,7 +91,7 @@ export function computeGraphView(
   siblings.forEach((siblingId: number, i: number) => {
     const sibling = tree.nodes.get(siblingId)!
     const id = `sibling-${siblingId}`
-    const pos = getPosition(viewNodeId, id, 200, -150 + siblingOffset + i * siblingSpacing)
+    const pos = getPosition(viewNodeId, id, rightEdge, topEdge + 40 + siblingOffset + i * siblingSpacing)
     const visibleNode: VisibleNode = {
       id,
       type: 'sibling',
@@ -99,7 +107,7 @@ export function computeGraphView(
   // --- Connector node (top center) ---
   if (viewNodeId !== tree.rootId) {
     const id = `connector-${viewNodeId}`
-    const pos = getPosition(viewNodeId, id, 0, -150)
+    const pos = getPosition(viewNodeId, id, 0, topEdge)
     const visibleNode: VisibleNode = {
       id,
       type: 'connector',
@@ -133,12 +141,36 @@ export function computeGraphView(
         sourceId: sourceVisibleId,
         targetId: targetVisibleId,
         arcType,
+        modelArcType: arc.arcType,
         knots: [],
       })
     }
   }
 
-  return { treeNodeId: viewNodeId, nodes, arcs }
+  // --- Open arcs: dangling ends attached wherever the owning composite is visible ---
+  for (const [compositeId, openArcList] of openArcs) {
+    const compositeVisibleId = findVisibleId(compositeId, viewNodeId, tree)
+    if (!compositeVisibleId || !nodeMap.has(compositeVisibleId)) continue
+    for (const openArc of openArcList) {
+      const externalLeafId = findLeafForModelNode(openArc.externalIri, tree)
+      if (externalLeafId === null) continue
+      const externalVisibleId = findVisibleId(externalLeafId, viewNodeId, tree)
+      if (externalVisibleId && nodeMap.has(externalVisibleId)) {
+        openArcsOut.push({
+          modelArcIri: openArc.iri,
+          sourceId: openArc.isSource ? compositeVisibleId : externalVisibleId,
+          targetId: openArc.isSource ? externalVisibleId : compositeVisibleId,
+          arcType: 'open',
+          modelArcType: openArc.arcType,
+          knots: [],
+          openEndId: compositeVisibleId,
+          openEndTreeNodeId: compositeId,
+        })
+      }
+    }
+  }
+
+  return { treeNodeId: viewNodeId, nodes, arcs, openArcs: openArcsOut }
 }
 
 /** Find which leaf tree node owns a given model node IRI. */

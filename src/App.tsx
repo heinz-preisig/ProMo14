@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo, useReducer } from 'react'
+import { useState, useEffect, useMemo, useReducer } from 'react'
 import { Stage, Layer, Circle, Line, Text, Group, Rect } from 'react-konva'
-import type { KonvaEventObject } from 'konva/lib/Node'
 import type { NodeType, NodeTypeDef, ArcType, ArcTypeDef } from './types'
 import { computeGraphView } from './tree/computeGraphView'
 import { AppState, initialState, applyCommand, Command } from './state/ModelState'
+import { useCanvasEvents } from './canvas/useCanvasEvents'
 
 const NODE_RADIUS = 24
 const STROKE_WIDTH = 2
@@ -45,6 +45,8 @@ const ARC_TYPES: ArcTypeDef[] = [
   { id: 'ArcType2', label: 'Arc Type 2', stroke: '#888', dash: [6, 4] },
 ]
 
+const getArcTypeDef = (id: string) => ARC_TYPES.find((t) => t.id === id)
+
 function reducer(state: AppState, cmd: Command): AppState {
   // console.log('Command:', cmd)
   return applyCommand(state, cmd)
@@ -52,6 +54,14 @@ function reducer(state: AppState, cmd: Command): AppState {
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
+
+  const [draggingOpenArc, setDraggingOpenArc] = useState<{
+    openArcIri: string
+    fixedX: number
+    fixedY: number
+    currentX: number
+    currentY: number
+  } | null>(null)
 
   // --- Palette state (UI only, not part of model) ---
   const [activeNodeType, setActiveNodeType] = useState<NodeType>('TypeA')
@@ -62,8 +72,9 @@ export default function App() {
     height: window.innerHeight - TOOLBAR_HEIGHT - BOTTOM_BAR_HEIGHT,
   })
 
-  const wasDragged = useRef(false)
-  const lastClickTime = useRef(0)
+  // --- View transform (pan / zoom) ---
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [scale, setScale] = useState(1)
 
   useEffect(() => {
     const handleResize = () => {
@@ -78,146 +89,33 @@ export default function App() {
 
   // --- Compute current GraphView on demand ---
   const graphView = useMemo(
-    () => computeGraphView(state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore),
-    [state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore]
+    () => computeGraphView(state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, stageSize.width, stageSize.height),
+    [state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, stageSize.width, stageSize.height]
   )
 
-  // --- Actions → dispatch single commands ---
+  // --- Three-panel zone boundaries ---
+  const leftZoneX = -stageSize.width / 2 + 80
+  const rightZoneX = stageSize.width / 2 - 80
+  const zoneTop = -stageSize.height / 2
+  const zoneBottom = stageSize.height / 2
 
-  const insertNodeAt = (x: number, y: number) => {
-    const id = state.tree.nextId + 1
-    const iri = `promo:Model/Node_${id}`
-    dispatch({
-      type: 'insertNode',
-      id,
-      iri,
-      label: `Node ${id}`,
-      entityType: activeNodeType,
-      parentViewNodeId: state.currentViewNodeId,
-      x,
-      y,
-    })
-  }
-
-  const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
-    if (wasDragged.current) return
-    if (e.target !== e.target.getStage()) return
-
-    const now = Date.now()
-    if (now - lastClickTime.current < 300) return
-    lastClickTime.current = now
-
-    const pos = e.target.getStage()?.getPointerPosition()
-    if (!pos) return
-
-    // Convert stage coords to centered scene coords
-    insertNodeAt(pos.x - stageSize.width / 2, pos.y - stageSize.height / 2)
-  }
-
-  const handleVisibleNodeClick =
-    (nodeId: string, type: string, treeNodeId?: number) =>
-    (e: KonvaEventObject<MouseEvent>) => {
-      e.cancelBubble = true
-      if (wasDragged.current) return
-
-      if (type === 'ancestor' && treeNodeId !== undefined) {
-        dispatch({ type: 'setView', viewNodeId: treeNodeId })
-        return
-      }
-
-      if (state.selectedVisibleNodeId && state.selectedVisibleNodeId !== nodeId) {
-        const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
-        const targetNode = graphView.nodes.find((n) => n.id === nodeId)
-        if (
-          sourceNode?.type === 'leaf' &&
-          targetNode?.type === 'leaf' &&
-          sourceNode.modelNodeIri &&
-          targetNode.modelNodeIri
-        ) {
-          const arcIri = `promo:Arc/Arc_${state.arcCounter}`
-          dispatch({
-            type: 'insertArc',
-            iri: arcIri,
-            sourceIri: sourceNode.modelNodeIri,
-            targetIri: targetNode.modelNodeIri,
-            arcType: activeArcType,
-          })
-        }
-        dispatch({ type: 'selectNode', id: null })
-        return
-      }
-
-      dispatch({ type: 'selectNode', id: nodeId })
-    }
-
-  const handleVisibleNodeDragMove = (nodeId: string) => (e: KonvaEventObject<DragEvent>) => {
-    const pos = e.target.position()
-    dispatch({
-      type: 'moveNode',
-      viewNodeId: state.currentViewNodeId,
-      nodeId,
-      x: pos.x,
-      y: pos.y,
-    })
-  }
-
-  const handleArcClick = (arcIri: string) => (e: KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true
-    if (wasDragged.current) return
-    dispatch({ type: 'selectArc', iri: arcIri })
-  }
-
-  const zoomInto = (treeNodeId: number) => {
-    dispatch({ type: 'setView', viewNodeId: treeNodeId })
-  }
-
-  const convertLeafToComposite = (leafTreeNodeId: number) => {
-    dispatch({
-      type: 'convertLeafToComposite',
-      treeNodeId: leafTreeNodeId,
-      stageWidth: stageSize.width,
-      stageHeight: stageSize.height,
-    })
-  }
-
-  const groupSelectedNodes = () => {
-    const selectedNodes = graphView.nodes.filter(
-      (n) => n.id === state.selectedVisibleNodeId && n.type === 'leaf'
-    )
-    if (selectedNodes.length === 0) return
-    const treeNodeIds = selectedNodes.map((n) => n.treeNodeId!).filter((id): id is number => id !== undefined)
-    dispatch({
-      type: 'groupNodes',
-      parentViewNodeId: state.currentViewNodeId,
-      treeNodeIds,
-    })
-  }
-
-  const handleDelete = () => {
-    if (state.selectedVisibleNodeId) {
-      const node = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
-      if (node?.type === 'leaf' && node.treeNodeId !== undefined) {
-        dispatch({
-          type: 'deleteNode',
-          visibleNodeId: node.id,
-          treeNodeId: node.treeNodeId,
-          modelNodeIri: node.modelNodeIri,
-        })
-      }
-    } else if (state.selectedModelArcIri) {
-      dispatch({ type: 'deleteArc', iri: state.selectedModelArcIri })
-    }
-  }
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        handleDelete()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleDelete])
+  // --- Canvas event handlers (isolated from rendering) ---
+  const {
+    handleStageClick,
+    handleStageRightClick,
+    handleStageMouseDown,
+    handleStageMouseMove,
+    handleStageMouseUp,
+    handleStageWheel,
+    handleVisibleNodeClick,
+    handleVisibleNodeRightClick,
+    handleNodeDragStart,
+    handleVisibleNodeDragMove,
+    handleNodeDragEnd,
+    handleArcClick,
+    zoomInto,
+    groupSelectedNodes,
+  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale)
 
   const getArcGeometry = (arc: { sourceId: string; targetId: string; knots: { x: number; y: number }[] }) => {
     const src = graphView.nodes.find((n) => n.id === arc.sourceId)
@@ -398,16 +296,40 @@ export default function App() {
           width={stageSize.width}
           height={stageSize.height}
           onClick={handleStageClick}
+          onContextMenu={handleStageRightClick}
+          onMouseDown={handleStageMouseDown}
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
+          onWheel={handleStageWheel}
           style={{ flex: 1, background: '#fafafa' }}
         >
           {/* Center the coordinate system: (0,0) is at canvas center */}
           <Layer>
-            <Group x={stageSize.width / 2} y={stageSize.height / 2}>
+            <Group x={stageSize.width / 2 + pan.x} y={stageSize.height / 2 + pan.y} scaleX={scale} scaleY={scale}>
+              {/* Three-panel separators */}
+              <Line
+                points={[leftZoneX, zoneTop, leftZoneX, zoneBottom]}
+                stroke="#ccc"
+                strokeWidth={1}
+                dash={[4, 4]}
+                listening={false}
+              />
+              <Line
+                points={[rightZoneX, zoneTop, rightZoneX, zoneBottom]}
+                stroke="#ccc"
+                strokeWidth={1}
+                dash={[4, 4]}
+                listening={false}
+              />
+
               {graphView.arcs.map((arc) => {
               const geom = getArcGeometry(arc)
               if (!geom) return null
               const isSelected = arc.modelArcIri === state.selectedModelArcIri
-              const colour = isSelected ? '#e74c3c' : '#333'
+              const arcStyle = getArcTypeDef(arc.modelArcType)
+              const colour = isSelected ? '#e74c3c' : (arcStyle?.stroke ?? '#333')
+              const dash = arcStyle?.dash
+              const strokeWidth = isSelected ? 3 : 2
               const aPoints = arrowPoints(geom.arrowX, geom.arrowY, geom.arrowAngle)
               return (
                 <Group key={arc.modelArcIri} onClick={handleArcClick(arc.modelArcIri)}>
@@ -420,14 +342,62 @@ export default function App() {
                   <Line
                     points={geom.points}
                     stroke={colour}
-                    strokeWidth={isSelected ? 3 : 2}
+                    strokeWidth={strokeWidth}
+                    dash={dash}
                   />
                   <Line
                     points={aPoints}
                     closed
                     fill={colour}
                     stroke={colour}
-                    strokeWidth={isSelected ? 3 : 2}
+                    strokeWidth={strokeWidth}
+                  />
+                </Group>
+              )
+              })}
+
+              {graphView.openArcs.map((arc) => {
+              const geom = getArcGeometry(arc)
+              if (!geom) return null
+              const aPoints = arrowPoints(geom.arrowX, geom.arrowY, geom.arrowAngle)
+              const midX = (geom.points[0] + geom.points[geom.points.length - 2]) / 2
+              const midY = (geom.points[1] + geom.points[geom.points.length - 1]) / 2
+              const openStyle = getArcTypeDef(arc.modelArcType)
+              const openStroke = openStyle?.stroke ?? '#333'
+              const openDash = openStyle?.dash
+              return (
+                <Group key={`open-${arc.modelArcIri}`}>
+                  <Line
+                    points={geom.points}
+                    stroke="transparent"
+                    strokeWidth={12}
+                    listening
+                  />
+                  <Line
+                    points={geom.points}
+                    stroke="#c0392b"
+                    strokeWidth={12}
+                    opacity={0.35}
+                  />
+                  <Line
+                    points={geom.points}
+                    stroke={openStroke}
+                    strokeWidth={2}
+                    dash={openDash}
+                  />
+                  <Line
+                    points={aPoints}
+                    closed
+                    fill={openStroke}
+                    stroke={openStroke}
+                    strokeWidth={2}
+                  />
+                  <Text
+                    text="OPEN"
+                    x={midX - 16}
+                    y={midY - 7}
+                    fontSize={11}
+                    fill="#c0392b"
                   />
                 </Group>
               )
@@ -435,7 +405,7 @@ export default function App() {
             </Group>
           </Layer>
           <Layer>
-            <Group x={stageSize.width / 2} y={stageSize.height / 2}>
+            <Group x={stageSize.width / 2 + pan.x} y={stageSize.height / 2 + pan.y} scaleX={scale} scaleY={scale}>
               {graphView.nodes.map((node) => {
               const isSelected = node.id === state.selectedVisibleNodeId
               const isLeaf = node.type === 'leaf'
@@ -451,16 +421,11 @@ export default function App() {
                     y={node.y}
                     draggable
                     dragDistance={10}
-                    onDragStart={() => { wasDragged.current = false }}
-                    onDragMove={(e) => {
-                      wasDragged.current = true
-                      handleVisibleNodeDragMove(node.id)(e)
-                    }}
-                    onDragEnd={() => {
-                      setTimeout(() => { wasDragged.current = false }, 50)
-                    }}
-                    onClick={handleVisibleNodeClick(node.id, node.type, node.treeNodeId)}
-                    onDblClick={() => node.treeNodeId && zoomInto(node.treeNodeId)}
+                    onDragStart={handleNodeDragStart}
+                    onDragMove={handleVisibleNodeDragMove(node.id)}
+                    onDragEnd={handleNodeDragEnd}
+                    onClick={handleVisibleNodeClick(node.id)}
+                    onContextMenu={handleVisibleNodeRightClick(node.id)}
                   >
                     <Rect
                       width={COMPOSITE_WIDTH}
@@ -509,18 +474,12 @@ export default function App() {
                   y={node.y}
                   draggable={isLeaf || isComposite}
                   dragDistance={10}
-                  onDragStart={() => { wasDragged.current = false }}
-                  onDragMove={(e) => {
-                    wasDragged.current = true
-                    if (isLeaf || isComposite) {
-                      handleVisibleNodeDragMove(node.id)(e)
-                    }
-                  }}
-                  onDragEnd={() => {
-                    setTimeout(() => { wasDragged.current = false }, 50)
-                  }}
-                  onClick={handleVisibleNodeClick(node.id, node.type, node.treeNodeId)}
-                  onDblClick={() => isLeaf && node.treeNodeId && convertLeafToComposite(node.treeNodeId)}
+                  onDragStart={handleNodeDragStart}
+                  onDragMove={handleVisibleNodeDragMove(node.id)}
+                  onDragEnd={handleNodeDragEnd}
+                  onClick={handleVisibleNodeClick(node.id)}
+                  onContextMenu={handleVisibleNodeRightClick(node.id)}
+                  onDblClick={() => node.treeNodeId && zoomInto(node.treeNodeId)}
                 >
                   <Circle
                     radius={NODE_RADIUS}
@@ -540,6 +499,88 @@ export default function App() {
                 </Group>
               )
             })}
+            {graphView.openArcs.map((arc) => {
+              const geom = getArcGeometry(arc)
+              if (!geom) return null
+              const isOpenEndSource = arc.sourceId === arc.openEndId
+              const openX = isOpenEndSource ? geom.points[0] : geom.points[geom.points.length - 2]
+              const openY = isOpenEndSource ? geom.points[1] : geom.points[geom.points.length - 1]
+              const fixedX = isOpenEndSource ? geom.points[geom.points.length - 2] : geom.points[0]
+              const fixedY = isOpenEndSource ? geom.points[geom.points.length - 1] : geom.points[1]
+              const fixedId = isOpenEndSource ? arc.targetId : arc.sourceId
+              const isDraggingThis = draggingOpenArc?.openArcIri === arc.modelArcIri
+              const handleX = isDraggingThis ? draggingOpenArc.currentX : openX
+              const handleY = isDraggingThis ? draggingOpenArc.currentY : openY
+              return (
+                <Circle
+                  key={`open-handle-${arc.modelArcIri}`}
+                  x={handleX}
+                  y={handleY}
+                  radius={10}
+                  fill="#c0392b"
+                  stroke="#fff"
+                  strokeWidth={3}
+                  shadowColor="#000"
+                  shadowBlur={4}
+                  shadowOpacity={0.35}
+                  draggable
+                  dragDistance={5}
+                  onDragStart={() => {
+                    setDraggingOpenArc({
+                      openArcIri: arc.modelArcIri,
+                      fixedX,
+                      fixedY,
+                      currentX: openX,
+                      currentY: openY,
+                    })
+                  }}
+                  onDragMove={(e) => {
+                    const pos = e.target.position()
+                    setDraggingOpenArc((prev) =>
+                      prev && prev.openArcIri === arc.modelArcIri
+                        ? { ...prev, currentX: pos.x, currentY: pos.y }
+                        : prev
+                    )
+                  }}
+                  onDragEnd={(e) => {
+                    const pos = e.target.position()
+                    const targetNode = graphView.nodes.find((n) => {
+                      if (n.type !== 'leaf' || !n.modelNodeIri) return false
+                      if (n.id === fixedId) return false
+                      const dx = n.x - pos.x
+                      const dy = n.y - pos.y
+                      return Math.hypot(dx, dy) <= NODE_RADIUS + 10
+                    })
+                    if (targetNode?.modelNodeIri) {
+                      dispatch({
+                        type: 'reconnectOpenArc',
+                        openArcIri: arc.modelArcIri,
+                        newModelNodeIri: targetNode.modelNodeIri,
+                      })
+                    }
+                    setDraggingOpenArc(null)
+                  }}
+                  onClick={(e) => {
+                    e.cancelBubble = true
+                  }}
+                />
+              )
+            })}
+            {draggingOpenArc && (
+              <Line
+                key="open-arc-drag-line"
+                points={[
+                  draggingOpenArc.fixedX,
+                  draggingOpenArc.fixedY,
+                  draggingOpenArc.currentX,
+                  draggingOpenArc.currentY,
+                ]}
+                stroke="#c0392b"
+                strokeWidth={2}
+                dash={[4, 4]}
+                listening={false}
+              />
+            )}
             </Group>
           </Layer>
         </Stage>
