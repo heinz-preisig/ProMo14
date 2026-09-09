@@ -57,6 +57,7 @@ PENDING / KNOWN ISSUES
 ----------------------
 - No save/load persistence yet
 - reconnectOpenArc implemented for dangling ends created by leaf-to-composite conversion
+- No direct arc endpoint reconnection for regular arcs (must delete and recreate)
 - No insertModelIntoModel (compose one model into another)
 - Arc rendering may clip at canvas edges
 - No drag-to-create-arc (only click-to-connect)

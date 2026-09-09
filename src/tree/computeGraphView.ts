@@ -135,7 +135,7 @@ export function computeGraphView(
     const sourceVisibleId = findVisibleId(sourceLeafId, viewNodeId, tree)
     const targetVisibleId = findVisibleId(targetLeafId, viewNodeId, tree)
 
-    if (sourceVisibleId && targetVisibleId && nodeMap.has(sourceVisibleId) && nodeMap.has(targetVisibleId)) {
+    if (sourceVisibleId && targetVisibleId && sourceVisibleId !== targetVisibleId && nodeMap.has(sourceVisibleId) && nodeMap.has(targetVisibleId)) {
       const arcType: VisibleArcType = 'connection'
       arcs.push({
         modelArcIri: arc.iri,
@@ -190,6 +190,8 @@ function findLeafForModelNode(iri: string, tree: Tree): number | null {
  * If the leaf is an ancestor, return `ancestor-{ancestorId}`.
  * If the leaf is a sibling, return `sibling-{siblingId}`.
  * If the leaf IS the view node, return `connector-{viewNodeId}`.
+ * If the leaf is a descendant of a direct child, ancestor, or sibling,
+ * return that visible ancestor's ID (arc projects to the composite).
  */
 function findVisibleId(leafId: number, viewNodeId: number, tree: Tree): string | null {
   if (leafId === viewNodeId) return `connector-${viewNodeId}`
@@ -213,6 +215,36 @@ function findVisibleId(leafId: number, viewNodeId: number, tree: Tree): string |
   if (viewNode.parentId !== null) {
     const parent = tree.nodes.get(viewNode.parentId)
     if (parent && parent.children.includes(leafId)) return `sibling-${leafId}`
+  }
+
+  // Is it a descendant of a direct child, ancestor, or sibling?
+  // Walk up from the leaf to find the nearest ancestor visible in this view.
+  let walk: number | null = leafId
+  while (walk !== null) {
+    const node = tree.nodes.get(walk)
+    if (!node) break
+    const parentId = node.parentId
+    if (parentId === null) break
+
+    // Check if parent is the view node (leaf is direct child — already handled above)
+    if (parentId === viewNodeId) return String(walk)
+
+    // Check if parent is an ancestor of the view node
+    let anc: number | null = viewNodeId
+    while (anc !== null) {
+      const ancNode = tree.nodes.get(anc)
+      if (!ancNode) break
+      if (ancNode.parentId === parentId) return `ancestor-${parentId}`
+      anc = ancNode.parentId ?? null
+    }
+
+    // Check if parent is a sibling of the view node
+    if (viewNode.parentId !== null) {
+      const viewParent = tree.nodes.get(viewNode.parentId)
+      if (viewParent && viewParent.children.includes(parentId)) return `sibling-${parentId}`
+    }
+
+    walk = parentId
   }
 
   return null

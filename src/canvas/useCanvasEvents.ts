@@ -33,6 +33,8 @@ export function useCanvasEvents(
   setDraggingOpenArc: (v: { openArcIri: string; fixedX: number; fixedY: number; currentX: number; currentY: number } | null) => void,
   setHoveredNodeId: (id: string | null) => void,
   setHoveredObject: (obj: SceneObject | null) => void,
+  pendingConnection: { sourceModelIri: string; sourceEntityType: string } | null,
+  setPendingConnection: (v: { sourceModelIri: string; sourceEntityType: string } | null) => void,
 ): CanvasEventHandlers {
   const wasDragged = useRef(false)
   const lastClickTime = useRef(0)
@@ -75,6 +77,9 @@ export function useCanvasEvents(
     if (state.selectedVisibleNodeId) {
       dispatch({ type: 'selectNode', id: null })
     }
+    if (pendingConnection) {
+      setPendingConnection(null)
+    }
   }
 
   const handleStageMouseDown = (e: KonvaEventObject<MouseEvent>) => {
@@ -115,6 +120,9 @@ export function useCanvasEvents(
     if (obj.kind === 'node') {
       if (obj.nodeType === 'leaf') {
         dispatch({ type: 'selectNode', id: obj.selectionId! })
+        if (obj.modelNodeIri && obj.entityType) {
+          setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
+        }
       } else if (obj.treeNodeId !== undefined) {
         dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
       }
@@ -138,12 +146,38 @@ export function useCanvasEvents(
     if (obj.kind !== 'node') return
 
     const nodeId = obj.selectionId!
-    if (state.selectedVisibleNodeId === nodeId) {
-      dispatch({ type: 'selectNode', id: null })
+
+    // If we have a pending connection source, try to connect to this node
+    if (pendingConnection && obj.nodeType === 'leaf' && obj.modelNodeIri && obj.entityType) {
+      // Don't connect to self
+      if (obj.modelNodeIri === pendingConnection.sourceModelIri) {
+        setPendingConnection(null)
+        dispatch({ type: 'selectNode', id: null })
+        return
+      }
+      const result = resolveConnection(
+        pendingConnection.sourceEntityType,
+        obj.entityType,
+        placeholderCatalogue,
+        placeholderRuleResolver,
+      )
+      const arcType = pickArcType(result, activeArcType)
+      if (arcType) {
+        const arcIri = `promo:Arc/Arc_${state.arcCounter}`
+        dispatch({
+          type: 'insertArc',
+          iri: arcIri,
+          sourceIri: pendingConnection.sourceModelIri,
+          targetIri: obj.modelNodeIri,
+          arcType,
+        })
+      }
+      setPendingConnection(null)
       return
     }
 
-    if (state.selectedVisibleNodeId) {
+    // Same-view connection (source visible in this view)
+    if (state.selectedVisibleNodeId && state.selectedVisibleNodeId !== nodeId) {
       const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
       const targetNode = graphView.nodes.find((n) => n.id === nodeId)
       if (
@@ -173,10 +207,17 @@ export function useCanvasEvents(
         }
       }
       dispatch({ type: 'selectNode', id: null })
+      setPendingConnection(null)
       return
     }
 
-    dispatch({ type: 'selectNode', id: nodeId })
+    // Select this node as connection source
+    if (obj.nodeType === 'leaf' && obj.modelNodeIri && obj.entityType) {
+      dispatch({ type: 'selectNode', id: nodeId })
+      setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
+    } else {
+      dispatch({ type: 'selectNode', id: nodeId })
+    }
   }
 
   const onSceneDoubleClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {

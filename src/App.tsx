@@ -61,6 +61,12 @@ export default function App() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [hoveredObject, setHoveredObject] = useState<SceneObject | null>(null)
 
+  // --- Pending connection source (persists across view changes) ---
+  const [pendingConnection, setPendingConnection] = useState<{
+    sourceModelIri: string
+    sourceEntityType: string
+  } | null>(null)
+
   useEffect(() => {
     const handleResize = () => {
       setStageSize({
@@ -80,19 +86,25 @@ export default function App() {
 
   // --- Compute connection-rule feedback for hovered target ---
   const { hoveredHighlight, validArcTypes } = useMemo(() => {
-    if (!state.selectedVisibleNodeId || !hoveredNodeId || state.selectedVisibleNodeId === hoveredNodeId) {
+    // Use pendingConnection as source if set (cross-view), else selectedVisibleNodeId (same-view)
+    const sourceEntityType = pendingConnection?.sourceEntityType
+      ?? (state.selectedVisibleNodeId
+        ? graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)?.entityType
+        : undefined)
+    const hasSource = !!(pendingConnection || state.selectedVisibleNodeId)
+    if (!hasSource || !hoveredNodeId || sourceEntityType === undefined) {
       return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
     }
-    const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
     const targetNode = graphView.nodes.find((n) => n.id === hoveredNodeId)
-    if (
-      sourceNode?.type !== 'leaf' || targetNode?.type !== 'leaf' ||
-      !sourceNode.entityType || !targetNode.entityType
-    ) {
+    if (targetNode?.type !== 'leaf' || !targetNode.entityType) {
+      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+    }
+    // Don't show feedback if hovering the pending source itself
+    if (pendingConnection && targetNode.modelNodeIri === pendingConnection.sourceModelIri) {
       return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
     }
     const result = resolveConnection(
-      sourceNode.entityType,
+      sourceEntityType,
       targetNode.entityType,
       placeholderCatalogue,
       placeholderRuleResolver,
@@ -104,7 +116,7 @@ export default function App() {
       hoveredHighlight: 'valid' as const,
       validArcTypes: result.connections.map((c) => c.arcTypeIri),
     }
-  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView])
+  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection])
 
   // --- Three-panel zone boundaries ---
   const leftZoneX = -stageSize.width / 2 + 80
@@ -136,7 +148,7 @@ export default function App() {
     handleStageWheel,
     groupSelectedNodes,
     sceneHandlers,
-  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject)
+  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject, pendingConnection, setPendingConnection)
 
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
   const selectedArc = graphView.arcs.find((a) => a.modelArcIri === state.selectedModelArcIri)
@@ -461,19 +473,21 @@ export default function App() {
             ? `Valid target — right-click to connect (${validArcTypes.length} arc type${validArcTypes.length > 1 ? 's' : ''})`
             : hoveredHighlight === 'invalid'
               ? 'Invalid target — connection not allowed'
-              : hoveredObject?.kind === 'knot'
-                ? 'Drag to move — double-click to add knot — right-click to remove'
-                : hoveredObject?.kind === 'arc'
-                  ? 'Click to select — Delete to remove'
-                  : hoveredObject?.kind === 'openArcHandle'
-                    ? 'Drag to reconnect to a nearby node'
-                    : hoveredObject?.kind === 'node' && !state.selectedVisibleNodeId
-                      ? 'Click to select — double-click to zoom — right-click to connect'
-                      : state.selectedVisibleNodeId
-                        ? 'Right-click a leaf to connect — Delete to remove'
-                        : state.selectedModelArcIri
-                          ? 'Delete to remove — drag knots to route'
-                          : 'Click canvas to add node — double-click composite to zoom — Delete to remove'}
+              : pendingConnection && !state.selectedVisibleNodeId
+                ? `Source selected (${pendingConnection.sourceModelIri}) — navigate to target view, right-click a leaf to connect`
+                : hoveredObject?.kind === 'knot'
+                  ? 'Drag to move — double-click to add knot — right-click to remove'
+                  : hoveredObject?.kind === 'arc'
+                    ? 'Click to select — Delete to remove'
+                    : hoveredObject?.kind === 'openArcHandle'
+                      ? 'Drag to reconnect to a nearby node'
+                      : hoveredObject?.kind === 'node' && !state.selectedVisibleNodeId
+                        ? 'Click to select — double-click to zoom — right-click to connect'
+                        : state.selectedVisibleNodeId
+                          ? 'Right-click a leaf to connect — double-click composite to zoom — Delete to remove'
+                          : state.selectedModelArcIri
+                            ? 'Delete to remove — drag knots to route'
+                            : 'Click canvas to add node — double-click composite to zoom — Delete to remove'}
         </span>
         <span style={{ marginLeft: 'auto', color: '#555' }}>
           {state.modelNodes.size} model nodes, {state.modelArcs.size} arcs (next node: {state.tree.nextId + 1})

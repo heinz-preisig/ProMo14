@@ -38,6 +38,26 @@ function arrowPoints(x: number, y: number, angleRad: number) {
   return [lx, ly, x, y, rx, ry]
 }
 
+function rimPointForNode(node: VisibleNode, towardX: number, towardY: number) {
+  if (node.type === 'composite') {
+    return rimPointRect(node.x, node.y, towardX, towardY, COMPOSITE_WIDTH, COMPOSITE_HEIGHT)
+  }
+  return rimPoint(node.x, node.y, towardX, towardY, NODE_RADIUS)
+}
+
+function rimPointRect(
+  cx: number, cy: number, tx: number, ty: number,
+  width: number, height: number,
+) {
+  const dx = tx - cx
+  const dy = ty - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const halfW = width / 2
+  const halfH = height / 2
+  const scale = Math.min(halfW / Math.abs(dx || 1), halfH / Math.abs(dy || 1))
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
 function getArcGeometry(
   arc: { sourceId: string; targetId: string; knots: { x: number; y: number }[] },
   nodeMap: Map<string, VisibleNode>
@@ -48,7 +68,7 @@ function getArcGeometry(
 
   const pts: number[] = []
   const k0 = arc.knots.length > 0 ? arc.knots[0] : tgt
-  const pStart = rimPoint(src.x, src.y, k0.x, k0.y, NODE_RADIUS)
+  const pStart = rimPointForNode(src, k0.x, k0.y)
   pts.push(pStart.x, pStart.y)
 
   for (const k of arc.knots) {
@@ -56,7 +76,7 @@ function getArcGeometry(
   }
 
   const kLast = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1] : src
-  const pEnd = rimPoint(tgt.x, tgt.y, kLast.x, kLast.y, NODE_RADIUS)
+  const pEnd = rimPointForNode(tgt, kLast.x, kLast.y)
   pts.push(pEnd.x, pEnd.y)
 
   const prevX = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].x : src.x
