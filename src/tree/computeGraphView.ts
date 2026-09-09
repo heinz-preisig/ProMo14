@@ -1,4 +1,4 @@
-import type { Tree, ModelNode, ModelArc, GraphView, VisibleNode, VisibleArc, VisibleArcType, OpenArc } from '../types'
+import type { Tree, ModelNode, ModelArc, GraphView, VisibleNode, VisibleArc, VisibleArcType, OpenArc, Knot } from '../types'
 import { TreeOps } from './Tree'
 
 /**
@@ -15,6 +15,7 @@ export function computeGraphView(
   modelArcs: Map<string, ModelArc>,
   layoutStore: Map<number, Map<string, { x: number; y: number }>>,
   openArcs: Map<number, OpenArc[]>,
+  knotStore: Map<string, Knot[]>,
   stageWidth: number,
   stageHeight: number
 ): GraphView {
@@ -142,7 +143,7 @@ export function computeGraphView(
         targetId: targetVisibleId,
         arcType,
         modelArcType: arc.arcType,
-        knots: [],
+        knots: knotStore.get(arc.iri) ?? [],
       })
     }
   }

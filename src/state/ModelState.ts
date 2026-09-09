@@ -1,4 +1,4 @@
-import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc } from '../types'
+import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc, Knot } from '../types'
 import { createTree, TreeOps } from '../tree/Tree'
 import { ModelGraphOps } from '../model/ModelGraph'
 
@@ -9,6 +9,7 @@ export interface AppState {
   tree: Tree
   layoutStore: Map<number, Map<string, { x: number; y: number }>>
   openArcs: Map<number, OpenArc[]> // keyed by composite tree node id
+  knotStore: Map<string, Knot[]> // keyed by arc IRI
   currentViewNodeId: number
   selectedVisibleNodeId: string | null
   selectedModelArcIri: string | null
@@ -21,6 +22,7 @@ export const initialState: AppState = {
   tree: createTree('Root'),
   layoutStore: new Map(),
   openArcs: new Map(),
+  knotStore: new Map(),
   currentViewNodeId: 0,
   selectedVisibleNodeId: null,
   selectedModelArcIri: null,
@@ -39,6 +41,9 @@ export type Command =
   | { type: 'selectArc'; iri: string | null }
   | { type: 'groupNodes'; parentViewNodeId: number; treeNodeIds: number[] }
   | { type: 'reconnectOpenArc'; openArcIri: string; newModelNodeIri: string }
+  | { type: 'moveKnot'; arcIri: string; knotIndex: number; x: number; y: number }
+  | { type: 'addKnot'; arcIri: string; x: number; y: number }
+  | { type: 'removeKnot'; arcIri: string; knotIndex: number }
   | { type: 'reset' }
 
 function findCompositeForOpenArc(openArcs: Map<number, OpenArc[]>, iri: string): number | undefined {
@@ -198,6 +203,33 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         selectedVisibleNodeId: null,
         selectedModelArcIri: openArc.iri,
       }
+    }
+
+    case 'moveKnot': {
+      const knots = state.knotStore.get(cmd.arcIri)
+      if (!knots || cmd.knotIndex < 0 || cmd.knotIndex >= knots.length) return state
+      const nextKnots = knots.map((k, i) => i === cmd.knotIndex ? { x: cmd.x, y: cmd.y } : k)
+      const nextKnotStore = new Map(state.knotStore)
+      nextKnotStore.set(cmd.arcIri, nextKnots)
+      return { ...state, knotStore: nextKnotStore }
+    }
+
+    case 'addKnot': {
+      const knots = state.knotStore.get(cmd.arcIri) ?? []
+      const nextKnots = [...knots, { x: cmd.x, y: cmd.y }]
+      const nextKnotStore = new Map(state.knotStore)
+      nextKnotStore.set(cmd.arcIri, nextKnots)
+      return { ...state, knotStore: nextKnotStore }
+    }
+
+    case 'removeKnot': {
+      const knots = state.knotStore.get(cmd.arcIri)
+      if (!knots || cmd.knotIndex < 0 || cmd.knotIndex >= knots.length) return state
+      const nextKnots = knots.filter((_, i) => i !== cmd.knotIndex)
+      const nextKnotStore = new Map(state.knotStore)
+      if (nextKnots.length > 0) nextKnotStore.set(cmd.arcIri, nextKnots)
+      else nextKnotStore.delete(cmd.arcIri)
+      return { ...state, knotStore: nextKnotStore }
     }
 
     case 'reset':

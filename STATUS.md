@@ -1,6 +1,6 @@
 # ProMo14 — Browser-based Model Composer Prototype
 
-**Date:** 2026-09-08
+**Date:** 2026-09-09
 **Version:** 0.0.1
 
 ## What is this?
@@ -17,26 +17,31 @@ A prototype for a new browser-based graphical modeller ("ModelComposer") for the
 - **Knots** — graphical waypoints on arcs to route them around objects.
 - **Open arcs** — arcs with one end left dangling when a leaf is converted into a composite. The open end is shown with a red handle and can be dragged onto another leaf to reconnect.
 - **Connection rules** — which node types may connect to which via which arc type, enforced at runtime.
+- **Scene objects** — computed graphical objects (`node`, `arc`, `openArc`, and `openArcHandle`) form one declarative rendering and interaction layer between `GraphView` and Konva.
+- **Model architecture direction** — the final model is a flat RDF topology whose nodes reference separately defined base entities, with a separate hierarchy and layout mapping.
 
 ## Current features
 
 | Feature | Status |
 |---------|--------|
-| Click canvas to add node | ✅ |
-| Click node to select | ✅ |
-| Click second node to create directed arc | ✅ |
-| Drag nodes to move (arcs follow) | ✅ |
-| Select arc and press Delete to remove | ✅ |
-| Directed arcs with arrowheads | ✅ |
-| Node types from palette | ✅ |
-| Arc types (solid / dashed) | ✅ |
-| Connection rules enforced | ✅ |
-| Knot structure in arcs (geometry supports them) | ✅ |
-| Open-arc reconnection via red drag handle | ✅ |
-| Interactive knot creation | ⏳ |
-| Visual feedback for invalid connections | ⏳ |
-| Parent/sibling panels (hierarchy) | ⏳ |
-| Ontology integration | ⏳ |
+| Click canvas to add node | 
+| Click node to select | 
+| Click second node to create directed arc | 
+| Drag nodes to move (arcs follow) | 
+| Select arc and press Delete to remove | 
+| Directed arcs with arrowheads | 
+| Node types from palette | 
+| Arc types (solid / dashed) | 
+| Connection rules enforced |  Placeholder types only; ontology-backed resolver pending |
+| Knot structure in arcs (geometry supports them) | 
+| Open-arc reconnection via red drag handle | 
+| Declarative `SceneObject[]` rendering layer | 
+| Uniform scene interaction dispatch | 
+| Interactive knot creation | 
+| Visual feedback for invalid connections | 
+| Parent/sibling projection | 
+| Multiple GraphView panels | 
+| Ontology integration | 
 
 ## Tech stack
 
@@ -60,7 +65,11 @@ ProMo14/
 │   │   ├── Tree.ts               # Hierarchy tree operations
 │   │   └── computeGraphView.ts   # Compute visible nodes/arcs/openArcs
 │   ├── canvas/
-│   │   └── useCanvasEvents.ts    # Canvas pointer/keyboard event handlers
+│   │   └── useCanvasEvents.ts    # Stage events + uniform SceneObject interactions
+│   ├── scene/
+│   │   ├── types.ts              # SceneObject union and interaction contracts
+│   │   ├── buildScene.ts         # GraphView → declarative SceneObject[]
+│   │   └── SceneRenderer.tsx     # Generic Konva scene renderer
 │   ├── types/
 │   │   ├── index.ts              # Generic graph types
 │   │   └── hierarchy.ts          # Model / tree / view type system
@@ -68,7 +77,8 @@ ProMo14/
 ├── docs/
 │   ├── ADR-001-hierarchy.md
 │   ├── ADR-002-state-management.md
-│   └── ADR-003-multiple-views.md
+│   ├── ADR-003-multiple-views.md
+│   └── ADR-004-model-and-graphical-architecture.md
 ├── index.html
 ├── package.json
 ├── tsconfig.json
@@ -81,7 +91,7 @@ ProMo14/
 ## How to run
 
 ```bash
-cd /home/heinz/1_Gits/CAM13/ProMo14
+cd /home/heinz/1_Gits/CAM14/ProMo14
 npm install
 npm run dev      # development server
 npm run build    # production build
@@ -89,20 +99,45 @@ npm run build    # production build
 
 ## Next planned steps
 
-1. **Scene-object / interaction abstraction** — refactor graphical objects into a declarative `SceneObject` layer so hit-areas, drag, click, hover, and reconnect can be handled uniformly without scattering event props through `App.tsx`.
-2. Visual feedback — dim nodes that are invalid targets when a node or arc-end is selected.
-3. Interactive knot creation — click on an arc to add a waypoint.
-4. Arc type selector when multiple rules match a source→target pair.
-5. Parent / sibling panels for hierarchy navigation.
-6. Ontology loading (replace generic TypeA/B/C with real ontology classes).
+### Phase 1 — Stabilize the scene layer
+
+1. Add focused tests for `buildScene` covering nodes, arcs, open arcs, handles, selection state, and interaction descriptors.
+2. Verify scene interaction dispatch for selection, dragging, navigation, deletion, and open-arc reconnection.
+
+### Phase 2 — Generic semantic contracts
+
+3. Define stable IRI-based contracts for base entities, domains, open-ended classifications, tokens, interfaces, graphical definitions, and connection-rule results.
+4. Add an in-memory placeholder catalogue and replace the closed `TypeA/B/C` and `ArcType1/2` unions without requiring ontology infrastructure yet.
+
+### Phase 3 — Rules and graphical resolution
+
+5. Move connection decisions behind a generic rule resolver shared by arc creation and reconnection.
+6. Add valid/invalid target feedback and an arc-type selector when several rules match.
+7. Replace hard-coded `buildScene` styles with externally assigned graphical definitions.
+
+### Phase 4 — Graph editing and persistence
+
+8. Add interactive knot scene objects and waypoint commands.
+9. Define serialization boundaries for flat RDF topology, hierarchy/layout data, and graphical assignments.
+
+### Phase 5 — Composition and scale
+
+10. Design reusable composite and instantiated-model insertion, provenance, parameter preservation/overrides, and graphical port mapping.
+11. Introduce repository contracts and on-demand projections for models too large to load fully into browser memory.
 
 ## Decisions made
 
-- **Generic placeholders** for node/arc types — the ontology will define real labels, colours, URIs, and connection rules later. The current structure (`ontologyUri` fields, `ConnectionRule` interface) is designed to make that substitution straightforward.
-- **No branch in palette** — branch (composite system) nodes are auto-generated by the hierarchy, not user-placed.
-- **No interface/intraface in palette** — these concepts have been eliminated or redefined in the new architecture.
-- **Open-arc reconnection** — when a leaf is converted into a composite, its incident arcs are deleted from the flat model graph and stored as `OpenArc` records keyed by the composite tree-node id. A red draggable handle is rendered at the open end; dropping it on a leaf emits `reconnectOpenArc`, re-inserts the arc into the model graph, and removes the `OpenArc`.
-- **Three-panel layout** planned (parent, current, sibling) but only the current graph panel is implemented now.
+- **Flat RDF topology plus separate hierarchy** — every actual model node and arc belongs to the authoritative flat graph. The attached hierarchy partitions and projects it for navigation and scalable editing; projected composite arcs are not additional semantic arcs.
+- **Base-entity references** — model nodes reference separately defined base-entity RDF graphs. Equations and linked behaviour are not embedded in the model topology.
+- **One domain per node** — arcs may be domain-internal or cross-domain. All connections are checked through ontology-defined rules.
+- **Recursive composition** — an assembled model can become a reusable entity for constructing another model while retaining the common model format.
+- **Generic graphical vocabulary** — the Modeller implements reusable graphical primitives and capabilities, while ontology/catalogue data assigns and configures them through stable identifiers.
+- **Shared graphical assignment** — the Behaviour Linker launches graphical assignment for completed base entities; the Modeller launches the same capability for completed composites and maps visual ports to exposed semantic inputs/outputs.
+- **Scene objects are transient** — `GraphView` is resolved into `SceneObject[]`; semantic and persistent view data remain outside the renderer.
+- **Generic placeholders** — `TypeA/B/C` and `ArcType1/2` remain temporary until ontology-backed catalogues are integrated.
+- **No branch in palette** — branch/composite nodes are generated by the hierarchy rather than directly placed as primitive model nodes.
+- **Open-arc reconnection** — the prototype stores dangling connections during leaf-to-composite conversion and reconnects them through draggable handles. Its final RDF/interface semantics remain to be refined.
+- **Three-panel layout** — parent/current/sibling navigation remains the planned projection, with broader multiple-view work described by ADR-003.
 
 ## Notes
 
@@ -110,6 +145,8 @@ npm run build    # production build
 - `NODE_RADIUS = 24`, `STROKE_WIDTH = 2`, `ARROW_SIZE = 10`
 - Palette width: 140px
 - Arc geometry already supports knots in the polyline calculation.
+- Model lifecycle: composition → parameter/constant instantiation → validation → numerical code generation.
+- See `docs/ADR-004-model-and-graphical-architecture.md` for the agreed long-term architecture and open design questions.
 
 ## Mouse / pointer mapping (as of 2026-09-08)
 

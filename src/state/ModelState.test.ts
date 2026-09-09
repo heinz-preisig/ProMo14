@@ -12,7 +12,7 @@ describe('applyCommand', () => {
         id: 1,
         iri: 'promo:Model/Node_1',
         label: 'A',
-        entityType: 'TypeA',
+        entityType: 'promo:TypeA',
         parentViewNodeId: 0,
         x: 0,
         y: 0,
@@ -22,7 +22,7 @@ describe('applyCommand', () => {
         id: 2,
         iri: 'promo:Model/Node_2',
         label: 'B',
-        entityType: 'TypeB',
+        entityType: 'promo:TypeB',
         parentViewNodeId: 0,
         x: 0,
         y: 0,
@@ -32,7 +32,7 @@ describe('applyCommand', () => {
         iri: 'promo:Arc/Arc_1',
         sourceIri: 'promo:Model/Node_1',
         targetIri: 'promo:Model/Node_2',
-        arcType: 'ArcType1',
+        arcType: 'promo:ArcType1',
       })
 
       expect(state.modelArcs.size).toBe(1)
@@ -43,7 +43,7 @@ describe('applyCommand', () => {
         id: 3,
         iri: 'promo:Model/Node_3',
         label: 'Detail',
-        entityType: 'TypeA',
+        entityType: 'promo:TypeA',
         parentViewNodeId: 1,
         x: 0,
         y: 0,
@@ -66,7 +66,7 @@ describe('applyCommand', () => {
       const arc = state.modelArcs.get('promo:Arc/Arc_1')!
       expect(arc.sourceIri).toBe('promo:Model/Node_3')
       expect(arc.targetIri).toBe('promo:Model/Node_2')
-      expect(arc.arcType).toBe('ArcType1')
+      expect(arc.arcType).toBe('promo:ArcType1')
     })
   })
 })

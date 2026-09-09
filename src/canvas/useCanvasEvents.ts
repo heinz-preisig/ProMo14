@@ -2,6 +2,9 @@ import { useRef, useEffect } from 'react'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { AppState, Command } from '../state/ModelState'
 import type { GraphView, NodeType, ArcType } from '../types'
+import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
+import { placeholderCatalogue, placeholderRuleResolver } from '../semantic/placeholderCatalogue'
+import { resolveConnection, pickArcType } from '../semantic/connectionService'
 
 export interface CanvasEventHandlers {
   handleStageClick: (e: KonvaEventObject<MouseEvent>) => void
@@ -10,15 +13,10 @@ export interface CanvasEventHandlers {
   handleStageMouseMove: (e: KonvaEventObject<MouseEvent>) => void
   handleStageMouseUp: (e: KonvaEventObject<MouseEvent>) => void
   handleStageWheel: (e: KonvaEventObject<WheelEvent>) => void
-  handleVisibleNodeClick: (nodeId: string) => (e: KonvaEventObject<MouseEvent>) => void
-  handleVisibleNodeRightClick: (nodeId: string) => (e: KonvaEventObject<MouseEvent>) => void
-  handleNodeDragStart: () => void
-  handleVisibleNodeDragMove: (nodeId: string) => (e: KonvaEventObject<DragEvent>) => void
-  handleNodeDragEnd: () => void
-  handleArcClick: (arcIri: string) => (e: KonvaEventObject<MouseEvent>) => void
   zoomInto: (treeNodeId: number) => void
   groupSelectedNodes: () => void
   handleDelete: () => void
+  sceneHandlers: SceneInteractionHandlers
 }
 
 export function useCanvasEvents(
@@ -31,7 +29,10 @@ export function useCanvasEvents(
   pan: { x: number; y: number },
   setPan: (pan: { x: number; y: number }) => void,
   scale: number,
-  setScale: (scale: number) => void
+  setScale: (scale: number) => void,
+  setDraggingOpenArc: (v: { openArcIri: string; fixedX: number; fixedY: number; currentX: number; currentY: number } | null) => void,
+  setHoveredNodeId: (id: string | null) => void,
+  setHoveredObject: (obj: SceneObject | null) => void,
 ): CanvasEventHandlers {
   const wasDragged = useRef(false)
   const lastClickTime = useRef(0)
@@ -107,70 +108,112 @@ export function useCanvasEvents(
     setScale(newScale)
   }
 
-  const handleVisibleNodeClick =
-    (nodeId: string) =>
-    (e: KonvaEventObject<MouseEvent>) => {
-      e.cancelBubble = true
-      if (wasDragged.current) return
+  const onSceneClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true
+    if (wasDragged.current) return
 
-      const node = graphView.nodes.find((n) => n.id === nodeId)
-      if (node?.type === 'leaf') {
-        dispatch({ type: 'selectNode', id: nodeId })
-      } else if (node?.treeNodeId !== undefined) {
-        dispatch({ type: 'setView', viewNodeId: node.treeNodeId })
+    if (obj.kind === 'node') {
+      if (obj.nodeType === 'leaf') {
+        dispatch({ type: 'selectNode', id: obj.selectionId! })
+      } else if (obj.treeNodeId !== undefined) {
+        dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
       }
+    } else if (obj.kind === 'arc') {
+      dispatch({ type: 'selectArc', iri: obj.arcIri! })
+    } else if (obj.kind === 'knot') {
+      dispatch({ type: 'selectArc', iri: obj.arcIri })
+    }
+  }
+
+  const onSceneRightClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
+    e.evt.preventDefault()
+    e.cancelBubble = true
+    if (wasDragged.current) return
+
+    if (obj.kind === 'knot') {
+      dispatch({ type: 'removeKnot', arcIri: obj.arcIri, knotIndex: obj.knotIndex })
+      return
     }
 
-  const handleVisibleNodeRightClick =
-    (nodeId: string) =>
-    (e: KonvaEventObject<MouseEvent>) => {
-      e.evt.preventDefault()
-      e.cancelBubble = true
-      if (wasDragged.current) return
+    if (obj.kind !== 'node') return
 
-      if (state.selectedVisibleNodeId === nodeId) {
-        dispatch({ type: 'selectNode', id: null })
-        return
-      }
+    const nodeId = obj.selectionId!
+    if (state.selectedVisibleNodeId === nodeId) {
+      dispatch({ type: 'selectNode', id: null })
+      return
+    }
 
-      if (state.selectedVisibleNodeId) {
-        const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
-        const targetNode = graphView.nodes.find((n) => n.id === nodeId)
-        if (
-          sourceNode?.type === 'leaf' &&
-          targetNode?.type === 'leaf' &&
-          sourceNode.modelNodeIri &&
-          targetNode.modelNodeIri
-        ) {
+    if (state.selectedVisibleNodeId) {
+      const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
+      const targetNode = graphView.nodes.find((n) => n.id === nodeId)
+      if (
+        sourceNode?.type === 'leaf' &&
+        targetNode?.type === 'leaf' &&
+        sourceNode.modelNodeIri &&
+        targetNode.modelNodeIri &&
+        sourceNode.entityType &&
+        targetNode.entityType
+      ) {
+        const result = resolveConnection(
+          sourceNode.entityType,
+          targetNode.entityType,
+          placeholderCatalogue,
+          placeholderRuleResolver,
+        )
+        const arcType = pickArcType(result, activeArcType)
+        if (arcType) {
           const arcIri = `promo:Arc/Arc_${state.arcCounter}`
           dispatch({
             type: 'insertArc',
             iri: arcIri,
             sourceIri: sourceNode.modelNodeIri,
             targetIri: targetNode.modelNodeIri,
-            arcType: activeArcType,
+            arcType,
           })
         }
-        dispatch({ type: 'selectNode', id: null })
-        return
       }
-
-      dispatch({ type: 'selectNode', id: nodeId })
+      dispatch({ type: 'selectNode', id: null })
+      return
     }
 
-  const handleNodeDragStart = () => {
+    dispatch({ type: 'selectNode', id: nodeId })
+  }
+
+  const onSceneDoubleClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true
+    if (wasDragged.current) return
+    if (obj.kind === 'knot') {
+      dispatch({ type: 'addKnot', arcIri: obj.arcIri, x: obj.x, y: obj.y })
+      return
+    }
+    if (obj.kind === 'node' && obj.treeNodeId !== undefined) {
+      dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
+    }
+  }
+
+  const onSceneMouseEnter = (obj: SceneObject, _e: KonvaEventObject<MouseEvent>) => {
+    setHoveredObject(obj)
+    if (obj.kind === 'node' && obj.selectionId) {
+      setHoveredNodeId(obj.selectionId)
+    }
+  }
+
+  const onSceneMouseLeave = (_obj: SceneObject, _e: KonvaEventObject<MouseEvent>) => {
+    setHoveredNodeId(null)
+    setHoveredObject(null)
+  }
+
+  const onSceneDragStart = (_obj: SceneObject, _e: KonvaEventObject<DragEvent>) => {
     wasDragged.current = false
   }
 
-  const handleVisibleNodeDragMove =
-    (nodeId: string) =>
-    (e: KonvaEventObject<DragEvent>) => {
-      wasDragged.current = true
-      const node = graphView.nodes.find((n) => n.id === nodeId)
+  const onSceneDragMove = (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
+    wasDragged.current = true
+
+    if (obj.kind === 'node') {
       const pos = e.target.position()
       let { x, y } = pos
-
-      if (node && (node.type === 'leaf' || node.type === 'composite')) {
+      if (obj.nodeType === 'leaf' || obj.nodeType === 'composite') {
         const halfW = stageSize.width / 2
         const halfH = stageSize.height / 2
         const minX = -halfW + 80
@@ -180,28 +223,87 @@ export function useCanvasEvents(
         x = Math.max(minX, Math.min(maxX, x))
         y = Math.max(minY, Math.min(maxY, y))
       }
-
       e.target.position({ x, y })
       dispatch({
         type: 'moveNode',
         viewNodeId: state.currentViewNodeId,
-        nodeId,
+        nodeId: obj.id,
         x,
         y,
       })
+    } else if (obj.kind === 'knot') {
+      const pos = e.target.position()
+      dispatch({
+        type: 'moveKnot',
+        arcIri: obj.arcIri,
+        knotIndex: obj.knotIndex,
+        x: pos.x,
+        y: pos.y,
+      })
+    } else if (obj.kind === 'openArcHandle') {
+      const pos = e.target.position()
+      setDraggingOpenArc({
+        openArcIri: obj.openArcIri,
+        fixedX: obj.fixedX,
+        fixedY: obj.fixedY,
+        currentX: pos.x,
+        currentY: pos.y,
+      })
     }
-
-  const handleNodeDragEnd = () => {
-    setTimeout(() => { wasDragged.current = false }, 50)
   }
 
-  const handleArcClick =
-    (arcIri: string) =>
-    (e: KonvaEventObject<MouseEvent>) => {
-      e.cancelBubble = true
-      if (wasDragged.current) return
-      dispatch({ type: 'selectArc', iri: arcIri })
+  const onSceneDragEnd = (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
+    setTimeout(() => { wasDragged.current = false }, 50)
+
+    if (obj.kind === 'openArcHandle') {
+      const pos = e.target.position()
+      const fixedId =
+        graphView.openArcs.find((a) => a.modelArcIri === obj.openArcIri)?.sourceId ===
+        graphView.openArcs.find((a) => a.modelArcIri === obj.openArcIri)?.openEndId
+          ? graphView.openArcs.find((a) => a.modelArcIri === obj.openArcIri)?.targetId
+          : graphView.openArcs.find((a) => a.modelArcIri === obj.openArcIri)?.sourceId
+
+      const targetNode = graphView.nodes.find((n) => {
+        if (n.type !== 'leaf' || !n.modelNodeIri) return false
+        if (n.id === fixedId) return false
+        const dx = n.x - pos.x
+        const dy = n.y - pos.y
+        return Math.hypot(dx, dy) <= 34
+      })
+      if (targetNode?.modelNodeIri && targetNode.entityType) {
+        const openArc = graphView.openArcs.find((a) => a.modelArcIri === obj.openArcIri)
+        if (openArc) {
+          for (const [, list] of state.openArcs) {
+            const oa = list.find((a) => a.iri === obj.openArcIri)
+            if (!oa) continue
+            const externalNode = state.modelNodes.get(oa.externalIri)
+            const externalEntityType = externalNode?.entityType
+            if (!externalEntityType) break
+
+            const sourceEntityType = oa.isSource ? targetNode.entityType : externalEntityType
+            const targetEntityType = oa.isSource ? externalEntityType : targetNode.entityType
+
+            const result = resolveConnection(
+              sourceEntityType,
+              targetEntityType,
+              placeholderCatalogue,
+              placeholderRuleResolver,
+            )
+            const arcType = pickArcType(result, oa.arcType)
+            if (arcType) {
+              dispatch({
+                type: 'reconnectOpenArc',
+                openArcIri: obj.openArcIri,
+                newModelNodeIri: targetNode.modelNodeIri,
+              })
+            }
+            break
+          }
+        }
+      }
+      setDraggingOpenArc(null)
     }
+  }
 
   const zoomInto = (treeNodeId: number) => {
     dispatch({ type: 'setView', viewNodeId: treeNodeId })
@@ -246,6 +348,17 @@ export function useCanvasEvents(
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [handleDelete])
 
+  const sceneHandlers: SceneInteractionHandlers = {
+    onClick: onSceneClick,
+    onRightClick: onSceneRightClick,
+    onDoubleClick: onSceneDoubleClick,
+    onDragStart: onSceneDragStart,
+    onDragMove: onSceneDragMove,
+    onDragEnd: onSceneDragEnd,
+    onMouseEnter: onSceneMouseEnter,
+    onMouseLeave: onSceneMouseLeave,
+  }
+
   return {
     handleStageClick,
     handleStageRightClick,
@@ -253,14 +366,9 @@ export function useCanvasEvents(
     handleStageMouseMove,
     handleStageMouseUp,
     handleStageWheel,
-    handleVisibleNodeClick,
-    handleVisibleNodeRightClick,
-    handleNodeDragStart,
-    handleVisibleNodeDragMove,
-    handleNodeDragEnd,
-    handleArcClick,
     zoomInto,
     groupSelectedNodes,
     handleDelete,
+    sceneHandlers,
   }
 }

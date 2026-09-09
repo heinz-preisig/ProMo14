@@ -1,4 +1,4 @@
-ProMo14 — Session Progress (2026-09-08)
+ProMo14 — Session Progress (2026-09-09)
 ======================================
 
 ARCHITECTURE (Command Automaton)
@@ -15,37 +15,53 @@ New commands added by extending Command union + applyCommand switch case.
 
 MODULES
 -------
-src/state/ModelState.ts      — AppState, Command, applyCommand reducer
-src/model/ModelGraph.ts      — ModelGraphOps (insert/delete node/arc, arc counter)
-src/tree/Tree.ts             — TreeOps (addChild, removeNode, moveID, getAncestors, getSiblings)
-src/tree/computeGraphView.ts — Compute visible nodes/arcs from tree + model + layout
-src/types/hierarchy.ts     — TypeScript interfaces for all three layers
+src/state/ModelState.ts       — AppState, Command, applyCommand reducer
+src/model/ModelGraph.ts       — ModelGraphOps (insert/delete node/arc, arc counter)
+src/tree/Tree.ts              — TreeOps (addChild, removeNode, moveID, getAncestors, getSiblings)
+src/tree/computeGraphView.ts  — Compute visible nodes/arcs from tree + model + layout
+src/types/hierarchy.ts        — TypeScript interfaces for model, hierarchy, and view layers
+src/scene/types.ts            — SceneObject union and interaction contracts
+src/scene/buildScene.ts       — Resolve GraphView into one declarative SceneObject[]
+src/scene/SceneRenderer.tsx   — Generic Konva renderer for scene objects
+src/semantic/contracts.ts        — IRI-based contracts: catalogue, rule resolver, graphical defs
+src/semantic/placeholderCatalogue.ts — In-memory placeholder catalogue + rule resolver
+src/semantic/connectionService.ts — Shared connection-rule query/resolve/pickArcType helpers
+src/canvas/useCanvasEvents.ts — Stage events and uniform SceneObject interactions
+docs/ADR-004-model-and-graphical-architecture.md — Agreed long-term model architecture
 
 CURRENTLY WORKING
 -----------------
 - Canvas click creates leaf node at cursor position (centered coords)
-- Nodes render with correct palette type colors (TypeA blue, TypeB green, TypeC yellow)
+- Nodes render with catalogue-resolved graphical definitions (fill, stroke, radius from SemanticCatalogue)
+- Arcs render with catalogue-resolved graphical definitions (stroke, dash, strokeWidth from SemanticCatalogue)
 - Three-panel layout: ancestors (left), children (center), siblings (right), connector (top)
 - Coordinate system centered: (0,0) is canvas center via wrapping Konva Group
-- Arc creation between leaves (select source, click target)
+- Arc creation between leaves (select source, right-click target) via connection-rule resolver
+- Valid/invalid hover feedback: green ring for valid targets, red ring for invalid
+- Arc type selector in properties panel shows valid types for current hover
+- Status bar shows connection feedback
 - Node selection, arc selection, delete (key or button)
 - Double-click composite → zoom into (setView)
 - Double-click leaf → zoom into leaf view; click empty canvas to add child and convert leaf into composite
 - Group selected leaf into composite
-- Open-arc reconnection via red drag handle
+- Interactive arc knots: drag to move, double-click to add, right-click to remove
+- Knot positions stored in knotStore (Map<arcIri, Knot[]>)
+- Unified SceneObject[] for nodes, arcs, open arcs, and reconnect handles
+- Generic SceneRenderer and uniform interaction callbacks
 - Reset all button
-- 15 unit tests passing (TreeOps + ModelState)
+- 35 unit tests passing (TreeOps + ModelState + buildScene + connectionService)
 - TypeScript compiles clean
+- Flat RDF topology, separate hierarchy, base-entity references, domains, connection rules, recursive composition, and graphical-assignment workflow documented in ADR-004
 
 PENDING / KNOWN ISSUES
 ----------------------
 - No save/load persistence yet
 - reconnectOpenArc implemented for dangling ends created by leaf-to-composite conversion
 - No insertModelIntoModel (compose one model into another)
-- Arc rendering may clip at canvas edges (arcs layer separate from nodes layer)
+- Arc rendering may clip at canvas edges
 - No drag-to-create-arc (only click-to-connect)
-- No connection rules enforcement (any leaf can connect to any leaf)
-- Group button only groups a single selected node (logic: graphView.nodes.filter n.id === selected)
+- Connection-rule resolver wired into arc creation and reconnection (placeholder allows all; ready for real ontology rules)
+- buildScene coverage now includes node roles, selection, arc geometry/styles, missing endpoints, open arcs, handles, drag position, interaction descriptors, layer order, and hover highlight
 
 START DEV SERVER
 ----------------
@@ -54,11 +70,16 @@ cd /home/heinz/1_Gits/CAM14/ProMo14
 
 Or run: ./run-dev.sh
 
-NEXT STEPS (suggested)
-----------------------
-1. Scene-object / interaction abstraction for graphical objects (handles, arcs, nodes, hit-areas, hover)
-2. Add save/load commands + JSON serialization of AppState
-3. Add insertModelIntoModel (compose)
-4. Add full reconnectArc command (change any arc endpoint)
-5. Add connection rules / ontology validation
-6. Expand tests for ModelGraphOps and applyCommand
+NEXT STEPS (agreed order)
+-------------------------
+CURRENT: Interactive knot SceneObjects and waypoint commands implemented. Knots are draggable, double-click adds a new knot, right-click removes. Knot positions stored in knotStore keyed by arc IRI. Next: define RDF topology and separate hierarchy/layout persistence boundaries.
+
+1. ✓ Define generic IRI-based catalogue, classification, token/interface, graphical-definition, and rule-result contracts
+2. ✓ Add an in-memory placeholder catalogue and remove closed TypeA/B/C and ArcType1/2 unions
+3. ✓ Move arc creation and reconnection behind a shared connection-rule resolver
+4. ✓ Add valid/invalid target feedback and selection among multiple valid arc types
+5. ✓ Replace hard-coded buildScene styles with a graphical-definition resolver
+6. ✓ Add interactive knot SceneObjects and waypoint commands
+7. Define RDF topology and separate hierarchy/layout persistence boundaries
+8. Design reusable composite/instantiated-model insertion and graphical port mapping
+9. Plan on-demand graph access after semantic contracts are stable

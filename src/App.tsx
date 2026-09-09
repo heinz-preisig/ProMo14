@@ -1,51 +1,32 @@
 import { useState, useEffect, useMemo, useReducer } from 'react'
-import { Stage, Layer, Circle, Line, Text, Group, Rect } from 'react-konva'
-import type { NodeType, NodeTypeDef, ArcType, ArcTypeDef } from './types'
+import { Stage, Layer, Line, Group } from 'react-konva'
+import type { NodeType, ArcType } from './types'
+import type { NodeGraphicalDefinition, ArcGraphicalDefinition } from './semantic/contracts'
+import { placeholderCatalogue, placeholderRuleResolver } from './semantic/placeholderCatalogue'
+import { resolveConnection } from './semantic/connectionService'
+import type { Iri } from './semantic/contracts'
+import type { Command } from './state/ModelState'
 import { computeGraphView } from './tree/computeGraphView'
-import { AppState, initialState, applyCommand, Command } from './state/ModelState'
+import type { AppState } from './state/ModelState'
+import { initialState, applyCommand } from './state/ModelState'
 import { useCanvasEvents } from './canvas/useCanvasEvents'
+import { buildScene } from './scene/buildScene'
+import { SceneRenderer } from './scene/SceneRenderer'
+import type { SceneObject } from './scene/types'
 
-const NODE_RADIUS = 24
-const STROKE_WIDTH = 2
 const TOOLBAR_HEIGHT = 40
 const BOTTOM_BAR_HEIGHT = 24
 const PALETTE_WIDTH = 140
-const ARROW_SIZE = 10
-const COMPOSITE_WIDTH = 80
-const COMPOSITE_HEIGHT = 60
 
-function rimPoint(x1: number, y1: number, x2: number, y2: number, radius: number) {
-  const dx = x2 - x1
-  const dy = y2 - y1
-  const len = Math.hypot(dx, dy)
-  if (len === 0) return { x: x1, y: y1 }
-  return { x: x1 + (dx / len) * radius, y: y1 + (dy / len) * radius }
-}
+const NODE_TYPES = placeholderCatalogue.getBaseEntities().map((entity) => {
+  const g = placeholderCatalogue.getGraphicalDefinition(entity.graphicalDefinitionIri!) as NodeGraphicalDefinition
+  return { id: entity.iri, label: entity.label, fill: g.fill, stroke: g.stroke }
+})
 
-function arrowPoints(x: number, y: number, angleRad: number) {
-  const cos = Math.cos(angleRad)
-  const sin = Math.sin(angleRad)
-  const ax = x - cos * ARROW_SIZE
-  const ay = y - sin * ARROW_SIZE
-  const lx = ax + sin * (ARROW_SIZE * 0.6)
-  const ly = ay - cos * (ARROW_SIZE * 0.6)
-  const rx = ax - sin * (ARROW_SIZE * 0.6)
-  const ry = ay + cos * (ARROW_SIZE * 0.6)
-  return [lx, ly, x, y, rx, ry]
-}
-
-const NODE_TYPES: NodeTypeDef[] = [
-  { id: 'TypeA', label: 'Type A', fill: '#e8f4fd', stroke: '#2980b9', ontologyUri: 'promo:TypeA' },
-  { id: 'TypeB', label: 'Type B', fill: '#d4edda', stroke: '#155724', ontologyUri: 'promo:TypeB' },
-  { id: 'TypeC', label: 'Type C', fill: '#fff3cd', stroke: '#856404', ontologyUri: 'promo:TypeC' },
-]
-
-const ARC_TYPES: ArcTypeDef[] = [
-  { id: 'ArcType1', label: 'Arc Type 1', stroke: '#333' },
-  { id: 'ArcType2', label: 'Arc Type 2', stroke: '#888', dash: [6, 4] },
-]
-
-const getArcTypeDef = (id: string) => ARC_TYPES.find((t) => t.id === id)
+const ARC_TYPES = placeholderCatalogue.getArcTypes().map((arcType) => {
+  const g = placeholderCatalogue.getGraphicalDefinition(arcType.graphicalDefinitionIri!) as ArcGraphicalDefinition
+  return { id: arcType.iri, label: arcType.label, stroke: g.stroke, dash: g.dash }
+})
 
 function reducer(state: AppState, cmd: Command): AppState {
   // console.log('Command:', cmd)
@@ -64,8 +45,8 @@ export default function App() {
   } | null>(null)
 
   // --- Palette state (UI only, not part of model) ---
-  const [activeNodeType, setActiveNodeType] = useState<NodeType>('TypeA')
-  const [activeArcType, setActiveArcType] = useState<ArcType>('ArcType1')
+  const [activeNodeType, setActiveNodeType] = useState<NodeType>('promo:TypeA')
+  const [activeArcType, setActiveArcType] = useState<ArcType>('promo:ArcType1')
 
   const [stageSize, setStageSize] = useState({
     width: window.innerWidth - PALETTE_WIDTH * 2,
@@ -75,6 +56,10 @@ export default function App() {
   // --- View transform (pan / zoom) ---
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
+
+  // --- Hovered node for connection feedback ---
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
+  const [hoveredObject, setHoveredObject] = useState<SceneObject | null>(null)
 
   useEffect(() => {
     const handleResize = () => {
@@ -89,15 +74,57 @@ export default function App() {
 
   // --- Compute current GraphView on demand ---
   const graphView = useMemo(
-    () => computeGraphView(state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, stageSize.width, stageSize.height),
-    [state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, stageSize.width, stageSize.height]
+    () => computeGraphView(state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height),
+    [state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height]
   )
+
+  // --- Compute connection-rule feedback for hovered target ---
+  const { hoveredHighlight, validArcTypes } = useMemo(() => {
+    if (!state.selectedVisibleNodeId || !hoveredNodeId || state.selectedVisibleNodeId === hoveredNodeId) {
+      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+    }
+    const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
+    const targetNode = graphView.nodes.find((n) => n.id === hoveredNodeId)
+    if (
+      sourceNode?.type !== 'leaf' || targetNode?.type !== 'leaf' ||
+      !sourceNode.entityType || !targetNode.entityType
+    ) {
+      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+    }
+    const result = resolveConnection(
+      sourceNode.entityType,
+      targetNode.entityType,
+      placeholderCatalogue,
+      placeholderRuleResolver,
+    )
+    if (result.status === 'forbidden') {
+      return { hoveredHighlight: 'invalid' as const, validArcTypes: [] as Iri[] }
+    }
+    return {
+      hoveredHighlight: 'valid' as const,
+      validArcTypes: result.connections.map((c) => c.arcTypeIri),
+    }
+  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView])
 
   // --- Three-panel zone boundaries ---
   const leftZoneX = -stageSize.width / 2 + 80
   const rightZoneX = stageSize.width / 2 - 80
   const zoneTop = -stageSize.height / 2
   const zoneBottom = stageSize.height / 2
+
+  // --- Build unified scene object list ---
+  const sceneObjects = useMemo(
+    () => buildScene({
+      graphView,
+      selectedNodeId: state.selectedVisibleNodeId,
+      selectedArcIri: state.selectedModelArcIri,
+      draggingOpenArc,
+      hoveredNodeId,
+      hoveredHighlight,
+      catalogue: placeholderCatalogue,
+    }),
+    [graphView, state.selectedVisibleNodeId, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight]
+  )
 
   // --- Canvas event handlers (isolated from rendering) ---
   const {
@@ -107,40 +134,9 @@ export default function App() {
     handleStageMouseMove,
     handleStageMouseUp,
     handleStageWheel,
-    handleVisibleNodeClick,
-    handleVisibleNodeRightClick,
-    handleNodeDragStart,
-    handleVisibleNodeDragMove,
-    handleNodeDragEnd,
-    handleArcClick,
-    zoomInto,
     groupSelectedNodes,
-  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale)
-
-  const getArcGeometry = (arc: { sourceId: string; targetId: string; knots: { x: number; y: number }[] }) => {
-    const src = graphView.nodes.find((n) => n.id === arc.sourceId)
-    const tgt = graphView.nodes.find((n) => n.id === arc.targetId)
-    if (!src || !tgt) return null
-
-    const pts: number[] = []
-    const k0 = arc.knots.length > 0 ? arc.knots[0] : tgt
-    const pStart = rimPoint(src.x, src.y, k0.x, k0.y, NODE_RADIUS)
-    pts.push(pStart.x, pStart.y)
-
-    for (const k of arc.knots) {
-      pts.push(k.x, k.y)
-    }
-
-    const kLast = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1] : src
-    const pEnd = rimPoint(tgt.x, tgt.y, kLast.x, kLast.y, NODE_RADIUS)
-    pts.push(pEnd.x, pEnd.y)
-
-    const prevX = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].x : src.x
-    const prevY = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].y : src.y
-    const angle = Math.atan2(pEnd.y - prevY, pEnd.x - prevX)
-
-    return { points: pts, arrowAngle: angle, arrowX: pEnd.x, arrowY: pEnd.y }
-  }
+    sceneHandlers,
+  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject)
 
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
   const selectedArc = graphView.arcs.find((a) => a.modelArcIri === state.selectedModelArcIri)
@@ -321,266 +317,22 @@ export default function App() {
                 dash={[4, 4]}
                 listening={false}
               />
-
-              {graphView.arcs.map((arc) => {
-              const geom = getArcGeometry(arc)
-              if (!geom) return null
-              const isSelected = arc.modelArcIri === state.selectedModelArcIri
-              const arcStyle = getArcTypeDef(arc.modelArcType)
-              const colour = isSelected ? '#e74c3c' : (arcStyle?.stroke ?? '#333')
-              const dash = arcStyle?.dash
-              const strokeWidth = isSelected ? 3 : 2
-              const aPoints = arrowPoints(geom.arrowX, geom.arrowY, geom.arrowAngle)
-              return (
-                <Group key={arc.modelArcIri} onClick={handleArcClick(arc.modelArcIri)}>
-                  <Line
-                    points={geom.points}
-                    stroke="transparent"
-                    strokeWidth={12}
-                    listening
-                  />
-                  <Line
-                    points={geom.points}
-                    stroke={colour}
-                    strokeWidth={strokeWidth}
-                    dash={dash}
-                  />
-                  <Line
-                    points={aPoints}
-                    closed
-                    fill={colour}
-                    stroke={colour}
-                    strokeWidth={strokeWidth}
-                  />
-                </Group>
-              )
-              })}
-
-              {graphView.openArcs.map((arc) => {
-              const geom = getArcGeometry(arc)
-              if (!geom) return null
-              const aPoints = arrowPoints(geom.arrowX, geom.arrowY, geom.arrowAngle)
-              const midX = (geom.points[0] + geom.points[geom.points.length - 2]) / 2
-              const midY = (geom.points[1] + geom.points[geom.points.length - 1]) / 2
-              const openStyle = getArcTypeDef(arc.modelArcType)
-              const openStroke = openStyle?.stroke ?? '#333'
-              const openDash = openStyle?.dash
-              return (
-                <Group key={`open-${arc.modelArcIri}`}>
-                  <Line
-                    points={geom.points}
-                    stroke="transparent"
-                    strokeWidth={12}
-                    listening
-                  />
-                  <Line
-                    points={geom.points}
-                    stroke="#c0392b"
-                    strokeWidth={12}
-                    opacity={0.35}
-                  />
-                  <Line
-                    points={geom.points}
-                    stroke={openStroke}
-                    strokeWidth={2}
-                    dash={openDash}
-                  />
-                  <Line
-                    points={aPoints}
-                    closed
-                    fill={openStroke}
-                    stroke={openStroke}
-                    strokeWidth={2}
-                  />
-                  <Text
-                    text="OPEN"
-                    x={midX - 16}
-                    y={midY - 7}
-                    fontSize={11}
-                    fill="#c0392b"
-                  />
-                </Group>
-              )
-              })}
-            </Group>
-          </Layer>
-          <Layer>
-            <Group x={stageSize.width / 2 + pan.x} y={stageSize.height / 2 + pan.y} scaleX={scale} scaleY={scale}>
-              {graphView.nodes.map((node) => {
-              const isSelected = node.id === state.selectedVisibleNodeId
-              const isLeaf = node.type === 'leaf'
-              const isComposite = node.type === 'composite'
-              const isAncestor = node.type === 'ancestor'
-              const isSibling = node.type === 'sibling'
-
-              if (isComposite) {
-                return (
-                  <Group
-                    key={node.id}
-                    x={node.x}
-                    y={node.y}
-                    draggable
-                    dragDistance={10}
-                    onDragStart={handleNodeDragStart}
-                    onDragMove={handleVisibleNodeDragMove(node.id)}
-                    onDragEnd={handleNodeDragEnd}
-                    onClick={handleVisibleNodeClick(node.id)}
-                    onContextMenu={handleVisibleNodeRightClick(node.id)}
-                  >
-                    <Rect
-                      width={COMPOSITE_WIDTH}
-                      height={COMPOSITE_HEIGHT}
-                      x={-COMPOSITE_WIDTH / 2}
-                      y={-COMPOSITE_HEIGHT / 2}
-                      fill={isSelected ? '#3498db' : '#e8f4fd'}
-                      stroke={isSelected ? '#2980b9' : '#2980b9'}
-                      strokeWidth={STROKE_WIDTH}
-                      cornerRadius={4}
-                    />
-                    <Text
-                      text={node.label}
-                      fontSize={12}
-                      fill={isSelected ? '#fff' : '#333'}
-                      align="center"
-                      width={COMPOSITE_WIDTH}
-                      x={-COMPOSITE_WIDTH / 2}
-                      y={-6}
-                    />
-                  </Group>
-                )
-              }
-
-              // Look up node type colors for leaves
-              const nodeTypeDef = isLeaf && node.entityType
-                ? NODE_TYPES.find((t) => t.id === node.entityType)
-                : undefined
-
-              // Leaf, ancestor, sibling, connector — all rendered as circles
-              const fill = isSelected
-                ? '#3498db'
-                : isAncestor
-                  ? '#f0e68c'
-                  : isSibling
-                    ? '#dda0dd'
-                    : nodeTypeDef
-                      ? nodeTypeDef.fill
-                      : '#e8f4fd'
-              const stroke = isSelected ? '#2980b9' : (nodeTypeDef ? nodeTypeDef.stroke : '#666')
-
-              return (
-                <Group
-                  key={node.id}
-                  x={node.x}
-                  y={node.y}
-                  draggable={isLeaf || isComposite}
-                  dragDistance={10}
-                  onDragStart={handleNodeDragStart}
-                  onDragMove={handleVisibleNodeDragMove(node.id)}
-                  onDragEnd={handleNodeDragEnd}
-                  onClick={handleVisibleNodeClick(node.id)}
-                  onContextMenu={handleVisibleNodeRightClick(node.id)}
-                  onDblClick={() => node.treeNodeId && zoomInto(node.treeNodeId)}
-                >
-                  <Circle
-                    radius={NODE_RADIUS}
-                    fill={fill}
-                    stroke={stroke}
-                    strokeWidth={STROKE_WIDTH}
-                  />
-                  <Text
-                    text={node.label}
-                    fontSize={12}
-                    fill={isSelected ? '#fff' : '#333'}
-                    align="center"
-                    width={NODE_RADIUS * 2}
-                    x={-NODE_RADIUS}
-                    y={-6}
-                  />
-                </Group>
-              )
-            })}
-            {graphView.openArcs.map((arc) => {
-              const geom = getArcGeometry(arc)
-              if (!geom) return null
-              const isOpenEndSource = arc.sourceId === arc.openEndId
-              const openX = isOpenEndSource ? geom.points[0] : geom.points[geom.points.length - 2]
-              const openY = isOpenEndSource ? geom.points[1] : geom.points[geom.points.length - 1]
-              const fixedX = isOpenEndSource ? geom.points[geom.points.length - 2] : geom.points[0]
-              const fixedY = isOpenEndSource ? geom.points[geom.points.length - 1] : geom.points[1]
-              const fixedId = isOpenEndSource ? arc.targetId : arc.sourceId
-              const isDraggingThis = draggingOpenArc?.openArcIri === arc.modelArcIri
-              const handleX = isDraggingThis ? draggingOpenArc.currentX : openX
-              const handleY = isDraggingThis ? draggingOpenArc.currentY : openY
-              return (
-                <Circle
-                  key={`open-handle-${arc.modelArcIri}`}
-                  x={handleX}
-                  y={handleY}
-                  radius={10}
-                  fill="#c0392b"
-                  stroke="#fff"
-                  strokeWidth={3}
-                  shadowColor="#000"
-                  shadowBlur={4}
-                  shadowOpacity={0.35}
-                  draggable
-                  dragDistance={5}
-                  onDragStart={() => {
-                    setDraggingOpenArc({
-                      openArcIri: arc.modelArcIri,
-                      fixedX,
-                      fixedY,
-                      currentX: openX,
-                      currentY: openY,
-                    })
-                  }}
-                  onDragMove={(e) => {
-                    const pos = e.target.position()
-                    setDraggingOpenArc((prev) =>
-                      prev && prev.openArcIri === arc.modelArcIri
-                        ? { ...prev, currentX: pos.x, currentY: pos.y }
-                        : prev
-                    )
-                  }}
-                  onDragEnd={(e) => {
-                    const pos = e.target.position()
-                    const targetNode = graphView.nodes.find((n) => {
-                      if (n.type !== 'leaf' || !n.modelNodeIri) return false
-                      if (n.id === fixedId) return false
-                      const dx = n.x - pos.x
-                      const dy = n.y - pos.y
-                      return Math.hypot(dx, dy) <= NODE_RADIUS + 10
-                    })
-                    if (targetNode?.modelNodeIri) {
-                      dispatch({
-                        type: 'reconnectOpenArc',
-                        openArcIri: arc.modelArcIri,
-                        newModelNodeIri: targetNode.modelNodeIri,
-                      })
-                    }
-                    setDraggingOpenArc(null)
-                  }}
-                  onClick={(e) => {
-                    e.cancelBubble = true
-                  }}
+              <SceneRenderer objects={sceneObjects} handlers={sceneHandlers} />
+              {draggingOpenArc && (
+                <Line
+                  key="open-arc-drag-line"
+                  points={[
+                    draggingOpenArc.fixedX,
+                    draggingOpenArc.fixedY,
+                    draggingOpenArc.currentX,
+                    draggingOpenArc.currentY,
+                  ]}
+                  stroke="#c0392b"
+                  strokeWidth={2}
+                  dash={[4, 4]}
+                  listening={false}
                 />
-              )
-            })}
-            {draggingOpenArc && (
-              <Line
-                key="open-arc-drag-line"
-                points={[
-                  draggingOpenArc.fixedX,
-                  draggingOpenArc.fixedY,
-                  draggingOpenArc.currentX,
-                  draggingOpenArc.currentY,
-                ]}
-                stroke="#c0392b"
-                strokeWidth={2}
-                dash={[4, 4]}
-                listening={false}
-              />
-            )}
+              )}
             </Group>
           </Layer>
         </Stage>
@@ -621,6 +373,73 @@ export default function App() {
               <div>To: {selectedArc.targetId}</div>
             </div>
           )}
+          {validArcTypes.length > 0 && (
+            <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 8 }}>
+              <strong style={{ fontSize: 12 }}>Valid arc types</strong>
+              <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Click to select, then right-click target</div>
+              {validArcTypes.map((arcIri) => {
+                const arcDef = ARC_TYPES.find((t) => t.id === arcIri)
+                const isActive = activeArcType === arcIri
+                return (
+                  <button
+                    key={arcIri}
+                    onClick={() => setActiveArcType(arcIri)}
+                    style={{
+                      fontSize: 12,
+                      padding: '4px 6px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      background: isActive ? '#fff' : '#e8e8e8',
+                      border: isActive ? '2px solid #2ecc71' : '1px solid #bbb',
+                      borderRadius: 4,
+                      width: '100%',
+                      marginBottom: 2,
+                    }}
+                  >
+                    {arcDef?.label ?? arcIri}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {hoveredHighlight === 'invalid' && (
+            <div style={{ fontSize: 11, color: '#c62828', borderTop: '1px solid #ccc', paddingTop: 8 }}>
+              Connection not allowed
+            </div>
+          )}
+          {/* Hover info (when nothing is selected) */}
+          {!selectedVisibleNode && !selectedArc && hoveredObject && (
+            <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 8, color: '#555' }}>
+              <strong style={{ fontSize: 12, color: '#333' }}>Hover</strong>
+              {hoveredObject.kind === 'node' && (
+                <>
+                  <div>{hoveredObject.label}</div>
+                  <div>Type: {hoveredObject.nodeType}</div>
+                  {hoveredObject.entityType && <div>Entity: {hoveredObject.entityType}</div>}
+                  {hoveredObject.modelNodeIri && <div>IRI: {hoveredObject.modelNodeIri}</div>}
+                  <div>x: {hoveredObject.x.toFixed(1)}, y: {hoveredObject.y.toFixed(1)}</div>
+                </>
+              )}
+              {hoveredObject.kind === 'arc' && (
+                <>
+                  <div>Arc: {hoveredObject.arcIri}</div>
+                </>
+              )}
+              {hoveredObject.kind === 'knot' && (
+                <>
+                  <div>Knot #{hoveredObject.knotIndex}</div>
+                  <div>Arc: {hoveredObject.arcIri}</div>
+                  <div>x: {hoveredObject.x.toFixed(1)}, y: {hoveredObject.y.toFixed(1)}</div>
+                </>
+              )}
+              {hoveredObject.kind === 'openArcHandle' && (
+                <>
+                  <div>Open arc handle</div>
+                  <div>Arc: {hoveredObject.openArcIri}</div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -638,11 +457,23 @@ export default function App() {
         }}
       >
         <span style={{ color: '#555' }}>
-          {state.selectedVisibleNodeId
-            ? `Node ${state.selectedVisibleNodeId} selected`
-            : state.selectedModelArcIri
-              ? `Arc ${state.selectedModelArcIri} selected`
-              : 'Click canvas to add node — click composite to zoom — Delete to remove'}
+          {hoveredHighlight === 'valid'
+            ? `Valid target — right-click to connect (${validArcTypes.length} arc type${validArcTypes.length > 1 ? 's' : ''})`
+            : hoveredHighlight === 'invalid'
+              ? 'Invalid target — connection not allowed'
+              : hoveredObject?.kind === 'knot'
+                ? 'Drag to move — double-click to add knot — right-click to remove'
+                : hoveredObject?.kind === 'arc'
+                  ? 'Click to select — Delete to remove'
+                  : hoveredObject?.kind === 'openArcHandle'
+                    ? 'Drag to reconnect to a nearby node'
+                    : hoveredObject?.kind === 'node' && !state.selectedVisibleNodeId
+                      ? 'Click to select — double-click to zoom — right-click to connect'
+                      : state.selectedVisibleNodeId
+                        ? 'Right-click a leaf to connect — Delete to remove'
+                        : state.selectedModelArcIri
+                          ? 'Delete to remove — drag knots to route'
+                          : 'Click canvas to add node — double-click composite to zoom — Delete to remove'}
         </span>
         <span style={{ marginLeft: 'auto', color: '#555' }}>
           {state.modelNodes.size} model nodes, {state.modelArcs.size} arcs (next node: {state.tree.nextId + 1})
