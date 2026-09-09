@@ -195,7 +195,7 @@ When viewing composite R (children N, O):
 ## Next steps
 
 1. ~~Decide on GraphView regeneration strategy~~ ✅ Done (on-demand)
-2. ~~Write definitive TypeScript interfaces for all three layers~~ ✅ Done
-3. ~~Sketch state management~~ ✅ Done (ADR-002)
-4. ~~Serialization format~~ ✅ Done (RDF/Turtle for model, JSON for tree+layout)
-5. Implement
+2. ~~Write definitive TypeScript interfaces for all three layers~~ ✅ Done (`src/types/hierarchy.ts`)
+3. ~~Sketch state management~~ ✅ Done (ADR-002, implemented as command automaton)
+4. ~~Serialization format~~ ✅ Decided (RDF/Turtle for model, JSON for tree+layout) — not yet implemented
+5. ~~Implement~~ ✅ Core implemented: three-layer architecture, three-panel layout, command automaton, scene objects, semantic contracts, connection rules, interactive knots. Persistence and composition remain.

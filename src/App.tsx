@@ -478,7 +478,7 @@ export default function App() {
                 : hoveredObject?.kind === 'knot'
                   ? 'Drag to move — double-click to add knot — right-click to remove'
                   : hoveredObject?.kind === 'arc'
-                    ? 'Click to select — Delete to remove'
+                    ? 'Click to select — double-click to add knot — Delete to remove'
                     : hoveredObject?.kind === 'openArcHandle'
                       ? 'Drag to reconnect to a nearby node'
                       : hoveredObject?.kind === 'node' && !state.selectedVisibleNodeId

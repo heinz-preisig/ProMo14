@@ -227,6 +227,14 @@ export function useCanvasEvents(
       dispatch({ type: 'addKnot', arcIri: obj.arcIri, x: obj.x, y: obj.y })
       return
     }
+    if (obj.kind === 'arc') {
+      const pos = e.target.getStage()?.getPointerPosition()
+      if (!pos) return
+      const sceneX = (pos.x - stageSize.width / 2 - pan.x) / scale
+      const sceneY = (pos.y - stageSize.height / 2 - pan.y) / scale
+      dispatch({ type: 'addKnot', arcIri: obj.arcIri!, x: sceneX, y: sceneY })
+      return
+    }
     if (obj.kind === 'node' && obj.treeNodeId !== undefined) {
       dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
     }

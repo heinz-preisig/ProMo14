@@ -1,4 +1,18 @@
-# ADR-002: State Management Sketch
+# ADR-002: State Management
+
+## Status
+
+Implemented — command automaton pattern
+
+## Evolution
+
+This ADR was originally a sketch of the planned state management. The prototype has since been implemented using a **command automaton** pattern: a single `useReducer` in `App.tsx` processes a discriminated-union `Command` type. All state changes go through one pure function: `applyCommand(state, cmd) → new State`.
+
+The original sketch below is retained for reference. The implemented architecture is documented in `src/state/ModelState.ts`.
+
+---
+
+## Original sketch (reference)
 
 ## Current state (flat, non-hierarchical)
 
@@ -206,11 +220,58 @@ The tree hierarchy + layout positions (Layer 2 + 3) are serialized as JSON.
 }
 ```
 
-### Key design decisions
+## Implemented architecture
 
-- **Model and view are separate files** — multiple views can reference the same model
-- **GraphView is not persisted** — always computed on demand
-- **Turtle for model** — human-readable, standard format, works with RDF tooling
-- **JSON for view** — simple, easy to manipulate programmatically
-- **Leaf tree nodes carry `iri` field** — explicit link to model node IRI
-- **Composites have no `iri`** — purely organizational
+The actual implementation uses a command automaton instead of scattered `useState` calls:
+
+```typescript
+// src/state/ModelState.ts
+export interface AppState {
+  modelNodes: Map<string, ModelNode>
+  modelArcs: Map<string, ModelArc>
+  tree: Tree
+  layoutStore: Map<number, Map<string, { x: number; y: number }>>
+  openArcs: Map<number, OpenArc[]>
+  knotStore: Map<string, Knot[]>
+  currentViewNodeId: number
+  selectedVisibleNodeId: string | null
+  selectedModelArcIri: string | null
+  arcCounter: number
+}
+
+export type Command =
+  | { type: 'insertNode'; ... }
+  | { type: 'deleteNode'; ... }
+  | { type: 'insertArc'; ... }
+  | { type: 'deleteArc'; ... }
+  | { type: 'moveNode'; ... }
+  | { type: 'setView'; ... }
+  | { type: 'selectNode'; ... }
+  | { type: 'selectArc'; ... }
+  | { type: 'groupNodes'; ... }
+  | { type: 'reconnectOpenArc'; ... }
+  | { type: 'moveKnot'; ... }
+  | { type: 'addKnot'; ... }
+  | { type: 'removeKnot'; ... }
+  | { type: 'reset' }
+
+export function applyCommand(state: AppState, cmd: Command): AppState { ... }
+```
+
+In `App.tsx`:
+```typescript
+const [state, dispatch] = useReducer(reducer, initialState)
+```
+
+UI events call `dispatch({ type: 'insertNode', ... })` etc. The reducer is pure and testable. The layout store, open arcs, and knot store are part of `AppState` as originally sketched.
+
+## Key design decisions (updated)
+
+- **Command automaton** — single `useReducer`, one pure reducer, discriminated-union commands. All state changes go through one door.
+- **Model and view are separate** — multiple views can reference the same model.
+- **GraphView is not persisted** — always computed on demand via `useMemo`.
+- **Turtle for model** — human-readable, standard format, works with RDF tooling.
+- **JSON for view** — simple, easy to manipulate programmatically.
+- **Leaf tree nodes carry `iri` field** — explicit link to model node IRI.
+- **Composites have no `iri`** — purely organizational.
+- **Serialization not yet implemented** — format decided, implementation pending.

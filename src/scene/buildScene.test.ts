@@ -132,7 +132,7 @@ describe('buildScene', () => {
       interactions: {
         clickable: true,
         draggable: false,
-        doubleClickable: false,
+        doubleClickable: true,
         rightClickable: false,
       },
     })

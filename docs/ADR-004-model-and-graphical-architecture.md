@@ -161,9 +161,9 @@ Model composition -> parameter instantiation -> validation -> code generation
 ## Consequences
 
 - `ModelNode.entityType` in the prototype will eventually become or be supplemented by a `baseEntityIri` and domain reference.
-- Hard-coded `TypeA`, `TypeB`, `TypeC`, `ArcType1`, and `ArcType2` values are temporary placeholders.
-- Hard-coded scene styles will be replaced by resolved graphical definitions.
-- Connection validation will move behind an ontology-backed rule resolver.
+- ~~Hard-coded `TypeA`, `TypeB`, `TypeC`, `ArcType1`, and `ArcType2` values are temporary placeholders.~~ ✅ Replaced by IRI-based `SemanticCatalogue` with in-memory placeholder implementations.
+- ~~Hard-coded scene styles will be replaced by resolved graphical definitions.~~ ✅ `buildScene` now resolves all graphical attributes from the `SemanticCatalogue`.
+- ~~Connection validation will move behind an ontology-backed rule resolver.~~ ✅ Both arc creation and open-arc reconnection go through `connectionService.ts` → `ConnectionRuleResolver`. Placeholder resolver allows all; ready for real ontology rules.
 - The hierarchy remains separate from the RDF topology.
 - Composite graphical assignment requires a stable exposed interface and port mapping.
 - Large models require on-demand graph and hierarchy access rather than loading the complete RDF graph into browser `Map` objects.
