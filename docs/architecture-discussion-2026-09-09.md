@@ -1,5 +1,10 @@
 # ProMo Suite Architecture Discussion — 2026-09-09
 
+> **Superseded** by `docs/suite-overview.md`.  Kept as a historical record
+> of the initial architecture discussion.  Several open questions listed
+> below have since been resolved — see ADR-005, `ontology-data-model.md`,
+> and `equation-context-contract.md`.
+
 ## Context
 
 ProMo14 Modeller (browser-based, React+Konva) has Phases 1–3 complete (35 tests passing). Now looking at the upstream modules before continuing with persistence (Phase 4).

@@ -1,98 +1,12 @@
-ProMo14 — Session Progress (updated 2026-09-09)
-================================================
+ProMo14 — Progress
+===================
 
-ARCHITECTURE (Command Automaton)
-----------------------------------
-Single useReducer in App.tsx. All state changes go through one door:
+**This file has been superseded.**  Progress is now tracked per-module:
 
-  Event → Command → applyCommand(state, cmd) → new State
+- Suite-wide summary:  docs/suite-status.md
+- Modeller:            docs/modeller-status.md
+- Equation Editor:     docs/equation-editor-status.md
+- Ontology Editor:     docs/ontology-editor-status.md
+- Behaviour Linker:    docs/behaviour-linker-status.md
 
-Commands are a discriminated union in src/state/ModelState.ts:
-  insertNode | deleteNode | insertArc | deleteArc | moveNode | setView |
-  selectNode | selectArc | groupNodes | reconnectOpenArc | moveKnot | addKnot | removeKnot | reset
-
-New commands added by extending Command union + applyCommand switch case.
-
-MODULES
--------
-apps/modeller/src/state/ModelState.ts       — AppState, Command, applyCommand reducer
-apps/modeller/src/model/ModelGraph.ts       — ModelGraphOps (insert/delete node/arc, arc counter)
-apps/modeller/src/tree/Tree.ts              — TreeOps (addChild, removeNode, moveID, getAncestors, getSiblings)
-apps/modeller/src/tree/computeGraphView.ts  — Compute visible nodes/arcs from tree + model + layout
-apps/modeller/src/types/hierarchy.ts        — TypeScript interfaces for model, hierarchy, and view layers
-apps/modeller/src/scene/types.ts            — SceneObject union and interaction contracts
-apps/modeller/src/scene/buildScene.ts       — Resolve GraphView into one declarative SceneObject[]
-apps/modeller/src/scene/SceneRenderer.tsx   — Generic Konva renderer for scene objects
-packages/semantic/src/contracts.ts          — IRI-based contracts: catalogue, rule resolver, graphical defs
-packages/semantic/src/placeholderCatalogue.ts — In-memory placeholder catalogue + rule resolver
-packages/semantic/src/connectionService.ts  — Shared connection-rule query/resolve/pickArcType helpers
-apps/modeller/src/canvas/useCanvasEvents.ts — Stage events and uniform SceneObject interactions
-backend/                                    — FastAPI app, per-tool routers + shared core/
-docs/ADR-004-model-and-graphical-architecture.md — Agreed long-term model architecture
-
-IMPLEMENTED
------------
-- Command Automaton: single useReducer in App.tsx, all state via applyCommand
-- Commands: insertNode | deleteNode | insertArc | deleteArc | moveNode | setView |
-  selectNode | selectArc | groupNodes | reconnectOpenArc | moveKnot | addKnot | removeKnot | reset
-- Three-layer architecture: flat model graph (semantic) → hierarchy tree (organizational) → GraphViews (visual)
-- Three-panel layout: ancestors (left), children (center), siblings (right), connector (top)
-- Coordinate system centered: (0,0) is canvas center via wrapping Konva Group
-- Canvas click creates leaf node at cursor position (centered coords)
-- Nodes render with catalogue-resolved graphical definitions (fill, stroke, radius from SemanticCatalogue)
-- Arcs render with catalogue-resolved graphical definitions (stroke, dash, strokeWidth from SemanticCatalogue)
-- Arc creation between leaves (select source, right-click target) via connection-rule resolver
-- Valid/invalid hover feedback: green ring for valid targets, red ring for invalid
-- Arc type selector in properties panel shows valid types for current hover
-- Status bar shows connection feedback
-- Node selection, arc selection, knot selection, delete (key or button)
-- Double-click composite → zoom into (setView)
-- Double-click leaf → zoom into leaf view; click empty canvas to add child and convert leaf into composite
-- Group selected leaf into composite
-- Interactive arc knots: drag to move, double-click to add, right-click to remove
-- Knot positions stored in knotStore (Map<arcIri, Knot[]>)
-- Unified SceneObject[] for nodes, arcs, open arcs, knots, and reconnect handles
-- Generic SceneRenderer and uniform interaction callbacks
-- Pan (middle-drag) and zoom (scroll wheel)
-- Reset all button
-- IRI-based semantic contracts: SemanticCatalogue, ConnectionRuleResolver
-- In-memory placeholder catalogue + placeholder rule resolver (allows all)
-- Shared connectionService: resolveConnection + pickArcType (used by arc creation and reconnection)
-- 35 unit tests passing (TreeOps: 14, ModelState: 1, buildScene: 11, connectionService: 9)
-- TypeScript compiles clean
-- Flat RDF topology, separate hierarchy, base-entity references, domains, connection rules,
-  recursive composition, and graphical-assignment workflow documented in ADR-004
-
-PENDING / KNOWN ISSUES
-----------------------
-- No save/load persistence yet (next step: define RDF topology + hierarchy/layout persistence boundaries)
-- reconnectOpenArc implemented for dangling ends created by leaf-to-composite conversion
-- No direct arc endpoint reconnection for regular arcs (must delete and recreate)
-- No insertModelIntoModel (compose one model into another)
-- Arc rendering may clip at canvas edges
-- No drag-to-create-arc (only right-click to connect)
-- Connection-rule resolver wired into arc creation and reconnection (placeholder allows all; ready for real ontology rules)
-- No real ontology backend yet (placeholder catalogue + resolver in place)
-- Knot insertion: addKnot appends to end of knot array regardless of click position along arc; knots render in array order, not geometric order. Future: sort by polyline projection.
-
-START DEV SERVER
-----------------
-cd /home/heinz/1_Gits/CAM14/ProMo14
-npm install        # once, sets up workspace links
-npm run dev        # starts @promo/modeller on port 3000
-
-Or run: ./run-dev.sh
-
-NEXT STEPS (agreed order)
--------------------------
-CURRENT: Phases 1–3 complete (semantic contracts, placeholder catalogue, connection-rule resolver, graphical resolution, interactive knots). Next: define RDF topology and separate hierarchy/layout persistence boundaries.
-
-1. ✓ Define generic IRI-based catalogue, classification, token/interface, graphical-definition, and rule-result contracts
-2. ✓ Add an in-memory placeholder catalogue and remove closed TypeA/B/C and ArcType1/2 unions
-3. ✓ Move arc creation and reconnection behind a shared connection-rule resolver
-4. ✓ Add valid/invalid target feedback and selection among multiple valid arc types
-5. ✓ Replace hard-coded buildScene styles with a graphical-definition resolver
-6. ✓ Add interactive knot SceneObjects and waypoint commands
-7. → Define RDF topology and separate hierarchy/layout persistence boundaries
-8. Design reusable composite/instantiated-model insertion and graphical port mapping
-9. Plan on-demand graph access after semantic contracts are stable
+Suite architecture:   docs/suite-overview.md
