@@ -11,7 +11,7 @@ import type {
   SemanticCatalogue,
   NodeGraphicalDefinition,
   ArcGraphicalDefinition,
-} from '../semantic/contracts'
+} from '@promo/semantic'
 
 const NODE_RADIUS = 24
 const COMPOSITE_WIDTH = 80

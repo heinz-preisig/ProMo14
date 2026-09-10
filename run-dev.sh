@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start ProMo14 dev server (kills any existing instance first)
+# Start the ProMo modeller dev server (kills any existing instance first)
 
 cd "$(dirname "$0")"
 

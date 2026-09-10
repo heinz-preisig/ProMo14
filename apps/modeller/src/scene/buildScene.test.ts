@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GraphView, VisibleNode } from '../types'
 import { buildScene } from './buildScene'
 import type { SceneArc, SceneHandle, SceneKnot, SceneNode, SceneOpenArc } from './types'
-import { placeholderCatalogue } from '../semantic/placeholderCatalogue'
+import { placeholderCatalogue } from '@promo/semantic'
 
 const leafA: VisibleNode = {
   id: 'node-a',

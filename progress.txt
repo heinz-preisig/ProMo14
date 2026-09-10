@@ -15,18 +15,19 @@ New commands added by extending Command union + applyCommand switch case.
 
 MODULES
 -------
-src/state/ModelState.ts       — AppState, Command, applyCommand reducer
-src/model/ModelGraph.ts       — ModelGraphOps (insert/delete node/arc, arc counter)
-src/tree/Tree.ts              — TreeOps (addChild, removeNode, moveID, getAncestors, getSiblings)
-src/tree/computeGraphView.ts  — Compute visible nodes/arcs from tree + model + layout
-src/types/hierarchy.ts        — TypeScript interfaces for model, hierarchy, and view layers
-src/scene/types.ts            — SceneObject union and interaction contracts
-src/scene/buildScene.ts       — Resolve GraphView into one declarative SceneObject[]
-src/scene/SceneRenderer.tsx   — Generic Konva renderer for scene objects
-src/semantic/contracts.ts        — IRI-based contracts: catalogue, rule resolver, graphical defs
-src/semantic/placeholderCatalogue.ts — In-memory placeholder catalogue + rule resolver
-src/semantic/connectionService.ts — Shared connection-rule query/resolve/pickArcType helpers
-src/canvas/useCanvasEvents.ts — Stage events and uniform SceneObject interactions
+apps/modeller/src/state/ModelState.ts       — AppState, Command, applyCommand reducer
+apps/modeller/src/model/ModelGraph.ts       — ModelGraphOps (insert/delete node/arc, arc counter)
+apps/modeller/src/tree/Tree.ts              — TreeOps (addChild, removeNode, moveID, getAncestors, getSiblings)
+apps/modeller/src/tree/computeGraphView.ts  — Compute visible nodes/arcs from tree + model + layout
+apps/modeller/src/types/hierarchy.ts        — TypeScript interfaces for model, hierarchy, and view layers
+apps/modeller/src/scene/types.ts            — SceneObject union and interaction contracts
+apps/modeller/src/scene/buildScene.ts       — Resolve GraphView into one declarative SceneObject[]
+apps/modeller/src/scene/SceneRenderer.tsx   — Generic Konva renderer for scene objects
+packages/semantic/src/contracts.ts          — IRI-based contracts: catalogue, rule resolver, graphical defs
+packages/semantic/src/placeholderCatalogue.ts — In-memory placeholder catalogue + rule resolver
+packages/semantic/src/connectionService.ts  — Shared connection-rule query/resolve/pickArcType helpers
+apps/modeller/src/canvas/useCanvasEvents.ts — Stage events and uniform SceneObject interactions
+backend/                                    — FastAPI app, per-tool routers + shared core/
 docs/ADR-004-model-and-graphical-architecture.md — Agreed long-term model architecture
 
 IMPLEMENTED
@@ -77,7 +78,8 @@ PENDING / KNOWN ISSUES
 START DEV SERVER
 ----------------
 cd /home/heinz/1_Gits/CAM14/ProMo14
-node node_modules/.bin/vite --port 3000 --host
+npm install        # once, sets up workspace links
+npm run dev        # starts @promo/modeller on port 3000
 
 Or run: ./run-dev.sh
 

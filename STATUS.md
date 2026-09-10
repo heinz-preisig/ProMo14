@@ -70,46 +70,51 @@ A prototype for a new browser-based graphical modeller ("ModelComposer") for the
 
 ```
 ProMo14/
-├── src/
-│   ├── App.tsx                      # Main component (canvas, palette, properties, status bar)
-│   ├── main.tsx                     # React entry point
-│   ├── state/
-│   │   ├── ModelState.ts            # AppState, Command union, applyCommand reducer
-│   │   └── ModelState.test.ts       # Reducer tests
-│   ├── model/
-│   │   └── ModelGraph.ts            # Flat model graph operations (insert/delete node/arc)
-│   ├── tree/
-│   │   ├── Tree.ts                  # Hierarchy tree operations (addChild, removeNode, moveID, ...)
-│   │   ├── Tree.test.ts             # Tree operation tests
-│   │   └── computeGraphView.ts      # Compute visible nodes/arcs/openArcs from tree + model + layout
-│   ├── canvas/
-│   │   └── useCanvasEvents.ts       # Stage events + uniform SceneObject interactions
-│   ├── scene/
-│   │   ├── types.ts                 # SceneObject union and interaction contracts
-│   │   ├── buildScene.ts            # GraphView → declarative SceneObject[]
-│   │   ├── buildScene.test.ts       # Scene building tests (nodes, arcs, knots, handles, hover)
-│   │   └── SceneRenderer.tsx        # Generic Konva scene renderer
-│   ├── semantic/
-│   │   ├── contracts.ts             # IRI-based contracts: SemanticCatalogue, ConnectionRuleResolver
-│   │   ├── placeholderCatalogue.ts  # In-memory placeholder catalogue + rule resolver
-│   │   ├── connectionService.ts     # Shared connection-rule query/resolve/pickArcType helpers
-│   │   └── connectionService.test.ts# Connection service tests
-│   ├── types/
-│   │   ├── index.ts                 # Generic graph types (NodeType, ArcType, Knot)
-│   │   └── hierarchy.ts             # Three-layer type system (ModelNode, ModelArc, Tree, GraphView)
-│   └── vite-env.d.ts                # Vite env types
+├── apps/
+│   ├── modeller/                    # Browser-based model composer (React + Konva)
+│   │   ├── index.html
+│   │   ├── package.json             # @promo/modeller
+│   │   ├── tsconfig.json
+│   │   ├── tsconfig.node.json
+│   │   ├── vite.config.ts
+│   │   ├── src/
+│   │   │   ├── App.tsx              # Main component (canvas, palette, properties, status bar)
+│   │   │   ├── main.tsx             # React entry point
+│   │   │   ├── state/               # AppState, Command union, applyCommand reducer
+│   │   │   ├── model/               # Flat model graph operations
+│   │   │   ├── tree/                # Hierarchy tree operations
+│   │   │   ├── canvas/              # Stage events + SceneObject interactions
+│   │   │   └── scene/               # SceneObject[] building and Konva rendering
+│   │   └── src/types/               # Generic graph types + three-layer type system
+│   ├── ontology-editor/             # Ontology editor scaffold
+│   ├── equation-editor/             # Equation editor scaffold
+│   └── behaviour-linker/            # Behaviour linker scaffold
+├── packages/
+│   └── semantic/                    # Shared IRI contracts, catalogue, connection rules
+│       ├── package.json             # @promo/semantic
+│       ├── tsconfig.json
+│       └── src/
+│           ├── contracts.ts
+│           ├── placeholderCatalogue.ts
+│           ├── connectionService.ts
+│           └── connectionService.test.ts
+├── backend/                         # Python FastAPI backend (per-tool + shared core)
+│   ├── main.py
+│   ├── requirements.txt
+│   ├── core/                        # Shared services (RDF, IRI, ontology client)
+│   ├── ontology/
+│   ├── equation/
+│   ├── behaviour/
+│   └── modeller/
 ├── docs/
-│   ├── ADR-001-hierarchy.md         # Tree hierarchy of GraphViews
-│   ├── ADR-002-state-management.md   # State management (command automaton)
-│   ├── ADR-003-multiple-views.md     # Multiple GraphView panels (future)
-│   ├── ADR-004-model-and-graphical-architecture.md  # Long-term model architecture
-│   └── suite-description.md         # ProMo suite overview
-├── index.html
-├── package.json
-├── tsconfig.json
-├── tsconfig.node.json
-├── vite.config.ts
-├── run-dev.sh                       # Dev server launch script
+│   ├── ADR-001-hierarchy.md
+│   ├── ADR-002-state-management.md
+│   ├── ADR-003-multiple-views.md
+│   ├── ADR-004-model-and-graphical-architecture.md
+│   └── suite-description.md
+├── package.json                     # npm workspaces root
+├── tsconfig.base.json               # Shared TypeScript config
+├── run-dev.sh                       # Modeller dev server launch script
 ├── progress.txt
 └── STATUS.md                        # This file
 ```

@@ -3,8 +3,7 @@ import type { KonvaEventObject } from 'konva/lib/Node'
 import type { AppState, Command } from '../state/ModelState'
 import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
-import { placeholderCatalogue, placeholderRuleResolver } from '../semantic/placeholderCatalogue'
-import { resolveConnection, pickArcType } from '../semantic/connectionService'
+import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, pickArcType } from '@promo/semantic'
 
 export interface CanvasEventHandlers {
   handleStageClick: (e: KonvaEventObject<MouseEvent>) => void
