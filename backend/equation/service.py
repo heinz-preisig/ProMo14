@@ -15,15 +15,18 @@ instead.
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from backend.core.graph_store import RdfStore
+from backend.ontology.rdf_context import RdfContext
+
 from .checker import check
 from .compile_space import CompileSpace, Index, Variable
 from .context import DictContext
-from backend.core.loader import load_context
 
 from .errors import VarError
 from .parser import ParseError, parse
@@ -126,47 +129,57 @@ class ContextResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@lru_cache(maxsize=1)
+def _get_store() -> RdfStore:
+    store = RdfStore()
+    store.load()
+    return store
+
+
 @router.get("/context", response_model=ContextResponse)
 def context_endpoint() -> ContextResponse:
-    """Load the equation context from PROMO_DATA_DIR."""
-    ctx = load_context()
+    """Load the equation context from the RDF graph store in PROMO_DATA_DIR."""
+    ctx = RdfContext(_get_store())
 
     variables = []
-    for v in ctx["variables"].values():
+    for v in ctx.variables().values():
         variables.append(
             VariableIn(
-                iri=v["iri"],
-                label=v["label"],
-                network=v["network"],
-                type=v["type"],
-                units=v["units"],
-                index_structures=v["index_structures"],
-                internal_id=v["internal_id"],
-                aliases=v["aliases"],
-                doc=v["doc"],
-                port_variable=v["port_variable"],
-                tokens=v["tokens"],
+                iri=v.iri,
+                label=v.label,
+                network=v.network,
+                type=v.type,
+                units=v.units.as_list(),
+                index_structures=v.index_structures,
+                internal_id=v.internal_id,
+                aliases=v.aliases,
+                doc=v.doc,
+                port_variable=v.port_variable,
+                tokens=v.tokens,
             )
         )
 
     indices = []
-    for i in ctx["indices"].values():
+    for i in ctx.indices().values():
+        short = i.aliases.get("internal_code")
+        if not short and i.label:
+            short = i.label[0]
         indices.append(
             IndexIn(
-                iri=i["iri"],
-                label=i["label"],
-                network=i["network"],
-                index_class=i["index_class"],
-                aliases=i["aliases"],
-                token=i.get("token"),
-                short_name=i.get("short_name"),
+                iri=i.iri,
+                label=i.label,
+                network=i.network,
+                index_class=i.index_class,
+                aliases=i.aliases,
+                token=i.token,
+                short_name=short,
             )
         )
 
     return ContextResponse(
         variables=variables,
         indices=indices,
-        network_tree=ctx["network_tree"],
+        network_tree=ctx.tree(),
     )
 
 
