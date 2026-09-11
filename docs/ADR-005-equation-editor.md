@@ -2,7 +2,8 @@
 
 ## Status
 
-Draft — findings from ProMo13 `EquationEditor_v01` and proposed direction for the browser-based rewrite.
+Implemented — recursive-descent parser, Python operator checker, and
+React + TypeScript + Vite frontend are in place.
 
 ## Context
 
@@ -453,37 +454,76 @@ Moving the frontend to the browser does **not** require rewriting the
 operator-dependent part in TypeScript. The canonical parser, index/unit
 checker, and variable-structure generator stay in Python behind FastAPI.
 
-### Proposed split
+### Current split
 
 ```
 backend/equation/
 ├── parser.py          # hand-written recursive-descent parser (replaces TPG)
-├── ast.py             # operator classes (Add, ReduceProduct, …)
+├── syntax.py          # AST node dataclasses (Add, ReduceProduct, …)
+├── symbols.py         # operator/function/delimiter symbol table
+├── checker.py         # semantic checker (units, indices, incidence)
+├── compile_space.py   # variable/index resolution, network!label, temp naming
+├── context.py         # EquationContext protocol + DictContext
 ├── units.py           # SI unit vector and operations
-├── compile_space.py   # variable/index resolution, temp naming
+├── errors.py          # VarError hierarchy
 ├── service.py         # FastAPI router: /api/equation/parse, /api/equation/check
-└── codegen/           # later: LaTeX, Python, Matlab targets
+└── test_*.py          # parser, checker, compile_space, units, corpus tests
 
 apps/equation-editor/
-└── src/               # React UI: expression input, variable palette,
-                       # LaTeX preview, error display, equation list
+├── index.html
+├── package.json       # @promo/equation-editor workspace
+├── tsconfig.json
+├── vite.config.ts
+└── src/
+    ├── main.tsx       # Vite entry point
+    ├── App.tsx        # Main layout and state
+    ├── types.ts       # Variable, Index, CheckRequest, CheckResponse, …
+    ├── api.ts         # /api/equation/parse and /api/equation/check clients
+    ├── latex.ts       # LaTeX rendering with index short_name subscripts
+    ├── demoContext.ts # Hard-coded demo variables, indices, and network tree
+    └── components/
+        ├── VariableWizard.tsx
+        ├── VariableEditor.tsx
+        ├── DependentVariableEditor.tsx
+        ├── ExpressionInput.tsx
+        ├── LaTeXPreview.tsx
+        ├── ResultPanel.tsx
+        ├── VariablePalette.tsx
+        ├── DeleteVariableDialog.tsx
+        ├── EquationList.tsx
+        ├── NetworkTreeSelect.tsx
+        └── ContextEditor.tsx
 ```
 
 ### Frontend responsibilities
 
-- Expression input with syntax highlighting and parenthesis matching.
-- Variable palette populated from the ontology/modeller context.
-- LaTeX preview of the parsed expression.
-- Display of parser/semantic errors returned by the backend.
-- Equation list and variable-definition management.
+- **Variable wizard** for creating port variables (name, SI unit vector,
+  index structures) and starting dependent variables (domain, class).
+- **Dependent variable editor** with expression input, operator/function
+  buttons, a single **Check** action, LaTeX preview, and a result panel.
+- **Variable palette** grouped by network; click to view details, click
+  `×` to delete with cascade impact analysis.
+- **LaTeX preview** of the parsed expression with `short_name` index
+  subscripts.
+- **Inline error display** from parser/semantic checker, with candidate
+  suggestions for ambiguous variables.
+- **Equation list** for saved dependent equations.
+- **Debug equation context (JSON)** popup for editing variables, indices,
+  the network tree, and the active expression network.
+- All authoritative parsing and checking is delegated to the FastAPI
+  backend.
 
 ### Backend responsibilities
 
-- Parse expression string → AST.
+- Parse expression string → AST (`/api/equation/parse`).
 - Run index/unit checks during AST construction.
-- Return normalized AST, inferred units, index structures, and errors.
-- Serialize the AST to RDF for storage in the ontology/model graph.
-- Later: code generation (Python, Matlab, LaTeX).
+- Return normalized AST, inferred units, index structures, incidence, and
+  errors (`/api/equation/check`).
+- Provide `EquationContext` (`context.py`) so the checker consumes
+  variables, indices, and the domain tree from any provider (`DictContext`
+  today, `RdfContext` later).
+- Later: serialize checked expressions to RDF and generate code (Python,
+  Matlab, LaTeX).
 
 ### Why keep the operator layer in Python
 
@@ -513,13 +553,11 @@ can be added later, but the authoritative check remains the backend.
 
 ## Next steps
 
-1. Implement `backend/equation/parser.py` as a recursive-descent parser for the
-   grammar above.
-2. Port `Units`, `PhysicalVariable`, `Operator` subclasses, and `CompileSpace`
-   into `backend/equation/`.
-3. Add a test suite that replays expressions from the old test files through
-   the new parser and compares ASTs and error cases.
-4. Expose `POST /api/equation/parse` and `POST /api/equation/check` in
-   `backend/equation/service.py`.
-5. Scaffold `apps/equation-editor/` with a minimal React UI that calls the
-   backend.
+1. Wire the frontend to the ontology graph store instead of the hard-coded
+   `demoContext.ts`.
+2. Implement an `RdfContext` provider over the ontology graph store.
+3. Finalize the RDF vocabulary for equations, variables, operators, and
+   indices and persist checked expressions back to the graph.
+4. Add code generation targets (Python, Matlab, LaTeX).
+5. Add client-side syntax highlighting and parenthesis matching for the
+   expression input.

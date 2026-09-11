@@ -1,13 +1,13 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-11
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
 | Ontology Editor | Scaffold | Scaffold | — | Design complete, not implemented |
-| Equation Editor | Parser + checker + service | Placeholder | 5 test files, corpus replay | Backend functional, frontend not started |
+| Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 5 test files, corpus replay | Backend and frontend functional |
 | Behaviour Linker | Scaffold | Scaffold | — | Not started, design TBD |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | 9 tests | Placeholder implementations in place |
@@ -37,10 +37,14 @@
   (73 expressions from ProMo13 — all parse, 28/73 pass full checks due
   to missing index structures, units, and domain tree in the old
   export).
-- **Frontend:** Placeholder only — `apps/equation-editor/README.md`.
+- **Frontend:** React + TypeScript + Vite app in `apps/equation-editor/`.
+  Features port/dependent variable creation, expression input with a
+  single **Check** action, LaTeX preview, error display, variable
+  palette with cascade delete, equation list, and a debug equation
+  context JSON editor.
 - **Known issues:** See `docs/equation-editor-known-issues.md`.
-- **Next:** Build React frontend (expression input, variable palette,
-  LaTeX preview, error display, equation list).
+- **Next:** Wire the frontend to the ontology graph store; implement
+  `RdfContext` provider.
 
 ### Behaviour Linker
 
@@ -92,5 +96,12 @@ npm test         # all workspace tests
 cd /home/heinz/1_Gits/CAM14/ProMo14/backend
 pip install -r requirements.txt
 python -m pytest equation/     # run equation tests
-uvicorn main:app --reload      # start API server
+uvicorn main:app --reload --port 8000  # start API server
+```
+
+### Equation editor (frontend)
+```bash
+cd /home/heinz/1_Gits/CAM14/ProMo14
+npm install
+npm run dev:equation  # Vite dev server on http://localhost:3001
 ```

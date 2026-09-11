@@ -6,7 +6,7 @@ with Python FastAPI backend.
 ## Modules
 
 - `apps/modeller` — graphical model composer (React + Konva)
-- `apps/equation-editor` — equation editor frontend (scaffold; backend exists)
+- `apps/equation-editor` — equation editor frontend (React + TypeScript + Vite)
 - `apps/ontology-editor` — ontology editor frontend (scaffold)
 - `apps/behaviour-linker` — behaviour linker frontend (scaffold)
 - `packages/semantic` — shared IRI contracts, catalogue, connection rules
@@ -16,8 +16,9 @@ with Python FastAPI backend.
 
 ```bash
 npm install
-npm run dev    # starts the modeller on :3000
-npm test       # all workspace tests
+npm run dev           # starts the modeller on :3000
+npm run dev:equation  # starts the equation editor on :3001
+npm test              # all workspace tests
 ```
 
 ## Documentation

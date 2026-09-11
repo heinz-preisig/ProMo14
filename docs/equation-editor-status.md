@@ -1,12 +1,13 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-11
 
 ## Current state
 
-Backend is functional — parser, checker, compile space, units, context
-protocol, and FastAPI service are implemented and tested.  Frontend is
-a placeholder only.
+Backend and frontend are functional.  The parser, checker, compile
+space, units, context protocol, and FastAPI service are implemented and
+tested; the React + TypeScript + Vite frontend in
+`apps/equation-editor/` is also implemented.
 
 ## Backend
 
@@ -61,30 +62,62 @@ See `docs/equation-editor-known-issues.md` for details.
 
 ## Frontend
 
-Placeholder only — `apps/equation-editor/README.md`.
+Implemented as a React + TypeScript + Vite app in
+`apps/equation-editor/`.  It calls the FastAPI backend via
+`POST /api/equation/parse` and `POST /api/equation/check`.
 
-### Planned frontend
+### Components
 
-- Expression input with syntax highlighting and parenthesis matching.
-- Variable palette populated from the ontology context.
-- LaTeX preview of parsed expressions.
-- Inline error display from parser/checker.
-- Equation list and variable-definition management.
+| Component | File | Purpose |
+|-----------|------|---------|
+| `VariableWizard` | `components/VariableWizard.tsx` | Multi-step flow for creating port or dependent variables (domain → class → details). |
+| `VariableEditor` | `components/VariableEditor.tsx` | Direct port-variable editor (used by the debug context popup). |
+| `DependentVariableEditor` | `components/DependentVariableEditor.tsx` | RHS expression input, Check, LaTeX preview, and result panel. |
+| `VariablePalette` | `components/VariablePalette.tsx` | Variable list grouped by network; click to view details, click `×` to delete with cascade impact. |
+| `ExpressionInput` | `components/ExpressionInput.tsx` | Operator/function buttons and keyboard input. |
+| `LaTeXPreview` | `components/LaTeXPreview.tsx` | Rendered expression with index subscripts. |
+| `ResultPanel` | `components/ResultPanel.tsx` | Check result with units, index structure, incidence, and candidate suggestions on error. |
+| `EquationList` | `components/EquationList.tsx` | Saved dependent equations. |
+| `ContextEditor` | `components/ContextEditor.tsx` | JSON editor for variables, indices, and the network tree (debug popup). |
+
+### Features
+
+- Port and dependent variable creation.
+- Domain / network tree selection.
+- SI unit vector entry.
+- Index structure selection with `short_name` display.
+- Single **Check** action that parses then semantically checks the RHS.
+- Inline parser / checker error display with candidate suggestions.
+- LaTeX preview with index subscripts.
+- Save and reload checked equations.
+- Debug equation context (JSON) popup.
 
 ## Pending items
 
-- Build React frontend.
-- Wire frontend to FastAPI backend.
-- Implement `RdfContext` provider (once ontology graph store exists).
+- Implement `RdfContext` provider once the ontology graph store exists.
+- Wire the frontend to the real ontology graph store (currently uses a
+  hard-coded demo context plus the debug JSON editor).
 - Code generation targets (Python, Matlab, LaTeX).
 - RDF vocabulary finalization for equations, operators, variables.
 
 ## How to run
+
+### Backend
 
 ```bash
 cd /home/heinz/1_Gits/CAM14/ProMo14/backend
 pip install -r requirements.txt
 python -m pytest equation/          # run all equation tests
 python -m pytest equation/test_corpus.py -v  # corpus replay with diagnostics
-uvicorn main:app --reload           # start API server
+uvicorn main:app --reload --port 8000  # start API server
 ```
+
+### Frontend
+
+```bash
+cd /home/heinz/1_Gits/CAM14/ProMo14
+npm install
+npm run dev:equation  # Vite dev server on http://localhost:3001
+```
+
+The dev server proxies `/api` to `http://localhost:8000`.

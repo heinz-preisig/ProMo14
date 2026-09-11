@@ -90,14 +90,18 @@ parse time (label → IRI resolution).
     user-defined templates or external compilers.
 
 #### Domain / location
-- `network` — the **variable definition network**.  The value is *chosen
-  from the ontology's domain tree* (see `promo:Network` in section 3.5) before
-  the variable is defined; it is not a free-form string.
-- `variable_class` — variable class (`state`, `effort`, `transport`,
-  `frame`, `network`, ...).  In the old JSON this field is called `type`; in
-  the Python dataclass it is `Variable.type` because `class` is a reserved
-  keyword.  The RDF predicate should be `promo:variable_class`.
-- `port_variable` — whether this is a port/interface variable.
+- `network` — the **variable definition network**.  The user must first
+  select a domain from the ontology's domain tree; the variable is then
+  defined in that network.  It is not a free-form string.
+- `variable_class` — variable class chosen from those valid for the
+  selected domain (`state`, `effort`, `transport`, `frame`, `network`, ...).
+  In the old JSON this field is called `type`; in the Python dataclass it is
+  `Variable.type` because `class` is a reserved keyword.  The RDF predicate
+  should be `promo:variable_class`.
+- `port_variable` — `true` for the fundamental quantities and constants
+  that **are the foundation** of the var/expr graph.  Port variables are
+  declared with a name, units, and index structure, but have **no defining
+  RHS expression**.
 - `imported` — *ontology-editor metadata*: marks a variable brought in from
   another ontology (e.g. a base physical ontology imported into a
   domain-specific one).  **Not consumed by the equation editor** — kept on
@@ -169,6 +173,10 @@ Grouped by purpose, a typical index carries:
 #### Identity & naming
 - `IRI` — stable graph key.
 - `label` — surface name (e.g. `species`).
+- `short_name` — optional single-letter (or short) display label used in the
+  equation editor UI and in generated LaTeX subscripts (e.g. `N` for `node`,
+  `C` for `species_conversion`).  Distinct from `internal_code`, which names the
+  index in the token stream / generated code.
 - `aliases` — language-specific surface names, e.g.
   `{"internal_code": "N", "latex": "N"}`.  The `internal_code` alias is the
   index's short code name in the token stream.
@@ -189,6 +197,7 @@ Example index records:
   "I_1": {
     "IRI": "iri_I1",
     "label": "species",
+    "short_name": "S",
     "aliases": {"internal_code": "N", "latex": "N"},
     "network": ["physical", "macroscopic"],
     "index_class": "index",
@@ -461,6 +470,7 @@ mass, temperature, current, light, nil) and the loader converts it to
 |---|---|---|
 | `promo:iri` / IRI itself | IRI | `Index.iri` |
 | `promo:label` | xsd:string | `Index.label` |
+| `promo:short_name` | xsd:string | `Index.short_name` |
 | `promo:has_alias` | `rdf:List` | `Index.aliases` |
 
 #### Domain
@@ -585,8 +595,8 @@ The provider must load:
    compute `accessible_networks`.
 2. **Variables** — materialise all `promo:Variable` resources with their
    predicates, grouped as in section 3.2.
-3. **Indices** — materialise `promo:Index` resources and their
-   `internal_code` aliases.
+3. **Indices** — materialise `promo:Index` resources, their `short_name`,
+   and their `internal_code` aliases.
 4. **Equations** — for each variable, materialise its `promo:Equation`
    resources, including the RHS token stream and `equation_class`.
 5. **Tokens** (for import/export) — map `global_id` and `internal_code`

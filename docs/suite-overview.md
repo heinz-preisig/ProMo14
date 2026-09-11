@@ -38,9 +38,53 @@ Stages 5–8 are downstream of the current implementation focus and are
 not yet built.  The meshing concept is documented in
 `docs/distributed-systems-design.md`.
 
-## 3. Cross-cutting architectural decisions
+## 3. Core modelling concepts: the var/expr bipartite graph
 
-### 3.1 Browser-based frontends, Python backend
+ProMo models are not an unstructured set of equations.  They are a
+**bipartite variable–expression graph** that is built from the bottom up and
+kept **lower-triangular**.
+
+1. **Port variables — the foundation.**  Port variables are the
+   fundamental quantities and constants — the leaves of the dependency graph.
+   To define any variable the user first selects a **domain (network)** and
+   a **variable class** that applies to that domain.  A port variable is
+   then defined by giving it:
+   - an IRI and a user-visible label;
+   - a variable class, e.g. `state`, `effort`, `transport`, `frame`,
+     `constant` or `parameter`;
+   - a network / domain in which it lives;
+   - physical units (SI vector or QUDT reference);
+   - an index structure (the tensor indices it carries).
+
+   Port variables have **no defining RHS expression**.  They are the base of
+   the bipartite graph.
+
+2. **Derived variables and equations.**  A non-port variable is introduced by
+   giving it a name and then a defining RHS expression.  The RHS may only use
+   variables that are already declared or already defined.  This keeps the
+   var/expr graph acyclic and lower-triangular.
+
+3. **Multiple definitions.**  A non-port variable may have more than one
+   checked definition.  Each definition is a separate `promo:Equation`
+   resource with its own expression network, equation class, and RHS.  The
+   Behaviour Linker later selects which definitions are active for a given
+   base entity, so multiple definitions provide alternative constitutive,
+   empirical, or balance relations for the same variable.
+
+4. **Domain and variable class.**  Every variable and every equation is
+   authored in a domain (network) and carries a variable class chosen from
+   those that apply to that domain.  The domain tree determines which
+   variables are visible to a given expression (the expression network plus
+   its ancestors).
+
+5. **Checked = trusted.**  The Equation Editor checks syntax, units, index
+   structures, and acyclic incidence.  Once a definition passes, it becomes a
+   node in the var/expr knowledge graph and is trusted by all downstream
+   tools without re-checking.
+
+## 4. Cross-cutting architectural decisions
+
+### 4.1 Browser-based frontends, Python backend
 
 All tools have browser-based frontends (React + TypeScript).  The
 mathematical compiler, semantic checker, and ontology logic stay in
@@ -50,14 +94,14 @@ check remains the backend.
 Motivation: unified tech stack, one spawnable Graphic Object Editor
 (ADR-004), unified IRI/catalogue space.
 
-### 3.2 RDF and IRI-based identity
+### 4.2 RDF and IRI-based identity
 
 All artefacts — ontology resources, variables, equations, model nodes,
 arcs, graphical definitions — are identified by IRIs in RDF named
 graphs.  The IRI is the stable identity across versions, merges, and
 tools.
 
-### 3.3 Three-name pattern
+### 4.3 Three-name pattern
 
 Every variable, index, token, and equation carries three names:
 
@@ -70,7 +114,7 @@ Every variable, index, token, and equation carries three names:
 The IRI is the canonical key.  Labels are scoped, not globally unique.
 Internal IDs are code-safe and allocated by the backend.
 
-### 3.4 Named graphs and ontology versioning
+### 4.4 Named graphs and ontology versioning
 
 Each published ontology is a versioned named graph.  Ontology resources
 are IRI-identified and immutable within a version.  Evolution produces
@@ -80,7 +124,7 @@ ontology version they were checked against (`promo:checkedAgainst`).
 See ADR-006 for the change classification (additive, annotation,
 deprecation, semantic modification, deletion) and migration rules.
 
-### 3.5 Publish–consume contract
+### 4.5 Publish–consume contract
 
 A checked expression is **trusted**.  All structural checking (syntax,
 units, index consistency) happens once, at authoring time, inside the
@@ -91,20 +135,20 @@ validation overhead from generated model code entirely.
 Consequence: the backend checker is the gatekeeper.  Whatever passes
 the editor's checks is contractually consistent.
 
-### 3.6 External ontology references
+### 4.6 External ontology references
 
 The suite mixes external ontology references (QUDT for quantities,
 units, dimensions) with ProMo-specific definitions (variable types,
 token types, domain tree).  Variables link to public IRIs when they
 exist (e.g. `qudt:Entropy`); otherwise ProMo-namespace IRIs are minted.
 
-## 4. Inter-module contracts
+## 5. Inter-module contracts
 
 These are the seams between modules.  Each contract defines what one
 module produces and the next consumes.  Changing a contract requires
 coordinating across modules.
 
-### 4.1 Ontology Editor → Equation Editor
+### 5.1 Ontology Editor → Equation Editor
 
 **Contract: `EquationContext`** (see `backend/equation/context.py`,
 `docs/equation-context-contract.md`)
@@ -123,7 +167,7 @@ A `DictContext` provides this from in-memory dicts for testing and the
 API.  A future `RdfContext` will sit on top of a triple store.  The
 checker code does not change when the provider changes.
 
-### 4.2 Equation Editor → Behaviour Linker
+### 5.2 Equation Editor → Behaviour Linker
 
 **Contract: var/expr knowledge graph** (see ADR-005,
 `docs/ontology-data-model.md`)
@@ -139,7 +183,7 @@ The equation editor produces a JSON-LD named graph containing:
 The Behaviour Linker consumes this to select which equations describe a
 base entity's I/O behaviour.
 
-### 4.3 Behaviour Linker → Modeller
+### 5.3 Behaviour Linker → Modeller
 
 **Contract: base-entity catalogue + graphical assignments + connection
 rules** (see ADR-004, `packages/semantic/src/contracts.ts`)
@@ -161,7 +205,7 @@ The Modeller consumes these through two TypeScript interfaces:
 In-memory placeholder implementations exist.  A real ontology backend
 will supply the same interfaces.
 
-### 4.4 Modeller → Downstream (Reuse, Instantiation, Codegen)
+### 5.4 Modeller → Downstream (Reuse, Instantiation, Codegen)
 
 **Contract: flat RDF topology + separate hierarchy + layout**
 
@@ -176,9 +220,9 @@ An assembled model can be published as a reusable entity and inserted
 into another model.  Instantiation adds constants/parameters to the
 topology.  Code generation consumes the instantiated model.
 
-## 5. Shared infrastructure
+## 6. Shared infrastructure
 
-### 5.1 `packages/semantic` (TypeScript)
+### 6.1 `packages/semantic` (TypeScript)
 
 Shared IRI-based contracts used by the Modeller (and eventually the
 Behaviour Linker):
@@ -188,12 +232,12 @@ Behaviour Linker):
 - `placeholderCatalogue.ts` — in-memory placeholder implementations.
 - `connectionService.ts` — shared connection-rule query/resolve helpers.
 
-### 5.2 `backend/core` (Python)
+### 6.2 `backend/core` (Python)
 
 Shared backend services (RDF store, IRI minting, ontology client) —
 scaffolded, not yet implemented.
 
-### 5.3 Graphic Object Editor
+### 6.3 Graphic Object Editor
 
 One spawnable graphical editor serves two entry points (ADR-004 §5):
 
@@ -207,13 +251,13 @@ One spawnable graphical editor serves two entry points (ADR-004 §5):
 Both use the same graphical vocabulary and persistence format.  The
 Modeller's renderer does not depend on which module spawned the editor.
 
-## 6. Monorepo structure
+## 7. Monorepo structure
 
 ```
 ProMo14/
 ├── apps/
 │   ├── modeller/              # React + Konva model composer
-│   ├── equation-editor/       # Frontend scaffold (backend exists)
+│   ├── equation-editor/       # React + TypeScript + Vite equation editor
 │   ├── ontology-editor/       # Frontend scaffold
 │   └── behaviour-linker/      # Frontend scaffold
 ├── packages/
@@ -229,7 +273,7 @@ ProMo14/
 └── tsconfig.base.json         # Shared TypeScript config
 ```
 
-## 7. Data flow
+## 8. Data flow
 
 ```
 Ontology Editor
@@ -258,7 +302,7 @@ Model Reuse / Instantiation
     └─ distributed (PDE) ──→ Meshing ──→ lumped network ──→ Code Generation
 ```
 
-## 8. Documentation map
+## 9. Documentation map
 
 ### Suite-level
 - `docs/suite-overview.md` — this document

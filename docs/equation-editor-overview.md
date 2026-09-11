@@ -11,6 +11,28 @@ consumers (Behaviour Linker, code generator) — no re-checking occurs.
 See `docs/suite-overview.md` for the full pipeline and cross-cutting
 contracts.
 
+## Core modelling concepts: the var/expr graph
+
+A ProMo model is a **bipartite variable–expression graph** that is built
+from the bottom up.
+
+- **Port variables are the foundation.**  To define a variable the user
+  first selects a **domain (network)** and a **variable class** that applies
+  to that domain.  The port variable is then declared with a name, a
+  variable class, a network, physical units, and an index structure.  Port
+  variables have **no defining RHS expression**.
+- **Derived variables** are created by first selecting a **domain (network)**
+  and a **variable class** that applies to that domain, then giving the
+  variable a name and a checked RHS expression.  The RHS may only use
+  variables that are already declared or already defined, so the graph stays
+  acyclic and lower-triangular.
+- **Multiple definitions are allowed.**  A derived variable can have many
+  checked equations.  Each is an independent `promo:Equation` resource with
+  its own expression network and equation class.  The Behaviour Linker
+  later selects which definitions are active for a given base entity.
+- The Equation Editor’s job is to parse and check each RHS, producing the
+  var/expr knowledge graph that downstream tools consume.
+
 ## Consumes
 
 - **Ontology context** via the `EquationContext` protocol
@@ -47,6 +69,44 @@ index-structured tensor operations.  Key characteristics:
 - Variable qualification: `network!label` for cross-network references.
 
 Full grammar and token table: see ADR-005.
+
+## User workflow
+
+### 1. Port variable (foundation)
+
+A port variable carries physical meaning directly; it has no defining RHS expression.
+
+1. Click **New variable…** in the left sidebar.
+2. Choose **Port variable**.
+3. In the multi-step wizard:
+   - Select a **domain / network** from the tree.
+   - Select a **variable class**.
+   - Enter a **name**.
+   - Enter the **SI unit vector**.
+   - Select the **index structures** from the ProMo ontology indices.  Each index shows its `short_name` (e.g. `N` for `node`) for quick reading.
+4. Click **Add variable**. The variable appears in the left palette.
+
+### 2. Dependent variable (RHS definition)
+
+A dependent variable is defined by a checked RHS expression over existing variables.
+
+1. Click **New variable…**.
+2. Choose **Dependent variable**.
+3. In the wizard, select a **domain / network**, a **variable class**, and enter a **name**.
+4. The **Dependent variable editor** opens:
+   - The LHS name is already set.
+   - Type the RHS expression using the variable palette and the operator/function buttons.
+   - Click **Check** (or `Ctrl/Cmd + Enter`) to parse and semantically check the RHS in one step.
+   - The **LaTeX preview** shows the expression with index subscripts using the index `short_name`.
+   - The **result panel** shows the LHS name, inferred units, index structure, and incidence.
+5. Add **documentation** for the variable.
+6. Click **Accept** to store the checked equation and create the dependent variable.
+
+### 3. Inspecting, editing and deleting variables
+
+- Click any variable in the left palette to open a **detail popup** with its IRI, network, class, units, index structures (`short_name` + label), and defining equation.
+- Click the `×` next to a variable to delete it.  The editor computes and shows the **cascade impact**: all dependent variables and equations that will be removed because they depend on the target directly or indirectly.
+- The **Debug equation context (JSON)** popup (opened from the right pane) lets advanced users edit variables, indices, the network tree, and the active expression network directly.  Click **Apply** to load the edited context back into the editor.
 
 ## Semantic checks
 
@@ -93,13 +153,16 @@ backend/equation/
 
 ### Browser architecture
 
-The frontend will be a React app calling the FastAPI backend:
+The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 
-- Expression input with syntax highlighting and parenthesis matching.
-- Variable palette populated from the ontology context.
-- LaTeX preview of parsed expressions.
-- Inline error display from parser/checker.
-- Equation list and variable-definition management.
+- **Variable wizard** (`VariableWizard`) — multi-step flow for creating port or dependent variables (domain → class → kind → details).
+- **Dependent variable editor** (`DependentVariableEditor`) — expression input, single **Check** action that parses then semantically checks, LaTeX preview with index subscripts, and result panel.
+- **Variable palette** (`VariablePalette`) — grouped by network; click to view details, click `×` to delete with cascade impact analysis.
+- **Expression input** (`ExpressionInput`) — operator/function buttons and keyboard shortcuts; one **Check** button triggers parse + check.
+- **LaTeX preview** (`LaTeXPreview`) — rendered expression, including index subscripts from each variable's `index_structures` mapped through the `short_name` of the index.
+- **Result panel** (`ResultPanel`) — shows check result with user-defined LHS label, inferred units, index structure (`short_name` + label), and incidence.
+- **Equation list** (`EquationList`) — saved dependent equations.
+- **Debug context popup** — the **Equation context (JSON)** editor is hidden behind a button and opens as a modal, keeping the main view focused on the repository.
 
 ## Key design decisions
 
