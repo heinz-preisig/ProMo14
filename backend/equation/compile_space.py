@@ -104,6 +104,7 @@ class CompileSpace:
         expression_definition_network: str,
         table: SymbolTable = DEFAULT_TABLE,
         accessible_networks: Optional[set] = None,
+        network_tree: Optional[Dict[str, List[str]]] = None,
     ):
         self.variables = variables
         self.indices = indices
@@ -118,6 +119,12 @@ class CompileSpace:
             if accessible_networks is not None
             else {expression_definition_network}
         )
+        self.network_tree = network_tree or {}
+        # Reverse map: child -> parent, used for nearest-ancestor resolution.
+        self._parent_of: Dict[str, str] = {}
+        for parent, children in self.network_tree.items():
+            for child in children:
+                self._parent_of[child] = parent
 
         # label and internal_code alias → index IRI (old ``inverse_indices``)
         self.inverse_indices: Dict[str, str] = {}
@@ -132,6 +139,11 @@ class CompileSpace:
             internal = idx.aliases.get("internal_code")
             if internal:
                 self.inverse_indices[internal] = iri
+            # Legacy IRI like http://example.org/indices#I_1 is also a valid
+            # surface token in the corpus.
+            tail = iri.split("#")[-1].split("/")[-1]
+            if tail and tail not in self.inverse_indices:
+                self.inverse_indices[tail] = iri
             if idx.index_class == "index":
                 self.base_indices.append(iri)
             else:
@@ -147,6 +159,43 @@ class CompileSpace:
         self._temp_counter = 0
 
     # -- resolution ---------------------------------------------------------
+
+    def _nearest_accessible(self, accessible: List[Variable]) -> Optional[Variable]:
+        """Return the accessible variable with the nearest ancestor network.
+
+        Distance is measured as the number of steps from
+        ``self.expression_definition_network`` up to the candidate's network.
+        If several candidates share the smallest distance, the label is still
+        ambiguous and ``None`` is returned so the caller raises.
+        """
+
+        def distance(network: str) -> int:
+            if network == self.expression_definition_network:
+                return 0
+            steps = 0
+            current = self.expression_definition_network
+            while current in self._parent_of:
+                current = self._parent_of[current]
+                steps += 1
+                if current == network:
+                    return steps
+            return -1
+
+        scored: List[Tuple[int, Variable]] = []
+        for var in accessible:
+            d = distance(var.network)
+            if d >= 0:
+                scored.append((d, var))
+
+        if not scored:
+            return None
+
+        scored.sort(key=lambda x: x[0])
+        best_distance = scored[0][0]
+        top = [var for d, var in scored if d == best_distance]
+        if len(top) == 1:
+            return top[0]
+        return None
 
     def resolve(self, symbol: str) -> ResolvedVariable:
         """Resolve a ``Var`` name to a variable.
@@ -190,6 +239,14 @@ class CompileSpace:
 
         if local is not None:
             return ResolvedVariable(local, imported=False)
+
+        # If we have a domain tree, prefer the accessible candidate closest
+        # to the expression network (fewest steps up the tree).
+        if self.network_tree and accessible:
+            best = self._nearest_accessible(accessible)
+            if best is not None:
+                return ResolvedVariable(best, imported=True)
+
         if len(accessible) == 1:
             return ResolvedVariable(accessible[0], imported=True)
         if len(accessible) > 1:

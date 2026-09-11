@@ -24,8 +24,10 @@ The corpus path defaults to the ProMo13 checkout; override with
 
 from __future__ import annotations
 
+import ast
 import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from .checker import check
@@ -66,6 +68,23 @@ def _field(block: str, name: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _parse_network(value: Optional[str]) -> str:
+    """The old TTL sometimes stores networks as Python list literals.
+
+    If the value is a list, take the most specific (last) network; otherwise
+    return the string or the default root.
+    """
+    if not value:
+        return "root"
+    try:
+        parsed = ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        return value
+    if isinstance(parsed, list) and parsed:
+        return str(parsed[-1])
+    return str(value)
+
+
 def load_corpus(path: str):
     """Parse the corpus TTL into variables, indices and expression lists."""
     text = open(path).read()
@@ -75,8 +94,10 @@ def load_corpus(path: str):
     indices: Dict[str, Index] = {}
     i_pos: Dict[str, str] = {}          # "I_4" -> index IRI
     expr_lists: Dict[str, List[str]] = {}   # E_N -> token IRIs
-    var_exprs: Dict[str, str] = {}      # variable IRI -> E_N
-    exprlist_v: Dict[str, str] = {}     # expression_list_V_N -> E_N
+    var_exprs: Dict[str, str] = {}      # variable IRI -> first E_N
+    expr_to_var: Dict[str, str] = {}    # E_N -> variable IRI
+    exprlist_v: Dict[str, List[str]] = {}  # expression_list_V_N -> [E_N, ...]
+    var_to_vn: Dict[str, str] = {}      # variable IRI -> V_N (resolved after V blocks)
 
     for b in _blocks(text):
         head = b.strip()
@@ -99,9 +120,9 @@ def load_corpus(path: str):
 
         m = re.match(r'promo:expression_list_(V_\d+)\b', head)
         if m:
-            em = re.search(r'promo:expression_list_(E_\d+)', head)
-            if em:
-                exprlist_v[m.group(1)] = em.group(1)
+            ems = re.findall(r'rdf:_\d+\s+promo:expression_list_(E_\d+)', head)
+            if ems:
+                exprlist_v[m.group(1)] = ems
             continue
 
         m = re.match(r'(promo|qudt):(\w+)\s+a\s+promo:variable', head)
@@ -113,13 +134,13 @@ def load_corpus(path: str):
             variables[iri] = Variable(
                 iri=iri,
                 label=_field(head, "label") or m.group(2),
-                network=_field(head, "network") or "root",
+                network=_parse_network(_field(head, "network")) or "root",
                 type=_field(head, "type") or "state",
                 units=Units(),          # units absent from this export
                 index_structures=[],    # emitted empty (ADR-005 known bug)
             )
             if ev:
-                var_exprs[iri] = exprlist_v.get(ev.group(1), "")
+                var_to_vn[iri] = ev.group(1)
             continue
 
         m = re.match(
@@ -133,7 +154,7 @@ def load_corpus(path: str):
             indices[iri] = Index(
                 iri=iri,
                 label=m.group(3),
-                network="root",
+                network=_parse_network(_field(head, "network")) or "root",
                 index_class=typ,
                 aliases={"internal_code": internal},
             )
@@ -141,7 +162,16 @@ def load_corpus(path: str):
                 i_pos["I_%s" % pos.group(1)] = iri
             continue
 
-    return label_map, variables, indices, i_pos, expr_lists, var_exprs
+    # Variable blocks occur before the expression_list_V blocks in the TTL
+    # file, so resolve the expression mapping now that all V blocks are known.
+    for iri, vn in var_to_vn.items():
+        eids = exprlist_v.get(vn, [""])
+        if eids:
+            var_exprs[iri] = eids[0]
+            for eid in eids:
+                expr_to_var[eid] = iri
+
+    return label_map, variables, indices, i_pos, expr_lists, var_exprs, expr_to_var
 
 
 def decode(tokens: List[str], label_map, variables, i_pos, indices) -> str:
@@ -180,7 +210,7 @@ def test_corpus_parses_all():
     if corpus is None:
         print("SKIP: corpus not found at", CORPUS_TTL)
         return
-    label_map, variables, indices, i_pos, expr_lists, _ = corpus
+    label_map, variables, indices, i_pos, expr_lists, _, _ = corpus
     failures = []
     for eid, toks in sorted(expr_lists.items(), key=lambda kv: int(kv[0][2:])):
         src = decode(toks, label_map, variables, i_pos, indices)
@@ -193,31 +223,96 @@ def test_corpus_parses_all():
     assert not failures, "%d corpus expressions failed to parse" % len(failures)
 
 
+def _iri_tail(iri: str) -> str:
+    """Return the fragment / last path segment of an IRI."""
+    return iri.split("#")[-1].split("/")[-1]
+
+
+def _rdf_context():
+    """Try to load the real ontology via RdfStore/RdfContext.
+
+    Returns ``(ctx, i_pos)`` on success, ``(None, None)`` if the graph store
+    is unavailable or the data directory is missing.
+    """
+    try:
+        from backend.core.graph_store import RdfStore
+        from backend.ontology.rdf_context import RdfContext
+    except ImportError:
+        return None, None
+
+    data_dir = os.environ.get(
+        "PROMO13_DATA_DIR",
+        str(
+            Path(CORPUS_TTL).parents[4]
+            / "Ontology_Repository"
+            / "processes_distributed_no_interface_eqs"
+        ),
+    )
+    if not os.path.isdir(data_dir):
+        return None, None
+
+    old = os.environ.get("PROMO_DATA_DIR")
+    try:
+        os.environ["PROMO_DATA_DIR"] = data_dir
+        store = RdfStore()
+        store.load()
+        ctx = RdfContext(store)
+    except Exception:
+        return None, None
+    finally:
+        if old is None:
+            os.environ.pop("PROMO_DATA_DIR", None)
+        else:
+            os.environ["PROMO_DATA_DIR"] = old
+
+    i_pos = {
+        _iri_tail(iri): iri
+        for iri, idx in ctx.indices().items()
+        if _iri_tail(iri).startswith("I_")
+    }
+
+    return ctx, i_pos
+
+
 def test_corpus_check_report():
     """Run the checker over the corpus and report results.
 
-    Index structures are empty in the export, so index-dependent operators
-    legitimately fail; this test reports rather than asserts.
+    If the ProMo13 data directory is available, the real RdfContext is used
+    for variables, indices, units and the domain tree.  The TTL export alone
+    (no index structures) is used as a fallback and explains any remaining
+    Reduce/Product failures.
     """
     corpus = _load()
     if corpus is None:
         print("SKIP: corpus not found at", CORPUS_TTL)
         return
-    label_map, variables, indices, i_pos, expr_lists, var_exprs = corpus
+    label_map, variables, indices, i_pos, expr_lists, var_exprs, expr_to_var = corpus
+
+    rdf_ctx, rdf_i_pos = _rdf_context()
+    if rdf_ctx is not None:
+        # Use the real ontology, but keep any corpus-only variables as a
+        # fallback (e.g. expression-level temporaries not in the v8 store).
+        ctx_variables = dict(variables)
+        ctx_variables.update(rdf_ctx.variables())
+        # The RDF indices are the authoritative ones; the TTL indices use
+        # different IRIs and would shadow the real index lookup.
+        ctx_indices = dict(rdf_ctx.indices())
+        ctx = DictContext(ctx_variables, ctx_indices, tree=rdf_ctx.tree())
+        i_pos = rdf_i_pos or i_pos
+    else:
+        ctx = DictContext(variables, indices, tree=CORPUS_TREE)
 
     ok, failed = [], []
     for eid, toks in sorted(expr_lists.items(), key=lambda kv: int(kv[0][2:])):
-        src = decode(toks, label_map, variables, i_pos, indices)
-        lhs_iri = next(
-            (v for v, e in var_exprs.items() if e == eid), None
-        )
-        lhs_net = variables[lhs_iri].network if lhs_iri else "root"
-        ctx = DictContext(variables, indices, tree=CORPUS_TREE)
+        src = decode(toks, label_map, ctx.variables(), i_pos, ctx.indices())
+        lhs_iri = expr_to_var.get(eid)
+        lhs_net = ctx.variables()[lhs_iri].network if lhs_iri else "root"
         space = CompileSpace(
             ctx.variables(), ctx.indices(),
             variable_definition_network=lhs_net,
             expression_definition_network=lhs_net,
             accessible_networks=ctx.accessible_networks(lhs_net),
+            network_tree=ctx.tree(),
         )
         try:
             node = parse(src)

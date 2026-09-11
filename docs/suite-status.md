@@ -1,17 +1,17 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-11 (end of session)
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Ontology Editor | Scaffold | Scaffold | — | Design complete, not implemented |
-| Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 5 test files, corpus replay | Backend and frontend functional |
+| Ontology Editor | `RdfStore` + `RdfContext` + service scaffold | Scaffold | `RdfContext`/corpus wired | Phase 0/1 backend done; CRUD pending |
+| Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 5 test files, corpus 70/73 | Backend and frontend functional |
 | Behaviour Linker | Scaffold | Scaffold | — | Not started, design TBD |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
-| Shared (`packages/semantic`) | — | Contracts + placeholder | 9 tests | Placeholder implementations in place |
-| Shared (`backend/core`) | Scaffold | — | — | Not started |
+| Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
+| Shared (`backend/core`) | `RdfStore`, legacy loader | — | corpus replay | Initial implementation, needs full graph CRUD |
 | Model Reuse | — | — | — | Not started |
 | Instantiation | — | — | — | Not started |
 | Code Generation | — | — | — | Not started |
@@ -22,10 +22,14 @@
 
 - **Design:** Complete — see `docs/ontology-editor-design.md`,
   `docs/ontology-data-model.md`, ADR-006.
-- **Backend:** `backend/ontology/` — empty scaffold.
-- **Frontend:** `apps/ontology-editor/` — empty scaffold.
-- **Next:** Implement backend graph store and `RdfContext` provider;
-  build frontend domain tree + variable table + detail editor.
+- **Backend:** `backend/ontology/rdf_context.py` (`RdfContext`) and
+  `backend/core/graph_store.py` (`RdfStore`) are implemented; the
+  `RdfContext` provider is already used by the equation corpus test.
+  `backend/ontology/service.py` is a router scaffold.
+- **Frontend:** `apps/ontology-editor/` — UI scaffold; build passes.
+- **Next:** Extend `RdfContext` to read all named graphs and the new
+  lowercase TriG types; build frontend domain tree + variable table +
+  detail editor.
 
 ### Equation Editor
 
@@ -34,17 +38,17 @@
   hand-written recursive-descent parser.
 - **API:** `POST /api/equation/parse`, `POST /api/equation/check`.
 - **Tests:** Parser, checker, compile space, units, and corpus replay
-  (73 expressions from ProMo13 — all parse, 28/73 pass full checks due
-  to missing index structures, units, and domain tree in the old
-  export).
+  (73 expressions from ProMo13 — all parse, **70/73** pass full checks
+  now that real index structures, units, and the domain tree are loaded
+  from the v8 ontology data).
 - **Frontend:** React + TypeScript + Vite app in `apps/equation-editor/`.
   Features port/dependent variable creation, expression input with a
   single **Check** action, LaTeX preview, error display, variable
   palette with cascade delete, equation list, and a debug equation
   context JSON editor.
 - **Known issues:** See `docs/equation-editor-known-issues.md`.
-- **Next:** Wire the frontend to the ontology graph store; implement
-  `RdfContext` provider.
+- **Next:** Switch corpus test to the new arc/connection TriG data; wire
+  the frontend to the ontology graph store.
 
 ### Behaviour Linker
 
@@ -77,9 +81,10 @@
 - **`packages/semantic`:** `SemanticCatalogue`, `ConnectionRuleResolver`
   interfaces with in-memory placeholder implementations.
   `connectionService.ts` shared by arc creation and reconnection.
-- **`backend/core`:** Empty scaffold — future home of shared RDF store,
-  IRI minting, ontology client.
-- **`backend/main.py`:** FastAPI app mounting per-tool routers.
+- **`backend/core`:** `RdfStore` and legacy v8 loader implemented; shared
+  IRI minting and CRUD operations are still pending.
+- **`backend/main.py`:** FastAPI app mounting per-tool routers; server
+  starts and `/api/health` returns `{"status":"ok"}`.
 
 ## How to run
 
@@ -93,10 +98,19 @@ npm test         # all workspace tests
 
 ### Equation editor (backend)
 ```bash
-cd /home/heinz/1_Gits/CAM14/ProMo14/backend
-pip install -r requirements.txt
-python -m pytest equation/     # run equation tests
-uvicorn main:app --reload --port 8000  # start API server
+cd /home/heinz/1_Gits/CAM14/ProMo14
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt
+
+# run compile-space tests
+.venv/bin/python -m backend.equation.test_compile_space
+
+# run corpus replay
+PROMO13_CORPUS_TTL=/home/heinz/1_Gits/CAM13/ProMo13/packages/Common/ontologies/var_equ_rdf.ttl \
+  .venv/bin/python -m backend.equation.test_corpus
+
+# start API server
+.venv/bin/uvicorn backend.main:app --port 8000
 ```
 
 ### Equation editor (frontend)

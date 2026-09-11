@@ -14,10 +14,15 @@ from __future__ import annotations
 import ast
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypeVar
 
-import rdflib
-from rdflib import Dataset, Namespace
+try:
+    import rdflib
+    from rdflib import Dataset, Namespace
+except ImportError:  # pragma: no cover - allows loading JSON without rdflib
+    rdflib = None  # type: ignore[assignment]
+    Dataset = None  # type: ignore[assignment, misc]
+    Namespace = None  # type: ignore[assignment, misc]
 
 from .config import get_data_dir
 
@@ -25,8 +30,12 @@ V8_FILES = ["variables_v8.json", "fix_variables_v8.json"]
 ONTOLOGY_FILE = "ontology.json"
 TRIG_FILES = ["variableExpression.trig", "model.trig"]
 
-PROMO = Namespace("http://example.org#")
-INDICES = Namespace("http://example.org/indices#")
+if Namespace is not None:
+    PROMO = Namespace("http://example.org#")
+    INDICES = Namespace("http://example.org/indices#")
+else:
+    PROMO = None  # type: ignore[assignment]
+    INDICES = None  # type: ignore[assignment]
 
 
 def _load_json(path: Path) -> Any:
@@ -43,19 +52,33 @@ def _find_trig_file(data_dir: Path) -> Optional[Path]:
 
 
 def _load_v8_records(data_dir: Path) -> Dict[str, dict]:
-    """Merge all available v8 variable files, later files overlay earlier ones."""
+    """Merge all available v8 variable files, later files overlay earlier ones.
+
+    Some projects keep versioned files like ``variables_v8(7).json`` alongside
+    the active ``variables_v8.json``; we load every matching file sorted by
+    size (smallest first) so the richest record wins, then apply fix overlays.
+    """
     records: Dict[str, dict] = {}
-    found = False
-    for name in V8_FILES:
-        path = data_dir / name
-        if path.exists():
-            found = True
-            raw = _load_json(path)
-            records.update(raw.get("variables", {}))
-    if not found:
+
+    main_files = sorted(
+        (p for p in data_dir.glob("variables_v8*.json")
+         if not p.name.startswith("fix_") and not p.name.endswith("_empty.json")),
+        key=lambda p: p.stat().st_size,
+    )
+    fix_files = sorted(
+        data_dir.glob("fix_variables_v8*.json"),
+        key=lambda p: p.stat().st_size,
+    )
+
+    if not main_files:
         raise FileNotFoundError(
             f"No v8 variable file ({', '.join(V8_FILES)}) found in {data_dir}"
         )
+
+    for path in main_files + fix_files:
+        raw = _load_json(path)
+        records.update(raw.get("variables", {}))
+
     return records
 
 
@@ -125,6 +148,10 @@ def _index_record_to_dict(key: str, rec: dict) -> dict:
 
 def _trig_indices(trig_path: Path) -> Dict[str, dict]:
     """Read index definitions from the TriG var/expr file."""
+    if rdflib is None:
+        return {}
+    if Dataset is None or PROMO is None:
+        return {}
     indices: Dict[str, dict] = {}
     try:
         ds = Dataset()

@@ -1,0 +1,6 @@
+cd /path/to/ProMo14
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt
+npm install
+PROMO13_CORPUS_TTL=/path/to/.../var_equ_rdf.ttl \
+  .venv/bin/python -m backend.equation.test_corpus

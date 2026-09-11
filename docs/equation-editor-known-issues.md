@@ -5,16 +5,14 @@ deferred until the rest of the ProMo14 architecture (ontology graph store,
 RDF persistence, network domain tree) is in place. It mirrors the
 test-corpus findings in ``backend/equation/test_corpus.py``.
 
-## 1. Corpus checker pass-rate is 28/73
+## 1. Corpus checker pass-rate is now 70/73
 
 `backend/equation/test_corpus.py` replays all 73 expressions from the
 ProMo13 `packages/Common/ontologies/var_equ_rdf.ttl` export.  All 73 parse
-successfully.  When the checker is run with the reconstructed variable/index
-context, only 28 of 73 expressions pass.
-
-The failing cases cluster into two root causes (see below).  The test does
-**not** assert the check pass-rate; it reports failures with diagnostics so
-we can re-run the suite once the missing data becomes available.
+successfully.  With real `index_structures`, units, and the domain tree
+loaded from the v8 JSON/TriG files, 70 of 73 expressions now pass full
+checks.  The 3 remaining failures are caused by legacy interface variables
+that no longer exist in the new arc/connection model (see section 5 below).
 
 ## 2. `index_structures` are empty in the old TTL export
 
@@ -34,11 +32,10 @@ operators that require a common running index fail:
 
 ### What to do once fixed
 
-When the ontology graph store can provide real `index_structures` for each
-variable, update ``test_corpus.py`` to resolve them.  The test is written so
-that the `CompileSpace` is built with real `Variable.index_structures`; the
-expected outcome is that the reduce/product suite (E_30, E_43–E_91,
-etc.) starts passing.
+This is now implemented.  `test_corpus.py` builds the `CompileSpace` from
+`RdfContext`, which loads real `Variable.index_structures` from the v8 JSON
+seed in `Ontology_Repository/processes_distributed_no_interface_eqs`.  The
+reduce/product suite (E_30, E_43–E_91, etc.) now passes.
 
 ## 3. Network hierarchy — mechanism done, data still missing
 
@@ -49,20 +46,21 @@ ancestor set from a parent→children ``tree``.
 
 ### What is still missing
 
-The corpus TTL does not export the domain tree, nor the per-expression
-``expression_definition_network``.  ``test_corpus.py`` therefore uses a
-hard-coded ``CORPUS_TREE`` and assumes the expression network equals the
-LHS variable's network.  Some corpus expressions still report
-``AmbiguousVariableError`` (e.g. ``U - T . S`` with ``T`` in
-``macroscopic``/``reactions``) because the real authoring network — likely a
-leaf network where ``T`` is local — is not recorded in the export.
+The real domain tree is now loaded from the v8 `ontology.json` into
+`RdfContext`, and the expression network is taken from the LHS variable.
+Most `AmbiguousVariableError` cases are resolved by nearest-ancestor network
+resolution.  The few remaining `T`/`V` ambiguities (`E_59`, `E_63`) were
+fixed once `RdfContext` parsed the legacy `>>>` interface network notation
+and the corpus loader started using the most-specific network.  The still
+failing `E_63` is a legacy interface variable (`promo:_V`) that is not valid
+in the new arc/connection model.
 
 ### What to do once fixed
 
-When the ontology graph store provides the real domain tree and the
-per-equation authoring network, pass them through ``EquationContext`` /
-``CheckRequest.network_tree`` / ``expression_definition_network``.  No
-checker changes are needed.
+This is implemented.  `test_corpus.py` constructs the `CompileSpace` with
+`network_tree=rdf_ctx.tree()` and the per-expression
+`expression_definition_network` derived from the LHS variable.  No further
+checker changes are needed for hierarchy-aware resolution.
 
 ## 4. Units are absent from the old variable export
 
@@ -78,16 +76,40 @@ be detected in the corpus replay.
 
 ### What to do once fixed
 
-Once the graph store exposes variable units, build the corpus
-``CompileSpace`` with real ``Units`` values.  The checker will then catch
-the unit consistency errors that the old ProMo13 editor caught.
+This is now implemented.  `RdfContext` reads the v8 `unitVector` and the
+TriG `promo:unit_*` fields.  The corpus `CompileSpace` uses real `Units`
+values.  The one remaining unit error (`E_92: anc + and_x`) is in legacy
+interface/arc data and is not expected to pass against the old export.
 
-## 5. FastAPI endpoint dependencies
+## 5. Remaining failures are legacy interface variables
+
+The ProMo13 `var_equ_rdf.ttl` contains interface/domain-to-domain variables
+such as `promo:_T`, `promo:_V`, and `promo:an`.  In the new ProMo14 model
+networks are linked by arcs/connections instead, so these variables are not
+valid.  The three still-failing expressions are therefore expected to fail
+against the old export:
+
+- `E_54: chemPotStandard + R . T . ln ( x )` — index mismatch
+  `[N, S] + [N, S, p]` in the old export.
+- `E_63: F_NI_source * I_1 V` — `V` ambiguity involving the legacy
+  `promo:_V` interface variable.
+- `E_92: anc + and_x` — unit mismatch in `promo:an`-related legacy data.
+
+### What to do
+
+Switch the corpus smoke test to the new arc/connection data in
+`Ontology_Repository/processes_distributed_no_interface_eqs/variableExpression.trig`
+(or the canonical v9 TriG file).  Update `RdfContext` to read all named
+graphs and lowercase `promo:variable` / `promo:index` types so it can
+consume the new TriG directly.  Once that is in place, these three legacy
+failures should disappear.
+
+## 6. FastAPI endpoint dependencies
 
 `backend/equation/service.py` declares ``POST /api/equation/parse`` and
 ``POST /api/equation/check``.  The endpoints are importable and tested with
-stubs, but a full server test requires `fastapi`/`pydantic` installed
-(``backend/requirements.txt`` already lists them).
+stubs.  FastAPI/uvicorn are installed in `.venv`; the server starts and
+`/api/health` returns `{"status":"ok"}`.
 
 ## Files involved
 

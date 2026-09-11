@@ -4,8 +4,26 @@
 
 ## Current state
 
-Design complete.  No implementation yet — backend and frontend are
-empty scaffolds.
+Design complete.  Phase 0 and Phase 1 backend are implemented and wired
+into the corpus smoke test.
+
+- `backend/core/graph_store.py` (`RdfStore`): implemented.
+  - Wraps `rdflib.Dataset`.
+  - Loads `PROMO_DATA_DIR/*.trig` and seeds from legacy v8 JSON/TriG when
+    the editable ontology graph is empty.
+  - Persist/serialize as TriG.
+- `backend/ontology/rdf_context.py` (`RdfContext`): implemented.
+  - Implements `EquationContext`.
+  - Reads variables, indices, and the network tree from the seeded
+    `RdfStore.ontology_graph`.
+  - Parses `promo:network` list literals and `>>>` interface paths.
+- `backend/core/loader.py`: updated.
+  - `rdflib` is optional for JSON-only loading.
+  - Discovers and merges versioned `variables_v8*.json` files by size.
+  - Converts v8 records into `Variable`/`Index` dataclass-compatible dicts.
+- `apps/ontology-editor/`: UI scaffold with `App.tsx`, build passes.
+- FastAPI router `backend/ontology/service.py` exists but is not yet fully
+  wired with CRUD.
 
 ## Design
 
@@ -18,7 +36,9 @@ empty scaffolds.
 
 ## Backend
 
-`backend/ontology/` — empty scaffold.
+`backend/ontology/` now contains the `RdfContext` provider and a
+FastAPI router scaffold.  The provider is functional and consumed by
+`backend/equation/test_corpus.py` for the real ontology context.
 
 ### Planned backend
 
@@ -82,8 +102,13 @@ contexts.
 - `backend/ontology/rdf_context.py`:
   - Implements `EquationContext` from `backend/equation/context.py`.
   - Builds `Variable`, `Index`, and the parent → children network tree by
-    walking the `RdfStore`.
+    walking the `RdfStore.ontology_graph`.
   - Computes `accessible_networks` from the RDF domain tree.
+  - Parses `promo:network` list literals and `>>>` interface paths.
+  - **Limitation:** currently only reads the seeded `ontology_graph`.
+    The `variableExpression.trig` data lives in named graphs with
+    lowercase `promo:variable`/`promo:index` types; `RdfContext` must be
+    extended to consume these.
 - `backend/equation/service.py`:
   - Switch `/api/equation/context` to use `RdfContext` when a graph IRI is
     available, or the legacy loader as a fallback.
@@ -133,6 +158,14 @@ contexts.
 
 ## Current priority
 
-Phase 0 and Phase 1 are the next concrete steps: build `RdfStore` and
-`RdfContext` so the equation editor reads from the graph store instead of
-the temporary loader.
+Phase 0 and Phase 1 are largely complete.  The next concrete steps are:
+
+1. Extend `RdfContext` to read **all named graphs** in the `RdfStore`
+   (not only `ontology_graph`) and to recognise lowercase
+   `promo:variable` / `promo:index` types used by
+   `variableExpression.trig`.
+2. Switch the corpus smoke test to the new arc/connection data in
+   `variableExpression.trig` (or the canonical v9 TriG file) so the
+   remaining 3 legacy failures disappear.
+3. Begin Phase 2 ontology CRUD backend (`models.py`, `service.py`,
+   `store.py`).

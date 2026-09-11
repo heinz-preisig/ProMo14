@@ -17,9 +17,11 @@ Responsibilities:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Protocol, Set
+from dataclasses import fields
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Protocol, Set
 
-from .compile_space import Index, Variable
+from .compile_space import Index, Units, Variable
 
 
 class EquationContext(Protocol):
@@ -66,11 +68,45 @@ class DictContext:
         self._indices = indices
         self._tree = tree or {}
 
+    @classmethod
+    def from_legacy(cls, data_dir: Optional[Path] = None):
+        """Build a DictContext from the legacy v8 JSON/TriG files in PROMO_DATA_DIR.
+
+        This is a stop-gap until ``RdfContext`` is fully wired.  It loads the
+        real v8 records and converts them into the ``Variable``/``Index``
+        dataclasses that ``CompileSpace`` expects.
+        """
+        from backend.core.loader import load_context
+
+        raw = load_context(data_dir)
+
+        var_fields = {f.name for f in fields(Variable)}
+        idx_fields = {f.name for f in fields(Index)}
+
+        def as_variable(rec: Dict[str, Any]) -> Variable:
+            rec = dict(rec)
+            units = rec.pop("units", [0] * 8)
+            rec["units"] = Units.from_list(units) if isinstance(units, list) else Units()
+            rec = {k: v for k, v in rec.items() if k in var_fields}
+            return Variable(**rec)
+
+        def as_index(rec: Dict[str, Any]) -> Index:
+            rec = {k: v for k, v in rec.items() if k in idx_fields}
+            return Index(**rec)
+
+        variables = {iri: as_variable(v) for iri, v in raw["variables"].items()}
+        indices = {iri: as_index(i) for iri, i in raw["indices"].items()}
+        return cls(variables, indices, tree=raw["network_tree"])
+
     def variables(self) -> Dict[str, Variable]:
         return self._variables
 
     def indices(self) -> Dict[str, Index]:
         return self._indices
+
+    def tree(self) -> Dict[str, List[str]]:
+        """Return the parent -> children network tree."""
+        return self._tree
 
     def accessible_networks(self, network: str) -> Set[str]:
         if network is None:

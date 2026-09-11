@@ -15,6 +15,7 @@ from rdflib import Namespace, URIRef
 from rdflib.namespace import RDF
 
 from backend.core.graph_store import RdfStore
+from backend.core.loader import _parse_network_literal
 from backend.equation.compile_space import Index, Variable
 from backend.equation.context import EquationContext
 from backend.equation.units import Units
@@ -24,6 +25,21 @@ PROMO = Namespace("http://example.org#")
 
 def _str(value) -> str:
     return str(value) if value is not None else ""
+
+
+def _network(raw: str) -> str:
+    """Return the most specific network from a list literal or path string."""
+    if not raw:
+        return "root"
+    try:
+        parsed = _parse_network_literal(raw)
+        if parsed and (len(parsed) > 1 or parsed[0] != raw):
+            return parsed[-1]
+    except (ValueError, SyntaxError):
+        pass
+    if ">>>" in raw:
+        return raw.split(">>>")[-1].strip()
+    return raw
 
 
 def _literal_list(graph, subject, predicate) -> List[str]:
@@ -130,7 +146,7 @@ class RdfContext(EquationContext):
             variables[iri] = Variable(
                 iri=iri,
                 label=_one_literal(self._graph, s, PROMO["label"], iri),
-                network=_one_literal(self._graph, s, PROMO["network"], "root"),
+                network=_network(_one_literal(self._graph, s, PROMO["network"], "root")),
                 type=_one_literal(self._graph, s, PROMO["variableClass"], "state"),
                 units=units,
                 index_structures=_literal_list(self._graph, s, PROMO["indexStructure"]),
@@ -155,7 +171,7 @@ class RdfContext(EquationContext):
             indices[iri] = Index(
                 iri=iri,
                 label=_one_literal(self._graph, s, PROMO["label"], iri),
-                network=_one_literal(self._graph, s, PROMO["network"], "root"),
+                network=_network(_one_literal(self._graph, s, PROMO["network"], "root")),
                 index_class=_one_literal(self._graph, s, PROMO["indexClass"], "index"),
                 aliases=aliases,
                 token=_one_literal(self._graph, s, PROMO["token"]) or None,
