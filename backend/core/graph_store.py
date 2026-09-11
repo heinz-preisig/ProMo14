@@ -32,6 +32,19 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
+# Module-level singleton so that all backend modules see the same store
+# within one process.  The store is loaded on first access.
+_STORE: Optional["RdfStore"] = None
+
+
+def get_store() -> "RdfStore":
+    """Return the shared ``RdfStore`` for this process."""
+    global _STORE
+    if _STORE is None:
+        _STORE = RdfStore()
+        _STORE.load()
+    return _STORE
+
 UNIT_FIELDS = [
     "time",
     "length",

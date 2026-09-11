@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from backend.core.graph_store import RdfStore
+from backend.core.graph_store import get_store
 from backend.ontology.rdf_context import RdfContext
 
 from .checker import check
@@ -129,17 +129,10 @@ class ContextResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)
-def _get_store() -> RdfStore:
-    store = RdfStore()
-    store.load()
-    return store
-
-
 @router.get("/context", response_model=ContextResponse)
 def context_endpoint() -> ContextResponse:
     """Load the equation context from the RDF graph store in PROMO_DATA_DIR."""
-    ctx = RdfContext(_get_store())
+    ctx = RdfContext(get_store())
 
     variables = []
     for v in ctx.variables().values():
