@@ -1,0 +1,5 @@
+# Ignore all user data files in this directory by default.
+# Only this file and the README are tracked by git.
+*
+!.gitignore
+!README.md

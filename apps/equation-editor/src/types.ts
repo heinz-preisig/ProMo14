@@ -26,6 +26,12 @@ export interface NetworkTree {
   [parent: string]: string[]
 }
 
+export interface ContextResponse {
+  variables: Variable[]
+  indices: Index[]
+  network_tree: NetworkTree
+}
+
 export interface CheckRequest {
   text: string
   variables: Variable[]

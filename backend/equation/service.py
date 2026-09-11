@@ -23,6 +23,8 @@ from pydantic import BaseModel, Field
 from .checker import check
 from .compile_space import CompileSpace, Index, Variable
 from .context import DictContext
+from backend.core.loader import load_context
+
 from .errors import VarError
 from .parser import ParseError, parse
 from .syntax import Node, Var
@@ -88,6 +90,7 @@ class IndexIn(BaseModel):
     index_class: str = "index"
     aliases: Dict[str, str] = Field(default_factory=dict)
     token: Optional[str] = None
+    short_name: Optional[str] = None
 
 
 class CheckRequest(BaseModel):
@@ -113,9 +116,59 @@ class CheckResponse(BaseModel):
     candidates: Optional[List[Dict[str, Any]]] = None  # AmbiguousVariableError
 
 
+class ContextResponse(BaseModel):
+    variables: List[VariableIn] = Field(default_factory=list)
+    indices: List[IndexIn] = Field(default_factory=list)
+    network_tree: Dict[str, List[str]] = Field(default_factory=dict)
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@router.get("/context", response_model=ContextResponse)
+def context_endpoint() -> ContextResponse:
+    """Load the equation context from PROMO_DATA_DIR."""
+    ctx = load_context()
+
+    variables = []
+    for v in ctx["variables"].values():
+        variables.append(
+            VariableIn(
+                iri=v["iri"],
+                label=v["label"],
+                network=v["network"],
+                type=v["type"],
+                units=v["units"],
+                index_structures=v["index_structures"],
+                internal_id=v["internal_id"],
+                aliases=v["aliases"],
+                doc=v["doc"],
+                port_variable=v["port_variable"],
+                tokens=v["tokens"],
+            )
+        )
+
+    indices = []
+    for i in ctx["indices"].values():
+        indices.append(
+            IndexIn(
+                iri=i["iri"],
+                label=i["label"],
+                network=i["network"],
+                index_class=i["index_class"],
+                aliases=i["aliases"],
+                token=i.get("token"),
+                short_name=i.get("short_name"),
+            )
+        )
+
+    return ContextResponse(
+        variables=variables,
+        indices=indices,
+        network_tree=ctx["network_tree"],
+    )
+
 
 @router.post("/parse", response_model=ParseResponse)
 def parse_endpoint(req: ParseRequest) -> ParseResponse:

@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { indexShortLabel } from './latex'
+import { loadContext } from './api'
 import type { Index, NetworkTree, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
@@ -29,6 +30,16 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
   const [debugOpen, setDebugOpen] = useState(false)
+
+  useEffect(() => {
+    loadContext()
+      .then((ctx) => {
+        setVariables(ctx.variables)
+        setIndices(ctx.indices)
+        setNetworkTree(ctx.network_tree)
+      })
+      .catch((err) => console.error('Failed to load context:', err))
+  }, [])
 
   const addPortVariable = useCallback((v: Variable) => {
     setVariables((prev) => [...prev, v])

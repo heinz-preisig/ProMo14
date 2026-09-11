@@ -1,4 +1,4 @@
-import type { AstNode, CheckRequest, CheckResponse, ParseRequest, ParseResponse } from './types'
+import type { AstNode, CheckRequest, CheckResponse, ContextResponse, ParseRequest, ParseResponse } from './types'
 
 export async function parseExpression(text: string): Promise<ParseResponse> {
   const res = await fetch('/api/equation/parse', {
@@ -16,6 +16,11 @@ export async function checkExpression(req: CheckRequest): Promise<CheckResponse>
     body: JSON.stringify(req),
   })
   return res.json() as Promise<CheckResponse>
+}
+
+export async function loadContext(): Promise<ContextResponse> {
+  const res = await fetch('/api/equation/context')
+  return res.json() as Promise<ContextResponse>
 }
 
 export function nodeToString(node: AstNode): string {
