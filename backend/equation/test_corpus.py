@@ -236,7 +236,7 @@ def test_corpus_check_report():
 if __name__ == "__main__":
     import sys
 
-    for name, fn in globals().items():
+    for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):
             try:
                 fn()
