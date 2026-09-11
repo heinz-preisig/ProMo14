@@ -5,24 +5,23 @@ This file captures the state of the ProMo14 workspace at the end of the
 
 ## TL;DR
 
-- Workspace TypeScript build passes.
-- Backend virtual environment (`.venv`) installed and works.
-- Corpus test now passes **70 / 73** (up from 28/73).
-- Remaining 3 failures are legacy interface/arc data issues, not checker
-  bugs (per user: domain-to-domain interfaces are gone, replaced by
-  arcs/connections).
+- Repository cleaned up: removed 7 stale files, archived corpus test.
+- Python backend migrated from pip/requirements.txt to uv/pyproject.toml.
+- All 77 backend tests pass (31 parser, 21 checker, 12 compile_space,
+  13 units).
+- TypeScript workspace build passes.
 - Backend FastAPI server starts; `/api/health` returns `{"status":"ok"}`.
-- Next: switch corpus test to the new arc/connection TriG data in
-  `variableExpression.trig` and extend `RdfContext` to read it.
+- Ontology editor design discussion started — see
+  `docs/ontology-design-discussion-2026-09-11.md`.
+- Next: continue ontology design discussion, then extend `RdfContext`
+  and build ontology editor frontend.
 
 ## Environment
 
 - Repo: `/home/heinz/1_Gits/CAM14/ProMo14`
 - Data (legacy v8 + no-interface TriG):
   `/home/heinz/1_Gits/CAM13/Ontology_Repository/processes_distributed_no_interface_eqs`
-- Legacy ProMo13 corpus:
-  `/home/heinz/1_Gits/CAM13/ProMo13/packages/Common/ontologies/var_equ_rdf.ttl`
-- Python virtual env: `/home/heinz/1_Gits/CAM14/.venv`
+- Python: `uv sync` (creates `.venv` automatically, uses `uv.lock`)
 - Node: managed by `nvm`; `npm install` from repo root.
 
 ## Quick start on a new machine
@@ -35,79 +34,75 @@ npm install
 npm run build        # workspace build; should pass
 
 # Python / backend
-python3 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
+uv sync
 
 # Compile-space unit tests
-.venv/bin/python -m backend.equation.test_compile_space
-
-# Corpus replay (legacy ProMo13 data; expects 70/73)
-PROMO13_CORPUS_TTL=/home/heinz/1_Gits/CAM13/ProMo13/packages/Common/ontologies/var_equ_rdf.ttl \
-  .venv/bin/python -m backend.equation.test_corpus
+uv run python -m backend.equation.test_compile_space
 
 # Backend server smoke test
-.venv/bin/uvicorn backend.main:app --port 8000 &
+uv run uvicorn backend.main:app --port 8000 &
 curl http://localhost:8000/api/health   # -> {"status":"ok"}
 ```
 
-## Files changed this session
+## Changes this session
 
-- `apps/ontology-editor/src/App.tsx` — removed dead imports.
-- `packages/semantic/package.json` — added `build` script (`tsc --noEmit`).
-- `backend/equation/__init__.py` — deferred FastAPI router import.
-- `backend/ontology/__init__.py` — deferred FastAPI router import.
-- `backend/main.py` — adjusted router imports.
-- `backend/equation/compile_space.py` — added `network_tree`,
-  `_nearest_accessible`, and IRI-tail index lookup.
-- `backend/equation/test_corpus.py` — added `_parse_network`, multi-E
-  variable mapping, `RdfContext` integration, RDF index precedence.
-- `backend/equation/context.py` — added `DictContext.from_legacy()` and
-  `tree()`.
-- `backend/core/loader.py` — made `rdflib` optional; glob and merge
-  versioned `variables_v8*.json` files.
-- `backend/ontology/rdf_context.py` — added network list-literal / `>>>`
-  parsing for `promo:network`.
-- Docs: `docs/equation-editor-status.md`,
-  `docs/equation-editor-known-issues.md`,
-  `docs/ontology-editor-status.md`, `docs/suite-status.md`, and this
-  file.
+### Repository cleanup
+- Archived `backend/equation/test_corpus.py` → `archive/test_corpus.py`.
+- Archived `docs/equation-editor-known-issues.md` → `archive/equation-editor-known-issues.md`.
+- Removed: `STATUS.md`, `progress.txt`, `otherMachine.txt`,
+  `docs/suite-description.md`, `docs/architecture-discussion-2026-09-09.md`,
+  `scripts/promo-update`, `dist/`.
+- Updated all docs to remove corpus references and point to archived
+  files where appropriate.
+
+### Python migration to uv
+- Added `pyproject.toml` (project metadata + deps + pytest dev extra).
+- Added `uv.lock` (reproducible lockfile, 32 packages).
+- Removed `backend/requirements.txt`.
+- Updated `Dockerfile` to use `uv` (`ghcr.io/astral-sh/uv`).
+- Updated all docs from `pip`/`.venv/bin/python` to `uv sync`/`uv run`.
+
+### Ontology design discussion
+- Started design discussion for ontology editor.
+- Key decisions: two-branch ontology (structure + behaviour), index
+  sources (nodes, arcs, tokens, conversion, signals), two arc types
+  (bidirectional physical, unidirectional information), domain tree dual
+  role (semantic vs structural).
+- See `docs/ontology-design-discussion-2026-09-11.md` for full details
+  and open questions.
 
 ## Test results
 
 | Test | Result |
 |------|--------|
 | `npm run build` | Pass |
-| `backend.equation.test_compile_space` | All pass |
-| `backend.equation.test_corpus` | **70 / 73** pass |
+| `backend.equation.test_parser` | 31 passed |
+| `backend.equation.test_checker` | 21 passed |
+| `backend.equation.test_compile_space` | 12 passed |
+| `backend.equation.test_units` | 13 passed |
 | `uvicorn backend.main:app` + `/api/health` | `{"status":"ok"}` |
-
-## Remaining 3 corpus failures
-
-These are from the legacy `var_equ_rdf.ttl` and involve variables that the
-new arc/connection model no longer uses:
-
-- `E_54: chemPotStandard + R . T . ln ( x )` — index mismatch.
-- `E_63: F_NI_source * I_1 V` — `V` ambiguity involving `promo:_V`.
-- `E_92: anc + and_x` — unit mismatch.
 
 ## Next concrete tasks
 
-1. Extend `RdfContext` to read **all named graphs** in `RdfStore` (not
+1. **Continue ontology design discussion** — resolve open questions in
+   `docs/ontology-design-discussion-2026-09-11.md` (variable classes
+   per structural element, structure ↔ behaviour interaction,
+   entity types, time as index).
+2. **Extend `RdfContext`** to read all named graphs in `RdfStore` (not
    just `ontology_graph`) and to accept lowercase `promo:variable` /
    `promo:index` types used by the new `variableExpression.trig`.
-2. Switch `test_corpus.py` to replay equations from
-   `Ontology_Repository/processes_distributed_no_interface_eqs/variableExpression.trig`
-   instead of the legacy `var_equ_rdf.ttl`.
-3. Once (1) and (2) land, the remaining 3 legacy failures should
-   disappear and the new arc/connection corpus becomes the regression
-   baseline.
-4. Continue Phase 2 ontology CRUD backend (`backend/ontology/models.py`,
-   `service.py`, `store.py`).
+3. **Build ontology editor frontend** — domain tree, variable table,
+   detail editor (per `docs/ontology-editor-design.md` + design
+   discussion outcomes).
 
 ## Useful references
 
+- `docs/ontology-design-discussion-2026-09-11.md` — current design
+  discussion (read this first to continue the conversation)
+- `docs/ontology-editor-design.md` — existing UI design
+- `docs/ontology-data-model.md` — RDF schema for variables, indices,
+  equations, tokens, domain tree
+- `docs/ontology-editor-status.md` — implementation status
 - `docs/equation-editor-status.md`
-- `docs/equation-editor-known-issues.md`
-- `docs/ontology-editor-status.md`
 - `docs/suite-status.md`
 - `docs/equation-context-contract.md`

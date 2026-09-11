@@ -326,9 +326,5 @@ Model Reuse / Instantiation
 - `docs/equation-context-contract.md` — EquationContext protocol and CompileSpace resolution rules
 - `docs/ontology-data-model.md` — variable/index/equation/token RDF schema, loader contract
 - `docs/ontology-editor-design.md` — ontology editor UI layout and workflow
-- `docs/equation-editor-known-issues.md` — deferred issues from corpus replay
 - `docs/distributed-systems-design.md` — meshing concept for distributed PDE systems (future)
 
-### Historical
-- `docs/architecture-discussion-2026-09-09.md` — initial architecture discussion (superseded by this document)
-- `docs/suite-description.md` — original one-paragraph description (superseded by this document)

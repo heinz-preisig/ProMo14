@@ -35,9 +35,12 @@ FROM python:3.12-slim AS backend
 
 WORKDIR /app
 
+# Install uv for fast, reproducible dependency management.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Install Python deps first for Docker layer caching.
-COPY backend/requirements.txt ./backend/
-RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the backend source and the built frontend dists.
 COPY backend ./backend
@@ -52,4 +55,4 @@ ENV ONTOLOGY_STATIC_DIR=/app/apps/ontology-editor/dist
 VOLUME ["/data"]
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

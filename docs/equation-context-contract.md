@@ -36,7 +36,6 @@ class EquationContext(Protocol):
 The in-memory implementation is used by:
 
 - unit and checker tests,
-- the ProMo13 corpus replay test,
 - the ``/api/equation/check`` endpoint until a graph-store provider is wired in.
 
 It takes a parent → children ``tree`` and walks up to the root to compute
@@ -76,10 +75,10 @@ constructs ``CompileSpace``.  In the future this will be replaced by a
 graph-store provider that implements ``EquationContext``; the checker will not
 change.
 
-## 5. Why this matters for the corpus
+## 5. Hierarchy-aware resolution
 
-The ProMo13 expression corpus (``var_equ_rdf.ttl``) does not export the
-domain tree.  Once the ontology work provides the tree and the real
-``index_structures``, the equation editor will run those 73 expressions
-through the same unchanged code path — only the provider implementation will
+The domain tree determines which variables are visible for unqualified
+label resolution.  Once the ontology work provides the tree and the real
+``index_structures``, the equation editor will run expressions through
+the same unchanged code path — only the provider implementation will
 change.

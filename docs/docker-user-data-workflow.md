@@ -81,7 +81,7 @@ The backend writes the edited ontology to
 The `Dockerfile` is a multi-stage build:
 
 1.  Node stage: installs and builds `apps/equation-editor`.
-2.  Python stage: installs `backend/requirements.txt` and copies the built
+2.  Python stage: installs dependencies via `uv sync` and copies the built
     `dist` directory.
 
 Build with:

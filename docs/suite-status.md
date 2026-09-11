@@ -6,12 +6,12 @@
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Ontology Editor | `RdfStore` + `RdfContext` + service scaffold | Scaffold | `RdfContext`/corpus wired | Phase 0/1 backend done; CRUD pending |
-| Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 5 test files, corpus 70/73 | Backend and frontend functional |
+| Ontology Editor | `RdfStore` + `RdfContext` + service scaffold | Scaffold | `RdfContext` wired | Phase 0/1 backend done; CRUD pending |
+| Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 4 test files | Backend and frontend functional |
 | Behaviour Linker | Scaffold | Scaffold | — | Not started, design TBD |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
-| Shared (`backend/core`) | `RdfStore`, legacy loader | — | corpus replay | Initial implementation, needs full graph CRUD |
+| Shared (`backend/core`) | `RdfStore`, legacy loader | — | — | Initial implementation, needs full graph CRUD |
 | Model Reuse | — | — | — | Not started |
 | Instantiation | — | — | — | Not started |
 | Code Generation | — | — | — | Not started |
@@ -20,16 +20,18 @@
 
 ### Ontology Editor
 
-- **Design:** Complete — see `docs/ontology-editor-design.md`,
-  `docs/ontology-data-model.md`, ADR-006.
+- **Design:** UI design complete — see `docs/ontology-editor-design.md`,
+  `docs/ontology-data-model.md`, ADR-006.  Ontology structure design
+  in progress — see `docs/ontology-design-discussion-2026-09-11.md`
+  (two-branch structure/behaviour model, index sources, arc types).
 - **Backend:** `backend/ontology/rdf_context.py` (`RdfContext`) and
   `backend/core/graph_store.py` (`RdfStore`) are implemented; the
-  `RdfContext` provider is already used by the equation corpus test.
+  `RdfContext` provider is wired and tested.
   `backend/ontology/service.py` is a router scaffold.
 - **Frontend:** `apps/ontology-editor/` — UI scaffold; build passes.
-- **Next:** Extend `RdfContext` to read all named graphs and the new
-  lowercase TriG types; build frontend domain tree + variable table +
-  detail editor.
+- **Next:** Finalise ontology design discussion; extend `RdfContext` to
+  read all named graphs and the new lowercase TriG types; build frontend
+  domain tree + variable table + detail editor.
 
 ### Equation Editor
 
@@ -37,18 +39,16 @@
   context protocol, and FastAPI service.  Replaces ProMo13 TPG with a
   hand-written recursive-descent parser.
 - **API:** `POST /api/equation/parse`, `POST /api/equation/check`.
-- **Tests:** Parser, checker, compile space, units, and corpus replay
-  (73 expressions from ProMo13 — all parse, **70/73** pass full checks
-  now that real index structures, units, and the domain tree are loaded
-  from the v8 ontology data).
+- **Tests:** Parser, checker, compile space, units — all passing.
+  The ProMo13 corpus replay (73 expressions, 70/73) has been archived
+  to `archive/test_corpus.py`; the new regression baseline will be
+  expressions re-entered through the equation editor.
 - **Frontend:** React + TypeScript + Vite app in `apps/equation-editor/`.
   Features port/dependent variable creation, expression input with a
   single **Check** action, LaTeX preview, error display, variable
   palette with cascade delete, equation list, and a debug equation
   context JSON editor.
-- **Known issues:** See `docs/equation-editor-known-issues.md`.
-- **Next:** Switch corpus test to the new arc/connection TriG data; wire
-  the frontend to the ontology graph store.
+- **Next:** Wire the frontend to the ontology graph store.
 
 ### Behaviour Linker
 
@@ -99,18 +99,13 @@ npm test         # all workspace tests
 ### Equation editor (backend)
 ```bash
 cd /home/heinz/1_Gits/CAM14/ProMo14
-python3 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
+uv sync
 
 # run compile-space tests
-.venv/bin/python -m backend.equation.test_compile_space
-
-# run corpus replay
-PROMO13_CORPUS_TTL=/home/heinz/1_Gits/CAM13/ProMo13/packages/Common/ontologies/var_equ_rdf.ttl \
-  .venv/bin/python -m backend.equation.test_corpus
+uv run python -m backend.equation.test_compile_space
 
 # start API server
-.venv/bin/uvicorn backend.main:app --port 8000
+uv run uvicorn backend.main:app --port 8000
 ```
 
 ### Equation editor (frontend)

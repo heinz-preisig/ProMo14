@@ -5,7 +5,7 @@
 ## Current state
 
 Design complete.  Phase 0 and Phase 1 backend are implemented and wired
-into the corpus smoke test.
+into the equation editor tests.
 
 - `backend/core/graph_store.py` (`RdfStore`): implemented.
   - Wraps `rdflib.Dataset`.
@@ -37,8 +37,7 @@ into the corpus smoke test.
 ## Backend
 
 `backend/ontology/` now contains the `RdfContext` provider and a
-FastAPI router scaffold.  The provider is functional and consumed by
-`backend/equation/test_corpus.py` for the real ontology context.
+FastAPI router scaffold.  The provider is functional and tested.
 
 ### Planned backend
 
@@ -164,8 +163,5 @@ Phase 0 and Phase 1 are largely complete.  The next concrete steps are:
    (not only `ontology_graph`) and to recognise lowercase
    `promo:variable` / `promo:index` types used by
    `variableExpression.trig`.
-2. Switch the corpus smoke test to the new arc/connection data in
-   `variableExpression.trig` (or the canonical v9 TriG file) so the
-   remaining 3 legacy failures disappear.
-3. Begin Phase 2 ontology CRUD backend (`models.py`, `service.py`,
+2. Begin Phase 2 ontology CRUD backend (`models.py`, `service.py`,
    `store.py`).

@@ -140,7 +140,7 @@ backend/equation/
 ├── units.py           # SI unit vector and operations
 ├── errors.py          # VarError hierarchy
 ├── service.py         # FastAPI router: /parse, /check
-└── test_*.py          # parser, checker, compile_space, units, corpus tests
+└── test_*.py          # parser, checker, compile_space, units tests
 ```
 
 ### Why the operator layer stays in Python
@@ -192,5 +192,3 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
   `CompileSpace` resolution rules.
 - `docs/ontology-data-model.md` — RDF schema for variables, indices,
   equations, tokens; loader contract.
-- `docs/equation-editor-known-issues.md` — deferred issues from corpus
-  replay.

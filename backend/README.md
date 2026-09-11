@@ -14,6 +14,6 @@ package exposing an `APIRouter`; shared services live in `core/`.
 ## Run
 
 ```bash
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 8000
+uv sync
+uv run uvicorn backend.main:app --reload --port 8000
 ```

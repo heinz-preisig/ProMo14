@@ -467,7 +467,7 @@ backend/equation/
 ├── units.py           # SI unit vector and operations
 ├── errors.py          # VarError hierarchy
 ├── service.py         # FastAPI router: /api/equation/parse, /api/equation/check
-└── test_*.py          # parser, checker, compile_space, units, corpus tests
+└── test_*.py          # parser, checker, compile_space, units tests
 
 apps/equation-editor/
 ├── index.html
