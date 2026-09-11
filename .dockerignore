@@ -1,0 +1,27 @@
+# Build artifacts and dependencies
+node_modules
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.venv
+
+dist
+.vite
+*.log
+
+# Git and editor
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+
+# User data (Docker image must not include the local data directory)
+data

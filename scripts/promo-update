@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Pull or build the latest ProMo14 Docker image.
+#
+# Set PROMO_IMAGE to override the image name (default: promo14:latest).
+# If the image is not available from a registry, the script prints build
+# instructions.
+#
+
+set -euo pipefail
+
+PROMO_IMAGE="${PROMO_IMAGE:-promo14:latest}"
+
+if docker pull "${PROMO_IMAGE}" 2>/dev/null; then
+    echo "Updated ${PROMO_IMAGE}"
+else
+    echo "PROMO_IMAGE=${PROMO_IMAGE} is not in a registry."
+    echo "Build it from the ProMo14 repository with:"
+    echo "  docker build -t ${PROMO_IMAGE} /path/to/ProMo14"
+    exit 1
+fi

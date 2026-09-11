@@ -5,7 +5,12 @@ and exposes an APIRouter under /api/<tool>/. Shared services (RDF store,
 IRI registry, ontology client) live in backend.core.
 """
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.behaviour import router as behaviour_router
 from backend.equation import router as equation_router
@@ -23,3 +28,23 @@ app.include_router(modeller_router, prefix="/api/modeller", tags=["modeller"])
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Static frontend (built equation editor)
+# ---------------------------------------------------------------------------
+
+STATIC_DIR = Path(os.environ.get("STATIC_DIR", "apps/equation-editor/dist")).resolve()
+ASSETS_DIR = STATIC_DIR / "assets"
+
+if ASSETS_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_spa(full_path: str) -> FileResponse:
+    """Serve the built React SPA for every non-API, non-asset route."""
+    index = STATIC_DIR / "index.html"
+    if index.is_file():
+        return FileResponse(str(index))
+    return FileResponse(str(STATIC_DIR / "index.html"), status_code=404)

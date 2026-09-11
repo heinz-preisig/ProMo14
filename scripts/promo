@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#
+# ProMo14 user-side launcher.
+#
+# Place this script in your ProMo data directory and run:
+#
+#   PROMO_DATA_DIR=/path/to/data ./promo
+#
+# The script ensures the Docker image is up to date, then starts the suite
+# container with your data directory mounted on /data. All user-owned data
+# stays outside the image.
+#
+
+set -euo pipefail
+
+PROMO_DATA_DIR="${PROMO_DATA_DIR:-$(pwd)}"
+PROMO_IMAGE="${PROMO_IMAGE:-promo14:latest}"
+PROMO_PORT="${PROMO_PORT:-8000}"
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [command]
+
+Commands:
+  run        Run the ProMo14 suite (default)
+  update     Pull or build the latest image
+  stop       Stop a running container
+  status     Show running container
+
+Environment:
+  PROMO_DATA_DIR  directory to mount as /data (default: current directory)
+  PROMO_IMAGE     Docker image name (default: promo14:latest)
+  PROMO_PORT      host port to expose (default: 8000)
+EOF
+}
+
+cd "${PROMO_DATA_DIR}"
+
+cmd="${1:-run}"
+
+case "$cmd" in
+    run)
+        echo "Starting ProMo14 from ${PROMO_DATA_DIR} on http://localhost:${PROMO_PORT}"
+        docker run --rm -it \
+            --name promo14 \
+            -p "${PROMO_PORT}:8000" \
+            -v "$(pwd):/data" \
+            -e PROMO_DATA_DIR=/data \
+            "${PROMO_IMAGE}"
+        ;;
+
+    update)
+        if docker pull "${PROMO_IMAGE}" 2>/dev/null; then
+            echo "Updated ${PROMO_IMAGE}"
+        else
+            echo "PROMO_IMAGE=${PROMO_IMAGE} not in a registry. Build it with:"
+            echo "  docker build -t ${PROMO_IMAGE} /path/to/ProMo14"
+        fi
+        ;;
+
+    stop)
+        docker stop promo14 || true
+        ;;
+
+    status)
+        docker ps --filter "name=promo14" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        ;;
+
+    -h|--help|help)
+        usage
+        ;;
+
+    *)
+        echo "Unknown command: $cmd"
+        usage
+        exit 1
+        ;;
+esac
