@@ -378,8 +378,30 @@ as the design evolves.
    No separate fixed mapping per domain type is needed — the
    inheritance mechanism handles it.
 
-7. **Event dynamics** — **Preliminary notes (Sep 12).**  Deferred for
-   full discussion, but key concepts captured:
+7. **Event dynamics** — **Resolved (Sep 12).**  Event dynamics fits
+   within the existing ontology taxonomy — no special ontological
+   concepts needed.
+
+   - **Event observer** = information capacity, event-dynamic (§4.2.3),
+     instantaneous I/O transformation.  Its trigger condition (boundary
+     crossing) is a *behaviour* defined through equations, not an
+     ontology type.
+   - **Sampler** = same entity type, different equations (fixed time
+     interval trigger).
+   - **Zero-order hold** = same entity type, different equations
+     (piecewise constant output).
+   - **Automaton** = an information processing representation of the
+     physical plant.  It is a model, not a new entity type.
+   - Event-dynamic *physical* capacities (4.1.4 point, 4.1.5 transport
+     system) are already in the physical branch.
+   - The bridging elements (observer, hold) are already in the
+     information branch.
+   - The connection between them is covered by connection rule type 3
+     (signal connections).
+   - The non-uniqueness of automaton transitions is a mathematical
+     property of the equations, not an ontological distinction.  The
+     equation editor handles it; the ontology just needs to know it is
+     an event-dynamic information processing element.
 
    **Analogy: sampled vs. event-discretised systems:**
 
@@ -408,9 +430,9 @@ as the design evolves.
      information arc (observation: physical → information; return:
      information → physical via zero-order hold).
 
-   **To be discussed:** variable classes, tokens, and equation
-   classes for event-dynamic systems; how the automaton representation
-   interacts with the continuous-time capacity/transport network.
+   **Remaining work is equation-level** (equation editor and behaviour
+   linker), not ontology-level: defining observer, hold, and automaton
+   behaviours.
 
 8. **Classification axis definition** — **Resolved (Sep 12).**
    Classification axes are per-domain with inheritance (same as
