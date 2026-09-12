@@ -378,10 +378,39 @@ as the design evolves.
    No separate fixed mapping per domain type is needed — the
    inheritance mechanism handles it.
 
-7. **Event dynamics** — how does event dynamic modelling fit into the
-   ontology?  What variable classes, tokens, and equation classes does
-   it need?  How does it interact with the continuous-time capacity/
-   transport network?  **Deferred** — to be addressed later.
+7. **Event dynamics** — **Preliminary notes (Sep 12).**  Deferred for
+   full discussion, but key concepts captured:
+
+   **Analogy: sampled vs. event-discretised systems:**
+
+   | | Sampled (time-triggered) | Event (boundary-triggered) |
+   |---|---|---|
+   | Discretiser | Sampler (fixed time interval) | Event observer (triggers when state crosses a boundary) |
+   | Return path | Zero-order hold (piecewise constant) | Zero-order hold (piecewise constant) |
+   | Result | Discrete-time signal | Event-discretised signal |
+   | Plant model | Continuous + discrete hybrid | Automaton (non-unique transitions) |
+
+   - Continuous/analogue control is not excluded — standard time
+     integration.
+   - Sampled systems: sampler produces discrete signals, zero-order
+     hold for manipulated variable back to continuous plant.  Standard
+     for digital control.
+   - Event observer: analogous to sampler, but triggers on boundary
+     crossing (not fixed time interval).  Zero-order hold for return
+     signal.
+   - Event-discretised plant: can build an automaton representation,
+     but transitions are **not unique** — state-space discretisation
+     loses information.  The mathematics exists and could be built into
+     the info processing system.
+   - Both sampler and event observer are **information processing
+     elements** (information branch, entity type §4.2.3 event-dynamic).
+   - The connection between observer and continuous plant is an
+     information arc (observation: physical → information; return:
+     information → physical via zero-order hold).
+
+   **To be discussed:** variable classes, tokens, and equation
+   classes for event-dynamic systems; how the automaton representation
+   interacts with the continuous-time capacity/transport network.
 
 8. **Classification axis definition** — **Resolved (Sep 12).**
    Classification axes are per-domain with inheritance (same as
