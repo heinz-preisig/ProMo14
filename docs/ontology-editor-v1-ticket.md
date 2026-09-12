@@ -106,22 +106,58 @@ class AxisTermRecord(BaseModel):
 
 ### 2.3 Variable record
 
-Update `VariableRecord`:
+Update `VariableRecord` to extend the existing data model from
+`docs/ontology-data-model.md` — add `classifications`, keep all
+existing fields:
 
 ```python
+class EquationRecord(BaseModel):
+    """Nested inside a variable, one per expression network."""
+    iri: str
+    internal_id: Optional[str] = None  # E_N code name
+    lhs: str                           # variable IRI being defined
+    rhs: str = ""                      # token stream (global_ID form)
+    rhs_latex: str = ""                # generated LaTeX, cached
+    equation_class: str = "generic"    # IRI of EquationClass node (hierarchical)
+    network: str = "root"              # expression definition network
+    incidence_list: List[str] = Field(default_factory=list)  # derived, cached
+    doc: str = ""
+    created: Optional[str] = None
+    modified: Optional[str] = None
+
 class VariableRecord(BaseModel):
+    # Identity & naming (three-name pattern)
     iri: str
     label: str
-    network: str = "root"
-    # Replaces variable_class: map of axis IRI -> axis term IRI
-    classifications: Dict[str, str] = Field(default_factory=dict)
-    units: List[int] = Field(default_factory=lambda: [0] * 8)
-    index_structures: List[str] = Field(default_factory=list)
     internal_id: Optional[str] = None
     aliases: Dict[str, str] = Field(default_factory=dict)
-    doc: str = ""
+    # extensible: internal_code, latex, matlab, python, modelica, ...
+
+    # Domain / location
+    network: str = "root"
+    classifications: Dict[str, str] = Field(default_factory=dict)
+    # Replaces variable_class: map of axis IRI -> axis term IRI
     port_variable: bool = False
+    imported: bool = False  # ontology-editor metadata
+
+    # Semantics
+    doc: str = ""
+    units: List[int] = Field(default_factory=lambda: [0] * 8)
     tokens: List[str] = Field(default_factory=list)
+
+    # Index structure
+    index_structures: List[str] = Field(default_factory=list)
+
+    # Equations (nested, one per expression network)
+    equations: Dict[str, EquationRecord] = Field(default_factory=dict)
+
+    # Codegen metadata (not consumed by equation editor)
+    compiled_lhs: Optional[Dict] = None
+    memory: Optional[Dict] = None
+
+    # Audit
+    created: Optional[str] = None
+    modified: Optional[str] = None
 ```
 
 Keep `variable_class` as a computed property for backward compat:
@@ -129,18 +165,15 @@ Keep `variable_class` as a computed property for backward compat:
 
 ### 2.4 Equation record
 
-Update `EquationRecord`:
+Equations are nested inside variables (see `EquationRecord` above),
+matching the existing data model in `docs/ontology-data-model.md`.
+The `equation_class` field changes from a flat string to an IRI
+referencing a hierarchical `promo:EquationClass` node.
 
-```python
-class EquationRecord(BaseModel):
-    iri: str
-    label: str
-    lhs: str
-    rhs_tokens: List[str] = Field(default_factory=list)
-    equation_class: str = "generic"  # IRI of EquationClass node
-    network: str = "root"
-    doc: str = ""
-```
+Equation class values from the existing model: `generic`,
+`instantiate`, `balance`, `empirical`, `user_function`.  These
+become top-level nodes in the equation class hierarchy, with
+sub-classes added per domain.
 
 ### 2.5 Entity type
 
@@ -311,8 +344,15 @@ Replace the single "Class" text input with a **multi-axis tagger**:
 
 Add interfaces for `ClassificationAxisRecord`, `AxisTermRecord`,
 `EntityTypeRecord`, `ConnectionRuleRecord`. Update `VariableRecord`
-with `classifications` map. Update `NetworkRecord` → `DomainRecord`
-with `branch` and `tokens`.
+with `classifications` map, nested `EquationRecord` (matching
+`docs/ontology-data-model.md`), and all existing fields (aliases,
+imported, compiled_lhs, memory, equations, timestamps). Update
+`NetworkRecord` → `DomainRecord` with `branch` and `tokens`.
+
+Update `EquationRecord` interface to match the existing data model:
+`iri`, `internal_id`, `lhs` (variable IRI), `rhs` (token stream),
+`rhs_latex`, `equation_class` (IRI), `network`, `incidence_list`,
+`doc`, `created`, `modified`.
 
 ### 4.9 API updates
 
