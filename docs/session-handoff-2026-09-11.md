@@ -1,20 +1,19 @@
-# Session Handoff — 2026-09-11
+# Session Handoff — 2026-09-12
 
 This file captures the state of the ProMo14 workspace at the end of the
-2026-09-11 session, so the work can be continued on another machine.
+2026-09-12 session, so the work can be continued on another machine.
 
 ## TL;DR
 
-- Repository cleaned up: removed 7 stale files, archived corpus test.
-- Python backend migrated from pip/requirements.txt to uv/pyproject.toml.
-- All 77 backend tests pass (31 parser, 21 checker, 12 compile_space,
-  13 units).
-- TypeScript workspace build passes.
-- Backend FastAPI server starts; `/api/health` returns `{"status":"ok"}`.
-- Ontology editor design discussion started — see
-  `docs/ontology-design-discussion-2026-09-11.md`.
-- Next: continue ontology design discussion, then extend `RdfContext`
-  and build ontology editor frontend.
+- Ontology design discussion complete: all 9 questions resolved.
+- Key decisions: two-branch domain tree (physical/information),
+  multi-axis variable classification (variable_class → "role" axis),
+  entity types from CWA 17960, 3 connection rule types, transport
+  system as node (not arc), event dynamics fits existing taxonomy.
+- Implementation ticket drafted: `docs/ontology-editor-v1-ticket.md`.
+- Ticket aligned with existing data model (`docs/ontology-data-model.md`).
+- Modeller (ADR-004) verified compatible with ontology design.
+- Next: implement ontology editor v1 per ticket (10-step sequence).
 
 ## Environment
 
@@ -46,30 +45,34 @@ curl http://localhost:8000/api/health   # -> {"status":"ok"}
 
 ## Changes this session
 
-### Repository cleanup
-- Archived `backend/equation/test_corpus.py` → `archive/test_corpus.py`.
-- Archived `docs/equation-editor-known-issues.md` → `archive/equation-editor-known-issues.md`.
-- Removed: `STATUS.md`, `progress.txt`, `otherMachine.txt`,
-  `docs/suite-description.md`, `docs/architecture-discussion-2026-09-09.md`,
-  `scripts/promo-update`, `dist/`.
-- Updated all docs to remove corpus references and point to archived
-  files where appropriate.
+### Ontology design discussion (continued from Sep 11)
+- Resolved all 9 open questions in
+  `docs/ontology-design-discussion-2026-09-11.md`.
+- Key resolutions:
+  - Q5: Entity types = temporal × spatial (CWA 17960 taxonomy, 5
+    physical + 3 information).
+  - Q6: Variable class vocabularies inherited with augmentation.
+  - Q7: Event dynamics fits within existing taxonomy (event observer =
+    information capacity §4.2.3, no special ontology concepts).
+  - Q8: Classification axes per-domain with inheritance; variable_class
+    becomes "role" axis; tagging + inferred defaults.
+  - Q9: Connection rules (3 types: same-domain physical, cross-domain
+    physical, signal).
+  - Domain tree: two main branches (physical, information).
+  - Transport system = event-dynamic distributed node (not arc).
+  - Arc = intraface (continuity conditions only).
+  - Valve modelling: two abstraction levels (physical entity or
+    coefficient).
 
-### Python migration to uv
-- Added `pyproject.toml` (project metadata + deps + pytest dev extra).
-- Added `uv.lock` (reproducible lockfile, 32 packages).
-- Removed `backend/requirements.txt`.
-- Updated `Dockerfile` to use `uv` (`ghcr.io/astral-sh/uv`).
-- Updated all docs from `pip`/`.venv/bin/python` to `uv sync`/`uv run`.
-
-### Ontology design discussion
-- Started design discussion for ontology editor.
-- Key decisions: two-branch ontology (structure + behaviour), index
-  sources (nodes, arcs, tokens, conversion, signals), two arc types
-  (bidirectional physical, unidirectional information), domain tree dual
-  role (semantic vs structural).
-- See `docs/ontology-design-discussion-2026-09-11.md` for full details
-  and open questions.
+### Ontology editor v1 implementation ticket
+- Created `docs/ontology-editor-v1-ticket.md`.
+- Aligned with existing data model (`docs/ontology-data-model.md`):
+  VariableRecord and EquationRecord extend existing fields, not
+  replace.
+- Verified compatibility with Modeller (ADR-004): modeller is generic,
+  consumes ontology via connection rule resolver and semantic
+  attributes.
+- 10-step implementation sequence defined.
 
 ## Test results
 
@@ -84,25 +87,32 @@ curl http://localhost:8000/api/health   # -> {"status":"ok"}
 
 ## Next concrete tasks
 
-1. **Continue ontology design discussion** — resolve open questions in
-   `docs/ontology-design-discussion-2026-09-11.md` (variable classes
-   per structural element, structure ↔ behaviour interaction,
-   entity types, time as index).
-2. **Extend `RdfContext`** to read all named graphs in `RdfStore` (not
-   just `ontology_graph`) and to accept lowercase `promo:variable` /
-   `promo:index` types used by the new `variableExpression.trig`.
-3. **Build ontology editor frontend** — domain tree, variable table,
-   detail editor (per `docs/ontology-editor-design.md` + design
-   discussion outcomes).
+1. **Implement ontology editor v1** — follow the 10-step sequence in
+   `docs/ontology-editor-v1-ticket.md`:
+   1. RDF vocabulary extensions (`graph_store.py`)
+   2. Backend models (`models.py`)
+   3. Graph store CRUD methods
+   4. Backend service endpoints
+   5. RdfContext updates
+   6. Seed data
+   7. Frontend types + API
+   8. Frontend domain tree (two-branch)
+   9. Frontend variable editor (multi-axis tagger)
+   10. Frontend new tabs (axes, entity types, connection rules, tokens)
+2. **Remaining design items** (not blocking v1):
+   - Q10: Mechanical device modelling at different abstraction levels
+   - Event dynamic equation editor (equation-level, not ontology)
 
 ## Useful references
 
-- `docs/ontology-design-discussion-2026-09-11.md` — current design
-  discussion (read this first to continue the conversation)
+- `docs/ontology-editor-v1-ticket.md` — implementation ticket (read this
+  first to start implementation)
+- `docs/ontology-design-discussion-2026-09-11.md` — design discussion
+  (all questions resolved)
+- `docs/ontology-data-model.md` — existing RDF schema (variable/equation
+  records must match this)
 - `docs/ontology-editor-design.md` — existing UI design
-- `docs/ontology-data-model.md` — RDF schema for variables, indices,
-  equations, tokens, domain tree
-- `docs/ontology-editor-status.md` — implementation status
-- `docs/equation-editor-status.md`
+- `docs/ADR-004-model-and-graphical-architecture.md` — modeller contract
 - `docs/suite-status.md`
+- `docs/equation-editor-status.md`
 - `docs/equation-context-contract.md`

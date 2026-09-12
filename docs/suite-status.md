@@ -1,12 +1,12 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-11 (end of session)
+**Last updated:** 2026-09-12 (end of session)
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Ontology Editor | `RdfStore` + `RdfContext` + service scaffold | Scaffold | `RdfContext` wired | Phase 0/1 backend done; CRUD pending |
+| Ontology Editor | `RdfStore` + `RdfContext` + service scaffold | Scaffold | `RdfContext` wired | Design complete; v1 ticket ready; implementation pending |
 | Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 4 test files | Backend and frontend functional |
 | Behaviour Linker | Scaffold | Scaffold | — | Not started, design TBD |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
@@ -20,18 +20,23 @@
 
 ### Ontology Editor
 
-- **Design:** UI design complete — see `docs/ontology-editor-design.md`,
-  `docs/ontology-data-model.md`, ADR-006.  Ontology structure design
-  in progress — see `docs/ontology-design-discussion-2026-09-11.md`
-  (two-branch structure/behaviour model, index sources, arc types).
+- **Design:** Complete — see `docs/ontology-design-discussion-2026-09-11.md`
+  (all 9 questions resolved), `docs/ontology-editor-v1-ticket.md`
+  (implementation plan), `docs/ontology-editor-design.md`,
+  `docs/ontology-data-model.md`, ADR-004, ADR-006.
+  Key decisions: two-branch domain tree (physical/information),
+  multi-axis variable classification (variable_class → "role" axis),
+  entity types from CWA 17960, 3 connection rule types, transport system
+  as node (not arc), event dynamics fits existing taxonomy.
 - **Backend:** `backend/ontology/rdf_context.py` (`RdfContext`) and
   `backend/core/graph_store.py` (`RdfStore`) are implemented; the
   `RdfContext` provider is wired and tested.
   `backend/ontology/service.py` is a router scaffold.
 - **Frontend:** `apps/ontology-editor/` — UI scaffold; build passes.
-- **Next:** Finalise ontology design discussion; extend `RdfContext` to
-  read all named graphs and the new lowercase TriG types; build frontend
-  domain tree + variable table + detail editor.
+- **Next:** Implement v1 per `docs/ontology-editor-v1-ticket.md` (10-step
+  sequence: RDF vocabulary → models → graph store → service → RdfContext
+  → seed data → frontend types/API → domain tree → variable editor →
+  new tabs).
 
 ### Equation Editor
 
