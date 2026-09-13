@@ -550,6 +550,39 @@ state. The BL doesn't need a flag that says "this entity type has/doesn't
 have state" — it just builds the subgraph, and if there's no cycle,
 there's no state. The absence of state is as informative as its presence.
 
+### Transport connects capacities (2026-09-13)
+
+The transport system has no state of its own — but it **connects
+capacities**. This is its role in the model network:
+
+- Capacity nodes have state (accumulation, time derivatives).
+- Transport system nodes have no state (algebraic, instantaneous).
+- Arcs carry continuity conditions (effort equality, flow conservation).
+- The transport system sits between capacities, computing the flow
+  between them as a function of the effort difference and transport
+  coefficients.
+
+So the transport system's inputs are the effort variables from the
+connected capacity nodes (external inputs via arcs), and its outputs
+are the transport flows that appear on the RHS of the capacity nodes'
+state equations.
+
+In BL subgraph terms:
+- The transport system's subgraph is acyclic and closed: all inputs
+  (efforts) come from outside (connected capacities), all outputs
+  (flows) go outside (back to capacity state equations).
+- The capacity nodes' subgraphs contain the cycle (state), and the
+  transport flow appears on the RHS of the state equation as an input
+  from outside (from the transport system node).
+
+This is where the **network** structure matters: the BL builds
+subgraphs per entity type, but the entity types are connected. A
+transport system's output is a capacity's input, and vice versa. The
+BL's per-entity-type subgraphs are individually closed, but they
+reference each other through external inputs/outputs. The full model
+(assembled in the Modeller) closes the network by connecting these
+external inputs to the corresponding outputs.
+
 ### PDAE → ODAE meshing — numerical, not BL
 
 PDAE vs ODAE is a **numerical issue**, not a BL concern. The BL does
