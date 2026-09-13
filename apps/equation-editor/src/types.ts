@@ -1,3 +1,17 @@
+export interface EquationRecord {
+  iri: string
+  internal_id?: string | null
+  lhs: string
+  rhs: string
+  rhs_latex?: string | null
+  equation_class?: string | null
+  network?: string | null
+  incidence_list?: string[]
+  doc?: string
+  created?: string | null
+  modified?: string | null
+}
+
 export interface Variable {
   iri: string
   label: string
@@ -10,6 +24,7 @@ export interface Variable {
   doc?: string
   port_variable?: boolean
   tokens?: string[]
+  equations?: Record<string, EquationRecord>
 }
 
 export interface Index {

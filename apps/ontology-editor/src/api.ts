@@ -1,10 +1,15 @@
 import type {
-  EquationRecord,
+  AxisTermRecord,
+  ClassificationAxisRecord,
+  ConnectionRuleRecord,
+  DomainRecord,
+  EntityTypeRecord,
   IndexRecord,
   NetworkRecord,
   OntologyContext,
+  ScaleDimensionRecord,
+  ScaleValueRecord,
   TokenRecord,
-  VariableRecord,
 } from './types'
 
 export async function loadOntologyContext(): Promise<OntologyContext> {
@@ -29,35 +34,6 @@ export async function createNetwork(record: NetworkRecord): Promise<NetworkRecor
   return res.json()
 }
 
-export async function listVariables(): Promise<VariableRecord[]> {
-  const res = await fetch('/api/ontology/variables')
-  if (!res.ok) throw new Error(`Failed to load variables: ${res.status}`)
-  return res.json()
-}
-
-export async function createVariable(record: VariableRecord): Promise<VariableRecord> {
-  const res = await fetch('/api/ontology/variables', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(record),
-  })
-  if (!res.ok) throw new Error(`Failed to create variable: ${res.status}`)
-  return res.json()
-}
-
-export async function updateVariable(
-  iri: string,
-  record: VariableRecord
-): Promise<VariableRecord> {
-  const res = await fetch(`/api/ontology/variables/${encodeURIComponent(iri)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(record),
-  })
-  if (!res.ok) throw new Error(`Failed to update variable: ${res.status}`)
-  return res.json()
-}
-
 export async function listIndices(): Promise<IndexRecord[]> {
   const res = await fetch('/api/ontology/indices')
   if (!res.ok) throw new Error(`Failed to load indices: ${res.status}`)
@@ -74,15 +50,223 @@ export async function createIndex(record: IndexRecord): Promise<IndexRecord> {
   return res.json()
 }
 
+export async function deleteIndex(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/indices/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete index: ${res.status}`)
+  return res.json()
+}
+
 export async function listTokens(): Promise<TokenRecord[]> {
   const res = await fetch('/api/ontology/tokens')
   if (!res.ok) throw new Error(`Failed to load tokens: ${res.status}`)
   return res.json()
 }
 
-export async function listEquations(): Promise<EquationRecord[]> {
-  const res = await fetch('/api/ontology/equations')
-  if (!res.ok) throw new Error(`Failed to load equations: ${res.status}`)
+export async function createToken(record: TokenRecord): Promise<TokenRecord> {
+  const res = await fetch('/api/ontology/tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create token: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteToken(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/tokens/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete token: ${res.status}`)
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Domains
+// ---------------------------------------------------------------------------
+
+export async function listDomains(): Promise<DomainRecord[]> {
+  const res = await fetch('/api/ontology/domains')
+  if (!res.ok) throw new Error(`Failed to load domains: ${res.status}`)
+  return res.json()
+}
+
+export async function createDomain(record: DomainRecord): Promise<DomainRecord> {
+  const res = await fetch('/api/ontology/domains', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create domain: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteDomain(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/domains/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete domain: ${res.status}`)
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Classification axes
+// ---------------------------------------------------------------------------
+
+export async function listAxes(): Promise<ClassificationAxisRecord[]> {
+  const res = await fetch('/api/ontology/axes')
+  if (!res.ok) throw new Error(`Failed to load axes: ${res.status}`)
+  return res.json()
+}
+
+export async function createAxis(record: ClassificationAxisRecord): Promise<ClassificationAxisRecord> {
+  const res = await fetch('/api/ontology/axes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create axis: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteAxis(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/axes/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete axis: ${res.status}`)
+  return res.json()
+}
+
+export async function listAxisTerms(): Promise<AxisTermRecord[]> {
+  const res = await fetch('/api/ontology/axis-terms')
+  if (!res.ok) throw new Error(`Failed to load axis terms: ${res.status}`)
+  return res.json()
+}
+
+export async function createAxisTerm(record: AxisTermRecord): Promise<AxisTermRecord> {
+  const res = await fetch('/api/ontology/axis-terms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create axis term: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteAxisTerm(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/axis-terms/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete axis term: ${res.status}`)
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Scale dimensions + values
+// ---------------------------------------------------------------------------
+
+export async function listScaleDimensions(): Promise<ScaleDimensionRecord[]> {
+  const res = await fetch('/api/ontology/scale-dimensions')
+  if (!res.ok) throw new Error(`Failed to load scale dimensions: ${res.status}`)
+  return res.json()
+}
+
+export async function createScaleDimension(record: ScaleDimensionRecord): Promise<ScaleDimensionRecord> {
+  const res = await fetch('/api/ontology/scale-dimensions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create scale dimension: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteScaleDimension(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/scale-dimensions/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete scale dimension: ${res.status}`)
+  return res.json()
+}
+
+export async function listScaleValues(): Promise<ScaleValueRecord[]> {
+  const res = await fetch('/api/ontology/scale-values')
+  if (!res.ok) throw new Error(`Failed to load scale values: ${res.status}`)
+  return res.json()
+}
+
+export async function createScaleValue(record: ScaleValueRecord): Promise<ScaleValueRecord> {
+  const res = await fetch('/api/ontology/scale-values', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create scale value: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteScaleValue(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/scale-values/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete scale value: ${res.status}`)
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Entity types
+// ---------------------------------------------------------------------------
+
+export async function listEntityTypes(): Promise<EntityTypeRecord[]> {
+  const res = await fetch('/api/ontology/entity-types')
+  if (!res.ok) throw new Error(`Failed to load entity types: ${res.status}`)
+  return res.json()
+}
+
+export async function createEntityType(record: EntityTypeRecord): Promise<EntityTypeRecord> {
+  const res = await fetch('/api/ontology/entity-types', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create entity type: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteEntityType(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/entity-types/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete entity type: ${res.status}`)
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Connection rules
+// ---------------------------------------------------------------------------
+
+export async function listConnectionRules(): Promise<ConnectionRuleRecord[]> {
+  const res = await fetch('/api/ontology/connection-rules')
+  if (!res.ok) throw new Error(`Failed to load connection rules: ${res.status}`)
+  return res.json()
+}
+
+export async function createConnectionRule(record: ConnectionRuleRecord): Promise<ConnectionRuleRecord> {
+  const res = await fetch('/api/ontology/connection-rules', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!res.ok) throw new Error(`Failed to create connection rule: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteConnectionRule(iri: string): Promise<{ deleted: string }> {
+  const res = await fetch(`/api/ontology/connection-rules/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete connection rule: ${res.status}`)
   return res.json()
 }
 

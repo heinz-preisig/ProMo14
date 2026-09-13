@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { indexShortLabel } from './latex'
-import { loadContext } from './api'
+import { deleteVariable, loadContext, saveVariable } from './api'
 import type { Index, NetworkTree, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
@@ -37,12 +37,38 @@ export default function App() {
         setVariables(ctx.variables)
         setIndices(ctx.indices)
         setNetworkTree(ctx.network_tree)
+        // Rebuild SavedEquation list from persisted equations
+        const saved: SavedEquation[] = []
+        for (const v of ctx.variables) {
+          if (v.equations) {
+            for (const [eqId, eq] of Object.entries(v.equations)) {
+              saved.push({
+                id: eqId,
+                lhs: v.label,
+                text: eq.rhs,
+                ast: null,
+                check: null,
+              })
+            }
+          }
+        }
+        if (saved.length > 0) {
+          setEquations(saved)
+        }
       })
       .catch((err) => console.error('Failed to load context:', err))
   }, [])
 
-  const addPortVariable = useCallback((v: Variable) => {
-    setVariables((prev) => [...prev, v])
+  const addPortVariable = useCallback(async (v: Variable) => {
+    try {
+      await saveVariable(v)
+      const ctx = await loadContext()
+      setVariables(ctx.variables)
+      setIndices(ctx.indices)
+      setNetworkTree(ctx.network_tree)
+    } catch (err) {
+      console.error('Failed to save variable:', err)
+    }
   }, [])
 
   const startDependent = useCallback((domain: string, variableClass: string) => {
@@ -51,8 +77,16 @@ export default function App() {
     setDependentOpen(true)
   }, [])
 
-  const acceptDependent = useCallback((v: Variable, eq: SavedEquation) => {
-    setVariables((prev) => [...prev, v])
+  const acceptDependent = useCallback(async (v: Variable, eq: SavedEquation) => {
+    try {
+      await saveVariable(v, eq)
+      const ctx = await loadContext()
+      setVariables(ctx.variables)
+      setIndices(ctx.indices)
+      setNetworkTree(ctx.network_tree)
+    } catch (err) {
+      console.error('Failed to save variable:', err)
+    }
     setEquations((prev) => [...prev, eq])
   }, [])
 
@@ -60,7 +94,14 @@ export default function App() {
     setEquations((prev) => prev.filter((eq) => eq.id !== id))
   }, [])
 
-  const removeVariable = useCallback((impact: DeleteImpact) => {
+  const removeVariable = useCallback(async (impact: DeleteImpact) => {
+    for (const iri of impact.variableIris) {
+      try {
+        await deleteVariable(iri)
+      } catch (err) {
+        console.error('Failed to delete variable:', iri, err)
+      }
+    }
     setVariables((prev) => prev.filter((v) => !impact.variableIris.includes(v.iri)))
     setEquations((prev) => prev.filter((eq) => !impact.equationIds.includes(eq.id)))
     setDeleteTarget(null)

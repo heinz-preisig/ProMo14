@@ -6,12 +6,12 @@
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Ontology Editor | `RdfStore` + `RdfContext` + service scaffold | Scaffold | `RdfContext` wired | Design complete; v1 ticket ready; implementation pending |
+| Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data | React UI with all v1 tabs | TypeScript + Vite build pass | **v1 implemented**; end-to-end testing next |
 | Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 4 test files | Backend and frontend functional |
 | Behaviour Linker | Scaffold | Scaffold | — | Not started, design TBD |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
-| Shared (`backend/core`) | `RdfStore`, legacy loader | — | — | Initial implementation, needs full graph CRUD |
+| Shared (`backend/core`) | `RdfStore`, legacy loader, full ontology CRUD | — | — | Ontology CRUD complete; shared IRI minting done |
 | Model Reuse | — | — | — | Not started |
 | Instantiation | — | — | — | Not started |
 | Code Generation | — | — | — | Not started |
@@ -28,15 +28,26 @@
   multi-axis variable classification (variable_class → "role" axis),
   entity types from CWA 17960, 3 connection rule types, transport system
   as node (not arc), event dynamics fits existing taxonomy.
-- **Backend:** `backend/ontology/rdf_context.py` (`RdfContext`) and
-  `backend/core/graph_store.py` (`RdfStore`) are implemented; the
-  `RdfContext` provider is wired and tested.
-  `backend/ontology/service.py` is a router scaffold.
-- **Frontend:** `apps/ontology-editor/` — UI scaffold; build passes.
-- **Next:** Implement v1 per `docs/ontology-editor-v1-ticket.md` (10-step
-  sequence: RDF vocabulary → models → graph store → service → RdfContext
-  → seed data → frontend types/API → domain tree → variable editor →
-  new tabs).
+- **Backend:** All v1 steps implemented:
+  - `backend/core/graph_store.py` — PROMO vocabulary for Domain,
+    ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
+    EquationClass. CRUD methods for all. `seed_default_ontology()`
+    bootstraps two-branch tree, 7 tokens, role axes, 8 entity types, 3
+    connection rules, 5 equation classes.
+  - `backend/ontology/models.py` — VariableRecord, EquationRecord,
+    DomainRecord, ClassificationAxisRecord, AxisTermRecord,
+    EntityTypeRecord, ConnectionRuleRecord.
+  - `backend/ontology/service.py` — REST endpoints for domains, axes,
+    axis terms, entity types, connection rules, token CRUD.
+  - `backend/ontology/rdf_context.py` — domains(), axes(),
+    entity_types(), connection_rules() accessors; multi-axis
+    classification loading.
+- **Frontend:** `apps/ontology-editor/` — all v1 tabs implemented:
+  Variables (with multi-axis tagger), Indices, Domains, Tokens, Axes,
+  Entity Types, Connection Rules, Equations. TypeScript and Vite
+  builds pass clean.
+- **Next:** End-to-end testing (backend + frontend together). Then wire
+  equation editor to `RdfContext`.
 
 ### Equation Editor
 
@@ -86,8 +97,9 @@
 - **`packages/semantic`:** `SemanticCatalogue`, `ConnectionRuleResolver`
   interfaces with in-memory placeholder implementations.
   `connectionService.ts` shared by arc creation and reconnection.
-- **`backend/core`:** `RdfStore` and legacy v8 loader implemented; shared
-  IRI minting and CRUD operations are still pending.
+- **`backend/core`:** `RdfStore` and legacy v8 loader implemented; full
+  ontology CRUD (domains, axes, entity types, connection rules, tokens);
+  shared IRI minting; seed data bootstrap.
 - **`backend/main.py`:** FastAPI app mounting per-tool routers; server
   starts and `/api/health` returns `{"status":"ok"}`.
 

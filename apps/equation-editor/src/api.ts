@@ -1,4 +1,5 @@
-import type { AstNode, CheckRequest, CheckResponse, ContextResponse, ParseRequest, ParseResponse } from './types'
+import type { AstNode, CheckRequest, CheckResponse, ContextResponse, ParseRequest, ParseResponse, Variable } from './types'
+import type { SavedEquation } from './components/EquationList'
 
 export async function parseExpression(text: string): Promise<ParseResponse> {
   const res = await fetch('/api/equation/parse', {
@@ -21,6 +22,60 @@ export async function checkExpression(req: CheckRequest): Promise<CheckResponse>
 export async function loadContext(): Promise<ContextResponse> {
   const res = await fetch('/api/equation/context')
   return res.json() as Promise<ContextResponse>
+}
+
+export async function saveVariable(v: Variable, equation?: SavedEquation): Promise<Variable> {
+  const equations: Record<string, unknown> = {}
+  if (equation) {
+    const eqId = `E_${Date.now()}`
+    equations[eqId] = {
+      iri: '',
+      internal_id: eqId,
+      lhs: v.iri,
+      rhs: equation.text,
+      rhs_latex: null,
+      equation_class: 'generic',
+      network: v.network,
+      incidence_list: equation.check?.incidence ?? [],
+      doc: '',
+      created: new Date().toISOString(),
+      modified: new Date().toISOString(),
+    }
+  }
+  const body = {
+    iri: v.iri || '',
+    label: v.label,
+    internal_id: v.internal_id ?? null,
+    aliases: v.aliases ?? {},
+    network: v.network,
+    classifications: {},
+    variable_class: v.type ?? null,
+    port_variable: v.port_variable ?? false,
+    imported: false,
+    doc: v.doc ?? '',
+    units: v.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
+    tokens: v.tokens ?? [],
+    index_structures: v.index_structures ?? [],
+    equations,
+    compiled_lhs: null,
+    memory: null,
+    created: null,
+    modified: null,
+  }
+  const res = await fetch('/api/equation/variables', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`Failed to save variable: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteVariable(iri: string): Promise<void> {
+  const res = await fetch(`/api/equation/variables/${encodeURIComponent(iri)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`Failed to delete variable: ${res.status}`)
 }
 
 export function nodeToString(node: AstNode): string {

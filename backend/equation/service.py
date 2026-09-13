@@ -15,13 +15,14 @@ instead.
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
-from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from rdflib import URIRef
 
 from backend.core.graph_store import get_store
+from backend.ontology.models import VariableRecord
 from backend.ontology.rdf_context import RdfContext
 
 from .checker import check
@@ -72,6 +73,20 @@ class ParseResponse(BaseModel):
     error: Optional[str] = None
 
 
+class EquationIn(BaseModel):
+    iri: str = ""
+    internal_id: Optional[str] = None
+    lhs: str = ""
+    rhs: str = ""
+    rhs_latex: Optional[str] = None
+    equation_class: Optional[str] = None
+    network: Optional[str] = None
+    incidence_list: List[str] = Field(default_factory=list)
+    doc: str = ""
+    created: Optional[str] = None
+    modified: Optional[str] = None
+
+
 class VariableIn(BaseModel):
     iri: str
     label: str
@@ -84,6 +99,7 @@ class VariableIn(BaseModel):
     doc: str = ""
     port_variable: bool = False
     tokens: List[str] = Field(default_factory=list)
+    equations: Dict[str, EquationIn] = Field(default_factory=dict)
 
 
 class IndexIn(BaseModel):
@@ -149,6 +165,7 @@ def context_endpoint() -> ContextResponse:
                 doc=v.doc,
                 port_variable=v.port_variable,
                 tokens=v.tokens,
+                equations=getattr(v, "equations", {}),
             )
         )
 
@@ -247,3 +264,52 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
         incidence=sorted(checked.incidence),
         label=checked.label,
     )
+
+
+# ---------------------------------------------------------------------------
+# Variable CRUD (variables and their nested equations live in the equation editor)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/variables", response_model=VariableRecord)
+def create_variable(record: VariableRecord) -> VariableRecord:
+    """Create a new variable (with nested equations) in the ontology graph."""
+    store = get_store()
+    if not record.iri:
+        record.iri = str(store.mint_iri("http://example.org/ontology", record.internal_id or store.next_internal_id("V")))
+    if not record.internal_id:
+        record.internal_id = store.next_internal_id("V")
+
+    var = record.model_dump()
+    if var.get("variable_class"):
+        var["type"] = var["variable_class"]
+    store.add_variable_dict(store.ontology_graph, var)
+    return record
+
+
+@router.put("/variables/{iri:path}", response_model=VariableRecord)
+def update_variable(iri: str, record: VariableRecord) -> VariableRecord:
+    """Replace a variable in the ontology graph."""
+    store = get_store()
+    graph = store.ontology_graph
+
+    subject = URIRef(iri)
+    if (subject, None, None) not in graph:
+        raise HTTPException(status_code=404, detail="Variable not found")
+
+    graph.remove((subject, None, None))
+    record.iri = iri
+    store.add_variable_dict(graph, record.model_dump())
+    return record
+
+
+@router.delete("/variables/{iri:path}")
+def delete_variable(iri: str) -> Dict[str, str]:
+    """Delete a variable from the ontology graph."""
+    store = get_store()
+    graph = store.ontology_graph
+    subject = URIRef(iri)
+    if (subject, None, None) not in graph:
+        raise HTTPException(status_code=404, detail="Variable not found")
+    graph.remove((subject, None, None))
+    return {"deleted": iri}

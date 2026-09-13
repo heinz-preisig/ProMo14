@@ -9,7 +9,7 @@ legacy-file loader.
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from rdflib import Namespace, URIRef
 from rdflib.namespace import RDF
@@ -108,6 +108,35 @@ class RdfContext(EquationContext):
         self._indices = self._load_indices()
         self._tree = self._load_network_tree()
         self._parent_of = self._build_parent_of(self._tree)
+        self._domains = self._load_domains()
+        self._axes = self._load_axes()
+        self._entity_types = self._load_entity_types()
+        self._connection_rules = self._load_connection_rules()
+
+    # ------------------------------------------------------------------
+    # New ontology entity accessors
+    # ------------------------------------------------------------------
+
+    def domains(self) -> List[Dict[str, Any]]:
+        """Return domain records (two-branch tree)."""
+        return self._domains
+
+    def axes(self) -> List[Dict[str, Any]]:
+        """Return classification axes with their terms."""
+        return self._axes
+
+    def entity_types(self) -> List[Dict[str, Any]]:
+        """Return entity types (CWA 17960 taxonomy)."""
+        return self._entity_types
+
+    def connection_rules(self) -> List[Dict[str, Any]]:
+        """Return connection rules."""
+        return self._connection_rules
+
+    def domain_tokens(self, domain_iri: str) -> List[str]:
+        """Return token IRIs bound to a domain."""
+        subject = URIRef(domain_iri)
+        return [str(t) for t in self._graph.objects(subject, PROMO["hasToken"])]
 
     # ------------------------------------------------------------------
     # EquationContext protocol
@@ -143,6 +172,13 @@ class RdfContext(EquationContext):
             iri = str(s)
             aliases = _aliases(self._graph, s)
             units = Units.from_list(_one_unit_list(self._graph, s, PROMO["unitVector"]))
+            # Load multi-axis classifications (promo:axisValue -> axis term IRI).
+            classifications: Dict[str, str] = {}
+            for term_iri in self._graph.objects(s, PROMO["axisValue"]):
+                # Find which axis this term belongs to.
+                axis_iri = self._graph.value(term_iri, PROMO["hasAxis"])
+                if axis_iri:
+                    classifications[str(axis_iri)] = str(term_iri)
             variables[iri] = Variable(
                 iri=iri,
                 label=_one_literal(self._graph, s, PROMO["label"], iri),
@@ -158,6 +194,45 @@ class RdfContext(EquationContext):
                 aliases=aliases,
                 tokens=_literal_list(self._graph, s, PROMO["carriesToken"]),
             )
+            # Attach classifications as a dynamic attribute.
+            setattr(variables[iri], "classifications", classifications)
+            setattr(variables[iri], "imported", _one_bool(self._graph, s, PROMO["imported"], False))
+
+            # Load nested equations (promo:hasEquation -> promo:Equation)
+            equations: Dict[str, dict] = {}
+            for eq_s in self._graph.objects(s, PROMO["hasEquation"]):
+                eq_iri = str(eq_s)
+                eq_internal_id = _one_literal(self._graph, eq_s, PROMO["internalID"])
+                eq_rhs = _one_literal(self._graph, eq_s, PROMO["rhs"])
+                eq_rhs_latex = _one_literal(self._graph, eq_s, PROMO["rhsLatex"])
+                eq_class = _one_literal(self._graph, eq_s, PROMO["equationClass"])
+                eq_network = _one_literal(self._graph, eq_s, PROMO["network"])
+                eq_doc = _one_literal(self._graph, eq_s, PROMO["doc"])
+                # incidence_list is stored as a JSON array literal
+                inc_raw = self._graph.value(eq_s, PROMO["incidenceList"])
+                eq_incidence: List[str] = []
+                if inc_raw is not None:
+                    try:
+                        parsed = json.loads(str(inc_raw))
+                        if isinstance(parsed, list):
+                            eq_incidence = [str(x) for x in parsed]
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                eq_key = eq_internal_id or eq_iri
+                equations[eq_key] = {
+                    "iri": eq_iri,
+                    "internal_id": eq_internal_id or None,
+                    "lhs": iri,
+                    "rhs": eq_rhs,
+                    "rhs_latex": eq_rhs_latex or None,
+                    "equation_class": eq_class or None,
+                    "network": eq_network or None,
+                    "incidence_list": eq_incidence,
+                    "doc": eq_doc or "",
+                    "created": None,
+                    "modified": None,
+                }
+            setattr(variables[iri], "equations", equations)
         return variables
 
     def _load_indices(self) -> Dict[str, Index]:
@@ -208,3 +283,92 @@ class RdfContext(EquationContext):
             for child in children:
                 parent_of[child] = parent
         return parent_of
+
+    # ------------------------------------------------------------------
+    # New entity loaders
+    # ------------------------------------------------------------------
+
+    def _load_domains(self) -> List[Dict[str, Any]]:
+        """Load domains (promo:Domain) from the graph."""
+        domains: List[Dict[str, Any]] = []
+        for s in self._graph.subjects(RDF.type, PROMO["Domain"]):
+            name = _one_literal(self._graph, s, PROMO["name"])
+            parent = self._graph.value(s, PROMO["parent"])
+            branch = self._graph.value(s, PROMO["branch"])
+            tokens = [str(t) for t in self._graph.objects(s, PROMO["hasToken"])]
+            domains.append({
+                "iri": str(s),
+                "name": name,
+                "parent": str(parent) if parent else None,
+                "branch": str(branch) if branch else None,
+                "tokens": tokens,
+            })
+        return domains
+
+    def _load_axes(self) -> List[Dict[str, Any]]:
+        """Load classification axes from the graph."""
+        axes: List[Dict[str, Any]] = []
+        for s in self._graph.subjects(RDF.type, PROMO["ClassificationAxis"]):
+            name = _one_literal(self._graph, s, PROMO["axisName"])
+            domain = self._graph.value(s, PROMO["hasDomain"])
+            parent = self._graph.value(s, PROMO["parent"])
+            # Load terms for this axis.
+            terms: List[Dict[str, str]] = []
+            for term_s in self._graph.subjects(PROMO["hasAxis"], s):
+                term_label = _one_literal(self._graph, term_s, PROMO["label"])
+                term_parent = self._graph.value(term_s, PROMO["parent"])
+                terms.append({
+                    "iri": str(term_s),
+                    "label": term_label,
+                    "parent": str(term_parent) if term_parent else None,
+                })
+            axes.append({
+                "iri": str(s),
+                "domain": str(domain) if domain else "",
+                "name": name,
+                "parent": str(parent) if parent else None,
+                "terms": terms,
+            })
+        return axes
+
+    def _load_entity_types(self) -> List[Dict[str, Any]]:
+        """Load entity types (CWA 17960) from the graph."""
+        entity_types: List[Dict[str, Any]] = []
+        for s in self._graph.subjects(RDF.type, PROMO["EntityType"]):
+            label = _one_literal(self._graph, s, PROMO["label"])
+            temporal = _one_literal(self._graph, s, PROMO["temporalType"])
+            spatial_type = self._graph.value(s, PROMO["spatialType"])
+            spatial_size = self._graph.value(s, PROMO["spatialSize"])
+            branch = _one_literal(self._graph, s, PROMO["branch"])
+            doc = _one_literal(self._graph, s, PROMO["doc"])
+            entity_types.append({
+                "iri": str(s),
+                "label": label,
+                "temporal_type": temporal,
+                "spatial_type": str(spatial_type) if spatial_type else None,
+                "spatial_size": str(spatial_size) if spatial_size else None,
+                "branch": branch,
+                "description": doc,
+            })
+        return entity_types
+
+    def _load_connection_rules(self) -> List[Dict[str, Any]]:
+        """Load connection rules from the graph."""
+        rules: List[Dict[str, Any]] = []
+        for s in self._graph.subjects(RDF.type, PROMO["ConnectionRule"]):
+            rule_type = _one_literal(self._graph, s, PROMO["ruleType"])
+            direction = self._graph.value(s, PROMO["direction"])
+            source = self._graph.value(s, PROMO["sourceDomain"])
+            target = self._graph.value(s, PROMO["targetDomain"])
+            tokens = [str(t) for t in self._graph.objects(s, PROMO["sharedTokens"])]
+            doc = _one_literal(self._graph, s, PROMO["doc"])
+            rules.append({
+                "iri": str(s),
+                "rule_type": rule_type,
+                "source_domain": str(source) if source else None,
+                "target_domain": str(target) if target else None,
+                "shared_tokens": tokens,
+                "direction": str(direction) if direction else None,
+                "description": doc,
+            })
+        return rules

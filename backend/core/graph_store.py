@@ -32,6 +32,52 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
+# ProMo14 ontology vocabulary extensions (see docs/ontology-editor-v1-ticket.md)
+#
+# Domain tree
+#   promo:Domain            — a domain in the tree (replaces promo:Network)
+#   promo:branch            — "physical" or "information" (top-level only)
+#   promo:hasToken          — links a domain to tokens that live in it
+#
+# Classification axes
+#   promo:ClassificationAxis — an axis definition
+#   promo:axisName          — axis label (e.g. "role", "extensivity")
+#   promo:AxisTerm          — a term in an axis hierarchy
+#   promo:axisValue         — links a variable to an axis term
+#   promo:hasAxis           — links a domain to an axis it defines
+#
+# Scale dimensions and values (first-class concept)
+#   promo:ScaleDimension   — a scale dimension (time scale, length scale, user-defined)
+#   promo:scaleName        — dimension name (e.g. "time", "length")
+#   promo:hasDomain        — links a scale dimension to the domain where it is defined
+#   promo:ScaleValue       — a value in a scale dimension's hierarchical tree
+#   promo:hasScale         — links a scale value to its dimension
+#   promo:scaleValueLabel  — label for a scale value (e.g. "microscopic", "macroscopic")
+#
+# Entity type taxonomy (CWA 17960 — seed/default, not hardcoded schema)
+#   promo:EntityType        — an entity type
+#   promo:temporalType     — "constant" | "dynamic" | "event-dynamic"
+#   promo:spatialType      — "uniform" | "distributed" (physical only)
+#   promo:spatialSize      — "infinite" | "finite" | "infinitesimal" (physical only)
+#   promo:hasScaleValue    — links an entity type to its scale value(s)
+#
+# Connection rules
+#   promo:ConnectionRule    — a connection rule definition
+#   promo:ruleType          — "physical-same" | "physical-cross" | "signal"
+#   promo:sharedTokens      — tokens that must be shared for physical rules
+#
+# Equation classes (hierarchical)
+#   promo:EquationClass     — an equation class node
+#   promo:equationClass     — links an equation to its class (IRI, not string)
+#
+# Equations (nested in variable's named graph)
+#   promo:Equation         — one equation (LHS variable + RHS expression)
+#   promo:hasEquation      — links a variable to its equation(s)
+#   promo:lhs              — the variable IRI being defined
+#   promo:rhs              — the expression token stream (string)
+#   promo:rhsLatex         — generated LaTeX of the RHS (cached)
+#   promo:incidenceList     — list of variable IRIs in the RHS (JSON array)
+
 # Module-level singleton so that all backend modules see the same store
 # within one process.  The store is loaded on first access.
 _STORE: Optional["RdfStore"] = None
@@ -118,6 +164,9 @@ class RdfStore:
         if not len(self.ontology_graph):
             self.seed_from_legacy()
 
+        if not len(self.ontology_graph):
+            self.seed_default_ontology()
+
         # Load any additional var/expr named graphs that are already in the
         # data directory, but do not replace the editable ontology graph.
         for path in sorted(self.data_dir.glob("*.trig")):
@@ -152,6 +201,169 @@ class RdfStore:
             self.add_index_dict(ontology, idx)
         for parent, children in ctx.get("network_tree", {}).items():
             self.add_network(ontology, parent, children=children)
+
+    def seed_default_ontology(self) -> None:
+        """Seed the default ProMo14 ontology (two-branch domain tree,
+        tokens, classification axes, entity types, connection rules).
+
+        Called when no legacy data is found and no ``ontology.trig`` exists.
+        """
+        g = self.ontology_graph
+        base = str(PROMO).rstrip("#")
+
+        # --- Domain tree: two branches ---
+        phys_iri = self.mint_iri(base, "domain_physical")
+        self.add_domain(g, "physical", iri=phys_iri, branch="physical")
+
+        info_iri = self.mint_iri(base, "domain_information")
+        self.add_domain(g, "information", iri=info_iri, branch="information")
+
+        # --- Tokens ---
+        physical_tokens = {
+            "energy": "Energy",
+            "mass": "Mass",
+            "momentum": "Momentum",
+            "charge": "Charge",
+            "entropy": "Entropy",
+            "component_mass": "Component Mass",
+        }
+        for frag, label in physical_tokens.items():
+            tok_iri = self.mint_iri(base, f"token_{frag}")
+            self.add_token(g, tok_iri, label)
+
+        signal_iri = self.mint_iri(base, "token_signal")
+        self.add_token(g, signal_iri, "Signal")
+
+        # Bind tokens to domains.
+        for frag in physical_tokens:
+            tok_iri = self.mint_iri(base, f"token_{frag}")
+            g.add((phys_iri, PROMO["hasToken"], tok_iri))
+        g.add((info_iri, PROMO["hasToken"], signal_iri))
+
+        # --- Classification axes: "role" axis on both branches ---
+        role_phys_iri = self.mint_iri(base, "axis_role_physical")
+        self.add_classification_axis(g, role_phys_iri, phys_iri, "role")
+        role_info_iri = self.mint_iri(base, "axis_role_information")
+        self.add_classification_axis(g, role_info_iri, info_iri, "role")
+
+        physical_role_terms = ["state", "effort", "transport", "frame", "constant", "parameter"]
+        for term in physical_role_terms:
+            term_iri = self.mint_iri(base, f"term_role_{term}")
+            self.add_axis_term(g, term_iri, role_phys_iri, term)
+
+        information_role_terms = ["state", "input", "output", "constant", "parameter"]
+        for term in information_role_terms:
+            term_iri = self.mint_iri(base, f"term_info_role_{term}")
+            self.add_axis_term(g, term_iri, role_info_iri, term)
+
+        # --- Scale dimensions + values (seed) ---
+        # Time scale: 4 levels, each with triple-domain children
+        # (constant / dynamic / event-dynamic).
+        # Multi-scale stacking: lower level's constant = higher level's
+        # event-dynamic.  Entity types reference the fine-grained children.
+        # These are seeds — user can rename, restructure, add levels.
+        time_scale_iri = self.mint_iri(base, "scale_time")
+        self.add_scale_dimension(g, time_scale_iri, "time", phys_iri)
+        time_val_iris = {}
+        time_levels = ["molecular", "nano", "milli", "macro"]
+        time_triple = ["constant", "dynamic", "event-dynamic"]
+        for level in time_levels:
+            level_iri = self.mint_iri(base, f"sval_time_{level}")
+            self.add_scale_value(g, level_iri, time_scale_iri, level)
+            time_val_iris[f"time_{level}"] = level_iri
+            for triple in time_triple:
+                tkey = triple.replace("-", "_")
+                child_key = f"time_{level}_{tkey}"
+                child_iri = self.mint_iri(base, f"sval_{child_key}")
+                self.add_scale_value(g, child_iri, time_scale_iri, triple,
+                                     parent=level_iri)
+                time_val_iris[child_key] = child_iri
+
+        # Length scale: 4 levels, each with spatial sub-values.
+        # infinitesimal: point (zero-size), finite (small)
+        # microscopic, macroscopic: uniform, distributed
+        # infinite: uniform only
+        length_scale_iri = self.mint_iri(base, "scale_length")
+        self.add_scale_dimension(g, length_scale_iri, "length", phys_iri)
+        length_val_iris = {}
+        length_levels = [
+            ("infinitesimal", ["point", "finite"]),
+            ("microscopic", ["uniform", "distributed"]),
+            ("macroscopic", ["uniform", "distributed"]),
+            ("infinite", ["uniform"]),
+        ]
+        for level, sub_labels in length_levels:
+            level_iri = self.mint_iri(base, f"sval_length_{level}")
+            self.add_scale_value(g, level_iri, length_scale_iri, level)
+            length_val_iris[f"length_{level}"] = level_iri
+            for sub in sub_labels:
+                child_key = f"length_{level}_{sub}"
+                child_iri = self.mint_iri(base, f"sval_{child_key}")
+                self.add_scale_value(g, child_iri, length_scale_iri, sub,
+                                     parent=level_iri)
+                length_val_iris[child_key] = child_iri
+
+        # --- Entity types (CWA 17960 seed) ---
+        # Entity types are compositions of fine-grained scale values.
+        # temporal_type / spatial_type / spatial_size are legacy fields
+        # kept for backward compat; the canonical definition is the
+        # scale value composition.  Behaviour Linker assigns a specific
+        # scale level to a base entity.
+        entity_types = [
+            ("environment", "constant", "uniform", "infinite", "physical",
+             "Constant/uniform/infinite — environment",
+             ["time_macro_constant", "length_infinite_uniform"]),
+            ("lumped", "dynamic", "uniform", "finite", "physical",
+             "Dynamic/uniform/finite — lumped ODE",
+             ["time_macro_dynamic", "length_macroscopic_uniform"]),
+            ("distributed", "dynamic", "distributed", "finite", "physical",
+             "Dynamic/distributed/finite — distributed PDE",
+             ["time_macro_dynamic", "length_macroscopic_distributed"]),
+            ("point", "event-dynamic", "uniform", "infinitesimal", "physical",
+             "Event-dynamic/point/infinitesimal — point (reactions)",
+             ["time_molecular_event_dynamic", "length_infinitesimal_point"]),
+            ("transport_system", "event-dynamic", "distributed", "finite", "physical",
+             "Event-dynamic/distributed/finite — transport system (node, not arc)",
+             ["time_molecular_event_dynamic", "length_microscopic_distributed"]),
+            ("info_constant", "constant", None, None, "information",
+             "Constant information capacity",
+             ["time_macro_constant"]),
+            ("info_dynamic", "dynamic", None, None, "information",
+             "Dynamic information capacity",
+             ["time_macro_dynamic"]),
+            ("info_event", "event-dynamic", None, None, "information",
+             "Event-dynamic information capacity (instantaneous I/O)",
+             ["time_molecular_event_dynamic"]),
+        ]
+        all_scale_vals = {**time_val_iris, **length_val_iris}
+        for frag, temporal, spatial, size, branch, desc, scale_frags in entity_types:
+            et_iri = self.mint_iri(base, f"etype_{frag}")
+            self.add_entity_type(g, et_iri, frag.replace("_", " ").title(),
+                                 temporal, branch, spatial_type=spatial,
+                                 spatial_size=size, description=desc)
+            for sf in scale_frags:
+                if sf in all_scale_vals:
+                    g.add((et_iri, PROMO["hasScaleValue"], all_scale_vals[sf]))
+
+        # --- Connection rules (3 types) ---
+        rules = [
+            ("physical-same", "bidirectional",
+             "Same domain, shared tokens — physical arc (continuity)"),
+            ("physical-cross", "bidirectional",
+             "Different physical domains, shared tokens — physical arc (continuity)"),
+            ("signal", "unidirectional",
+             "Signal connection — information arc (unidirectional)"),
+        ]
+        for rule_type, direction, desc in rules:
+            rule_iri = self.mint_iri(base, f"rule_{rule_type}")
+            self.add_connection_rule(g, rule_iri, rule_type,
+                                     direction=direction, description=desc)
+
+        # --- Equation classes (top-level hierarchy) ---
+        eq_classes = ["generic", "instantiate", "balance", "empirical", "user_function"]
+        for ec in eq_classes:
+            ec_iri = self.mint_iri(base, f"eqclass_{ec}")
+            self.add_equation_class(g, ec_iri, ec)
 
     # ------------------------------------------------------------------
     # Named graph helpers
@@ -249,18 +461,66 @@ class RdfStore:
                 self.add_network(graph, child, iri=child_iri)
         return iri
 
+    def add_domain(
+        self,
+        graph: Graph,
+        name: str,
+        iri: Optional[URIRef] = None,
+        parent: Optional[Union[str, URIRef]] = None,
+        branch: Optional[str] = None,
+        tokens: Optional[List[Union[str, URIRef]]] = None,
+    ) -> URIRef:
+        """Add a domain to the ontology graph with branch and token bindings."""
+        if iri is None:
+            iri = self.mint_iri(PROMO, f"domain_{name}")
+        graph.add((iri, RDF.type, PROMO["Domain"]))
+        graph.set((iri, PROMO["name"], _as_literal(name)))
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = self.mint_iri(PROMO, f"domain_{parent}")
+            graph.set((iri, PROMO["parent"], parent))
+        if branch is not None:
+            graph.set((iri, PROMO["branch"], _as_literal(branch)))
+        if tokens:
+            for token in tokens:
+                if isinstance(token, str):
+                    token = URIRef(token)
+                graph.add((iri, PROMO["hasToken"], token))
+        return iri
+
     def add_variable_dict(self, graph: Graph, var: dict) -> URIRef:
-        """Add a variable record to the graph using the ProMo14 schema."""
+        """Add a variable record to the graph using the ProMo14 schema.
+
+        Supports both the legacy ``variable_class`` (string) and the new
+        ``classifications`` (map of axis IRI → axis term IRI) fields.
+        If ``classifications`` is present, each entry is stored as a
+        ``promo:axisValue`` triple.  If ``variable_class`` / ``type`` is
+        present (legacy), it is stored as ``promo:variableClass`` for
+        backward compatibility.
+        """
         iri = URIRef(var["iri"])
         graph.add((iri, RDF.type, PROMO["Variable"]))
         self._set_literal(graph, iri, PROMO["label"], var.get("label"))
         self._set_literal(graph, iri, PROMO["internalID"], var.get("internal_id"))
         self._set_literal(graph, iri, PROMO["network"], var.get("network"))
-        self._set_literal(graph, iri, PROMO["variableClass"], var.get("type"))
         self._set_literal(graph, iri, PROMO["doc"], var.get("doc"))
         self._set_literal(
             graph, iri, PROMO["portVariable"], var.get("port_variable", False)
         )
+        self._set_literal(
+            graph, iri, PROMO["imported"], var.get("imported", False)
+        )
+
+        # Legacy variable_class (string) — kept for backward compat.
+        vc = var.get("variable_class") or var.get("type")
+        if vc:
+            self._set_literal(graph, iri, PROMO["variableClass"], vc)
+
+        # New multi-axis classifications (map of axis IRI → axis term IRI).
+        classifications = var.get("classifications")
+        if classifications:
+            for axis_iri, term_iri in classifications.items():
+                graph.add((iri, PROMO["axisValue"], URIRef(term_iri)))
 
         # Units as an 8-element vector literal.
         units = var.get("units")
@@ -275,6 +535,13 @@ class RdfStore:
 
         if var.get("aliases"):
             self._add_aliases(graph, iri, var["aliases"])
+
+        # Nested equations (dict of E_N -> equation record)
+        equations = var.get("equations")
+        if equations:
+            for eq_id, eq in equations.items():
+                eq_iri = eq.get("iri") or str(self.mint_iri(str(PROMO).rstrip("#"), eq_id))
+                self.add_equation(graph, URIRef(eq_iri), iri, eq)
 
         return iri
 
@@ -304,6 +571,191 @@ class RdfStore:
         if parent is not None:
             graph.set((iri, PROMO["parent"], parent))
         return iri
+
+    # ------------------------------------------------------------------
+    # Classification axes, entity types, connection rules, equation classes
+    # ------------------------------------------------------------------
+
+    def add_classification_axis(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        domain: Union[str, URIRef],
+        name: str,
+        parent: Optional[Union[str, URIRef]] = None,
+    ) -> URIRef:
+        """Add a classification axis definition to the graph."""
+        graph.add((iri, RDF.type, PROMO["ClassificationAxis"]))
+        self._set_literal(graph, iri, PROMO["axisName"], name)
+        if isinstance(domain, str):
+            domain = URIRef(domain)
+        graph.set((iri, PROMO["hasDomain"], domain))
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = URIRef(parent)
+            graph.set((iri, PROMO["parent"], parent))
+        return iri
+
+    def add_axis_term(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        axis: Union[str, URIRef],
+        label: str,
+        parent: Optional[Union[str, URIRef]] = None,
+    ) -> URIRef:
+        """Add a term to a classification axis hierarchy."""
+        graph.add((iri, RDF.type, PROMO["AxisTerm"]))
+        self._set_literal(graph, iri, PROMO["label"], label)
+        if isinstance(axis, str):
+            axis = URIRef(axis)
+        graph.set((iri, PROMO["hasAxis"], axis))
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = URIRef(parent)
+            graph.set((iri, PROMO["parent"], parent))
+        return iri
+
+    def add_scale_dimension(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        name: str,
+        domain: Union[str, URIRef],
+        parent: Optional[Union[str, URIRef]] = None,
+    ) -> URIRef:
+        """Add a scale dimension (time scale, length scale, user-defined)."""
+        graph.add((iri, RDF.type, PROMO["ScaleDimension"]))
+        self._set_literal(graph, iri, PROMO["scaleName"], name)
+        if isinstance(domain, str):
+            domain = URIRef(domain)
+        graph.set((iri, PROMO["hasDomain"], domain))
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = URIRef(parent)
+            graph.set((iri, PROMO["parent"], parent))
+        return iri
+
+    def add_scale_value(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        dimension: Union[str, URIRef],
+        label: str,
+        parent: Optional[Union[str, URIRef]] = None,
+    ) -> URIRef:
+        """Add a value to a scale dimension's hierarchical tree."""
+        graph.add((iri, RDF.type, PROMO["ScaleValue"]))
+        self._set_literal(graph, iri, PROMO["scaleValueLabel"], label)
+        if isinstance(dimension, str):
+            dimension = URIRef(dimension)
+        graph.set((iri, PROMO["hasScale"], dimension))
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = URIRef(parent)
+            graph.set((iri, PROMO["parent"], parent))
+        return iri
+
+    def add_entity_type(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        label: str,
+        temporal_type: str,
+        branch: str,
+        spatial_type: Optional[str] = None,
+        spatial_size: Optional[str] = None,
+        description: str = "",
+    ) -> URIRef:
+        """Add an entity type (CWA 17960 taxonomy) to the graph."""
+        graph.add((iri, RDF.type, PROMO["EntityType"]))
+        self._set_literal(graph, iri, PROMO["label"], label)
+        self._set_literal(graph, iri, PROMO["temporalType"], temporal_type)
+        self._set_literal(graph, iri, PROMO["branch"], branch)
+        if spatial_type is not None:
+            self._set_literal(graph, iri, PROMO["spatialType"], spatial_type)
+        if spatial_size is not None:
+            self._set_literal(graph, iri, PROMO["spatialSize"], spatial_size)
+        if description:
+            self._set_literal(graph, iri, PROMO["doc"], description)
+        return iri
+
+    def add_connection_rule(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        rule_type: str,
+        direction: Optional[str] = None,
+        source_domain: Optional[Union[str, URIRef]] = None,
+        target_domain: Optional[Union[str, URIRef]] = None,
+        shared_tokens: Optional[List[Union[str, URIRef]]] = None,
+        description: str = "",
+    ) -> URIRef:
+        """Add a connection rule definition to the graph."""
+        graph.add((iri, RDF.type, PROMO["ConnectionRule"]))
+        self._set_literal(graph, iri, PROMO["ruleType"], rule_type)
+        if direction is not None:
+            self._set_literal(graph, iri, PROMO["direction"], direction)
+        if source_domain is not None:
+            if isinstance(source_domain, str):
+                source_domain = URIRef(source_domain)
+            graph.set((iri, PROMO["sourceDomain"], source_domain))
+        if target_domain is not None:
+            if isinstance(target_domain, str):
+                target_domain = URIRef(target_domain)
+            graph.set((iri, PROMO["targetDomain"], target_domain))
+        if shared_tokens:
+            for token in shared_tokens:
+                if isinstance(token, str):
+                    token = URIRef(token)
+                graph.add((iri, PROMO["sharedTokens"], token))
+        if description:
+            self._set_literal(graph, iri, PROMO["doc"], description)
+        return iri
+
+    def add_equation_class(
+        self,
+        graph: Graph,
+        iri: URIRef,
+        label: str,
+        parent: Optional[Union[str, URIRef]] = None,
+    ) -> URIRef:
+        """Add an equation class node to the hierarchy."""
+        graph.add((iri, RDF.type, PROMO["EquationClass"]))
+        self._set_literal(graph, iri, PROMO["label"], label)
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = URIRef(parent)
+            graph.set((iri, PROMO["parent"], parent))
+        return iri
+
+    def add_equation(
+        self,
+        graph: Graph,
+        eq_iri: URIRef,
+        lhs_var: URIRef,
+        eq: dict,
+    ) -> URIRef:
+        """Add an equation (LHS variable + RHS expression) to the graph.
+
+        Links the equation to its parent variable via ``promo:hasEquation``.
+        """
+        graph.add((eq_iri, RDF.type, PROMO["Equation"]))
+        graph.add((lhs_var, PROMO["hasEquation"], eq_iri))
+        graph.set((eq_iri, PROMO["lhs"], lhs_var))
+        self._set_literal(graph, eq_iri, PROMO["internalID"], eq.get("internal_id"))
+        self._set_literal(graph, eq_iri, PROMO["rhs"], eq.get("rhs"))
+        self._set_literal(graph, eq_iri, PROMO["rhsLatex"], eq.get("rhs_latex"))
+        self._set_literal(graph, eq_iri, PROMO["equationClass"], eq.get("equation_class"))
+        self._set_literal(graph, eq_iri, PROMO["network"], eq.get("network"))
+        self._set_literal(graph, eq_iri, PROMO["doc"], eq.get("doc"))
+        if eq.get("incidence_list"):
+            graph.set((eq_iri, PROMO["incidenceList"], _as_literal(eq["incidence_list"])))
+        if eq.get("created"):
+            self._set_literal(graph, eq_iri, PROMO["created"], eq["created"])
+        if eq.get("modified"):
+            self._set_literal(graph, eq_iri, PROMO["modified"], eq["modified"])
+        return eq_iri
 
     # ------------------------------------------------------------------
     # Helpers

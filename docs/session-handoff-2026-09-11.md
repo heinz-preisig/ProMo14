@@ -5,15 +5,13 @@ This file captures the state of the ProMo14 workspace at the end of the
 
 ## TL;DR
 
-- Ontology design discussion complete: all 9 questions resolved.
-- Key decisions: two-branch domain tree (physical/information),
-  multi-axis variable classification (variable_class → "role" axis),
-  entity types from CWA 17960, 3 connection rule types, transport
-  system as node (not arc), event dynamics fits existing taxonomy.
-- Implementation ticket drafted: `docs/ontology-editor-v1-ticket.md`.
-- Ticket aligned with existing data model (`docs/ontology-data-model.md`).
-- Modeller (ADR-004) verified compatible with ontology design.
-- Next: implement ontology editor v1 per ticket (10-step sequence).
+- Ontology editor v1 **implemented** — all 10 steps complete.
+- Backend: RDF vocabulary, models, CRUD methods, service endpoints,
+  RdfContext, and seed data all done.
+- Frontend: types, API, domain tree, multi-axis variable editor, and
+  new tabs (domains, axes, entity types, connection rules) all done.
+- TypeScript and Vite builds pass clean.
+- Next: end-to-end testing, then wire equation editor to RdfContext.
 
 ## Environment
 
@@ -45,6 +43,35 @@ curl http://localhost:8000/api/health   # -> {"status":"ok"}
 
 ## Changes this session
 
+### Ontology editor v1 implementation (all 10 steps)
+
+1. **RDF vocabulary** (`graph_store.py`) — added PROMO terms for
+   Domain, ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
+   EquationClass. Added CRUD methods for each.
+2. **Backend models** (`models.py`) — expanded VariableRecord and
+   EquationRecord to match `ontology-data-model.md`. Added
+   DomainRecord, ClassificationAxisRecord, AxisTermRecord,
+   EntityTypeRecord, ConnectionRuleRecord.
+3. **Graph store CRUD** (`graph_store.py`) — add_domain,
+   add_classification_axis, add_axis_term, add_entity_type,
+   add_connection_rule, add_equation_class. Updated
+   add_variable_dict for multi-axis classifications.
+4. **Backend service** (`service.py`) — REST endpoints for domains,
+   axes, axis terms, entity types, connection rules (GET/POST/DELETE).
+   Updated /context to return all new entities. Token CRUD added.
+5. **RdfContext** (`rdf_context.py`) — added domains(), axes(),
+   entity_types(), connection_rules() accessors. Updated _load_variables
+   to read multi-axis classifications.
+6. **Seed data** (`graph_store.py`) — seed_default_ontology()
+   bootstraps two-branch tree, 7 tokens, role axes with terms, 8 CWA
+   17960 entity types, 3 connection rules, 5 equation classes.
+7. **Frontend types** (`types.ts`) — full type definitions for all
+   new entities.
+8. **Frontend API** (`api.ts`) — API functions for all new endpoints.
+9. **Frontend UI** (`App.tsx`) — new tabs: Domains, Axes, Entity
+   Types, Connection Rules. Variable editor includes multi-axis
+   classification tagger. Removed obsolete Networks tab.
+
 ### Ontology design discussion (continued from Sep 11)
 - Resolved all 9 open questions in
   `docs/ontology-design-discussion-2026-09-11.md`.
@@ -66,47 +93,41 @@ curl http://localhost:8000/api/health   # -> {"status":"ok"}
 
 ### Ontology editor v1 implementation ticket
 - Created `docs/ontology-editor-v1-ticket.md`.
-- Aligned with existing data model (`docs/ontology-data-model.md`):
-  VariableRecord and EquationRecord extend existing fields, not
-  replace.
-- Verified compatibility with Modeller (ADR-004): modeller is generic,
-  consumes ontology via connection rule resolver and semantic
-  attributes.
-- 10-step implementation sequence defined.
+- Aligned with existing data model (`docs/ontology-data-model.md`).
+- Verified compatibility with Modeller (ADR-004).
 
 ## Test results
 
 | Test | Result |
 |------|--------|
-| `npm run build` | Pass |
-| `backend.equation.test_parser` | 31 passed |
-| `backend.equation.test_checker` | 21 passed |
+| `npx tsc --noEmit` (ontology-editor) | Pass |
+| `npx vite build` (ontology-editor) | Pass |
+| Seed data verification (Python) | 138 triples, all entity types present |
 | `backend.equation.test_compile_space` | 12 passed |
 | `backend.equation.test_units` | 13 passed |
-| `uvicorn backend.main:app` + `/api/health` | `{"status":"ok"}` |
 
 ## Next concrete tasks
 
-1. **Implement ontology editor v1** — follow the 10-step sequence in
-   `docs/ontology-editor-v1-ticket.md`:
-   1. RDF vocabulary extensions (`graph_store.py`)
-   2. Backend models (`models.py`)
-   3. Graph store CRUD methods
-   4. Backend service endpoints
-   5. RdfContext updates
-   6. Seed data
-   7. Frontend types + API
-   8. Frontend domain tree (two-branch)
-   9. Frontend variable editor (multi-axis tagger)
-   10. Frontend new tabs (axes, entity types, connection rules, tokens)
-2. **Remaining design items** (not blocking v1):
+1. **End-to-end testing** — start backend + frontend, verify UI loads
+   seed data, create/edit variables with classifications, save
+   ontology.trig.
+2. **Wire equation editor to RdfContext** — switch
+   `/api/equation/context` to use `RdfContext` instead of legacy
+   loader.
+3. **Remaining design items** (not blocking v1):
    - Q10: Mechanical device modelling at different abstraction levels
    - Event dynamic equation editor (equation-level, not ontology)
+4. **Ontology v2 items** (from ticket §7):
+   - User-defined validation rules for axis values
+   - Drag-and-drop token binding
+   - User-defined entity types beyond CWA 17960
+   - Ontology versioning (ADR-006)
+   - QUDT integration for units
 
 ## Useful references
 
-- `docs/ontology-editor-v1-ticket.md` — implementation ticket (read this
-  first to start implementation)
+- `docs/ontology-editor-v1-ticket.md` — implementation ticket (v1
+  complete, see §7 for v2 scope)
 - `docs/ontology-design-discussion-2026-09-11.md` — design discussion
   (all questions resolved)
 - `docs/ontology-data-model.md` — existing RDF schema (variable/equation

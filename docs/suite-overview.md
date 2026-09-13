@@ -25,9 +25,9 @@ Ontology Editor → Equation Editor → Behaviour Linker → Modeller → Model 
 
 | Stage | Module | What it does |
 |-------|--------|-------------|
-| 1 | Ontology Editor | Defines the domain tree, variables, indices, tokens, and core equations. Source of truth for all downstream vocabulary. |
+| 1 | Ontology Editor | Defines the framework: domain tree, tokens, classification axes, scales, entity types, connection rules, indices, and abstract graphical symbols. Source of truth for all downstream vocabulary. |
 | 2 | Equation Editor | Authors and checks mathematical expressions. Produces a validated var/expr knowledge graph. |
-| 3 | Behaviour Linker | Selects equations describing I/O behaviour of a base entity and assigns its graphical representation. |
+| 3 | Behaviour Linker | Selects equations describing I/O behaviour of a base entity and assigns its concrete graphical representation (level-2 graphics). |
 | 4 | Modeller | Assembles base entities into larger models by drawing connections. Produces a flat RDF topology + hierarchy. |
 | 5 | Model Reuse | An assembled model can be used as a base entity in a later model. Same format, recursive composition. |
 | 6 | Instantiation | Assigns constants and parameters to a model definition. Result is itself reusable. |
@@ -157,7 +157,10 @@ The equation editor does not read the ontology graph directly.  It
 consumes a read-only snapshot:
 
 - `variables()` — keyed by IRI, each with label, network, units, index
-  structures, tokens, aliases.
+  structures, tokens, aliases.  (Variables are authored in the
+  Equation Editor; the ontology provides the framework — tokens,
+  indices, domain tree, classification axes — not the variables
+  themselves.)
 - `indices()` — keyed by IRI, each with label, network, token binding.
 - `accessible_networks(network)` — the expression network plus all
   ancestors; determines which variables are visible for unqualified
@@ -277,22 +280,27 @@ ProMo14/
 
 ```
 Ontology Editor
-    │  produces: ontology named graph (domain tree, variables, indices, tokens, equations)
-    │  contract: EquationContext
+    │  produces: ontology named graph (domain tree, tokens, classification
+    │           axes, scales, entity types, connection rules, indices,
+    │           abstract graphical symbols)
+    │  contract: EquationContext (tokens, indices, domain tree, axes)
     ▼
 Equation Editor
-    │  consumes: EquationContext (variables, indices, domain tree)
-    │  produces: var/expr knowledge graph (JSON-LD, checked expressions, incidence lists)
+    │  consumes: EquationContext (tokens, indices, domain tree, axes)
+    │  produces: var/expr knowledge graph (JSON-LD, variables, equations,
+    │           checked expressions, incidence lists)
     │  contract: var/expr graph
     ▼
 Behaviour Linker
-    │  consumes: var/expr graph + ontology
-    │  produces: base-entity definitions (behaviour + graphical assignments + connection rules)
+    │  consumes: var/expr graph + ontology (entity types, rules, symbols)
+    │  produces: base-entity definitions (behaviour + level-2 graphics +
+    │           connection rules)
     │  contract: SemanticCatalogue + ConnectionRuleResolver
     ▼
 Modeller
     │  consumes: base-entity catalogue, connection rules, graphical definitions
-    │  produces: flat RDF topology + hierarchy + layout
+    │  applies: glasses (domain-specific visual skins, separate artefact)
+    │  produces: flat RDF topology + hierarchy + layout + level-3 composite graphics
     ▼
 Model Reuse / Instantiation
     │  produces: instantiated model (constants/parameters assigned)
@@ -301,6 +309,11 @@ Model Reuse / Instantiation
     │
     └─ distributed (PDE) ──→ Meshing ──→ lumped network ──→ Code Generation
 ```
+
+Glasses (domain-specific visual skins) are a **separate artefact**,
+authored independently, stored in their own named graph.  The Modeller
+is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
+§19–21 for the three-level graphics model.
 
 ## 9. Documentation map
 
