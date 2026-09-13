@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-12 (end of session)
+**Last updated:** 2026-09-13 (end of session)
 
 ## Summary
 
@@ -8,7 +8,7 @@
 |--------|---------|----------|-------|--------|
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data | React UI with all v1 tabs | TypeScript + Vite build pass | **v1 implemented**; end-to-end testing next |
 | Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 4 test files | Backend and frontend functional |
-| Behaviour Linker | Scaffold | Scaffold | — | Not started, design TBD |
+| Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
 | Shared (`backend/core`) | `RdfStore`, legacy loader, full ontology CRUD | — | — | Ontology CRUD complete; shared IRI minting done |
@@ -68,13 +68,17 @@
 
 ### Behaviour Linker
 
-- **Design:** Not started.  Role is defined in ADR-004 (selects
-  equations for I/O behaviour, assigns graphical representation, spawns
-  Graphic Object Editor).
+- **Design:** In progress.  Design discussion started 2026-09-13 — see
+  `docs/behaviour-linker-design-discussion.md`.  Core mechanic defined:
+  BL reads ontology + var/expr bipartite graph, user selects
+  state-defining equation, RHS variables resolved recursively.  Key
+  principles: ontology tags are hints, BL selections are bindings; state
+  is emergent (structural property of equation subgraph); transport
+  system has no state.  Open questions remain on unit of selection,
+  assignment artefact, interface definitions, and graphics.
 - **Backend:** `backend/behaviour/` — empty scaffold.
 - **Frontend:** `apps/behaviour-linker/` — empty scaffold.
-- **Next:** Define the behaviour-linking workflow and graphical
-  assignment contract.
+- **Next:** Resolve open design questions, then implement.
 
 ### Modeller
 

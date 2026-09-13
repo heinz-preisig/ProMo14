@@ -345,24 +345,27 @@ But good ontology design makes the BL's job easier.
 ## 7. Open questions (to be resolved)
 
 1. **Unit of selection** — per entity type, per variable class, or per
-   equation class? (Q1)
+   equation class? (Q1) — **Resolved**, see §9.
 2. **Assignment artefact structure** — what does the RDF named graph
-   look like? What predicates?
+   look like? What predicates? — **Draft proposal**, see §13.
 3. **Interface/port definitions** — does the BL need these, and should
-   they come from the ontology or from the equation editor?
+   they come from the ontology or the equation editor? — **Resolved**,
+   see §10.
 4. **Equation eligibility metadata** — should equations carry scale-value
    constraints, or should the BL infer eligibility from variable
-   classifications?
+   classifications? — **Resolved (tentative)**, see §11.
 5. **Validation scope** — what does the BL validate, and what is
-   deferred to code generation / instantiation?
+   deferred to code generation / instantiation? — **Resolved**, see §12.
 6. **Graphics assignment** — is this a BL responsibility or a separate
    step? (The three-level graphics model says Level 2 concrete base
    graphics are assigned in the BL, but the Graphic Object Editor is a
    separate module.)
 7. **Mathematical role classification** — does the BL need to know about
    dependent/independent/input/parameter roles, or is that determined by
-   the equation subgraph structure? (See §8.)
-8. **PDAE → ODAE meshing** — where does meshing live? (See §8.)
+   the equation subgraph structure? (See §8.) — **Resolved**: implied by
+   subgraph position; ontology hints optional.
+8. **PDAE → ODAE meshing** — where does meshing live? (See §8.) —
+   **Resolved**: downstream of BL (code generation / instantiation).
 
 ## 8. The mathematics domain (2026-09-13)
 
@@ -426,15 +429,77 @@ This means the BL's algorithm is:
 3. Each input must be **resolved**: either
    - another equation in the var/expr graph defines it (the user selects
      that equation too, and it becomes part of the subgraph), or
-   - it is **instantiated** (it's a parameter — value set at
-     instantiation time), or
+   - it is **marked to be instantiated** (see below), or
    - it comes from **outside** the entity (a connected entity provides
      it — this is a port/input).
 4. Repeat recursively: each newly selected equation has its own RHS
    variables, which must be resolved the same way.
 5. The subgraph is **closed** when every RHS variable in every selected
-   equation is either defined within the subgraph, instantiated, or
-   declared as an external input.
+   equation is either defined within the subgraph, marked to be
+   instantiated, or declared as an external input.
+
+### The `Instantiate` operator (2026-09-13)
+
+A variable is not "instantiated" — it is **marked to be instantiated**.
+There is an `Instantiate` operator in the ProMo language definition.
+Its purpose is to keep units and index structures clean: the variable
+retains its full semantic identity (units, index structures, token
+bindings, classifications) but is flagged as a parameter whose value
+will be set at instantiation time, not computed by the equation system.
+
+This distinction matters: the variable is still a first-class entity in
+the var/expr graph with all its metadata. The `Instantiate` operator
+just marks it as "value comes from outside the equation system, at
+instantiation time."
+
+### Two ways to mark a variable to-be-instantiated (2026-09-13)
+
+There are two places where a variable can be marked to-be-instantiated:
+
+1. **In the equation editor** — via the `Instantiate` operator directly
+   in the equation expression. The equation author writes something
+   like `Q = Instantiate(heat_transfer_coefficient)`. This is baked into
+   the equation definition itself.
+
+2. **In the BL** — when resolving an unresolved RHS variable during
+   subgraph construction, the user marks it as to-be-instantiated
+   instead of selecting a defining equation for it.
+
+The question is: should the BL be able to mark **any** unresolved
+variable as to-be-instantiated?
+
+**Open question**: Can all variables be marked to-be-instantiated in
+the BL, or only some? This needs further thinking. There may be
+variables that should never be parameters (e.g. state variables, or
+variables whose value is structurally determined by the equation
+system). Allowing the BL to mark anything as to-be-instantiated could
+lead to degenerate subgraphs where the equation system is trivially
+satisfied by instantiating everything.
+
+This needs discussion.
+
+### Cycle check is indirect (2026-09-13)
+
+The cycle check is **not** an explicit graph-theoretic cycle detection.
+It is implicit in the recursive construction:
+
+- One starts with a base equation and recursively fills in new equations
+  to define not-yet-defined variables.
+- The **endpoints** of this recursion are:
+  - **to-be-instantiated** (parameter — marked with `Instantiate`),
+  - **state** (the LHS of the base equation — the cycle closes here),
+  - **a flow in a balance equation** (external input from a connected
+    entity — port).
+- If the recursion encounters a variable that is already being defined
+  by an equation in the subgraph (other than the state variable), that's
+  an error — an unwanted cycle. The user must resolve it by marking the
+  variable as to-be-instantiated or declaring it external.
+
+So the cycle through the state variable is the **natural endpoint** of
+the recursion — the recursion terminates because the state variable is
+already defined (by the base equation). No explicit cycle detection is
+needed; the recursive construction naturally identifies the state as
+the one variable that closes the loop.
 
 This is the **lower-triangular subgraph** construction from §6: starting
 from the base equation, the BL builds downward through the incidence
@@ -616,3 +681,433 @@ This means the mathematics domain also needs to understand:
   hints could help the UI suggest defaults.)
 - Where does meshing live — code generation, instantiation, or a
   separate step?
+
+## 9. Unit of selection — per entity type (2026-09-13)
+
+### Resolution
+
+The unit of selection is **per entity type**. The BL builds a complete
+behaviour description for each entity type — a closed equation subgraph
+that only depends on what is connected to it (external inputs) and what
+is instantiated (parameters).
+
+For a **capacity** (physical entity with state):
+- The state equation closes over the state variable (the cycle).
+- External inputs are token flows (from connected transport systems)
+  and instantiated variables (parameters).
+- All other equations (properties, efforts, etc.) are internal to the
+  entity's subgraph — they are resolved within it.
+
+For **information processing** (e.g. control):
+- The same applies for dynamic equations. A controller has a state
+  (dynamic equation), and its inputs come from connected entities
+  (observations, setpoints).
+
+### Information processing in the BL (2026-09-13)
+
+How does information processing map to the BL design?
+
+#### Same mechanics, different semantics
+
+The BL mechanics are identical for information and physical entities:
+select a base equation, resolve RHS inputs, close the subgraph. The
+differences are in the semantics of connections and state:
+
+**Physical domain:**
+- Arcs are bidirectional (continuity conditions: effort equality, flow
+  conservation).
+- Transport system nodes connect capacities — they compute flows.
+- State = physical capacity effect (accumulation of mass, energy, ...).
+- External inputs = token flows from transport systems.
+
+**Information domain:**
+- Arcs are unidirectional (output of one function = input of next).
+- No transport system equivalent — the arc IS the connection. It just
+  passes the signal. No separate node needed to compute the connection.
+- State = algorithmic memory (e.g. integral of error in a PID controller,
+  filter state). Structurally identical to physical state: a time
+  derivative creates the cycle.
+- External inputs = signals from upstream entities (observations,
+  setpoints, manipulated variables).
+
+#### Entity types in information processing
+
+From the ontology design (CWA 17960 §4.2), information capacities have
+3 types: constant, dynamic, event-dynamic (instantaneous I/O).
+
+In BL terms:
+- **Dynamic information entity** (e.g. PID controller, filter): has a
+  state equation (dynamic equation with time derivative). The cycle
+  goes through the state variable. Same structure as a physical capacity.
+- **Algebraic information entity** (e.g. gain block, summing junction,
+  lookup table): no state, no cycle. All equations are algebraic. Same
+  structure as a transport system — but it's a node, not an arc.
+- **Constant information entity** (e.g. fixed setpoint): no equations,
+  just a parameter. Instantiated.
+
+#### What connects to what?
+
+Cross-domain connections (from ontology design discussion):
+- Physical → Information: observation (sensor reading)
+- Information → Physical: manipulated variable (valve position, heater
+  power)
+- Within Information: signal chain (controller output → actuator
+  command)
+
+In the BL, these cross-domain connections are all **external inputs**:
+- A controller's subgraph has observation variables as external inputs
+  (from a physical capacity's output).
+- A physical capacity's subgraph has a manipulated variable as an
+  external input (from a controller's output).
+
+The BL doesn't need to know it's a cross-domain connection — it just
+sees an external input that comes from a connected entity. The
+connection rules in the ontology determine which connections are valid.
+
+#### Open question: is there an information-domain "transport system"?
+
+In the physical domain, the transport system is a separate node that
+connects capacities. In the information domain, the arc just passes
+the signal — no separate node needed.
+
+But what about more complex information routing? E.g. a multiplexer,
+a splitter, a signal selector? Are these:
+- Separate entity types (nodes in the Modeller)?
+- Or just arcs with special properties?
+
+This needs further discussion.
+
+### What is a node? (2026-09-13)
+
+This raises a key question: is an algebraic equation that is connected
+to the state equation's holding entity also a node?
+
+From the ontology design discussion (2026-09-11/12):
+> Property functions (thermo relations, geometric relations) are
+> sub-routines called within a node, NOT network nodes. Old ProMo
+> tried to put them in a separate domain — was not clean.
+
+So the answer is: **no**, an algebraic equation connected to the state
+equation is NOT a separate node. It is part of the same entity's
+behaviour description. The BL includes it in the entity's equation
+subgraph.
+
+The distinction is:
+- **Network nodes** (entities in the Modeller) — connected by arcs,
+  exchange variables through ports. Each has its own behaviour
+  description (BL subgraph).
+- **Internal equations** (within a node's subgraph) — resolved within
+  the entity. Property functions, effort relations, constitutive
+  equations. They are not nodes; they are part of the node's behaviour.
+
+The BL's subgraph for an entity type includes ALL equations needed to
+close the description — state, properties, efforts, transports (if
+internal), constitutive relations. Only variables that come from
+outside (connected entities) or are instantiated (parameters) are
+external to the subgraph.
+
+### Open question: what about transport systems?
+
+The transport system IS a network node (entity type 4.1.5) — it has its
+own behaviour description (algebraic transport equations). It is NOT an
+internal equation of a capacity node. The transport system connects
+capacities; it is a peer node in the network, not a subroutine.
+
+So the rule is:
+- If the equation describes the entity's own behaviour (properties,
+  constitutive relations, efforts) → internal to the entity's subgraph.
+- If the equation describes interaction between entities (transport
+  between capacities) → separate entity type, separate node, separate
+  subgraph.
+
+The distinction is in the ontology's entity type definitions, not in
+the BL logic. The BL just builds subgraphs per entity type.
+
+## 10. Interface/port definitions (2026-09-13)
+
+### Current state in the codebase
+
+The semantic contracts (`packages/semantic/src/contracts.ts`) already
+define:
+
+```typescript
+type PortDirection = 'input' | 'output' | 'bidirectional'
+
+interface InterfacePortDefinition {
+  iri: Iri
+  label: string
+  direction: PortDirection
+  tokenTypeIris: Iri[]
+  attributes: SemanticAttribute[]
+}
+
+interface EntityInterfaceDefinition {
+  iri: Iri
+  ports: InterfacePortDefinition[]
+}
+```
+
+`VariableRecord` has `port_variable: bool`. But `getInterface()` in the
+placeholder catalogue returns `undefined` — not populated from RDF yet.
+
+This concept likely originates from CWA 17960 / old ProMo.
+
+### Do we need a special definition for cross-domain information?
+
+No. We do not have a special definition for information exchanged between
+domains. The connection rules already encode which connections are
+valid (type 3: signal connections). The key distinction is direction:
+
+- **Physical ports**: bidirectional (effort equality + flow conservation
+  — both quantities are exchanged through the connection).
+- **Information ports**: unidirectional (output of one entity = input of
+  next). Direction is `input` or `output`, never `bidirectional`.
+- **Cross-domain connections**: unidirectional information arcs.
+  Physical→information (observation), information→physical (manipulated
+  variable).
+
+### Where do port definitions come from?
+
+Following the hint/binding pattern:
+
+- **Ontology**: connection rules define which tokens can be exchanged
+  between entity types, and the arc type (physical bidirectional vs.
+  information unidirectional). This determines the port's direction and
+  token types — a **hint**.
+- **BL**: the subgraph closure identifies which variables are external
+  (not defined within the subgraph, not instantiated). These external
+  variables are the entity's **ports**. The BL **binds** which specific
+  variables are the actual inputs/outputs for each entity type.
+- **Direction**: determined by the arc type (physical = bidirectional,
+  information = unidirectional). For information entities, the direction
+  (input vs. output) is determined by whether the variable appears on
+  the RHS (input) or is the LHS of an equation whose result goes outside
+  (output).
+
+So ports **emerge** from the BL's subgraph closure, just as state
+emerges from the cycle. The BL doesn't need a separate port definition
+step — it identifies external variables during closure, and these
+become the entity's interface.
+
+### Open question
+
+- The current `InterfacePortDefinition` has `tokenTypeIris` — should
+  this be populated from the variable's token tags, or from the
+  connection rules? (Likely both: the variable carries token tags, and
+  the connection rule validates that tokens match.)
+
+## 11. Equation eligibility metadata (2026-09-13)
+
+### The question
+
+Should equations carry metadata saying "I'm valid for entity type X" or
+"I'm valid for scale value Y" (e.g. "this is a PDE balance equation for
+distributed entities")? Or should the BL infer eligibility from the
+variables' classifications?
+
+### Following the hint/binding pattern
+
+This is the same pattern as state, transport, and ports:
+
+- **Equation eligibility metadata = hint**: the equation author tags an
+  equation with scale-value constraints or entity-type applicability.
+  This helps the BL filter/sort which equations to show as selectable for
+  a given entity type. But it does not bind — the user can override.
+- **User selection = binding**: the user selects which equations apply
+  to which entity types. The BL's subgraph closure is the actual
+  assignment.
+
+Without eligibility metadata, the user sees all equations and must
+choose wisely. With eligibility metadata, the BL can filter/sort the
+list, making the user's job easier.
+
+### Where could eligibility metadata live?
+
+Options:
+1. **On the equation itself** — `promo:eligibleForScaleValue` or
+   `promo:eligibleForEntityType` predicates on the `Equation` node.
+2. **On the equation class** — the `EquationClass` hierarchy could
+   carry scale-value constraints (e.g. "balance" class is eligible for
+   all entity types, "PDE balance" subclass is eligible for distributed
+   only).
+3. **Inferred from variables** — the BL checks whether the variables in
+   the equation have classifications compatible with the entity type's
+   scale values. No explicit metadata needed.
+
+Option 3 is the most consistent with the flexibility principle (no
+extra metadata to maintain), but it requires the BL to understand the
+relationship between variable classifications and entity type scale
+values — which may be complex.
+
+Option 2 is a middle ground: equation classes are already hierarchical,
+and adding eligibility constraints to the hierarchy is a natural
+extension. The equation editor already has `equation_class` as a field.
+
+### Resolution (tentative)
+
+Start without explicit eligibility metadata (option 3). The BL shows all
+equations; the user selects. If the UI becomes unwieldy, add equation
+class-level eligibility constraints (option 2) as hints.
+
+This is consistent with the incremental approach: don't add metadata
+until the need is proven. The BL works without it — it just works
+better with it.
+
+## 12. Validation scope (2026-09-13)
+
+### What the BL validates
+
+From the discussion so far, the BL performs these checks during subgraph
+construction:
+
+1. **Closure check** — every RHS variable in every selected equation is
+   either:
+   - defined by another equation in the subgraph,
+   - marked to-be-instantiated, or
+   - declared as an external input (port).
+   If any RHS variable is unresolved, the subgraph is not closed.
+
+2. **Unwanted cycle detection (indirect)** — the recursive construction
+   naturally identifies the state variable as the endpoint where the
+   cycle closes. If the recursion encounters a variable already defined
+   by another equation in the subgraph (other than the state variable),
+   that's an unwanted cycle — an error the user must resolve.
+
+3. **Endpoint validity** — the three valid endpoints of the recursion
+   are: to-be-instantiated, state, or a flow in a balance equation
+   (external input/port). Any other endpoint is an error.
+
+### What the BL does NOT validate
+
+The following are deferred to code generation, instantiation, or other
+downstream steps:
+
+- **Numerical solvability** — DAE index, PDAE vs ODAE, stiffness,
+  well-posedness. These are numerical concerns.
+- **Meshing** — spatial discretisation of PDEs into ODE networks. This
+  is a code generation / pre-processing step.
+- **Parameter values** — actual values of to-be-instantiated variables.
+  Set at instantiation time.
+- **Network-level closure** — connecting entity subgraphs in the
+  Modeller. The BL builds per-entity-type subgraphs; the full model is
+  assembled downstream.
+- **Unit consistency across entities** — the equation editor checks
+  units per-equation. Cross-entity unit consistency is a code
+  generation or model-level validation concern.
+- **Physical validity** — does the selected equation set make physical
+  sense? The BL doesn't judge physics; the user does.
+
+### Summary
+
+| BL validates | Deferred |
+|---|---|
+| Subgraph closure | Numerical solvability |
+| Unwanted cycles (indirect) | Meshing |
+| Endpoint validity | Parameter values |
+| | Network-level closure |
+| | Cross-entity unit consistency |
+| | Physical validity |
+
+The BL's validation is **structural** — it checks the subgraph is
+well-formed. It does not validate **semantics** (physics) or
+**numerics** (solvability). Those are downstream concerns.
+
+## 13. Assignment artefact structure (2026-09-13)
+
+### What is the assignment artefact?
+
+The BL's output is an RDF named graph — the **assignment artefact** —
+that records the result of the user's equation selection for each
+entity type. It is the binding: which equations describe which entity
+type's behaviour, which variable is the state, which variables are
+to-be-instantiated, and which are external inputs (ports).
+
+### Existing PROMO vocabulary
+
+The codebase (`backend/core/graph_store.py`) already defines:
+
+- `promo:EntityType` — entity type
+- `promo:Equation` — equation (with `promo:lhs`, `promo:rhs`,
+  `promo:incidenceList`)
+- `promo:hasEquation` — links a variable to its equation(s)
+- `promo:hasScaleValue` — links entity type to scale values
+- `promo:EquationClass` — equation class hierarchy
+- `promo:equationClass` — links equation to its class
+
+### Proposed predicates for the assignment artefact
+
+The assignment artefact is an RDF named graph. Everything that can be
+linked via RDF should be linked — equation IRIs, variable IRIs, entity
+type IRIs all reference the existing graphs. No copying or reification.
+
+The key insight: **the list of equations must be ordered** — in the
+sequence they are discovered and added during the recursive
+construction. This order directly defines the **computation sequence**
+for code generation.
+
+The computation sequence is:
+
+1. **State equation** — the base equation (integrated over time)
+2. **Secondary state** — property equations (thermodynamic relations,
+   effort, geometry, ...) that depend on state and on each other
+3. **Transport** — transport equations (flow rates, fluxes)
+4. **Reactions** — reaction equations (if applicable)
+
+This order emerges naturally from the recursive construction: the user
+selects the base equation, then resolves its RHS inputs by selecting
+equations in order. Each equation's LHS becomes available for
+subsequent equations.
+
+### RDF structure
+
+```
+promo:Assignment              — the assignment (one per entity type)
+  promo:forEntityType         — links to the entity type IRI
+  promo:hasBaseEquation       — the state-defining equation IRI (first in sequence)
+  promo:hasEquationSequence   — an rdf:List of equation IRIs, in computation order
+  promo:hasStateVariable      — the state variable IRI (if entity has state)
+  promo:hasPortVariable       — an external input variable IRI (port)
+  promo:hasInstantiatedVariable — a to-be-instantiated variable IRI
+```
+
+Using `rdf:List` (ordered collection) for the equation sequence
+preserves the discovery order. Each equation IRI references the
+equation in the var/expr graph — single source of truth.
+
+Variable role predicates can be flat triples:
+
+```
+entityType IRI  promo:hasState      variable IRI
+entityType IRI  promo:hasPort       variable IRI
+entityType IRI  promo:hasParameter  variable IRI
+```
+
+### Why order matters
+
+The computation sequence is critical for code generation:
+
+- The integrator needs the state equation first.
+- Secondary state equations (properties) are evaluated after state is
+  known — they are algebraic functions of state.
+- Transport equations are evaluated after properties are known
+  (transport depends on effort, which depends on properties).
+- Reactions are evaluated after transport (reaction rates depend on
+  concentrations, which depend on state and transport).
+
+This is the **lower-triangular evaluation order**: each equation's
+inputs are either the state (from the integrator), outputs of earlier
+equations in the sequence, to-be-instantiated parameters, or external
+inputs (ports). The recursive construction naturally produces this
+order — no topological sort needed at code generation time.
+
+### Resolved sub-questions
+
+- **Reference, not copy**: equation IRIs reference the var/expr graph.
+- **Order matters**: use `rdf:List` to preserve computation sequence.
+- **Single graph**: one assignment named graph for all entity types
+  (simpler to query, and entity types are independent).
+
+### Remaining open question
+
+- How are port variables linked to connection rules? The port variable
+  needs to match a token type when connected in the Modeller.
