@@ -608,7 +608,52 @@ A concrete `DictContext` is already implemented for in-memory provision and
 testing.  The future `RdfContext` will sit on top of an RDF triple store
 (e.g. `rdflib` or a persistent graph database).
 
-## 5. Open questions
+## 5. Ontology graph semantics (implemented 2026-09-14)
+
+The editable ontology graph (`http://example.org/ontology`) follows these
+rules, enforced by `backend/ontology/service.py` and
+`backend/core/graph_store.py`:
+
+### Containment vs reference
+
+- **Containment predicates** — deleting the object deletes the subject
+  recursively: `promo:parent` (subdomains, sub-tokens, sub-terms,
+  sub-scale-values), `promo:hasAxis` (terms → axis), `promo:hasScale`
+  (values → dimension), `promo:hasDomain` (axes/dimensions → domain).
+- **Reference predicates** — deleting the object only removes the link:
+  `promo:hasToken`, `promo:hasScaleValue`, `promo:sourceDomain`,
+  `promo:targetDomain`, `promo:sharedTokens`, `promo:axisValue`,
+  `promo:token`.
+- `_cascade_delete` implements both: contained descendants are deleted
+  recursively; all other incoming triples are removed so no dangling
+  references remain.
+
+### Token inheritance
+
+- `promo:hasToken` links a domain to the tokens active in it.
+- A subdomain inherits all tokens active in its ancestors; the API
+  exposes them as `DomainRecord.inherited_tokens` (resolved by walking
+  `promo:parent`).  Inheritance is additive — a subdomain can activate
+  additional tokens from the global list but cannot remove inherited
+  ones.
+- `add_domain` replaces the full `hasToken` set on update (not
+  append-only); same for `sharedTokens` on connection rules.
+
+### Connection rule resolution
+
+`GET /api/ontology/resolve-connection?source&target` returns the rules
+applicable to a domain pair:
+
+- A rule applies when its `source_domain`/`target_domain` equals the
+  endpoint domain or one of its ancestors (rules are inherited down the
+  domain tree, not copied).
+- `bidirectional` rules also match the swapped pair.
+- `physical-same` requires the endpoints to share a common ancestor
+  domain; `physical-cross` requires they do not.
+- Results are ordered most-specific first (closest ancestor wins over
+  wildcard rules).
+
+## 6. Open questions
 
 1. **Units representation** — do we store raw SI exponents, QUDT quantity
    kinds, or both?  If QUDT, the loader needs a `quantity_kind → Units` map.
@@ -621,7 +666,7 @@ testing.  The future `RdfContext` will sit on top of an RDF triple store
 4. **Entities / incidence graph** — should the modeller own the bipartite
    graph, or is it part of the ontology graph?
 
-## 6. Files / references
+## 7. Files / references
 
 - `backend/equation/context.py` — the contract.
 - `docs/equation-context-contract.md` — the contract description.

@@ -877,3 +877,81 @@ add, or delete scale levels and their children.  The seed uses
 molecular / nano / milli / macro for time and infinitesimal /
 microscopic / macroscopic / infinite for length, but these are
 editable defaults.
+
+### 26. Token model — global list, per-domain activation, additive inheritance — 2026-09-14
+
+**Decision:** Tokens follow a three-level model:
+
+1. **Stage 1 (Tokens tab)** defines the *global* token list — every
+   token available in the ontology.
+2. **Stage 2 (Domains tab)** activates tokens per domain.  The set of
+   active tokens implicitly defines the domain.
+3. **Subdomains inherit** all tokens active in their ancestors and may
+   activate additional tokens from the global list.  Inherited tokens
+   **cannot be removed** in a subdomain — inheritance is additive only.
+
+**Implementation:**
+
+- `promo:hasToken` links a domain to its *directly activated* tokens
+  only; inherited tokens are never copied into the child.
+- The API exposes `DomainRecord.inherited_tokens`, resolved by walking
+  the `promo:parent` chain (`_list_domain_records`).
+- The UI renders inherited tokens checked, greyed-out, disabled,
+  labelled `(inherited)`; only non-inherited tokens are toggleable.
+- `add_domain` *replaces* the full `hasToken` set on save (not
+  append-only), so unchecking a token persists.
+
+### 27. Connection rules are inherited, not copied — 2026-09-14
+
+**Decision:** A connection rule defined on a domain applies to that
+domain **and all its descendants**.  Rules are resolved at query time
+via ancestor-aware matching, not duplicated per subdomain.
+
+**Rationale:** Consistent with token inheritance (§26) — the domain
+tree carries semantics downward.  Copying rules into subdomains would
+create maintenance drift and contradict the "domain = token set"
+model.
+
+**Implementation:** `GET /api/ontology/resolve-connection?source&target`
+
+- A constrained rule applies when its `source_domain`/`target_domain`
+  equals the endpoint domain or one of its ancestors.
+- `bidirectional` rules also match the swapped pair.
+- `physical-same` requires the endpoints to share a common ancestor
+  domain; `physical-cross` requires they do not.
+- Results are ordered most-specific first (closest ancestor match wins
+  over wildcard rules).
+- The modeller consumes this endpoint through a
+  `ConnectionRuleResolver` implementation (packages/semantic) rather
+  than embedding rule logic.
+
+### 28. Delete semantics — containment vs reference — 2026-09-14
+
+**Decision:** Deletion distinguishes two predicate classes:
+
+- **Containment** — deleting the object deletes the subject
+  recursively: `promo:parent` (subdomains, sub-tokens, sub-terms,
+  sub-scale-values), `promo:hasAxis`, `promo:hasScale`,
+  `promo:hasDomain`.
+- **Reference** — deleting the object only removes the link:
+  `promo:hasToken`, `promo:hasScaleValue`, `promo:sourceDomain`,
+  `promo:targetDomain`, `promo:sharedTokens`, `promo:axisValue`,
+  `promo:token`.
+
+**Implementation:** `_cascade_delete` in `service.py` deletes the
+subject's outgoing triples, removes *all* incoming triples (no dangling
+references), and recurses into containment-linked children.  Applied to
+every delete endpoint.
+
+### 29. Seed indices — 2026-09-14
+
+**Decision:** The default ontology seeds three indices:
+
+- `species` — enumerates chemical components; bound to the
+  `component_mass` token (index bound to token).
+- `node` — network topology index over nodes.
+- `arc` — network topology index over arcs.
+
+Each carries `internal_id` plus `global_ID` and `internal_code`
+aliases, matching the variable naming scheme ("three names, three
+jobs").

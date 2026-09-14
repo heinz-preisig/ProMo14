@@ -52,6 +52,7 @@ class Index:
     index_class: str = "index"  # "index" | "block_index"
     aliases: Dict[str, str] = field(default_factory=dict)
     token: Optional[str] = None  # IRI of the token type this index carries
+    internal_id: Optional[str] = None
 
     def alias(self, language: str = "internal_code") -> str:
         return self.aliases.get(language, self.label)

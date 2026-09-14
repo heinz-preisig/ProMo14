@@ -35,6 +35,34 @@ from .models import (
 router = APIRouter()
 
 
+# Predicates that define containment: deleting the object also deletes the
+# subject (e.g. deleting an axis deletes its terms, deleting a domain deletes
+# its subdomains, axes, and scale dimensions).
+_CONTAINMENT_PREDICATES = (
+    PROMO["parent"],     # subdomains, sub-tokens, sub-terms, sub-scale-values
+    PROMO["hasAxis"],    # axis terms belong to their axis
+    PROMO["hasScale"],   # scale values belong to their dimension
+    PROMO["hasDomain"],  # axes and scale dimensions belong to their domain
+)
+
+
+def _cascade_delete(graph, subject: URIRef) -> None:
+    """Remove subject, all contained descendants, and all incoming references.
+
+    Contained descendants (linked via _CONTAINMENT_PREDICATES) are deleted
+    recursively.  Any other triple pointing at the subject (e.g. a domain's
+    hasToken link to a deleted token) is removed so no dangling references
+    remain.
+    """
+    children = set()
+    for pred in _CONTAINMENT_PREDICATES:
+        children.update(graph.subjects(pred, subject))
+    graph.remove((subject, None, None))   # outgoing triples
+    graph.remove((None, None, subject))   # incoming references
+    for child in children:
+        _cascade_delete(graph, child)
+
+
 def _variable_to_record(v) -> Dict[str, Any]:
     return {
         "iri": v.iri,
@@ -64,6 +92,7 @@ def _index_to_record(i) -> Dict[str, Any]:
         "label": i.label,
         "network": i.network,
         "index_class": i.index_class,
+        "internal_id": i.internal_id,
         "aliases": i.aliases,
         "token": i.token,
         "short_name": i.aliases.get("internal_code") or i.label[0]
@@ -119,9 +148,11 @@ def list_domains() -> List[DomainRecord]:
 @router.post("/domains", response_model=DomainRecord)
 def create_domain(record: DomainRecord) -> DomainRecord:
     """Create or update a domain with branch and token bindings."""
+    if not record.name or not record.name.strip():
+        raise HTTPException(status_code=422, detail="Domain name must not be empty")
     store = get_store()
     if not record.iri:
-        record.iri = str(store.mint_iri("http://example.org/ontology", f"domain_{record.name}"))
+        record.iri = str(store.mint_iri("http://example.org/ontology", f"domain_{record.name.strip()}"))
     store.add_domain(
         store.ontology_graph,
         record.name,
@@ -135,13 +166,13 @@ def create_domain(record: DomainRecord) -> DomainRecord:
 
 @router.delete("/domains/{iri:path}")
 def delete_domain(iri: str) -> Dict[str, str]:
-    """Delete a domain from the ontology graph."""
+    """Delete a domain and all its subdomains from the ontology graph."""
     store = get_store()
     graph = store.ontology_graph
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Domain not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -197,6 +228,8 @@ def list_indices() -> List[IndexRecord]:
 @router.post("/indices", response_model=IndexRecord)
 def create_index(record: IndexRecord) -> IndexRecord:
     """Create a new index in the ontology graph."""
+    if not record.label or not record.label.strip():
+        raise HTTPException(status_code=422, detail="Index label must not be empty")
     store = get_store()
     if not record.iri:
         record.iri = str(store.mint_iri("http://example.org/ontology", record.internal_id or store.next_internal_id("I")))
@@ -216,7 +249,7 @@ def delete_index(iri: str) -> Dict[str, str]:
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Index not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -247,9 +280,11 @@ def list_tokens() -> List[TokenRecord]:
 @router.post("/tokens", response_model=TokenRecord)
 def create_token(record: TokenRecord) -> TokenRecord:
     """Create or update a token type."""
+    if not record.label or not record.label.strip():
+        raise HTTPException(status_code=422, detail="Token label must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = record.label.lower().replace(" ", "_")
+        fragment = record.label.strip().lower().replace(" ", "_")
         record.iri = str(store.mint_iri("http://example.org/ontology", f"token_{fragment}"))
     store.add_token(
         store.ontology_graph,
@@ -262,13 +297,13 @@ def create_token(record: TokenRecord) -> TokenRecord:
 
 @router.delete("/tokens/{iri:path}")
 def delete_token(iri: str) -> Dict[str, str]:
-    """Delete a token type from the ontology graph."""
+    """Delete a token type and all child tokens from the ontology graph."""
     store = get_store()
     graph = store.ontology_graph
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Token not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -287,9 +322,11 @@ def list_axes() -> List[ClassificationAxisRecord]:
 @router.post("/axes", response_model=ClassificationAxisRecord)
 def create_axis(record: ClassificationAxisRecord) -> ClassificationAxisRecord:
     """Create or update a classification axis."""
+    if not record.name or not record.name.strip():
+        raise HTTPException(status_code=422, detail="Axis name must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"axis_{record.name}"
+        fragment = f"axis_{record.name.strip()}"
         record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
     store.add_classification_axis(
         store.ontology_graph,
@@ -309,7 +346,7 @@ def delete_axis(iri: str) -> Dict[str, str]:
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Axis not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -337,9 +374,11 @@ def list_axis_terms() -> List[AxisTermRecord]:
 @router.post("/axis-terms", response_model=AxisTermRecord)
 def create_axis_term(record: AxisTermRecord) -> AxisTermRecord:
     """Create or update an axis term."""
+    if not record.label or not record.label.strip():
+        raise HTTPException(status_code=422, detail="Axis term label must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"term_{record.label.lower().replace(' ', '_')}"
+        fragment = f"term_{record.label.strip().lower().replace(' ', '_')}"
         record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
     store.add_axis_term(
         store.ontology_graph,
@@ -353,13 +392,13 @@ def create_axis_term(record: AxisTermRecord) -> AxisTermRecord:
 
 @router.delete("/axis-terms/{iri:path}")
 def delete_axis_term(iri: str) -> Dict[str, str]:
-    """Delete an axis term."""
+    """Delete an axis term and all its child terms."""
     store = get_store()
     graph = store.ontology_graph
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Axis term not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -378,9 +417,11 @@ def list_scale_dimensions() -> List[ScaleDimensionRecord]:
 @router.post("/scale-dimensions", response_model=ScaleDimensionRecord)
 def create_scale_dimension(record: ScaleDimensionRecord) -> ScaleDimensionRecord:
     """Create or update a scale dimension."""
+    if not record.name or not record.name.strip():
+        raise HTTPException(status_code=422, detail="Scale dimension name must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"scale_{record.name}"
+        fragment = f"scale_{record.name.strip()}"
         record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
     store.add_scale_dimension(
         store.ontology_graph,
@@ -400,7 +441,7 @@ def delete_scale_dimension(iri: str) -> Dict[str, str]:
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Scale dimension not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -428,9 +469,11 @@ def list_scale_values() -> List[ScaleValueRecord]:
 @router.post("/scale-values", response_model=ScaleValueRecord)
 def create_scale_value(record: ScaleValueRecord) -> ScaleValueRecord:
     """Create or update a scale value."""
+    if not record.label or not record.label.strip():
+        raise HTTPException(status_code=422, detail="Scale value label must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"sval_{record.label.lower().replace(' ', '_')}"
+        fragment = f"sval_{record.label.strip().lower().replace(' ', '_')}"
         record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
     store.add_scale_value(
         store.ontology_graph,
@@ -444,13 +487,13 @@ def create_scale_value(record: ScaleValueRecord) -> ScaleValueRecord:
 
 @router.delete("/scale-values/{iri:path}")
 def delete_scale_value(iri: str) -> Dict[str, str]:
-    """Delete a scale value."""
+    """Delete a scale value and all its child values."""
     store = get_store()
     graph = store.ontology_graph
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Scale value not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -469,9 +512,11 @@ def list_entity_types() -> List[EntityTypeRecord]:
 @router.post("/entity-types", response_model=EntityTypeRecord)
 def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
     """Create or update an entity type."""
+    if not record.label or not record.label.strip():
+        raise HTTPException(status_code=422, detail="Entity type label must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"etype_{record.label.lower().replace(' ', '_')}"
+        fragment = f"etype_{record.label.strip().lower().replace(' ', '_')}"
         record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
     store.add_entity_type(
         store.ontology_graph,
@@ -494,7 +539,7 @@ def delete_entity_type(iri: str) -> Dict[str, str]:
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Entity type not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
 
 
@@ -513,9 +558,11 @@ def list_connection_rules() -> List[ConnectionRuleRecord]:
 @router.post("/connection-rules", response_model=ConnectionRuleRecord)
 def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord:
     """Create or update a connection rule."""
+    if not record.rule_type or not record.rule_type.strip():
+        raise HTTPException(status_code=422, detail="Connection rule type must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"rule_{record.rule_type}"
+        fragment = f"rule_{record.rule_type.strip()}"
         record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
     store.add_connection_rule(
         store.ontology_graph,
@@ -538,8 +585,91 @@ def delete_connection_rule(iri: str) -> Dict[str, str]:
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Connection rule not found")
-    graph.remove((subject, None, None))
+    _cascade_delete(graph, subject)
     return {"deleted": iri}
+
+
+# ---------------------------------------------------------------------------
+# Connection rule resolution (ancestor-aware matching)
+# ---------------------------------------------------------------------------
+
+
+def _domain_ancestor_chain(graph, iri: str) -> List[str]:
+    """Return ``[iri, parent, grandparent, ...]`` walking the parent chain."""
+    chain: List[str] = []
+    seen = set()
+    current = URIRef(iri)
+    while current is not None and str(current) not in seen:
+        seen.add(str(current))
+        chain.append(str(current))
+        current = graph.value(current, PROMO["parent"])
+    return chain
+
+
+def _rule_domain_match(rule: ConnectionRuleRecord,
+                       src_chain: List[str],
+                       tgt_chain: List[str]) -> bool:
+    """Check a rule's domain constraints against ancestor chains.
+
+    A constrained rule applies when its ``source_domain``/``target_domain``
+    is the actual domain or one of its ancestors.  Bidirectional rules also
+    match the swapped pair.
+    """
+    def ok(s_chain: List[str], t_chain: List[str]) -> bool:
+        return (
+            (not rule.source_domain or rule.source_domain in s_chain)
+            and (not rule.target_domain or rule.target_domain in t_chain)
+        )
+
+    if ok(src_chain, tgt_chain):
+        return True
+    if rule.direction == "bidirectional":
+        return ok(tgt_chain, src_chain)
+    return False
+
+
+@router.get("/resolve-connection")
+def resolve_connection(source: str, target: str) -> Dict[str, Any]:
+    """Return connection rules applicable to a source→target domain pair.
+
+    Rules stay attached to the domain where they are defined; a rule applies
+    to a pair when its domain constraints are ancestors (or self) of the
+    actual endpoint domains.  Unconstrained rules are filtered by
+    ``rule_type``: ``physical-same`` requires the endpoints to share a common
+    ancestor domain, ``physical-cross`` requires they do not.  Results are
+    ordered most-specific first (closest ancestor match wins).
+    """
+    store = get_store()
+    graph = store.ontology_graph
+    src_chain = _domain_ancestor_chain(graph, source)
+    tgt_chain = _domain_ancestor_chain(graph, target)
+    common = set(src_chain) & set(tgt_chain)
+
+    ctx = RdfContext(store)
+    scored = []
+    for rule in _list_connection_rule_records(ctx):
+        if not _rule_domain_match(rule, src_chain, tgt_chain):
+            continue
+        if rule.rule_type == "physical-same" and not common:
+            continue
+        if rule.rule_type == "physical-cross" and common:
+            continue
+        # Specificity: distance of the constrained domains up the chains.
+        # Unconstrained rules sort last.
+        spec = (
+            src_chain.index(rule.source_domain)
+            if rule.source_domain else len(src_chain)
+        ) + (
+            tgt_chain.index(rule.target_domain)
+            if rule.target_domain else len(tgt_chain)
+        )
+        scored.append((spec, rule))
+    scored.sort(key=lambda m: m[0])
+    return {
+        "source": source,
+        "target": target,
+        "rules": [r.model_dump() for _, r in scored],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -561,22 +691,36 @@ def save_ontology(req: SaveRequest) -> Dict[str, str]:
 
 
 def _list_domain_records(ctx) -> List[DomainRecord]:
-    """Load domain records from the graph."""
+    """Load domain records from the graph, resolving inherited tokens."""
     store = get_store()
     graph = store.ontology_graph
+
+    def _own_tokens(iri: URIRef) -> List[str]:
+        return [str(t) for t in graph.objects(iri, PROMO["hasToken"])]
+
+    def _ancestor_tokens(iri: URIRef, visited: set) -> List[str]:
+        """Collect tokens from all ancestors, avoiding cycles."""
+        parent = graph.value(iri, PROMO["parent"])
+        if parent is None or str(parent) in visited:
+            return []
+        visited.add(str(parent))
+        return _own_tokens(parent) + _ancestor_tokens(parent, visited)
+
     records = []
     for s in graph.subjects(RDF.type, PROMO["Domain"]):
         name = graph.value(s, PROMO["name"])
         parent = graph.value(s, PROMO["parent"])
         branch = graph.value(s, PROMO["branch"])
-        tokens = [str(t) for t in graph.objects(s, PROMO["hasToken"])]
+        own = _own_tokens(s)
+        inherited = [t for t in _ancestor_tokens(s, {str(s)}) if t not in own]
         records.append(
             DomainRecord(
                 iri=str(s),
                 name=str(name) if name else "",
                 parent=str(parent) if parent else None,
                 branch=str(branch) if branch else None,
-                tokens=tokens,
+                tokens=own,
+                inherited_tokens=list(dict.fromkeys(inherited)),  # deduplicated, order preserved
             )
         )
     return records

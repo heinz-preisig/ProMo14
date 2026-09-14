@@ -1,29 +1,57 @@
 # Ontology Editor — Implementation Status
 
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-14
 
 ## Current state
 
-Design complete.  Phase 0 and Phase 1 backend are implemented and wired
-into the equation editor tests.
+v1 implemented and verified end-to-end.  Backend, frontend, and seed data
+all working; manual UI testing done 2026-09-14.
 
 - `backend/core/graph_store.py` (`RdfStore`): implemented.
   - Wraps `rdflib.Dataset`.
   - Loads `PROMO_DATA_DIR/*.trig` and seeds from legacy v8 JSON/TriG when
-    the editable ontology graph is empty.
+    the editable ontology graph is empty; otherwise seeds
+    `seed_default_ontology()`.
   - Persist/serialize as TriG.
+  - `add_domain` replaces the full `hasToken` set on save (update
+    semantics, not append-only); same for `sharedTokens` on rules.
 - `backend/ontology/rdf_context.py` (`RdfContext`): implemented.
   - Implements `EquationContext`.
   - Reads variables, indices, and the network tree from the seeded
     `RdfStore.ontology_graph`.
   - Parses `promo:network` list literals and `>>>` interface paths.
-- `backend/core/loader.py`: updated.
-  - `rdflib` is optional for JSON-only loading.
-  - Discovers and merges versioned `variables_v8*.json` files by size.
-  - Converts v8 records into `Variable`/`Index` dataclass-compatible dicts.
-- `apps/ontology-editor/`: UI scaffold with `App.tsx`, build passes.
-- FastAPI router `backend/ontology/service.py` exists but is not yet fully
-  wired with CRUD.
+- `backend/ontology/service.py`: full CRUD for domains, tokens, axes,
+  axis terms, scale dimensions/values, entity types, indices, connection
+  rules; `POST /save`; `GET /resolve-connection` (ancestor-aware rule
+  matching).
+- `apps/ontology-editor/`: 7 stage tabs (Tokens, Domains, Axes, Scales,
+  Entity Types, Indices, Rules), hierarchical tree rendering, token
+  inheritance UI.
+
+## Semantics implemented (2026-09-14)
+
+- **Token model** — Stage 1 (Tokens tab) defines the global token list;
+  Stage 2 (Domains tab) activates tokens per domain.  Subdomains inherit
+  parent tokens (read-only, greyed-out `(inherited)` in the UI) and may
+  add more from the global list; inherited tokens cannot be removed.
+  Backend resolves `inherited_tokens` by walking the `promo:parent`
+  chain in `_list_domain_records`.
+- **Cascade delete** — `_cascade_delete` removes the subject, all
+  contained descendants (via `parent`, `hasAxis`, `hasScale`,
+  `hasDomain`), and all incoming references (e.g. `hasToken` links from
+  domains to a deleted token).  Applied to every delete endpoint.
+- **Connection rule resolution** — `GET /api/ontology/resolve-connection?source&target`
+  returns applicable rules for a domain pair.  A rule applies when its
+  `source_domain`/`target_domain` is the endpoint domain or an ancestor;
+  bidirectional rules match the swapped pair; `physical-same` requires a
+  common ancestor, `physical-cross` requires none; results sorted
+  most-specific first.
+- **Validation** — frontend disables Save until required fields are
+  filled; backend returns 422 on empty labels; axis terms require a
+  selected axis.
+- **Seed indices** — `species` (bound to `component_mass` token), `node`,
+  `arc` (network topology indices).
+- **Dev tooling** — `dev.sh` runs uvicorn with `--reload`.
 
 ## Design
 
@@ -64,14 +92,13 @@ FastAPI router scaffold.  The provider is functional and tested.
 
 ## Pending items
 
-1. Implement backend graph store and `RdfContext` provider.
-2. Build frontend domain tree pane.
-3. Build variable table with filtering.
-4. Build detail/editor pane with tabs (identity, domain, semantics,
-   indices, equations).
-5. Integrate equation editor for equation authoring.
-6. Implement ontology versioning and change classification.
-7. Add publication export functionality.
+1. Wire equation editor to `RdfContext` (switch `/api/equation/context`).
+2. Wire modeller `ConnectionRuleResolver` to
+   `GET /api/ontology/resolve-connection`.
+3. Implement ontology versioning and change classification (ADR-006).
+4. Add publication export functionality.
+5. Persist `ontology.trig` automatically or prompt on unsaved changes
+   (currently manual via Save ontology button).
 
 ## Implementation plan
 
@@ -157,11 +184,12 @@ contexts.
 
 ## Current priority
 
-Phase 0 and Phase 1 are largely complete.  The next concrete steps are:
+v1 is complete and verified.  The next concrete steps are:
 
-1. Extend `RdfContext` to read **all named graphs** in the `RdfStore`
+1. Wire equation editor `/api/equation/context` to `RdfContext`.
+2. Consume `resolve-connection` from the modeller's
+   `ConnectionRuleResolver` (replaces the allow-all placeholder).
+3. Extend `RdfContext` to read **all named graphs** in the `RdfStore`
    (not only `ontology_graph`) and to recognise lowercase
    `promo:variable` / `promo:index` types used by
    `variableExpression.trig`.
-2. Begin Phase 2 ontology CRUD backend (`models.py`, `service.py`,
-   `store.py`).

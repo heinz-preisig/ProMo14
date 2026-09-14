@@ -40,7 +40,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 const EMPTY_TOKEN: TokenRecord = { iri: '', label: '', parent: null }
-const EMPTY_DOMAIN: DomainRecord = { iri: '', name: '', label: null, parent: null, branch: null, children: [], tokens: [] }
+const EMPTY_DOMAIN: DomainRecord = { iri: '', name: '', label: null, parent: null, branch: null, children: [], tokens: [], inherited_tokens: [] }
 const EMPTY_AXIS: ClassificationAxisRecord = { iri: '', domain: '', name: '', parent: null, terms: [] }
 const EMPTY_AXIS_TERM: AxisTermRecord = { iri: '', axis: '', label: '', parent: null }
 const EMPTY_SCALE_DIM: ScaleDimensionRecord = { iri: '', name: '', domain: '', parent: null, values: [] }
@@ -254,7 +254,8 @@ export default function App() {
             <option key={t.iri} value={t.iri}>{t.label}</option>
           ))}
         </select>
-        <button style={S.button} onClick={async () => {
+        <button style={S.button} disabled={!draftToken.label.trim()} onClick={async () => {
+          if (!draftToken.label.trim()) { msg('Label must not be empty'); return }
           try { await createToken(draftToken); msg('Token saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>
@@ -295,7 +296,12 @@ export default function App() {
         <label style={S.label}>Name</label>
         <input style={S.input} value={draftDomain.name} onChange={(e) => setDraftDomain({ ...draftDomain, name: e.target.value })} />
         <label style={S.label}>Parent</label>
-        <select style={S.select} value={draftDomain.parent || ''} onChange={(e) => setDraftDomain({ ...draftDomain, parent: e.target.value || null })}>
+        <select style={S.select} value={draftDomain.parent || ''} onChange={(e) => {
+          const parentIri = e.target.value || null
+          const parent = domains.find((d) => d.iri === parentIri)
+          const inherited = parent ? [...parent.inherited_tokens, ...parent.tokens] : []
+          setDraftDomain({ ...draftDomain, parent: parentIri, inherited_tokens: inherited })
+        }}>
           <option value="">(none — top level)</option>
           {domains.filter((d) => d.iri !== draftDomain.iri).map((d) => (
             <option key={d.iri} value={d.iri}>{d.name}</option>
@@ -308,21 +314,27 @@ export default function App() {
           <option value="information">information</option>
         </select>
         <label style={S.label}>Tokens</label>
-        <div style={{ marginBottom: 8, maxHeight: 120, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
-          {tokens.map((t) => (
-            <label key={t.iri} style={{ display: 'block', fontSize: 12 }}>
-              <input
-                type="checkbox"
-                checked={draftDomain.tokens.includes(t.iri)}
-                onChange={(e) => {
-                  const next = e.target.checked
-                    ? [...draftDomain.tokens, t.iri]
-                    : draftDomain.tokens.filter((x) => x !== t.iri)
-                  setDraftDomain({ ...draftDomain, tokens: next })
-                }}
-              /> {t.label}
-            </label>
-          ))}
+        <div style={{ marginBottom: 8, maxHeight: 160, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
+          {tokens.map((t) => {
+            const isInherited = draftDomain.inherited_tokens.includes(t.iri)
+            const isOwn = draftDomain.tokens.includes(t.iri)
+            return (
+              <label key={t.iri} style={{ display: 'block', fontSize: 12, color: isInherited ? '#999' : undefined }}>
+                <input
+                  type="checkbox"
+                  checked={isOwn || isInherited}
+                  disabled={isInherited}
+                  onChange={(e) => {
+                    if (isInherited) return
+                    const next = e.target.checked
+                      ? [...draftDomain.tokens, t.iri]
+                      : draftDomain.tokens.filter((x) => x !== t.iri)
+                    setDraftDomain({ ...draftDomain, tokens: next })
+                  }}
+                /> {t.label}{isInherited ? ' (inherited)' : ''}
+              </label>
+            )
+          })}
         </div>
         <button style={S.button} onClick={async () => {
           try { await createDomain(draftDomain); msg('Domain saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
@@ -356,11 +368,11 @@ export default function App() {
                   onClick={(e) => { e.stopPropagation(); onDelete(axis.iri, deleteAxis, 'Axis') }}
                 >x</button>
               </div>
-              {axis.terms.map((term) => (
-                <div key={term.iri} style={{ ...S.listItem, paddingLeft: 28, fontSize: 12, color: '#666' }}
+              {buildTree(axis.terms).map(({ item: term, depth }) => (
+                <div key={term.iri} style={{ ...S.listItem, paddingLeft: 20 + depth * 14, fontSize: 12, color: '#666' }}
                   onClick={() => { setDraftAxisTerm({ ...term }) }}
                 >
-                  {term.parent ? '└─ ' : '• '}{term.label}
+                  {depth > 0 ? '└─ ' : '• '}{term.label}
                   <button
                     style={{ ...S.buttonGhost, float: 'right', padding: '1px 5px', fontSize: 10 }}
                     onClick={(e) => { e.stopPropagation(); onDelete(term.iri, deleteAxisTerm, 'Term') }}
@@ -389,10 +401,10 @@ export default function App() {
         <div style={{ ...S.section, marginTop: 24, borderTop: '1px solid #eee', paddingTop: 12 }}>
           <h3 style={S.h3}>Add term to axis</h3>
           <label style={S.label}>Axis</label>
-          <select style={S.select} value={draftAxisTerm.axis} onChange={(e) => setDraftAxisTerm({ ...draftAxisTerm, axis: e.target.value })}>
+          <select style={S.select} value={draftAxisTerm.axis} onChange={(e) => setDraftAxisTerm({ ...draftAxisTerm, axis: e.target.value, parent: null })}>
             <option value="">(select axis)</option>
             {axes.map((a) => (
-              <option key={a.iri} value={a.iri}>{a.name}</option>
+              <option key={a.iri} value={a.iri}>{a.name} ({domainName(a.domain)})</option>
             ))}
           </select>
           <label style={S.label}>Label</label>
@@ -404,7 +416,9 @@ export default function App() {
               <option key={t.iri} value={t.iri}>{t.label}</option>
             ))}
           </select>
-          <button style={S.button} onClick={async () => {
+          <button style={S.button} disabled={!draftAxisTerm.axis || !draftAxisTerm.label.trim()} onClick={async () => {
+            if (!draftAxisTerm.axis) { msg('Select an axis first'); return }
+            if (!draftAxisTerm.label.trim()) { msg('Label must not be empty'); return }
             try { await createAxisTerm(draftAxisTerm); msg('Term saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
           }}>Save term</button>
         </div>
@@ -749,7 +763,6 @@ export default function App() {
           Save ontology
         </button>
       </div>
-      {message && <div style={S.message}>{message}</div>}
       <div style={S.body}>
         {stage === 'tokens' && renderTokens()}
         {stage === 'domains' && renderDomains()}
@@ -759,6 +772,7 @@ export default function App() {
         {stage === 'indices' && renderIndices()}
         {stage === 'rules' && renderRules()}
       </div>
+      {message && <div style={{ ...S.message, position: 'fixed', bottom: 0, left: 0, right: 0, textAlign: 'center' }}>{message}</div>}
     </div>
   )
 }

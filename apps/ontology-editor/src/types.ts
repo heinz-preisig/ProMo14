@@ -16,7 +16,8 @@ export interface DomainRecord {
   parent: string | null
   branch: string | null // "physical" or "information" (top-level only)
   children: string[]
-  tokens: string[] // token IRIs bound to this domain
+  tokens: string[] // token IRIs explicitly assigned to this domain
+  inherited_tokens: string[] // token IRIs inherited from ancestors (read-only)
 }
 
 // ---------------------------------------------------------------------------

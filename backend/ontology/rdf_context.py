@@ -250,6 +250,9 @@ class RdfContext(EquationContext):
                 index_class=_one_literal(self._graph, s, PROMO["indexClass"], "index"),
                 aliases=aliases,
                 token=_one_literal(self._graph, s, PROMO["token"]) or None,
+                internal_id=_one_literal(self._graph, s, PROMO["internalID"])
+                or aliases.get("global_ID")
+                or iri,
             )
         return indices
 

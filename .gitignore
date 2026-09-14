@@ -3,6 +3,7 @@ dist
 .vite
 .venv
 *.log
+logs/
 
 __pycache__/
 *.pyc

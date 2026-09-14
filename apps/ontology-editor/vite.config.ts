@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   base: '/ontology/',
   server: {
-    port: 3002,
+    port: 3001,
     open: true,
     proxy: {
       '/api': {

@@ -1,12 +1,12 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-13 (end of session)
+**Last updated:** 2026-09-14 (end of session)
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data | React UI with all v1 tabs | TypeScript + Vite build pass | **v1 implemented**; end-to-end testing next |
+| Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution | React UI with all v1 tabs | TypeScript + Vite build pass | **v1 verified end-to-end**; inheritance + cascade delete done |
 | Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 4 test files | Backend and frontend functional |
 | Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
@@ -28,26 +28,30 @@
   multi-axis variable classification (variable_class → "role" axis),
   entity types from CWA 17960, 3 connection rule types, transport system
   as node (not arc), event dynamics fits existing taxonomy.
-- **Backend:** All v1 steps implemented:
+- **Backend:** All v1 steps implemented and verified:
   - `backend/core/graph_store.py` — PROMO vocabulary for Domain,
     ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
     EquationClass. CRUD methods for all. `seed_default_ontology()`
     bootstraps two-branch tree, 7 tokens, role axes, 8 entity types, 3
-    connection rules, 5 equation classes.
+    connection rules, 5 equation classes, 3 indices (species/node/arc).
+    `add_domain`/`add_connection_rule` use replace semantics for
+    `hasToken`/`sharedTokens`.
   - `backend/ontology/models.py` — VariableRecord, EquationRecord,
-    DomainRecord, ClassificationAxisRecord, AxisTermRecord,
-    EntityTypeRecord, ConnectionRuleRecord.
-  - `backend/ontology/service.py` — REST endpoints for domains, axes,
-    axis terms, entity types, connection rules, token CRUD.
+    DomainRecord (with `inherited_tokens`), ClassificationAxisRecord,
+    AxisTermRecord, EntityTypeRecord, ConnectionRuleRecord.
+  - `backend/ontology/service.py` — REST endpoints for all entity
+    types; `_cascade_delete` (containment + incoming references);
+    `GET /resolve-connection` ancestor-aware rule matching.
   - `backend/ontology/rdf_context.py` — domains(), axes(),
     entity_types(), connection_rules() accessors; multi-axis
-    classification loading.
-- **Frontend:** `apps/ontology-editor/` — all v1 tabs implemented:
-  Variables (with multi-axis tagger), Indices, Domains, Tokens, Axes,
-  Entity Types, Connection Rules, Equations. TypeScript and Vite
-  builds pass clean.
-- **Next:** End-to-end testing (backend + frontend together). Then wire
-  equation editor to `RdfContext`.
+    classification loading; index `internal_id` round-trip.
+- **Frontend:** `apps/ontology-editor/` — all v1 tabs implemented and
+  manually verified: Tokens, Domains (token inheritance UI), Axes
+  (hierarchical terms), Scales, Entity Types, Indices, Rules.
+- **Semantics:** token inheritance down the domain tree (additive only);
+  cascade delete; ancestor-aware connection rule resolution.
+- **Next:** Wire equation editor to `RdfContext`; consume
+  `resolve-connection` from the modeller's `ConnectionRuleResolver`.
 
 ### Equation Editor
 

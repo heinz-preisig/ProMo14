@@ -110,7 +110,7 @@ def _as_literal(value: Any) -> Literal:
         return Literal(value, datatype=XSD.integer)
     if isinstance(value, float):
         return Literal(value, datatype=XSD.double)
-    if isinstance(value, list):
+    if isinstance(value, (list, dict)):
         return Literal(json.dumps(value))
     return Literal(str(value))
 
@@ -359,6 +359,28 @@ class RdfStore:
             self.add_connection_rule(g, rule_iri, rule_type,
                                      direction=direction, description=desc)
 
+        # --- Indices ---
+        # species: enumerates chemical components, bound to component mass token.
+        # node / arc: index the network graph topology.
+        seed_indices = [
+            ("idx_species", "species", "s", "physical", "index",
+             "token_component_mass"),
+            ("idx_node", "node", "n", "physical", "node", None),
+            ("idx_arc", "arc", "a", "physical", "arc", None),
+        ]
+        for frag, label, short, network, iclass, token_frag in seed_indices:
+            internal_id = self.next_internal_id("I")
+            self.add_index_dict(g, {
+                "iri": str(self.mint_iri(base, frag)),
+                "label": label,
+                "short_name": short,
+                "network": network,
+                "index_class": iclass,
+                "internal_id": internal_id,
+                "aliases": {"global_ID": internal_id, "internal_code": short},
+                "token": str(self.mint_iri(base, token_frag)) if token_frag else None,
+            })
+
         # --- Equation classes (top-level hierarchy) ---
         eq_classes = ["generic", "instantiate", "balance", "empirical", "user_function"]
         for ec in eq_classes:
@@ -477,11 +499,12 @@ class RdfStore:
         graph.set((iri, PROMO["name"], _as_literal(name)))
         if parent is not None:
             if isinstance(parent, str):
-                parent = self.mint_iri(PROMO, f"domain_{parent}")
+                parent = URIRef(parent)
             graph.set((iri, PROMO["parent"], parent))
         if branch is not None:
             graph.set((iri, PROMO["branch"], _as_literal(branch)))
-        if tokens:
+        if tokens is not None:
+            graph.remove((iri, PROMO["hasToken"], None))
             for token in tokens:
                 if isinstance(token, str):
                     token = URIRef(token)
@@ -704,7 +727,8 @@ class RdfStore:
             if isinstance(target_domain, str):
                 target_domain = URIRef(target_domain)
             graph.set((iri, PROMO["targetDomain"], target_domain))
-        if shared_tokens:
+        if shared_tokens is not None:
+            graph.remove((iri, PROMO["sharedTokens"], None))
             for token in shared_tokens:
                 if isinstance(token, str):
                     token = URIRef(token)

@@ -36,7 +36,8 @@ class DomainRecord(BaseModel):
     parent: Optional[str] = None
     branch: Optional[str] = None  # "physical" or "information" (top-level only)
     children: List[str] = Field(default_factory=list)
-    tokens: List[str] = Field(default_factory=list)  # token IRIs bound to this domain
+    tokens: List[str] = Field(default_factory=list)  # token IRIs explicitly assigned to this domain
+    inherited_tokens: List[str] = Field(default_factory=list)  # token IRIs inherited from ancestors (read-only)
 
 
 # ---------------------------------------------------------------------------
