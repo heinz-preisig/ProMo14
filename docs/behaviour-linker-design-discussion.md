@@ -594,6 +594,18 @@ rates as functions of effort differences, transport coefficients, etc.),
 not accumulation. There is no time derivative, no cycle through a state
 variable, no capacity.
 
+**Refinement (2026-09-15):** "no state" means no *autonomous dynamic*
+state, and it is the **time-scale value** that decides.  Modelled as a
+*dynamic distributed* entity, the transport system is a PDAE: it has
+its own integrated state (spatial profiles of T, c, v evolved by its
+balance equations).  Modelled with the *event-dynamic* assumption, the
+internal state still exists but is **boundary-determined** — the
+profiles are whatever the adjacent capacities currently impose
+(quasi-steady assumption).  The subgraph is then acyclic *given the
+port inputs*, not because nothing inside could be a state.  Same
+equations, same ports — the modelling choice lives in the scale value,
+not in the code.
+
 In the BL's subgraph terms:
 - The transport system's equation subgraph is **acyclic** — no equation's
   LHS transitively depends on itself.
