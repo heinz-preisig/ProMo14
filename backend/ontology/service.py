@@ -7,6 +7,7 @@ state lives in the shared ``RdfStore``; the ontology graph is saved to
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
@@ -563,7 +564,8 @@ def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord
         raise HTTPException(status_code=422, detail="Connection rule type must not be empty")
     store = get_store()
     if not record.iri:
-        fragment = f"rule_{record.rule_type.strip()}"
+        slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", record.rule_type.strip().lower())
+        fragment = f"rule_{slug or 'unnamed'}"
         record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_connection_rule(
         store.ontology_graph,

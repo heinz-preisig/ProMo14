@@ -221,6 +221,9 @@ class RdfStore:
             tok_iri = self.mint_iri(base, f"token_{frag}")
             g.add((phys_iri, PROMO["hasToken"], tok_iri))
         g.add((info_iri, PROMO["hasToken"], signal_iri))
+        # The signal token is information-branch only.  Physical domains
+        # that expose measurements (e.g. transport) add it themselves —
+        # see scripts/extend_ontology_hap.py.
 
         # --- Classification axes: "role" axis on both branches ---
         role_phys_iri = self.mint_iri(base, "axis_role_physical")
@@ -327,24 +330,60 @@ class RdfStore:
                 if sf in all_scale_vals:
                     g.add((et_iri, PROMO["hasScaleValue"], all_scale_vals[sf]))
 
-        # --- Connection rules (3 types) ---
+        # --- Connection rules ---
         # Arc semantics live in rule attributes, not in the type name:
         #   direction : unidirectional | bidirectional
         #   carrier   : token-flow | reference
-        #   scope     : same | cross | any   (branch constraint)
+        #   scope     : same | cross | any   (branch constraint:
+        #               same = shared ancestor, cross = none)
+        # physical-cross was retired (2026-09-15): a token-flow arc with
+        # scope=cross can never apply (cross-branch pairs share no
+        # tokens); physical-same covers all intra-physical continuity.
+        physical_token_iris = [
+            self.mint_iri(base, f"token_{f}") for f in physical_tokens
+        ]
         rules = [
             ("physical-same", "bidirectional", "token-flow", "same",
-             "Same domain, shared tokens — physical arc (continuity)"),
-            ("physical-cross", "bidirectional", "token-flow", "cross",
-             "Different physical domains, shared tokens — physical arc (continuity)"),
-            ("signal", "unidirectional", "reference", "any",
+             phys_iri, phys_iri, physical_token_iris,
+             "Same branch, shared tokens — physical arc (continuity)"),
+            ("signal", "unidirectional", "reference", "same",
+             info_iri, info_iri, [signal_iri],
              "Signal connection — information arc (unidirectional)"),
         ]
-        for rule_type, direction, carrier, scope, desc in rules:
+        for rule_type, direction, carrier, scope, src, tgt, shared, desc in rules:
             rule_iri = self.mint_iri(base, f"rule_{rule_type}")
             self.add_connection_rule(g, rule_iri, rule_type,
                                      direction=direction, carrier=carrier,
-                                     scope=scope, description=desc)
+                                     scope=scope, source_domain=src,
+                                     target_domain=tgt, shared_tokens=shared,
+                                     description=desc)
+
+        # access: physical→physical reference arcs (service couplings —
+        # reactions, properties, geometry reading host state). Domain-
+        # constrained to the physical branch, so resolve_connection
+        # prefers it over the unconstrained signal rule for those pairs.
+        access_iri = self.mint_iri(base, "rule_access")
+        self.add_connection_rule(g, access_iri, "access",
+                                 direction="unidirectional",
+                                 carrier="reference", scope="same",
+                                 source_domain=phys_iri,
+                                 target_domain=phys_iri,
+                                 shared_tokens=[signal_iri],
+                                 description="Physical→physical accessibility arc (service coupling)")
+
+        # signal is information-internal; sensor/actuation close the loop
+        # across the branch boundary (scope=cross — no shared ancestor).
+        for name, src, tgt, desc in [
+            ("sensor", phys_iri, info_iri,
+             "Physical→information accessibility arc (measurement)"),
+            ("actuation", info_iri, phys_iri,
+             "Information→physical accessibility arc (control loop closure)"),
+        ]:
+            self.add_connection_rule(
+                g, self.mint_iri(base, f"rule_{name}"), name,
+                direction="unidirectional", carrier="reference",
+                scope="cross", source_domain=src, target_domain=tgt,
+                shared_tokens=[signal_iri], description=desc)
 
         # --- Indices ---
         # species: enumerates chemical components, bound to component mass token.

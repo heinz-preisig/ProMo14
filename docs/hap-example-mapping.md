@@ -250,10 +250,39 @@ index. No code changes needed.
    the seeded `signal` rule is unconstrained + unidirectional, so it
    covers every accessibility-arc case (physical→information sensor,
    information→physical actuation, physical→physical service
-   coupling). OPEN: naming — `signal` describes the information use
-   but the same mechanism serves physical service domains; candidate
-   rule-type names `access` / `reference` / `service` / `delegate`
-   (`link` avoided — collides with Behaviour Linker).
+   coupling). Naming RESOLVED (2026-09-15): `signal` stays the
+   information-side rule; a new rule type `access` covers
+   physical→physical service couplings — same attributes
+   (unidirectional, reference) but domain-constrained to
+   `physical`→`physical`, so the resolver prefers it over `signal`
+   for those pairs (constrained rules sort first).
+
+   **Framing (2026-09-15):** service domains fit the functional
+   paradigm — the secondary-state, observation, reaction-rate and
+   effort-variable calculations form ONE acyclic, lower-triangular
+   network of functions. Access/signal arcs are data-flow edges of
+   that network (same mechanism: unidirectional + reference; the
+   branch of the endpoints is data, not arc semantics). There is no
+   call/return — a service's outputs are referenced by consumers via
+   a second arc. Acyclicity of the reference subgraph is the
+   BL-checkable constraint (the computation sequence); capacities
+   hold the only cyclic part — state feeding back through
+   integration. Model = state holders + one function DAG.
+
+   **Final rule set (2026-09-15):** reference arcs are a complete
+   2×2 over branch pairs — `access` (physical→physical, service
+   couplings), `sensor` (physical→information, measurement),
+   `actuation` (information→physical, loop closure; may be narrowed
+   to →transport), `signal` (information→information). All
+   unidirectional + reference; scope same|cross follows the branch
+   pair. The `signal` token lives on the information branch plus the
+   `transport` domain — the transport system is the physical node that
+   is measured/actuated. `physical-same` (bi, token-flow, scope=same)
+   covers all intra-physical continuity including different
+   subdomains (liquid–gas). `physical-cross` was retired 2026-09-15:
+   token-flow + scope=cross can never apply (cross-branch pairs share
+   no tokens), and its original different-physical-domains case is
+   scope=same under the ancestor semantics.
 
    **Design tension → resolution direction (2026-09-15):** naming arc
    kinds in the ontology freezes vocabulary that downstream tools

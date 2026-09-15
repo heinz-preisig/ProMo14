@@ -95,13 +95,99 @@ def main() -> None:
     # carry these values).
     for frag, carrier, scope in [
         ("rule_physical-same", "token-flow", "same"),
-        ("rule_physical-cross", "token-flow", "cross"),
-        ("rule_signal", "reference", "any"),
+        ("rule_signal", "reference", "same"),
     ]:
         rule_iri = URIRef(f"{base}#{frag}")
         g.set((rule_iri, PROMO["carrier"], Literal(carrier)))
         g.set((rule_iri, PROMO["scope"], Literal(scope)))
         print(f"rule    {frag:<20} carrier={carrier} scope={scope}")
+
+    # physical-cross retired (2026-09-15): a token-flow arc with
+    # scope=cross can never apply — cross-branch pairs share no tokens.
+    # physical-same covers all intra-physical continuity (incl. the
+    # liquid-gas interface case it was named for).  Remove it from
+    # existing data files.
+    retired = URIRef(f"{base}#rule_physical-cross")
+    if (retired, None, None) in g:
+        g.remove((retired, None, None))
+        print("rule    rule_physical-cross  (retired, removed)")
+
+    # access: physical→physical reference arcs (service couplings).
+    # Domain-constrained so the resolver prefers it over signal.
+    # scope must be "same": two physical domains always share the
+    # physical ancestor, so scope=cross can never fire.
+    access_iri = URIRef(f"{base}#rule_access")
+    if (access_iri, None, None) in g:
+        g.set((access_iri, PROMO["scope"], Literal("same")))
+        print("rule    rule_access          scope=same (corrected)")
+    else:
+        store.add_connection_rule(
+            g, access_iri, "access",
+            direction="unidirectional", carrier="reference", scope="same",
+            source_domain=phys, target_domain=phys,
+            description="Physical→physical accessibility arc (service coupling)")
+        print("rule    rule_access          carrier=reference scope=same physical→physical")
+
+    # signal is information-internal; sensor/actuation close the loop
+    # across the branch boundary.  Existing user-defined rules are kept
+    # (e.g. an actuation rule constrained to the transport domain).
+    signal_rule = URIRef(f"{base}#rule_signal")
+    g.set((signal_rule, PROMO["sourceDomain"], info))
+    g.set((signal_rule, PROMO["targetDomain"], info))
+    print("rule    rule_signal          constrained information→information")
+    for name, src, tgt, desc in [
+        ("sensor", phys, info,
+         "Physical→information accessibility arc (measurement)"),
+        ("actuation", info, phys,
+         "Information→physical accessibility arc (control loop closure)"),
+    ]:
+        rule_iri = URIRef(f"{base}#rule_{name}")
+        if (rule_iri, None, None) in g:
+            print(f"rule    rule_{name:<15} (already present, skipped)")
+        else:
+            store.add_connection_rule(
+                g, rule_iri, name, direction="unidirectional",
+                carrier="reference", scope="cross",
+                source_domain=src, target_domain=tgt, description=desc)
+            print(f"rule    rule_{name:<15} carrier=reference scope=cross")
+
+    # Shared tokens: physical arcs share the physical token set;
+    # reference (accessibility) arcs share the signal token.
+    signal_tok = URIRef(f"{base}#token_signal")
+    physical_token_iris = [
+        URIRef(f"{base}#token_{t}") for t in (
+            "energy", "mass", "momentum", "charge", "entropy",
+            "component_mass")
+    ]
+    for frag, tokens in [
+        ("rule_physical-same", physical_token_iris),
+        ("rule_access", [signal_tok]),
+        ("rule_sensor", [signal_tok]),
+        ("rule_actuation", [signal_tok]),
+        ("rule_signal", [signal_tok]),
+    ]:
+        rule_iri = URIRef(f"{base}#{frag}")
+        g.remove((rule_iri, PROMO["sharedTokens"], None))
+        for tok in tokens:
+            g.add((rule_iri, PROMO["sharedTokens"], tok))
+    print("rule    *                    sharedTokens normalised")
+
+    # The signal token is information-internal plus transport: the
+    # transport system is the physical node that is measured/actuated.
+    # Remove the old branch-wide binding on domain_physical.
+    transport = URIRef(f"{base}#domain_transport")
+    g.remove((phys, PROMO["hasToken"], signal_tok))
+    g.add((transport, PROMO["hasToken"], signal_tok))
+    print("token   signal               domain_physical → domain_transport")
+
+    # --- Extensity axis (physical) -------------------------------------
+    ext_axis = URIRef(f"{base}#axis_extensity")
+    if (ext_axis, None, None) not in g:
+        store.add_classification_axis(g, ext_axis, phys, "Extensity")
+        for frag in ("extensive", "intensive"):
+            store.add_axis_term(
+                g, URIRef(f"{base}#term_extensity_{frag}"), ext_axis, frag)
+        print("axis    Extensity          + extensive/intensive")
 
     # --- Index q (reaction index, conversion source) -------------------
     q_iri = store.mint_iri(base, "idx_reaction_q")

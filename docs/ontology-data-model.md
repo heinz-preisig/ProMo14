@@ -648,8 +648,14 @@ applicable to a domain pair:
   endpoint domain or one of its ancestors (rules are inherited down the
   domain tree, not copied).
 - `bidirectional` rules also match the swapped pair.
-- `physical-same` requires the endpoints to share a common ancestor
-  domain; `physical-cross` requires they do not.
+- The `scope` attribute filters on the branch pair: `same` requires the
+  endpoints to share a common ancestor domain, `cross` requires they do
+  not (i.e. different branches), `any` imposes no constraint.  Rules
+  without `scope` fall back to the legacy rule-type names.
+- `physical-cross` was retired (2026-09-15): a `token-flow` arc with
+  `scope=cross` can never apply — cross-branch pairs share no tokens.
+  `physical-same` covers all intra-physical continuity, including the
+  different-subdomain (liquid–gas) case the old name referred to.
 - Results are ordered most-specific first (closest ancestor wins over
   wildcard rules).
 

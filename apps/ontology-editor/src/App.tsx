@@ -47,7 +47,7 @@ const EMPTY_SCALE_DIM: ScaleDimensionRecord = { iri: '', name: '', domain: '', p
 const EMPTY_SCALE_VAL: ScaleValueRecord = { iri: '', dimension: '', label: '', parent: null }
 const EMPTY_ENTITY_TYPE: EntityTypeRecord = { iri: '', label: '', temporal_type: 'dynamic', spatial_type: null, spatial_size: null, branch: 'physical', scale_values: [], description: '' }
 const EMPTY_INDEX: IndexRecord = { iri: '', label: '', short_name: '', network: 'root', index_class: 'index', internal_id: null, aliases: {}, token: null }
-const EMPTY_RULE: ConnectionRuleRecord = { iri: '', rule_type: 'physical-same', source_domain: null, target_domain: null, shared_tokens: [], direction: 'bidirectional', carrier: 'token-flow', scope: 'same', description: '' }
+const EMPTY_RULE: ConnectionRuleRecord = { iri: '', rule_type: '', source_domain: null, target_domain: null, shared_tokens: [], direction: 'bidirectional', carrier: 'token-flow', scope: 'same', description: '' }
 
 // ---------------------------------------------------------------------------
 // Types
@@ -679,12 +679,20 @@ export default function App() {
       </div>
       <div style={S.right}>
         <h3 style={S.h3}>{selRule ? 'Edit rule' : 'New rule'}</h3>
-        <label style={S.label}>Rule type</label>
-        <select style={S.select} value={draftRule.rule_type} onChange={(e) => setDraftRule({ ...draftRule, rule_type: e.target.value })}>
-          <option value="physical-same">physical-same (same domain, shared tokens)</option>
-          <option value="physical-cross">physical-cross (different domains, shared tokens)</option>
-          <option value="signal">signal (information arc, unidirectional)</option>
-        </select>
+        <label style={S.label}>Rule name (label — semantics come from the attributes below)</label>
+        <input
+          style={S.select}
+          list="rule-name-suggestions"
+          value={draftRule.rule_type}
+          onChange={(e) => setDraftRule({ ...draftRule, rule_type: e.target.value })}
+        />
+        <datalist id="rule-name-suggestions">
+          <option value="physical-same" />
+          <option value="signal" />
+          <option value="access" />
+          <option value="sensor" />
+          <option value="actuation" />
+        </datalist>
         <label style={S.label}>Direction</label>
         <select style={S.select} value={draftRule.direction || ''} onChange={(e) => setDraftRule({ ...draftRule, direction: e.target.value || null })}>
           <option value="bidirectional">bidirectional</option>
@@ -701,14 +709,14 @@ export default function App() {
           <option value="cross">cross (no shared ancestor)</option>
           <option value="any">any</option>
         </select>
-        <label style={S.label}>Source domain (for physical-cross)</label>
+        <label style={S.label}>Source domain (optional constraint)</label>
         <select style={S.select} value={draftRule.source_domain || ''} onChange={(e) => setDraftRule({ ...draftRule, source_domain: e.target.value || null })}>
           <option value="">(any)</option>
           {domains.map((d) => (
             <option key={d.iri} value={d.iri}>{d.name}</option>
           ))}
         </select>
-        <label style={S.label}>Target domain (for physical-cross)</label>
+        <label style={S.label}>Target domain (optional constraint)</label>
         <select style={S.select} value={draftRule.target_domain || ''} onChange={(e) => setDraftRule({ ...draftRule, target_domain: e.target.value || null })}>
           <option value="">(any)</option>
           {domains.map((d) => (
@@ -716,7 +724,7 @@ export default function App() {
           ))}
         </select>
         <label style={S.label}>Shared tokens</label>
-        <div style={{ marginBottom: 8, maxHeight: 100, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
+        <div style={{ marginBottom: 8, maxHeight: 240, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
           {tokens.map((t) => (
             <label key={t.iri} style={{ display: 'block', fontSize: 12 }}>
               <input
@@ -735,7 +743,13 @@ export default function App() {
         <label style={S.label}>Description</label>
         <textarea style={S.textarea} value={draftRule.description} onChange={(e) => setDraftRule({ ...draftRule, description: e.target.value })} />
         <button style={S.button} onClick={async () => {
-          try { await createConnectionRule(draftRule); msg('Rule saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+          try {
+            const saved = await createConnectionRule(draftRule)
+            setSelRule(saved.iri)
+            setDraftRule({ ...saved })
+            msg('Rule saved')
+            await load()
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>
     </>

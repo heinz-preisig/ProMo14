@@ -103,6 +103,60 @@ This file captures the state of the ProMo14 workspace at the end of the
 5. **Behaviour Linker** — design discussion continues.
 6. **Ontology v2 items** — versioning (ADR-006), QUDT units.
 
+## Afternoon session — ontology editor fixes + rule vocabulary
+
+### Ontology editor bugfixes (`apps/ontology-editor/src/App.tsx`)
+
+- **`+ New` appeared not to clear the rule form** — `EMPTY_RULE.rule_type`
+  defaulted to `physical-same` and the control was a `<select>` (cannot
+  render empty).  Now `rule_type: ''` + `<input list>`/`<datalist>`.
+- **Duplicate rules on double-save** — Save now adopts the
+  backend-minted IRI (`setSelRule(saved.iri)`), so a second Save updates
+  instead of duplicating.  Three leftover duplicates under
+  `promo/ontology#rule_*` were deleted from the graph.
+- Shared-tokens widget enlarged (`maxHeight` 100 → 240).
+
+### Ontology data changes (in `data/ontology.trig`, saved)
+
+- `sharedTokens` populated on all rules: `physical-same` → 6 physical
+  tokens; `access`/`sensor`/`actuation`/`signal` → `token_signal`.
+- `token_signal` moved off `domain_physical` → own token of
+  `domain_transport` (transport system is the measured/actuated node).
+- `rule_access` scope corrected `cross` → `same` — with
+  physical→physical constraints, `cross` (no common ancestor) could
+  never fire.
+- `axis_Extensity` `hasDomain` repaired (was a `file://` URI →
+  `domain_physical`).
+
+### `physical-cross` retired
+
+A `token-flow` arc with `scope=cross` can never apply — cross-branch
+pairs share no tokens, and its original "different physical domains"
+case (liquid–gas) is `scope=same` under the ancestor semantics.
+Removed from: seed (`graph_store.py`), `extend_ontology_hap.py`
+(existing data files get it deleted), UI datalist, tests, docs.
+The legacy name→scope fallback in `resolve_connection` stays for old
+data files.
+
+### Reproducing this ontology on another machine
+
+`data/` is gitignored — the ontology does not travel via git.  On the
+other machine:
+
+```bash
+git pull
+uv run python scripts/extend_ontology_hap.py   # patches or builds data/ontology.trig
+./dev.sh restart                              # backend reloads the file
+```
+
+The script is idempotent: it adds the HAP domains (macroscopic,
+transport, reactions, properties, geometry, control), role terms,
+`component_mass` subtoken, rule attributes + `sharedTokens`, the
+signal→transport binding, the `Extensity` axis, and index `q`; it
+removes `rule_physical-cross` if present.  If no `ontology.trig`
+exists, the backend seeds the base ontology on first load and the
+script extends it.
+
 ## Useful references
 
 - `publish/README.md` — publishing workflow + checklist

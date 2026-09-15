@@ -43,9 +43,12 @@ all working; manual UI testing done 2026-09-14.
 - **Connection rule resolution** — `GET /api/ontology/resolve-connection?source&target`
   returns applicable rules for a domain pair.  A rule applies when its
   `source_domain`/`target_domain` is the endpoint domain or an ancestor;
-  bidirectional rules match the swapped pair; `physical-same` requires a
-  common ancestor, `physical-cross` requires none; results sorted
-  most-specific first.
+  bidirectional rules match the swapped pair; the `scope` attribute
+  filters on the branch pair (`same` = shared ancestor, `cross` = none,
+  `any` = unconstrained); results sorted most-specific first.
+  `physical-cross` was retired 2026-09-15 (token-flow + cross can never
+  apply); seed rules are `physical-same`, `signal`, `access`, `sensor`,
+  `actuation`.
 - **Validation** — frontend disables Save until required fields are
   filled; backend returns 422 on empty labels; axis terms require a
   selected axis.

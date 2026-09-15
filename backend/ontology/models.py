@@ -187,8 +187,8 @@ class EntityTypeRecord(BaseModel):
 
 class ConnectionRuleRecord(BaseModel):
     iri: str
-    rule_type: str  # "physical-same" | "physical-cross" | "signal"
-    source_domain: Optional[str] = None  # for physical-cross
+    rule_type: str  # label, e.g. "physical-same" | "signal" | "access" | "sensor" | "actuation"
+    source_domain: Optional[str] = None  # optional domain constraint
     target_domain: Optional[str] = None
     shared_tokens: List[str] = Field(default_factory=list)  # token IRIs
     direction: Optional[str] = None  # "bidirectional" | "unidirectional"

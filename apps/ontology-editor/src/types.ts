@@ -157,7 +157,7 @@ export interface EntityTypeRecord {
 
 export interface ConnectionRuleRecord {
   iri: string
-  rule_type: string // "physical-same" | "physical-cross" | "signal"
+  rule_type: string // label, e.g. "physical-same" | "signal" | "access" | "sensor" | "actuation"
   source_domain: string | null
   target_domain: string | null
   shared_tokens: string[]

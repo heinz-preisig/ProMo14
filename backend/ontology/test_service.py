@@ -114,8 +114,13 @@ def test_seed_connection_rules(client):
     rules = r.json()
     rule_types = {r["rule_type"] for r in rules}
     assert "physical-same" in rule_types
-    assert "physical-cross" in rule_types
     assert "signal" in rule_types
+    assert "access" in rule_types
+    assert "sensor" in rule_types
+    assert "actuation" in rule_types
+    # physical-cross retired 2026-09-15 (token-flow + scope=cross can
+    # never apply — cross-branch pairs share no tokens)
+    assert "physical-cross" not in rule_types
 
 
 def test_seed_scale_dimensions(client):
