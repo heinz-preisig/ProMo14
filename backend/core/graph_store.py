@@ -209,6 +209,10 @@ class RdfStore:
             tok_iri = self.mint_iri(base, f"token_{frag}")
             self.add_token(g, tok_iri, label)
 
+        # component_mass is a subtoken of mass (mass decomposed by species).
+        g.set((self.mint_iri(base, "token_component_mass"), PROMO["parent"],
+               self.mint_iri(base, "token_mass")))
+
         signal_iri = self.mint_iri(base, "token_signal")
         self.add_token(g, signal_iri, "Signal")
 

@@ -224,9 +224,28 @@ index. No code changes needed.
    computes equation-of-state and property relations (`p`, `T` via
    `ParDiff`, `cp`, `rho`, `h`), exports them back to the host.
    Separate domain, sibling of `macroscopic` — not folded in.
-   Naming TBD: the root domain is already `physical`; candidates
-   `properties` / `fundamental_thermo`. The `property` role term still
+   Named `properties` (2026-09-15). The `property` role term still
    classifies the variables — axis classifies, domain hosts.
+
+   **Domain structure decided (2026-09-15):** `geometry` is also a
+   service domain — with it segregated, ALL secondary-variable
+   computation lives in service domains behind access arcs;
+   capacities keep only primary state + balances. `transport` is a
+   domain hosting the transport nodes (`massFlow`, `heatFlow`,
+   `controlledMassFlow`) — flat, since every `physical` subdomain
+   inherits all root tokens anyway (additive inheritance makes
+   per-mechanism token scoping moot under the current root).
+   Service is a modelling pattern, not schema — nothing is
+   hard-wired. Resulting tree:
+
+       physical
+       ├── macroscopic     capacity: mass, component_mass, energy
+       ├── transport       transport nodes (flat)
+       ├── reactions       service
+       ├── properties      service
+       └── geometry        service
+       information
+       └── control         pControl: signal
 5. **Control/signal branch** — mechanically RESOLVED (2026-09-15):
    the seeded `signal` rule is unconstrained + unidirectional, so it
    covers every accessibility-arc case (physical→information sensor,

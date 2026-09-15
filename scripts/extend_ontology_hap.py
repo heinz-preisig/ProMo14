@@ -55,9 +55,15 @@ def main() -> None:
     state_term = URIRef(f"{base}#term_role_state")
 
     # --- Domains -------------------------------------------------------
+    # physical: macroscopic (capacity), transport (transport nodes),
+    #           reactions / properties / geometry (service domains)
+    # information: control (pControl)
     for name, parent, branch in [
         ("macroscopic", phys, "physical"),
+        ("transport", phys, "physical"),
         ("reactions", phys, "physical"),
+        ("properties", phys, "physical"),
+        ("geometry", phys, "physical"),
         ("control", info, "information"),
     ]:
         iri = store.mint_iri(base, f"domain_{name}")
@@ -77,6 +83,11 @@ def main() -> None:
         store.add_axis_term(g, iri, role_phys, label, parent=parent)
         p = f" < {parent.split('#')[-1]}" if parent else ""
         print(f"term    {label:<20}{p}")
+
+    # --- Token hierarchy: component_mass < mass ------------------------
+    g.set((URIRef(f"{base}#token_component_mass"), PROMO["parent"],
+           URIRef(f"{base}#token_mass")))
+    print("token   component_mass       < token_mass")
 
     # --- Connection-rule attributes (carrier / scope) ------------------
     # Arc semantics live in rule attributes, not in the type name.
