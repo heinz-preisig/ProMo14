@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-14 (end of session)
+**Last updated:** 2026-09-15 (end of session)
 
 ## Summary
 
@@ -11,7 +11,7 @@
 | Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
-| Shared (`backend/core`) | `RdfStore`, legacy loader, full ontology CRUD | — | — | Ontology CRUD complete; shared IRI minting done |
+| Shared (`backend/core`) | `RdfStore`, full ontology CRUD | — | — | Ontology CRUD complete; shared IRI minting done; legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
 | Instantiation | — | — | — | Not started |
 | Code Generation | — | — | — | Not started |
@@ -50,8 +50,16 @@
   (hierarchical terms), Scales, Entity Types, Indices, Rules.
 - **Semantics:** token inheritance down the domain tree (additive only);
   cascade delete; ancestor-aware connection rule resolution.
-- **Next:** Wire equation editor to `RdfContext`; consume
-  `resolve-connection` from the modeller's `ConnectionRuleResolver`.
+- **Namespace:** `https://w3id.org/promo#` throughout
+  (`backend/core/graph_store.py`: `PROMO`, `PROMOLG`,
+  `ONTOLOGY_GRAPH_IRI`).  Publishing pipeline live: exported
+  `ontology.ttl` → `heinz-preisig/ProMo-ontologies` (GitHub Pages) →
+  w3id redirect pending merge of perma-id/w3id.org PR #6700.  See
+  `publish/README.md`.
+- **Next:** Consume `resolve-connection` from the modeller's
+  `ConnectionRuleResolver`.  (Equation editor → `RdfContext` wiring is
+  done — all named graphs, ProMo14 vocabulary only; legacy loader
+  archived.)
 
 ### Equation Editor
 

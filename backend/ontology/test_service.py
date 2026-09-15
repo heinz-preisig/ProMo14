@@ -563,47 +563,47 @@ def test_save_ontology(client):
 # ---------------------------------------------------------------------------
 
 def test_delete_nonexistent_domain(client):
-    r = client.delete(f"/api/ontology/domains/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/domains/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_token(client):
-    r = client.delete(f"/api/ontology/tokens/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/tokens/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_index(client):
-    r = client.delete(f"/api/ontology/indices/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/indices/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_axis(client):
-    r = client.delete(f"/api/ontology/axes/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/axes/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_entity_type(client):
-    r = client.delete(f"/api/ontology/entity-types/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/entity-types/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_connection_rule(client):
-    r = client.delete(f"/api/ontology/connection-rules/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/connection-rules/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_scale_dimension(client):
-    r = client.delete(f"/api/ontology/scale-dimensions/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/scale-dimensions/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_scale_value(client):
-    r = client.delete(f"/api/ontology/scale-values/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/scale-values/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 
 def test_delete_nonexistent_axis_term(client):
-    r = client.delete(f"/api/ontology/axis-terms/{_iri_path('http://example.org/ontology#nonexistent')}")
+    r = client.delete(f"/api/ontology/axis-terms/{_iri_path('https://w3id.org/promo/ontology#nonexistent')}")
     assert r.status_code == 404
 
 

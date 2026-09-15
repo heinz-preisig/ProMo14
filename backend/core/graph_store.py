@@ -3,12 +3,10 @@
 ``RdfStore`` wraps an ``rdflib.Dataset`` and provides the low-level storage
 that the ontology editor, equation editor, and modeller share.  It is
 intentionally thin: it loads/saves named graphs from ``PROMO_DATA_DIR`` and
-offers a few helpers for minting IRIs and importing the legacy v8 data.
+offers a few helpers for minting IRIs.
 
-The store uses a small ProMo vocabulary (``http://example.org#``).  The
-initial content can be seeded from ``variables_v8.json``,
-``fix_variables_v8.json``, ``ontology.json`` and ``variableExpression.trig``
-using the existing legacy loader.
+The store uses the ProMo vocabulary (``https://w3id.org/promo#``).  When no
+``ontology.trig`` exists, a default two-branch ontology is seeded.
 """
 
 from __future__ import annotations
@@ -22,11 +20,10 @@ import rdflib
 from rdflib import Dataset, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
-from . import loader
 from .config import get_data_dir
 
-PROMO = Namespace("http://example.org#")
-PROMOLG = Namespace("http://example.org/language#")
+PROMO = Namespace("https://w3id.org/promo#")
+PROMOLG = Namespace("https://w3id.org/promo/language#")
 QUDT = Namespace("http://qudt.org/schema/qudt/")
 
 # Legacy prefixes used in old TriG files.
@@ -125,7 +122,7 @@ class RdfStore:
     """
 
     # Default named graph for the editable ontology vocabulary.
-    ONTOLOGY_GRAPH_IRI = URIRef("http://example.org/ontology")
+    ONTOLOGY_GRAPH_IRI = URIRef("https://w3id.org/promo/ontology")
 
     def __init__(self, data_dir: Optional[Union[str, Path]] = None):
         if data_dir is None:
@@ -151,8 +148,7 @@ class RdfStore:
         """Load the ontology from ``PROMO_DATA_DIR``.
 
         If ``ontology.trig`` exists it is loaded first.  If the editable
-        ontology graph is still empty, the legacy JSON/TriG files are imported
-        as the initial seed.
+        ontology graph is still empty, the default ontology is seeded.
         """
         ontology_path = self.data_dir / "ontology.trig"
         if ontology_path.exists():
@@ -160,9 +156,6 @@ class RdfStore:
                 self.dataset.parse(str(ontology_path), format="trig")
             except Exception:
                 pass
-
-        if not len(self.ontology_graph):
-            self.seed_from_legacy()
 
         if not len(self.ontology_graph):
             self.seed_default_ontology()
@@ -187,26 +180,11 @@ class RdfStore:
         self.dataset.serialize(str(path), format="trig")
         return path
 
-    def seed_from_legacy(self) -> None:
-        """Import legacy v8 JSON/TriG files into the store."""
-        try:
-            ctx = loader.load_context(self.data_dir)
-        except FileNotFoundError:
-            return
-
-        ontology = self.ontology_graph
-        for var in ctx["variables"].values():
-            self.add_variable_dict(ontology, var)
-        for idx in ctx["indices"].values():
-            self.add_index_dict(ontology, idx)
-        for parent, children in ctx.get("network_tree", {}).items():
-            self.add_network(ontology, parent, children=children)
-
     def seed_default_ontology(self) -> None:
         """Seed the default ProMo14 ontology (two-branch domain tree,
         tokens, classification axes, entity types, connection rules).
 
-        Called when no legacy data is found and no ``ontology.trig`` exists.
+        Called when no ``ontology.trig`` exists.
         """
         g = self.ontology_graph
         base = str(PROMO).rstrip("#")

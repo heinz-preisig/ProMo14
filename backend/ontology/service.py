@@ -152,7 +152,7 @@ def create_domain(record: DomainRecord) -> DomainRecord:
         raise HTTPException(status_code=422, detail="Domain name must not be empty")
     store = get_store()
     if not record.iri:
-        record.iri = str(store.mint_iri("http://example.org/ontology", f"domain_{record.name.strip()}"))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, f"domain_{record.name.strip()}"))
     store.add_domain(
         store.ontology_graph,
         record.name,
@@ -184,14 +184,15 @@ def delete_domain(iri: str) -> Dict[str, str]:
 @router.get("/networks", response_model=List[NetworkRecord])
 def list_networks() -> List[NetworkRecord]:
     """List all networks as a flat list with parent/children references."""
-    ctx = RdfContext(get_store())
+    store = get_store()
+    ctx = RdfContext(store)
     tree = ctx.tree()
     parent_of = ctx._parent_of
     records = []
     for name, children in tree.items():
         records.append(
             NetworkRecord(
-                iri=f"http://example.org/ontology#network_{name}",
+                iri=f"{store.ONTOLOGY_GRAPH_IRI}#network_{name}",
                 name=name,
                 parent=parent_of.get(name),
                 children=children,
@@ -232,7 +233,7 @@ def create_index(record: IndexRecord) -> IndexRecord:
         raise HTTPException(status_code=422, detail="Index label must not be empty")
     store = get_store()
     if not record.iri:
-        record.iri = str(store.mint_iri("http://example.org/ontology", record.internal_id or store.next_internal_id("I")))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, record.internal_id or store.next_internal_id("I")))
     if not record.aliases.get("global_ID"):
         record.aliases["global_ID"] = store.next_internal_id("I")
     if not record.aliases.get("internal_code"):
@@ -285,7 +286,7 @@ def create_token(record: TokenRecord) -> TokenRecord:
     store = get_store()
     if not record.iri:
         fragment = record.label.strip().lower().replace(" ", "_")
-        record.iri = str(store.mint_iri("http://example.org/ontology", f"token_{fragment}"))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, f"token_{fragment}"))
     store.add_token(
         store.ontology_graph,
         URIRef(record.iri),
@@ -327,7 +328,7 @@ def create_axis(record: ClassificationAxisRecord) -> ClassificationAxisRecord:
     store = get_store()
     if not record.iri:
         fragment = f"axis_{record.name.strip()}"
-        record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_classification_axis(
         store.ontology_graph,
         URIRef(record.iri),
@@ -379,7 +380,7 @@ def create_axis_term(record: AxisTermRecord) -> AxisTermRecord:
     store = get_store()
     if not record.iri:
         fragment = f"term_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_axis_term(
         store.ontology_graph,
         URIRef(record.iri),
@@ -422,7 +423,7 @@ def create_scale_dimension(record: ScaleDimensionRecord) -> ScaleDimensionRecord
     store = get_store()
     if not record.iri:
         fragment = f"scale_{record.name.strip()}"
-        record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_scale_dimension(
         store.ontology_graph,
         URIRef(record.iri),
@@ -474,7 +475,7 @@ def create_scale_value(record: ScaleValueRecord) -> ScaleValueRecord:
     store = get_store()
     if not record.iri:
         fragment = f"sval_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_scale_value(
         store.ontology_graph,
         URIRef(record.iri),
@@ -517,7 +518,7 @@ def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
     store = get_store()
     if not record.iri:
         fragment = f"etype_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_entity_type(
         store.ontology_graph,
         URIRef(record.iri),
@@ -563,7 +564,7 @@ def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord
     store = get_store()
     if not record.iri:
         fragment = f"rule_{record.rule_type.strip()}"
-        record.iri = str(store.mint_iri("http://example.org/ontology", fragment))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
     store.add_connection_rule(
         store.ontology_graph,
         URIRef(record.iri),

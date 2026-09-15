@@ -610,7 +610,7 @@ testing.  The future `RdfContext` will sit on top of an RDF triple store
 
 ## 5. Ontology graph semantics (implemented 2026-09-14)
 
-The editable ontology graph (`http://example.org/ontology`) follows these
+The editable ontology graph (`https://w3id.org/promo/ontology`) follows these
 rules, enforced by `backend/ontology/service.py` and
 `backend/core/graph_store.py`:
 

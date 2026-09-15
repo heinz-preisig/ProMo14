@@ -2,8 +2,12 @@
 
 ``RdfContext`` reads the ontology vocabulary (variables, indices, domain tree)
 from an ``RdfStore`` and presents it to the equation checker as a read-only
-snapshot.  It is the first concrete provider that replaces the temporary
-legacy-file loader.
+snapshot.
+
+Variables, indices and the network tree are collected from **all** named
+graphs in the dataset — the editable ontology graph plus any var/expr graphs
+published by the equation editor.  Ontology vocabulary (domains, axes,
+entity types, rules) is read from the ontology graph only.
 """
 
 from __future__ import annotations
@@ -11,16 +15,13 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional, Set
 
-from rdflib import Namespace, URIRef
+from rdflib import URIRef
 from rdflib.namespace import RDF
 
-from backend.core.graph_store import RdfStore
-from backend.core.loader import _parse_network_literal
+from backend.core.graph_store import PROMO, RdfStore
 from backend.equation.compile_space import Index, Variable
 from backend.equation.context import EquationContext
 from backend.equation.units import Units
-
-PROMO = Namespace("http://example.org#")
 
 
 def _str(value) -> str:
@@ -28,18 +29,8 @@ def _str(value) -> str:
 
 
 def _network(raw: str) -> str:
-    """Return the most specific network from a list literal or path string."""
-    if not raw:
-        return "root"
-    try:
-        parsed = _parse_network_literal(raw)
-        if parsed and (len(parsed) > 1 or parsed[0] != raw):
-            return parsed[-1]
-    except (ValueError, SyntaxError):
-        pass
-    if ">>>" in raw:
-        return raw.split(">>>")[-1].strip()
-    return raw
+    """Return the network name, defaulting to ``"root"``."""
+    return raw or "root"
 
 
 def _literal_list(graph, subject, predicate) -> List[str]:
@@ -71,6 +62,8 @@ def _one_unit_list(graph, subject, predicate) -> List[int]:
     except (json.JSONDecodeError, ValueError):
         pass
     return [0] * 8
+
+
 
 
 def _aliases(graph, subject) -> Dict[str, str]:
@@ -106,12 +99,15 @@ class RdfContext(EquationContext):
         self._graph = store.ontology_graph
         self._variables = self._load_variables()
         self._indices = self._load_indices()
-        self._tree = self._load_network_tree()
-        self._parent_of = self._build_parent_of(self._tree)
+        self._tree, self._parent_of = self._load_network_tree()
         self._domains = self._load_domains()
         self._axes = self._load_axes()
         self._entity_types = self._load_entity_types()
         self._connection_rules = self._load_connection_rules()
+
+    def _all_graphs(self) -> List[Any]:
+        """Every graph in the dataset (ontology + var/expr named graphs)."""
+        return list(self.store.dataset.contexts())
 
     # ------------------------------------------------------------------
     # New ontology entity accessors
@@ -155,6 +151,8 @@ class RdfContext(EquationContext):
         current = network
         while current in self._parent_of:
             current = self._parent_of[current]
+            if current in accessible:  # cycle guard (derived >>> edges)
+                break
             accessible.add(current)
         return accessible
 
@@ -168,124 +166,201 @@ class RdfContext(EquationContext):
 
     def _load_variables(self) -> Dict[str, Variable]:
         variables: Dict[str, Variable] = {}
-        for s in self._graph.subjects(RDF.type, PROMO["Variable"]):
-            iri = str(s)
-            aliases = _aliases(self._graph, s)
-            units = Units.from_list(_one_unit_list(self._graph, s, PROMO["unitVector"]))
-            # Load multi-axis classifications (promo:axisValue -> axis term IRI).
-            classifications: Dict[str, str] = {}
-            for term_iri in self._graph.objects(s, PROMO["axisValue"]):
-                # Find which axis this term belongs to.
-                axis_iri = self._graph.value(term_iri, PROMO["hasAxis"])
-                if axis_iri:
-                    classifications[str(axis_iri)] = str(term_iri)
-            variables[iri] = Variable(
-                iri=iri,
-                label=_one_literal(self._graph, s, PROMO["label"], iri),
-                network=_network(_one_literal(self._graph, s, PROMO["network"], "root")),
-                type=_one_literal(self._graph, s, PROMO["variableClass"], "state"),
-                units=units,
-                index_structures=_literal_list(self._graph, s, PROMO["indexStructure"]),
-                doc=_one_literal(self._graph, s, PROMO["doc"], ""),
-                port_variable=_one_bool(self._graph, s, PROMO["portVariable"], False),
-                internal_id=_one_literal(self._graph, s, PROMO["internalID"])
-                or aliases.get("global_ID")
-                or iri,
-                aliases=aliases,
-                tokens=_literal_list(self._graph, s, PROMO["carriesToken"]),
-            )
-            # Attach classifications as a dynamic attribute.
-            setattr(variables[iri], "classifications", classifications)
-            setattr(variables[iri], "imported", _one_bool(self._graph, s, PROMO["imported"], False))
-
-            # Load nested equations (promo:hasEquation -> promo:Equation)
-            equations: Dict[str, dict] = {}
-            for eq_s in self._graph.objects(s, PROMO["hasEquation"]):
-                eq_iri = str(eq_s)
-                eq_internal_id = _one_literal(self._graph, eq_s, PROMO["internalID"])
-                eq_rhs = _one_literal(self._graph, eq_s, PROMO["rhs"])
-                eq_rhs_latex = _one_literal(self._graph, eq_s, PROMO["rhsLatex"])
-                eq_class = _one_literal(self._graph, eq_s, PROMO["equationClass"])
-                eq_network = _one_literal(self._graph, eq_s, PROMO["network"])
-                eq_doc = _one_literal(self._graph, eq_s, PROMO["doc"])
-                # incidence_list is stored as a JSON array literal
-                inc_raw = self._graph.value(eq_s, PROMO["incidenceList"])
-                eq_incidence: List[str] = []
-                if inc_raw is not None:
-                    try:
-                        parsed = json.loads(str(inc_raw))
-                        if isinstance(parsed, list):
-                            eq_incidence = [str(x) for x in parsed]
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-                eq_key = eq_internal_id or eq_iri
-                equations[eq_key] = {
-                    "iri": eq_iri,
-                    "internal_id": eq_internal_id or None,
-                    "lhs": iri,
-                    "rhs": eq_rhs,
-                    "rhs_latex": eq_rhs_latex or None,
-                    "equation_class": eq_class or None,
-                    "network": eq_network or None,
-                    "incidence_list": eq_incidence,
-                    "doc": eq_doc or "",
-                    "created": None,
-                    "modified": None,
-                }
-            setattr(variables[iri], "equations", equations)
+        for graph in self._all_graphs():
+            for s in graph.subjects(RDF.type, PROMO["Variable"]):
+                iri = str(s)
+                var = self._build_variable(graph, s, iri)
+                existing = variables.get(iri)
+                if existing is None:
+                    variables[iri] = var
+                else:
+                    # Same variable in several graphs: merge equations
+                    # rather than dropping one copy.
+                    getattr(existing, "equations").update(
+                        getattr(var, "equations")
+                    )
         return variables
+
+    def _build_variable(self, graph, s, iri: str) -> Variable:
+        aliases = _aliases(graph, s)
+        fragment = iri.split("#")[-1].split("/")[-1]
+        if fragment and "global_ID" not in aliases:
+            aliases["global_ID"] = fragment
+
+        # Multi-axis classifications (promo:axisValue -> axis term IRI).
+        classifications: Dict[str, str] = {}
+        for term_iri in graph.objects(s, PROMO["axisValue"]):
+            axis_iri = graph.value(term_iri, PROMO["hasAxis"])
+            if axis_iri:
+                classifications[str(axis_iri)] = str(term_iri)
+
+        var = Variable(
+            iri=iri,
+            label=_one_literal(graph, s, PROMO["label"]) or iri,
+            network=_network(_one_literal(graph, s, PROMO["network"], "root")),
+            type=_one_literal(graph, s, PROMO["variableClass"], "state"),
+            units=Units.from_list(
+                _one_unit_list(graph, s, PROMO["unitVector"])
+            ),
+            index_structures=_literal_list(graph, s, PROMO["indexStructure"]),
+            doc=_one_literal(graph, s, PROMO["doc"], ""),
+            port_variable=_one_bool(graph, s, PROMO["portVariable"], False),
+            internal_id=_one_literal(graph, s, PROMO["internalID"])
+            or aliases.get("global_ID")
+            or iri,
+            aliases=aliases,
+            tokens=_literal_list(graph, s, PROMO["carriesToken"]),
+        )
+        setattr(var, "classifications", classifications)
+        setattr(
+            var,
+            "imported",
+            _one_bool(graph, s, PROMO["imported"], False),
+        )
+        setattr(var, "equations", self._variable_equations(graph, s, iri))
+        return var
+
+    def _variable_equations(self, graph, s, var_iri: str) -> Dict[str, dict]:
+        """Collect ``promo:hasEquation`` -> ``promo:Equation`` resources."""
+        equations: Dict[str, dict] = {}
+        for eq_s in graph.objects(s, PROMO["hasEquation"]):
+            eq_iri = str(eq_s)
+            eq_internal_id = _one_literal(graph, eq_s, PROMO["internalID"])
+            # incidence_list is stored as a JSON array literal
+            inc_raw = graph.value(eq_s, PROMO["incidenceList"])
+            eq_incidence: List[str] = []
+            if inc_raw is not None:
+                try:
+                    parsed = json.loads(str(inc_raw))
+                    if isinstance(parsed, list):
+                        eq_incidence = [str(x) for x in parsed]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            eq_key = eq_internal_id or eq_iri
+            equations[eq_key] = {
+                "iri": eq_iri,
+                "internal_id": eq_internal_id or None,
+                "lhs": var_iri,
+                "rhs": _one_literal(graph, eq_s, PROMO["rhs"]),
+                "rhs_latex": _one_literal(graph, eq_s, PROMO["rhsLatex"])
+                or None,
+                "equation_class": _one_literal(graph, eq_s, PROMO["equationClass"])
+                or None,
+                "network": _one_literal(graph, eq_s, PROMO["network"]) or None,
+                "incidence_list": eq_incidence,
+                "doc": _one_literal(graph, eq_s, PROMO["doc"]) or "",
+                "created": _one_literal(graph, eq_s, PROMO["created"]) or None,
+                "modified": _one_literal(graph, eq_s, PROMO["modified"]) or None,
+            }
+        return equations
 
     def _load_indices(self) -> Dict[str, Index]:
         indices: Dict[str, Index] = {}
-        for s in self._graph.subjects(RDF.type, PROMO["Index"]):
-            iri = str(s)
-            aliases = _aliases(self._graph, s)
-            short = _one_literal(self._graph, s, PROMO["shortName"])
-            if short and "internal_code" not in aliases:
-                aliases["internal_code"] = short
-            indices[iri] = Index(
-                iri=iri,
-                label=_one_literal(self._graph, s, PROMO["label"], iri),
-                network=_network(_one_literal(self._graph, s, PROMO["network"], "root")),
-                index_class=_one_literal(self._graph, s, PROMO["indexClass"], "index"),
-                aliases=aliases,
-                token=_one_literal(self._graph, s, PROMO["token"]) or None,
-                internal_id=_one_literal(self._graph, s, PROMO["internalID"])
-                or aliases.get("global_ID")
-                or iri,
-            )
+        for graph in self._all_graphs():
+            for s in graph.subjects(RDF.type, PROMO["Index"]):
+                iri = str(s)
+                if iri in indices:
+                    continue
+                indices[iri] = self._build_index(graph, s, iri)
         return indices
 
-    def _load_network_tree(self) -> Dict[str, List[str]]:
-        """Build a parent -> children map from ``promo:child`` triples."""
-        tree: Dict[str, List[str]] = {}
-        name_to_iri: Dict[str, URIRef] = {}
+    @staticmethod
+    def _build_index(graph, s, iri: str) -> Index:
+        aliases = _aliases(graph, s)
+        fragment = iri.split("#")[-1].split("/")[-1]
+        if fragment and "global_ID" not in aliases:
+            aliases["global_ID"] = fragment
+        label = _one_literal(graph, s, PROMO["label"]) or fragment or iri
+        # The short name is the surface token used in expressions; fall
+        # back to the label when no explicit shortName is stored.
+        short = _one_literal(graph, s, PROMO["shortName"]) or label
+        if "internal_code" not in aliases:
+            aliases["internal_code"] = short
 
-        for s in self._graph.subjects(RDF.type, PROMO["Network"]):
-            name = _one_literal(self._graph, s, PROMO["name"])
-            if name:
-                name_to_iri[name] = s
+        network = _network(_one_literal(graph, s, PROMO["network"], "root"))
 
-        # First pass: explicit children.
-        for parent, child in self._graph.subject_objects(PROMO["child"]):
-            parent_name = _one_literal(self._graph, parent, PROMO["name"])
-            child_name = _one_literal(self._graph, child, PROMO["name"])
-            if parent_name and child_name:
-                tree.setdefault(parent_name, []).append(child_name)
+        # The ontology's indexClass names the index *source* (node, arc,
+        # token, conversion, signal); the checker's index_class only knows
+        # "index" | "block_index".  Map across and keep the source kind in
+        # the aliases for consumers that care.
+        raw_class = _one_literal(graph, s, PROMO["indexClass"], "index")
+        index_class = raw_class if raw_class in ("index", "block_index") else "index"
+        if raw_class != index_class:
+            aliases.setdefault("index_source", raw_class)
 
-        # Second pass: make sure leaf networks appear in the tree.
-        for name in name_to_iri:
-            if name not in tree:
-                tree[name] = []
+        return Index(
+            iri=iri,
+            label=label,
+            network=network,
+            index_class=index_class,
+            aliases=aliases,
+            token=_one_literal(graph, s, PROMO["token"]) or None,
+            internal_id=_one_literal(graph, s, PROMO["internalID"])
+            or aliases.get("global_ID")
+            or iri,
+        )
 
-        return tree
+    def _load_network_tree(self) -> "tuple[Dict[str, List[str]], Dict[str, str]]":
+        """Build the (display tree, parent map) pair for network names.
 
-    def _build_parent_of(self, tree: Dict[str, List[str]]) -> Dict[str, str]:
+        Built from ``promo:Domain`` nodes linked by ``promo:parent``.
+        Network names referenced by variables are included as well so a
+        variable can never live in an invisible network.  Parentless
+        top-level entries are attached under ``"root"`` so the frontend's
+        tree select always has a single root.
+        """
+        names: Set[str] = set()
         parent_of: Dict[str, str] = {}
-        for parent, children in tree.items():
-            for child in children:
-                parent_of[child] = parent
-        return parent_of
+
+        for graph in self._all_graphs():
+            for s in graph.subjects(RDF.type, PROMO["Domain"]):
+                name = _one_literal(graph, s, PROMO["name"])
+                if not name:
+                    continue
+                names.add(name)
+                parent = graph.value(s, PROMO["parent"])
+                if parent is not None:
+                    parent_name = _one_literal(graph, parent, PROMO["name"])
+                    if parent_name and parent_name != name:
+                        parent_of[name] = parent_name
+                        names.add(parent_name)
+
+            # Register network names referenced by variables.
+            for s in graph.subjects(RDF.type, PROMO["Variable"]):
+                names.add(
+                    _network(_one_literal(graph, s, PROMO["network"], "root"))
+                )
+
+        # Every parentless network hangs under "root" so the global scope
+        # is reachable from everywhere.
+        for name in names:
+            if name != "root":
+                parent_of.setdefault(name, "root")
+
+        # Break cycles: if walking up from a node revisits a node, reattach
+        # the starting node directly under "root".
+        for name in list(names):
+            seen = {name}
+            current = name
+            while current in parent_of:
+                current = parent_of[current]
+                if current in seen:
+                    parent_of[name] = "root"
+                    break
+                seen.add(current)
+
+        # Invert into a parent -> children display tree; parentless names go
+        # under "root" so the frontend always has a single root.
+        tree: Dict[str, List[str]] = {}
+        for name in sorted(names):
+            parent = parent_of.get(name, "root")
+            if name == "root":
+                continue
+            tree.setdefault(parent, []).append(name)
+        for name in names | {"root"}:
+            tree.setdefault(name, [])
+
+        return tree, parent_of
 
     # ------------------------------------------------------------------
     # New entity loaders

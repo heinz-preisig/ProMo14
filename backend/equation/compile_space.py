@@ -140,8 +140,7 @@ class CompileSpace:
             internal = idx.aliases.get("internal_code")
             if internal:
                 self.inverse_indices[internal] = iri
-            # Legacy IRI like http://example.org/indices#I_1 is also a valid
-            # surface token in the corpus.
+            # The IRI fragment (e.g. ...#I_1) is also a valid surface token.
             tail = iri.split("#")[-1].split("/")[-1]
             if tail and tail not in self.inverse_indices:
                 self.inverse_indices[tail] = iri

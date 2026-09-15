@@ -276,7 +276,7 @@ def create_variable(record: VariableRecord) -> VariableRecord:
     """Create a new variable (with nested equations) in the ontology graph."""
     store = get_store()
     if not record.iri:
-        record.iri = str(store.mint_iri("http://example.org/ontology", record.internal_id or store.next_internal_id("V")))
+        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, record.internal_id or store.next_internal_id("V")))
     if not record.internal_id:
         record.internal_id = store.next_internal_id("V")
 

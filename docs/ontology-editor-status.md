@@ -92,7 +92,11 @@ FastAPI router scaffold.  The provider is functional and tested.
 
 ## Pending items
 
-1. Wire equation editor to `RdfContext` (switch `/api/equation/context`).
+1. ~~Wire equation editor to `RdfContext`~~ **Done (2026-09-15):**
+   `RdfContext` reads all named graphs (ProMo14 vocabulary only) and
+   builds the domain tree from `promo:Domain`/`promo:parent` with a
+   synthetic `root`; verified end-to-end via `/api/equation/context` +
+   `/check`.  Legacy v8 loader archived to `archive/loader.py`.
 2. Wire modeller `ConnectionRuleResolver` to
    `GET /api/ontology/resolve-connection`.
 3. Implement ontology versioning and change classification (ADR-006).
@@ -186,10 +190,11 @@ contexts.
 
 v1 is complete and verified.  The next concrete steps are:
 
-1. Wire equation editor `/api/equation/context` to `RdfContext`.
+1. ~~Wire equation editor `/api/equation/context` to `RdfContext`~~ —
+   done (2026-09-15).
 2. Consume `resolve-connection` from the modeller's
    `ConnectionRuleResolver` (replaces the allow-all placeholder).
-3. Extend `RdfContext` to read **all named graphs** in the `RdfStore`
-   (not only `ontology_graph`) and to recognise lowercase
-   `promo:variable` / `promo:index` types used by
-   `variableExpression.trig`.
+3. ~~Extend `RdfContext` to read **all named graphs** in the `RdfStore`~~
+   — done (2026-09-15).  Legacy `promo:variable`/`promo:index` support
+   was dropped again the same day: the legacy loader is archived and
+   only the ProMo14 vocabulary is recognised.

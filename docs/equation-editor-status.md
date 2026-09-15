@@ -81,12 +81,19 @@ Implemented as a React + TypeScript + Vite app in
 
 ## Pending items
 
-- `RdfContext` is implemented; it currently reads only the seeded
-  `ontology_graph`.  Make it read all named graphs (including the
-  `variableExpression.trig` named graphs) and lowercase
-  `promo:variable` / `promo:index` types that the new TriG export uses.
-- Wire the frontend to the real ontology graph store (currently uses a
-  hard-coded demo context plus the debug JSON editor).
+- ~~`RdfContext` reads only the seeded `ontology_graph`.~~ **Done
+  (2026-09-15):** `RdfContext` reads all named graphs in the dataset
+  (ontology graph + var/expr graphs) using the ProMo14 vocabulary
+  (`promo:Variable`/`promo:Index`, `promo:hasEquation`,
+  `promo:unitVector`).  The network tree is built from
+  `promo:Domain`/`promo:parent` with a synthetic `root` and cycle
+  breaking.  Ontology `indexClass` source kinds (node/arc/...) map to
+  the checker's `index`/`block_index`.  The legacy v8 loader
+  (`backend/core/loader.py`) and all legacy vocabulary handling were
+  removed — archived to `archive/loader.py`.
+- ~~Wire the frontend to the real ontology graph store~~ **Done:** the
+  frontend already calls `GET /api/equation/context`; verified
+  end-to-end (variable create → context → `/check` infers units).
 - Code generation targets (Python, Matlab, LaTeX).
 - RDF vocabulary finalization for equations, operators, variables.
 
