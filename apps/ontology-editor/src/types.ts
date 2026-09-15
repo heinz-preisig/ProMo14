@@ -162,6 +162,8 @@ export interface ConnectionRuleRecord {
   target_domain: string | null
   shared_tokens: string[]
   direction: string | null // "bidirectional" | "unidirectional"
+  carrier: string | null // "token-flow" | "reference"
+  scope: string | null // "same" | "cross" | "any"
   description: string
 }
 

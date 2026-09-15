@@ -324,18 +324,23 @@ class RdfStore:
                     g.add((et_iri, PROMO["hasScaleValue"], all_scale_vals[sf]))
 
         # --- Connection rules (3 types) ---
+        # Arc semantics live in rule attributes, not in the type name:
+        #   direction : unidirectional | bidirectional
+        #   carrier   : token-flow | reference
+        #   scope     : same | cross | any   (branch constraint)
         rules = [
-            ("physical-same", "bidirectional",
+            ("physical-same", "bidirectional", "token-flow", "same",
              "Same domain, shared tokens — physical arc (continuity)"),
-            ("physical-cross", "bidirectional",
+            ("physical-cross", "bidirectional", "token-flow", "cross",
              "Different physical domains, shared tokens — physical arc (continuity)"),
-            ("signal", "unidirectional",
+            ("signal", "unidirectional", "reference", "any",
              "Signal connection — information arc (unidirectional)"),
         ]
-        for rule_type, direction, desc in rules:
+        for rule_type, direction, carrier, scope, desc in rules:
             rule_iri = self.mint_iri(base, f"rule_{rule_type}")
             self.add_connection_rule(g, rule_iri, rule_type,
-                                     direction=direction, description=desc)
+                                     direction=direction, carrier=carrier,
+                                     scope=scope, description=desc)
 
         # --- Indices ---
         # species: enumerates chemical components, bound to component mass token.
@@ -690,6 +695,8 @@ class RdfStore:
         source_domain: Optional[Union[str, URIRef]] = None,
         target_domain: Optional[Union[str, URIRef]] = None,
         shared_tokens: Optional[List[Union[str, URIRef]]] = None,
+        carrier: Optional[str] = None,
+        scope: Optional[str] = None,
         description: str = "",
     ) -> URIRef:
         """Add a connection rule definition to the graph."""
@@ -697,6 +704,10 @@ class RdfStore:
         self._set_literal(graph, iri, PROMO["ruleType"], rule_type)
         if direction is not None:
             self._set_literal(graph, iri, PROMO["direction"], direction)
+        if carrier is not None:
+            self._set_literal(graph, iri, PROMO["carrier"], carrier)
+        if scope is not None:
+            self._set_literal(graph, iri, PROMO["scope"], scope)
         if source_domain is not None:
             if isinstance(source_domain, str):
                 source_domain = URIRef(source_domain)

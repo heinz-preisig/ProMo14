@@ -570,6 +570,8 @@ def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord
         URIRef(record.iri),
         record.rule_type,
         direction=record.direction,
+        carrier=record.carrier,
+        scope=record.scope,
         source_domain=record.source_domain,
         target_domain=record.target_domain,
         shared_tokens=record.shared_tokens or [],
@@ -635,10 +637,12 @@ def resolve_connection(source: str, target: str) -> Dict[str, Any]:
 
     Rules stay attached to the domain where they are defined; a rule applies
     to a pair when its domain constraints are ancestors (or self) of the
-    actual endpoint domains.  Unconstrained rules are filtered by
-    ``rule_type``: ``physical-same`` requires the endpoints to share a common
-    ancestor domain, ``physical-cross`` requires they do not.  Results are
-    ordered most-specific first (closest ancestor match wins).
+    actual endpoint domains.  Rules are filtered by their ``scope``
+    attribute: ``same`` requires the endpoints to share a common ancestor
+    domain, ``cross`` requires they do not, ``any`` imposes no branch
+    constraint.  Rules without a ``scope`` attribute fall back to the
+    legacy rule-type names.  Results are ordered most-specific first
+    (closest ancestor match wins).
     """
     store = get_store()
     graph = store.ontology_graph
@@ -651,9 +655,15 @@ def resolve_connection(source: str, target: str) -> Dict[str, Any]:
     for rule in _list_connection_rule_records(ctx):
         if not _rule_domain_match(rule, src_chain, tgt_chain):
             continue
-        if rule.rule_type == "physical-same" and not common:
+        scope = rule.scope
+        if scope is None:
+            # Legacy rules without a scope attribute: derive it from the
+            # rule-type name (pre-attribute vocabulary).
+            scope = {"physical-same": "same",
+                     "physical-cross": "cross"}.get(rule.rule_type, "any")
+        if scope == "same" and not common:
             continue
-        if rule.rule_type == "physical-cross" and common:
+        if scope == "cross" and common:
             continue
         # Specificity: distance of the constrained domains up the chains.
         # Unconstrained rules sort last.
@@ -831,6 +841,8 @@ def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
     for s in graph.subjects(RDF.type, PROMO["ConnectionRule"]):
         rule_type = graph.value(s, PROMO["ruleType"])
         direction = graph.value(s, PROMO["direction"])
+        carrier = graph.value(s, PROMO["carrier"])
+        scope = graph.value(s, PROMO["scope"])
         source = graph.value(s, PROMO["sourceDomain"])
         target = graph.value(s, PROMO["targetDomain"])
         tokens = [str(t) for t in graph.objects(s, PROMO["sharedTokens"])]
@@ -843,6 +855,8 @@ def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
                 target_domain=str(target) if target else None,
                 shared_tokens=tokens,
                 direction=str(direction) if direction else None,
+                carrier=str(carrier) if carrier else None,
+                scope=str(scope) if scope else None,
                 description=str(doc) if doc else "",
             )
         )

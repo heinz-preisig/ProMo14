@@ -32,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.core.graph_store import PROMO, RdfStore  # noqa: E402
-from rdflib import URIRef  # noqa: E402
+from rdflib import Literal, URIRef  # noqa: E402
 
 
 def main() -> None:
@@ -77,6 +77,20 @@ def main() -> None:
         store.add_axis_term(g, iri, role_phys, label, parent=parent)
         p = f" < {parent.split('#')[-1]}" if parent else ""
         print(f"term    {label:<20}{p}")
+
+    # --- Connection-rule attributes (carrier / scope) ------------------
+    # Arc semantics live in rule attributes, not in the type name.
+    # Patch the seeded rules in existing data files (new seeds already
+    # carry these values).
+    for frag, carrier, scope in [
+        ("rule_physical-same", "token-flow", "same"),
+        ("rule_physical-cross", "token-flow", "cross"),
+        ("rule_signal", "reference", "any"),
+    ]:
+        rule_iri = URIRef(f"{base}#{frag}")
+        g.set((rule_iri, PROMO["carrier"], Literal(carrier)))
+        g.set((rule_iri, PROMO["scope"], Literal(scope)))
+        print(f"rule    {frag:<20} carrier={carrier} scope={scope}")
 
     # --- Index q (reaction index, conversion source) -------------------
     q_iri = store.mint_iri(base, "idx_reaction_q")

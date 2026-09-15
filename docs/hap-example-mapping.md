@@ -148,18 +148,104 @@ index. No code changes needed.
 
 ## 8. Open questions for review
 
-1. **Transport node granularity** — one transport-system node per
-   mechanism (convection/diffusion/controlled) as the old arcs suggest,
-   or merged? Old structure says: separate.
-2. **`>>>` elimination** — confirm ports fully replace the projection
-   equations; `reactions` domain then has `c`, `x`, `T` as input ports
-   and `np` as output port.
+1. **Transport node granularity** — RESOLVED (2026-09-15): separate
+   transport-system nodes per mechanism. Mechanisms are physically
+   distinct: mass diffusion, heat diffusion, radiation, volumetric
+   (convective) flow; controlled flow maps into convective; forced and
+   natural convection are mostly separate.
+
+   Combined transport systems: when mechanisms are independent but
+   co-located, use **parallel transport nodes** on the same connection
+   (each exports its own flow; the capacity balance sums them). When
+   the physics genuinely couples (Soret/Dufour, heat–mass coupling —
+   one mechanism's equations reference the other's internals), the
+   coupled equations must live in **one node**: the shared variables
+   are not at the port interface, so the scope can't be split.
+2. **`>>>` elimination** — RESOLVED (2026-09-15): replaced by the two
+   arc concepts, which are distinct:
+
+   - **Continuity arcs** (physical intraface): effort equality + flow
+     conservation between connected physical nodes.
+   - **Accessibility arcs**: **uni-directional** variable visibility —
+     a variable in one node is accessible to another node (e.g. `T` in
+     a lumped capacity read by an information-processing node; the
+     control output read back). Information systems use these, not the
+     continuity arcs of physics.
+
+   The variable lives in exactly one node; no copy, no projection
+   equation. The **port** is the equation-level declaration ("this
+   comes from across an arc"); BL treats it as an external endpoint
+   and the modeller binds it along the arc.
+
+   For `reactions` (resolved 2026-09-15): the reaction domain behaves
+   like an **information-processing domain** — physical content,
+   information-style connectivity. It reads `c`, `x`, `T` via
+   accessibility arcs, computes the kinetics, and exports `np` via an
+   accessibility arc; the capacity's species balance consumes `np` as
+   a source term. No continuity arc — nothing crosses a boundary, the
+   reaction generates within the capacity. It stays on the physical
+   branch because its variables are physical quantities (tokens,
+   units); the branch says what variables *are*, the arc type says how
+   the node *connects*. Consequence: accessibility arcs must be
+   permitted between physical domains — `physical-cross` covers them,
+   or accessibility becomes its own rule kind usable across branches
+   (physical→physical for reactions, physical→information for sensors,
+   information→physical for actuators).
+
+   **Connectivity patterns (2026-09-15):** the information-flow shape
+   distinguishes service domains from control. A *service* domain is
+   request-response: the host sends state-dependent information and
+   gets the result back to itself — both arcs connect the same pair
+   of nodes (satellite of one host). *Control* is routed: the input
+   comes from one place (the measured capacity's `T`) and the output
+   goes to a different place (the transport law). The controller is
+   thus the **transport system of the information branch** — a
+   mediator between two endpoints, like physical transport between
+   two capacities, but on accessibility arcs.
+
+   Resulting taxonomy: **capacity** (state, balances; continuity
+   arcs) · **transport** (flows between two capacities; continuity
+   arcs) · **service** (satellite of one host, request-response;
+   accessibility arcs — reactions, properties, geometry-as-model) ·
+   **information processing** (signals routed between a source and a
+   different destination; accessibility arcs — control).
 3. **Selection matrices** (`S_Ip`, `S_Iq`, `F_NI_*`, `I_NA`, `A_Npq`) —
-   do these survive as network-structure variables, or does the new
-   index machinery make them implicit?
-4. **`physical` network** — fundamental thermo (`U`, `S`, `V`, `n`,
-   `p`, `T`) is a separate domain in old data. Keep as separate domain
-   under the physical branch, or fold into `macroscopic`?
-5. **Control/signal branch** — `pControl` event node + signal arc:
-   first information-branch example; check the signal connection rule
-   covers it.
+   RESOLVED (2026-09-15): **eliminated**. They belonged to the old
+   *interface* mechanism — the special arcs that transferred
+   information between physical and information systems. That concept
+   is replaced by accessibility arcs + ports, where the routing is the
+   arc binding itself; there is nothing for the matrices to do.
+   Caveat: if `S_Iq` carried stoichiometric content (species×reaction
+   coefficients), that is chemistry data, not routing — it then lives
+   as parameters inside the `reactions` domain's kinetics.
+4. **`physical` network** — RESOLVED (2026-09-15): it is a **service
+   domain** (same pattern as `reactions`): reads the host's
+   fundamental state (`U`, `S`, `V`, `n`) via accessibility arcs,
+   computes equation-of-state and property relations (`p`, `T` via
+   `ParDiff`, `cp`, `rho`, `h`), exports them back to the host.
+   Separate domain, sibling of `macroscopic` — not folded in.
+   Naming TBD: the root domain is already `physical`; candidates
+   `properties` / `fundamental_thermo`. The `property` role term still
+   classifies the variables — axis classifies, domain hosts.
+5. **Control/signal branch** — mechanically RESOLVED (2026-09-15):
+   the seeded `signal` rule is unconstrained + unidirectional, so it
+   covers every accessibility-arc case (physical→information sensor,
+   information→physical actuation, physical→physical service
+   coupling). OPEN: naming — `signal` describes the information use
+   but the same mechanism serves physical service domains; candidate
+   rule-type names `access` / `reference` / `service` / `delegate`
+   (`link` avoided — collides with Behaviour Linker).
+
+   **Design tension → resolution direction (2026-09-15):** naming arc
+   kinds in the ontology freezes vocabulary that downstream tools
+   then depend on — against the flexibility principle. Resolution:
+   **bake the semantics into the connection rules** — arcs are
+   associated with rules, so the rule *is* the arc-type definition.
+   A rule carries constraint (domain restrictions + `scope` =
+   same|cross|any) and semantics (`direction` = uni|bi, `carrier` =
+   token-flow|reference). An arc references its rule; tools read
+   attributes, never names. Frozen core = three small enums; rule
+   names (`physical-same`, `signal`, `access`, ...) stay
+   user-extensible seed vocabulary. Requires moving the same/cross
+   logic in `resolve_connection` off the rule_type name onto the
+   `scope` attribute.

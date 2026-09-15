@@ -47,7 +47,7 @@ const EMPTY_SCALE_DIM: ScaleDimensionRecord = { iri: '', name: '', domain: '', p
 const EMPTY_SCALE_VAL: ScaleValueRecord = { iri: '', dimension: '', label: '', parent: null }
 const EMPTY_ENTITY_TYPE: EntityTypeRecord = { iri: '', label: '', temporal_type: 'dynamic', spatial_type: null, spatial_size: null, branch: 'physical', scale_values: [], description: '' }
 const EMPTY_INDEX: IndexRecord = { iri: '', label: '', short_name: '', network: 'root', index_class: 'index', internal_id: null, aliases: {}, token: null }
-const EMPTY_RULE: ConnectionRuleRecord = { iri: '', rule_type: 'physical-same', source_domain: null, target_domain: null, shared_tokens: [], direction: 'bidirectional', description: '' }
+const EMPTY_RULE: ConnectionRuleRecord = { iri: '', rule_type: 'physical-same', source_domain: null, target_domain: null, shared_tokens: [], direction: 'bidirectional', carrier: 'token-flow', scope: 'same', description: '' }
 
 // ---------------------------------------------------------------------------
 // Types
@@ -689,6 +689,17 @@ export default function App() {
         <select style={S.select} value={draftRule.direction || ''} onChange={(e) => setDraftRule({ ...draftRule, direction: e.target.value || null })}>
           <option value="bidirectional">bidirectional</option>
           <option value="unidirectional">unidirectional</option>
+        </select>
+        <label style={S.label}>Carrier</label>
+        <select style={S.select} value={draftRule.carrier || ''} onChange={(e) => setDraftRule({ ...draftRule, carrier: e.target.value || null })}>
+          <option value="token-flow">token-flow (continuity arc)</option>
+          <option value="reference">reference (accessibility arc)</option>
+        </select>
+        <label style={S.label}>Scope</label>
+        <select style={S.select} value={draftRule.scope || ''} onChange={(e) => setDraftRule({ ...draftRule, scope: e.target.value || null })}>
+          <option value="same">same (shared ancestor domain)</option>
+          <option value="cross">cross (no shared ancestor)</option>
+          <option value="any">any</option>
         </select>
         <label style={S.label}>Source domain (for physical-cross)</label>
         <select style={S.select} value={draftRule.source_domain || ''} onChange={(e) => setDraftRule({ ...draftRule, source_domain: e.target.value || null })}>

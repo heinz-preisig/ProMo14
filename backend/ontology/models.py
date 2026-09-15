@@ -192,6 +192,8 @@ class ConnectionRuleRecord(BaseModel):
     target_domain: Optional[str] = None
     shared_tokens: List[str] = Field(default_factory=list)  # token IRIs
     direction: Optional[str] = None  # "bidirectional" | "unidirectional"
+    carrier: Optional[str] = None  # "token-flow" | "reference"
+    scope: Optional[str] = None  # "same" | "cross" | "any"
     description: str = ""
 
 
