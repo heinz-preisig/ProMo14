@@ -269,11 +269,13 @@ def list_tokens() -> List[TokenRecord]:
     for s in graph.subjects(RDF.type, PROMO["Token"]):
         label = graph.value(s, PROMO["label"]) or graph.value(s, RDFS.label)
         parent = graph.value(s, PROMO["parent"])
+        kind = graph.value(s, PROMO["tokenKind"])
         records.append(
             TokenRecord(
                 iri=str(s),
                 label=str(label) if label else "",
                 parent=str(parent) if parent else None,
+                kind=str(kind) if kind else None,
             )
         )
     return records
@@ -293,6 +295,7 @@ def create_token(record: TokenRecord) -> TokenRecord:
         URIRef(record.iri),
         record.label,
         parent=URIRef(record.parent) if record.parent else None,
+        kind=record.kind,
     )
     return record
 
@@ -431,6 +434,7 @@ def create_scale_dimension(record: ScaleDimensionRecord) -> ScaleDimensionRecord
         record.name,
         record.domain,
         parent=record.parent,
+        kind=record.kind,
     )
     return record
 
@@ -529,6 +533,7 @@ def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
         spatial_type=record.spatial_type,
         spatial_size=record.spatial_size,
         description=record.description,
+        scale_values=record.scale_values,
     )
     return record
 
@@ -782,6 +787,7 @@ def _list_scale_dimension_records(ctx) -> List[ScaleDimensionRecord]:
         name = graph.value(s, PROMO["scaleName"])
         domain = graph.value(s, PROMO["hasDomain"])
         parent = graph.value(s, PROMO["parent"])
+        kind = graph.value(s, PROMO["dimensionKind"])
         # Load values for this dimension
         values = []
         for val_s in graph.subjects(PROMO["hasScale"], s):
@@ -801,6 +807,7 @@ def _list_scale_dimension_records(ctx) -> List[ScaleDimensionRecord]:
                 name=str(name) if name else "",
                 domain=str(domain) if domain else "",
                 parent=str(parent) if parent else None,
+                kind=str(kind) if kind else None,
                 values=values,
             )
         )

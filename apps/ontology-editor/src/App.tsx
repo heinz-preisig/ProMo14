@@ -39,11 +39,11 @@ import type {
 // Empty records
 // ---------------------------------------------------------------------------
 
-const EMPTY_TOKEN: TokenRecord = { iri: '', label: '', parent: null }
+const EMPTY_TOKEN: TokenRecord = { iri: '', label: '', parent: null, kind: null }
 const EMPTY_DOMAIN: DomainRecord = { iri: '', name: '', label: null, parent: null, branch: null, children: [], tokens: [], inherited_tokens: [] }
 const EMPTY_AXIS: ClassificationAxisRecord = { iri: '', domain: '', name: '', parent: null, terms: [] }
 const EMPTY_AXIS_TERM: AxisTermRecord = { iri: '', axis: '', label: '', parent: null }
-const EMPTY_SCALE_DIM: ScaleDimensionRecord = { iri: '', name: '', domain: '', parent: null, values: [] }
+const EMPTY_SCALE_DIM: ScaleDimensionRecord = { iri: '', name: '', domain: '', parent: null, kind: null, values: [] }
 const EMPTY_SCALE_VAL: ScaleValueRecord = { iri: '', dimension: '', label: '', parent: null }
 const EMPTY_ENTITY_TYPE: EntityTypeRecord = { iri: '', label: '', temporal_type: 'dynamic', spatial_type: null, spatial_size: null, branch: 'physical', scale_values: [], description: '' }
 const EMPTY_INDEX: IndexRecord = { iri: '', label: '', short_name: '', network: 'root', index_class: 'index', internal_id: null, aliases: {}, token: null }
@@ -71,13 +71,14 @@ const S: Record<string, React.CSSProperties> = {
   leftList: { flex: 1, overflow: 'auto' },
   listItem: { padding: '6px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: 13 },
   listItemSelected: { background: '#e0f2ff' },
-  right: { flex: 1, padding: 16, overflow: 'auto' },
+  right: { flex: 1, padding: 16, overflow: 'auto', display: 'flex', flexDirection: 'column' },
   input: { width: '100%', marginBottom: 8, padding: 6, boxSizing: 'border-box' },
   select: { width: '100%', marginBottom: 8, padding: 6, boxSizing: 'border-box' },
   textarea: { width: '100%', marginBottom: 8, padding: 6, minHeight: 50, boxSizing: 'border-box' },
-  button: { padding: '6px 14px', cursor: 'pointer', marginRight: 8, border: '1px solid #0b7cbe', background: '#0b7cbe', color: '#fff', borderRadius: 4, fontSize: 13 },
-  buttonDanger: { padding: '6px 14px', cursor: 'pointer', marginRight: 8, border: '1px solid #c0392b', background: '#c0392b', color: '#fff', borderRadius: 4, fontSize: 13 },
+  button: { padding: '6px 14px', cursor: 'pointer', marginRight: 8, border: '1px solid #0b7cbe', background: '#0b7cbe', color: '#fff', borderRadius: 4, fontSize: 13, alignSelf: 'flex-start' },
+  buttonDanger: { padding: '6px 14px', cursor: 'pointer', marginRight: 8, border: '1px solid #c0392b', background: '#c0392b', color: '#fff', borderRadius: 4, fontSize: 13, alignSelf: 'flex-start' },
   buttonGhost: { padding: '4px 10px', cursor: 'pointer', border: '1px solid #ccc', background: '#fff', color: '#333', borderRadius: 4, fontSize: 12 },
+  buttonDisabled: { border: '1px solid #bbb', background: '#ddd', color: '#888', cursor: 'default' },
   label: { fontSize: 12, color: '#666', marginBottom: 2, display: 'block' },
   message: { padding: '6px 12px', background: '#fff3cd', fontSize: 13 },
   section: { marginBottom: 16 },
@@ -85,6 +86,9 @@ const S: Record<string, React.CSSProperties> = {
   indented: { marginLeft: 16 },
   muted: { color: '#999', fontSize: 11 },
   badge: { display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 11, marginLeft: 4 },
+  // Checkbox pick-list: sizes to content, shrinks (and scrolls) when the
+  // form would overflow the window instead of pushing the Save button out.
+  checkList: { marginBottom: 8, flex: '0 1 auto', minHeight: 80, overflow: 'auto', border: '1px solid #ddd', padding: 4 },
 }
 
 // ---------------------------------------------------------------------------
@@ -155,25 +159,53 @@ export default function App() {
   const [selIndex, setSelIndex] = useState<string | null>(null)
   const [selRule, setSelRule] = useState<string | null>(null)
 
+  // Entity type list ordering: 'scale' | 'scale-desc' | 'alpha'
+  const [etSort, setEtSort] = useState<'scale' | 'scale-desc' | 'alpha'>('scale')
+
   // Stage availability
   const hasTokens = tokens.length > 0
   const hasDomains = domains.length > 0
   const hasScales = scaleDims.length > 0
+
+  // Dirty tracking: draft differs from the selected record (or the empty
+  // draft for new items). Save buttons disable while clean.
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const tokenDirty = !same(draftToken, tokens.find((t) => t.iri === selToken) ?? EMPTY_TOKEN)
+  const domainDirty = !same(draftDomain, domains.find((d) => d.iri === selDomain) ?? EMPTY_DOMAIN)
+  const axisDirty = !same(draftAxis, axes.find((a) => a.iri === selAxis) ?? EMPTY_AXIS)
+  const axisTermDirty = !same(draftAxisTerm, axes.flatMap((a) => a.terms).find((t) => t.iri === draftAxisTerm.iri) ?? EMPTY_AXIS_TERM)
+  const scaleDimDirty = !same(draftScaleDim, scaleDims.find((d) => d.iri === selScaleDim) ?? EMPTY_SCALE_DIM)
+  const scaleValDirty = !same(draftScaleVal, scaleVals.find((v) => v.iri === draftScaleVal.iri) ?? EMPTY_SCALE_VAL)
+  const entityTypeDirty = !same(draftEntityType, entityTypes.find((e) => e.iri === selEntityType) ?? EMPTY_ENTITY_TYPE)
+  const indexDirty = !same(draftIndex, indices.find((i) => i.iri === selIndex) ?? EMPTY_INDEX)
+  const ruleDirty = !same(draftRule, rules.find((r) => r.iri === selRule) ?? EMPTY_RULE)
   const load = async () => {
     try {
       const ctx = await loadOntologyContext()
-      setIndices(ctx.indices)
-      setDomains(ctx.domains || [])
-      setAxes(ctx.axes || [])
-      setScaleDims(ctx.scale_dimensions || [])
-      setEntityTypes(ctx.entity_types || [])
-      setRules(ctx.connection_rules || [])
       const toks = await listTokens()
-      setTokens(toks)
       const svals = await listScaleValues()
-      setScaleVals(svals)
+      const data = {
+        indices: ctx.indices,
+        domains: ctx.domains || [],
+        axes: ctx.axes || [],
+        scaleDimensions: ctx.scale_dimensions || [],
+        entityTypes: ctx.entity_types || [],
+        rules: ctx.connection_rules || [],
+        tokens: toks,
+        scaleValues: svals,
+      }
+      setIndices(data.indices)
+      setDomains(data.domains)
+      setAxes(data.axes)
+      setScaleDims(data.scaleDimensions)
+      setEntityTypes(data.entityTypes)
+      setRules(data.rules)
+      setTokens(data.tokens)
+      setScaleVals(data.scaleValues)
+      return data
     } catch (err) {
       setMessage(`Load failed: ${err}`)
+      return null
     }
   }
 
@@ -216,6 +248,87 @@ export default function App() {
   // Token label helper
   const domainName = (iri: string): string => domains.find((d) => d.iri === iri)?.name || iri
 
+  // Entity type ordering: rank each scale value by DFS preorder within its
+  // dimension tree (siblings keep backend order), then sort entity types by
+  // the tuple of ranks across dimensions (sorted by dimension IRI), label last.
+  const svRank = (() => {
+    const rank = new Map<string, number>()
+    const dims = [...new Set(scaleVals.map((v) => v.dimension))]
+    for (const dim of dims) {
+      const children = new Map<string | null, ScaleValueRecord[]>()
+      for (const v of scaleVals.filter((s) => s.dimension === dim)) {
+        const key = v.parent ?? null
+        children.set(key, [...(children.get(key) ?? []), v])
+      }
+      let i = 0
+      const visit = (v: ScaleValueRecord) => {
+        rank.set(v.iri, i++)
+        for (const c of children.get(v.iri) ?? []) visit(c)
+      }
+      for (const r of children.get(null) ?? []) visit(r)
+    }
+    return rank
+  })()
+
+  const etSortKey = (et: EntityTypeRecord): (number | string)[] => {
+    const byDim = new Map<string, number>()
+    for (const sv of et.scale_values) {
+      const v = scaleVals.find((s) => s.iri === sv)
+      if (v) byDim.set(v.dimension, svRank.get(sv) ?? Number.MAX_SAFE_INTEGER)
+    }
+    const ranks = [...byDim.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, r]) => r)
+    return [...ranks, et.label]
+  }
+
+  const sortedEntityTypes = [...entityTypes].sort((a, b) => {
+    if (etSort === 'alpha') return a.label.localeCompare(b.label)
+    const ka = etSortKey(a)
+    const kb = etSortKey(b)
+    for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+      const x = ka[i] ?? ''
+      const y = kb[i] ?? ''
+      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
+      if (c !== 0) return etSort === 'scale' ? c : -c
+    }
+    return 0
+  })
+
+  // Scale values ordered by dimension (scaleDims order), then DFS rank within
+  // each dimension tree — used for checkbox lists and dropdowns.
+  const sortedScaleVals = [...scaleVals].sort((a, b) => {
+    const da = scaleDims.findIndex((d) => d.iri === a.dimension)
+    const db = scaleDims.findIndex((d) => d.iri === b.dimension)
+    if (da !== db) return da - db
+    return (svRank.get(a.iri) ?? 0) - (svRank.get(b.iri) ?? 0)
+  })
+
+  // Ancestor-or-self set of a domain IRI (walks the parent chain).
+  const domainScope = (iri: string | null | undefined): Set<string> => {
+    const scope = new Set<string>()
+    let cur = domains.find((d) => d.iri === iri)
+    while (cur && !scope.has(cur.iri)) {
+      scope.add(cur.iri)
+      cur = domains.find((d) => d.iri === cur!.parent)
+    }
+    return scope
+  }
+
+  // The root domain: top-level and unbranched.
+  const rootDomain = domains.find((d) => !d.parent && !d.branch)
+
+  // Scale values eligible for the entity-type draft: structural dimensions
+  // only (content dims like phase never compose entity types), and the
+  // dimension's domain binding must be an ancestor-or-self of the draft's
+  // branch root — bound to root = global, bound to a branch = inherited.
+  const entityTypeScaleVals = sortedScaleVals.filter((sv) => {
+    const dim = scaleDims.find((d) => d.iri === sv.dimension)
+    if (!dim) return true
+    if (dim.kind === 'content') return false
+    if (!dim.domain) return true // unbound = global
+    const branchRoot = domains.find((d) => d.branch === draftEntityType.branch)
+    return branchRoot ? domainScope(branchRoot.iri).has(dim.domain) : true
+  })
+
   // =========================================================================
   // Render: Tokens
   // =========================================================================
@@ -235,6 +348,7 @@ export default function App() {
               onClick={() => { setSelToken(item.iri); setDraftToken({ ...item }) }}
             >
               <strong>{item.label}</strong>
+              {item.kind && <span style={{ ...S.badge, background: '#f0e8fd' }}>{item.kind}</span>}
               <button
                 style={{ ...S.buttonGhost, float: 'right', padding: '2px 6px' }}
                 onClick={(e) => { e.stopPropagation(); onDelete(item.iri, deleteToken, 'Token') }}
@@ -254,9 +368,21 @@ export default function App() {
             <option key={t.iri} value={t.iri}>{t.label}</option>
           ))}
         </select>
-        <button style={S.button} disabled={!draftToken.label.trim()} onClick={async () => {
+        <label style={S.label}>Kind</label>
+        <select style={S.select} value={draftToken.kind || ''} onChange={(e) => setDraftToken({ ...draftToken, kind: e.target.value || null })}>
+          <option value="">(unset)</option>
+          <option value="conserved">conserved — accumulates, rides token-flow arcs</option>
+          <option value="reference">reference — variable access, rides reference arcs</option>
+        </select>
+        <button style={{ ...S.button, ...(tokenDirty && draftToken.label.trim() ? {} : S.buttonDisabled) }} disabled={!tokenDirty || !draftToken.label.trim()} onClick={async () => {
           if (!draftToken.label.trim()) { msg('Label must not be empty'); return }
-          try { await createToken(draftToken); msg('Token saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+          try {
+            const saved = await createToken(draftToken)
+            const fresh = await load()
+            const rec = fresh?.tokens.find((t) => t.iri === saved.iri)
+            if (rec) { setSelToken(rec.iri); setDraftToken({ ...rec }) }
+            msg('Token saved')
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>
     </>
@@ -271,7 +397,14 @@ export default function App() {
       <div style={S.left}>
         <div style={S.leftHeader}>
           <span style={{ fontWeight: 'bold', fontSize: 13 }}>Domains</span>
-          <button style={S.buttonGhost} onClick={() => { setSelDomain(null); setDraftDomain(EMPTY_DOMAIN) }}>+ New</button>
+          <button style={S.buttonGhost} onClick={() => {
+            setSelDomain(null)
+            setDraftDomain({
+              ...EMPTY_DOMAIN,
+              parent: rootDomain?.iri ?? null,
+              inherited_tokens: rootDomain ? [...rootDomain.inherited_tokens, ...rootDomain.tokens] : [],
+            })
+          }}>+ New</button>
         </div>
         <div style={S.leftList}>
           {buildTree(domains).map(({ item, depth }) => (
@@ -283,10 +416,12 @@ export default function App() {
               <strong>{item.name}</strong>
               {item.branch && <span style={{ ...S.badge, background: '#e8f4fd' }}>{item.branch}</span>}
               {item.tokens.length > 0 && <span style={S.muted}> ({item.tokens.length} tokens)</span>}
-              <button
-                style={{ ...S.buttonGhost, float: 'right', padding: '2px 6px' }}
-                onClick={(e) => { e.stopPropagation(); onDelete(item.iri, deleteDomain, 'Domain') }}
-              >x</button>
+              {item.iri !== rootDomain?.iri && (
+                <button
+                  style={{ ...S.buttonGhost, float: 'right', padding: '2px 6px' }}
+                  onClick={(e) => { e.stopPropagation(); onDelete(item.iri, deleteDomain, 'Domain') }}
+                >x</button>
+              )}
             </div>
           ))}
         </div>
@@ -296,7 +431,7 @@ export default function App() {
         <label style={S.label}>Name</label>
         <input style={S.input} value={draftDomain.name} onChange={(e) => setDraftDomain({ ...draftDomain, name: e.target.value })} />
         <label style={S.label}>Parent</label>
-        <select style={S.select} value={draftDomain.parent || ''} onChange={(e) => {
+        <select style={S.select} value={draftDomain.parent || ''} disabled={draftDomain.iri === rootDomain?.iri} onChange={(e) => {
           const parentIri = e.target.value || null
           const parent = domains.find((d) => d.iri === parentIri)
           const inherited = parent ? [...parent.inherited_tokens, ...parent.tokens] : []
@@ -314,7 +449,7 @@ export default function App() {
           <option value="information">information</option>
         </select>
         <label style={S.label}>Tokens</label>
-        <div style={{ marginBottom: 8, maxHeight: 160, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
+        <div style={S.checkList}>
           {tokens.map((t) => {
             const isInherited = draftDomain.inherited_tokens.includes(t.iri)
             const isOwn = draftDomain.tokens.includes(t.iri)
@@ -336,8 +471,14 @@ export default function App() {
             )
           })}
         </div>
-        <button style={S.button} onClick={async () => {
-          try { await createDomain(draftDomain); msg('Domain saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+        <button style={{ ...S.button, ...(domainDirty ? {} : S.buttonDisabled) }} disabled={!domainDirty} onClick={async () => {
+          try {
+            const saved = await createDomain(draftDomain)
+            const fresh = await load()
+            const rec = fresh?.domains.find((d) => d.iri === saved.iri)
+            if (rec) { setSelDomain(rec.iri); setDraftDomain({ ...rec }) }
+            msg('Domain saved')
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>
     </>
@@ -394,8 +535,14 @@ export default function App() {
             <option key={d.iri} value={d.iri}>{d.name}</option>
           ))}
         </select>
-        <button style={S.button} onClick={async () => {
-          try { await createAxis(draftAxis); msg('Axis saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+        <button style={{ ...S.button, ...(axisDirty ? {} : S.buttonDisabled) }} disabled={!axisDirty} onClick={async () => {
+          try {
+            const saved = await createAxis(draftAxis)
+            const fresh = await load()
+            const rec = fresh?.axes.find((a) => a.iri === saved.iri)
+            if (rec) { setSelAxis(rec.iri); setDraftAxis({ ...rec }) }
+            msg('Axis saved')
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save axis</button>
 
         <div style={{ ...S.section, marginTop: 24, borderTop: '1px solid #eee', paddingTop: 12 }}>
@@ -416,10 +563,16 @@ export default function App() {
               <option key={t.iri} value={t.iri}>{t.label}</option>
             ))}
           </select>
-          <button style={S.button} disabled={!draftAxisTerm.axis || !draftAxisTerm.label.trim()} onClick={async () => {
+          <button style={{ ...S.button, ...(axisTermDirty && draftAxisTerm.axis && draftAxisTerm.label.trim() ? {} : S.buttonDisabled) }} disabled={!axisTermDirty || !draftAxisTerm.axis || !draftAxisTerm.label.trim()} onClick={async () => {
             if (!draftAxisTerm.axis) { msg('Select an axis first'); return }
             if (!draftAxisTerm.label.trim()) { msg('Label must not be empty'); return }
-            try { await createAxisTerm(draftAxisTerm); msg('Term saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+            try {
+              const saved = await createAxisTerm(draftAxisTerm)
+              const fresh = await load()
+              const rec = fresh?.axes.flatMap((a) => a.terms).find((t) => t.iri === saved.iri)
+              if (rec) { setDraftAxisTerm({ ...rec }) }
+              msg('Term saved')
+            } catch (err) { msg(`Save failed: ${err}`) }
           }}>Save term</button>
         </div>
       </div>
@@ -445,6 +598,7 @@ export default function App() {
                 onClick={() => { setSelScaleDim(dim.iri); setDraftScaleDim({ ...dim }) }}
               >
                 <strong>{dim.name}</strong>
+                {dim.kind && <span style={{ ...S.badge, background: '#fde8f0' }}>{dim.kind}</span>}
                 <span style={S.muted}> ({domainName(dim.domain)})</span>
                 <button
                   style={{ ...S.buttonGhost, float: 'right', padding: '2px 6px' }}
@@ -477,8 +631,20 @@ export default function App() {
             <option key={d.iri} value={d.iri}>{d.name}</option>
           ))}
         </select>
-        <button style={S.button} onClick={async () => {
-          try { await createScaleDimension(draftScaleDim); msg('Scale dimension saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+        <label style={S.label}>Kind</label>
+        <select style={S.select} value={draftScaleDim.kind || ''} onChange={(e) => setDraftScaleDim({ ...draftScaleDim, kind: e.target.value || null })}>
+          <option value="">(unset)</option>
+          <option value="structural">structural — composes entity types</option>
+          <option value="content">content — bound per node instance (e.g. phase)</option>
+        </select>
+        <button style={{ ...S.button, ...(scaleDimDirty ? {} : S.buttonDisabled) }} disabled={!scaleDimDirty} onClick={async () => {
+          try {
+            const saved = await createScaleDimension(draftScaleDim)
+            const fresh = await load()
+            const rec = fresh?.scaleDimensions.find((d) => d.iri === saved.iri)
+            if (rec) { setSelScaleDim(rec.iri); setDraftScaleDim({ ...rec }) }
+            msg('Scale dimension saved')
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save dimension</button>
 
         <div style={{ ...S.section, marginTop: 24, borderTop: '1px solid #eee', paddingTop: 12 }}>
@@ -495,12 +661,18 @@ export default function App() {
           <label style={S.label}>Parent (optional, for hierarchy — e.g. triple domain children)</label>
           <select style={S.select} value={draftScaleVal.parent || ''} onChange={(e) => setDraftScaleVal({ ...draftScaleVal, parent: e.target.value || null })}>
             <option value="">(none — root level)</option>
-            {scaleVals.filter((v) => v.dimension === draftScaleVal.dimension && v.iri !== draftScaleVal.iri).map((v) => (
+            {sortedScaleVals.filter((v) => v.dimension === draftScaleVal.dimension && v.iri !== draftScaleVal.iri).map((v) => (
               <option key={v.iri} value={v.iri}>{scaleValLabel(v.iri)}</option>
             ))}
           </select>
-          <button style={S.button} onClick={async () => {
-            try { await createScaleValue(draftScaleVal); msg('Scale value saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+          <button style={{ ...S.button, ...(scaleValDirty ? {} : S.buttonDisabled) }} disabled={!scaleValDirty} onClick={async () => {
+            try {
+              const saved = await createScaleValue(draftScaleVal)
+              const fresh = await load()
+              const rec = fresh?.scaleValues.find((v) => v.iri === saved.iri)
+              if (rec) { setDraftScaleVal({ ...rec }) }
+              msg('Scale value saved')
+            } catch (err) { msg(`Save failed: ${err}`) }
           }}>Save value</button>
         </div>
       </div>
@@ -516,10 +688,17 @@ export default function App() {
       <div style={S.left}>
         <div style={S.leftHeader}>
           <span style={{ fontWeight: 'bold', fontSize: 13 }}>Entity Types</span>
-          <button style={S.buttonGhost} onClick={() => { setSelEntityType(null); setDraftEntityType(EMPTY_ENTITY_TYPE) }}>+ New</button>
+          <span>
+            <button
+              style={{ ...S.buttonGhost, marginRight: 4 }}
+              title="Cycle list ordering"
+              onClick={() => setEtSort(etSort === 'scale' ? 'scale-desc' : etSort === 'scale-desc' ? 'alpha' : 'scale')}
+            >{etSort === 'scale' ? 'scale ↓' : etSort === 'scale-desc' ? 'scale ↑' : 'a–z'}</button>
+            <button style={S.buttonGhost} onClick={() => { setSelEntityType(null); setDraftEntityType(EMPTY_ENTITY_TYPE) }}>+ New</button>
+          </span>
         </div>
         <div style={S.leftList}>
-          {entityTypes.map((et) => (
+          {sortedEntityTypes.map((et) => (
             <div
               key={et.iri}
               style={{ ...S.listItem, ...(selEntityType === et.iri ? S.listItemSelected : {}) }}
@@ -569,8 +748,11 @@ export default function App() {
           <option value="infinitesimal">infinitesimal</option>
         </select>
         <label style={S.label}>Scale values (canonical definition)</label>
-        <div style={{ marginBottom: 8, maxHeight: 150, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
-          {scaleVals.map((sv) => (
+        {entityTypeScaleVals.length === 0 && (
+          <div style={S.muted}>No structural scale dimensions bound to the {draftEntityType.branch} branch.</div>
+        )}
+        <div style={S.checkList}>
+          {entityTypeScaleVals.map((sv) => (
             <label key={sv.iri} style={{ display: 'block', fontSize: 12 }}>
               <input
                 type="checkbox"
@@ -587,8 +769,14 @@ export default function App() {
         </div>
         <label style={S.label}>Description</label>
         <textarea style={S.textarea} value={draftEntityType.description} onChange={(e) => setDraftEntityType({ ...draftEntityType, description: e.target.value })} />
-        <button style={S.button} onClick={async () => {
-          try { await createEntityType(draftEntityType); msg('Entity type saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+        <button style={{ ...S.button, ...(entityTypeDirty ? {} : S.buttonDisabled) }} disabled={!entityTypeDirty} onClick={async () => {
+          try {
+            const saved = await createEntityType(draftEntityType)
+            const fresh = await load()
+            const rec = fresh?.entityTypes.find((e) => e.iri === saved.iri)
+            if (rec) { setSelEntityType(rec.iri); setDraftEntityType({ ...rec }) }
+            msg('Entity type saved')
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>
     </>
@@ -641,8 +829,14 @@ export default function App() {
             <option key={t.iri} value={t.iri}>{t.label}</option>
           ))}
         </select>
-        <button style={S.button} onClick={async () => {
-          try { await createIndex(draftIndex); msg('Index saved'); await load() } catch (err) { msg(`Save failed: ${err}`) }
+        <button style={{ ...S.button, ...(indexDirty ? {} : S.buttonDisabled) }} disabled={!indexDirty} onClick={async () => {
+          try {
+            const saved = await createIndex(draftIndex)
+            const fresh = await load()
+            const rec = fresh?.indices.find((i) => i.iri === saved.iri)
+            if (rec) { setSelIndex(rec.iri); setDraftIndex({ ...rec }) }
+            msg('Index saved')
+          } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>
     </>
@@ -724,7 +918,7 @@ export default function App() {
           ))}
         </select>
         <label style={S.label}>Shared tokens</label>
-        <div style={{ marginBottom: 8, maxHeight: 240, overflow: 'auto', border: '1px solid #ddd', padding: 4 }}>
+        <div style={S.checkList}>
           {tokens.map((t) => (
             <label key={t.iri} style={{ display: 'block', fontSize: 12 }}>
               <input
@@ -742,13 +936,13 @@ export default function App() {
         </div>
         <label style={S.label}>Description</label>
         <textarea style={S.textarea} value={draftRule.description} onChange={(e) => setDraftRule({ ...draftRule, description: e.target.value })} />
-        <button style={S.button} onClick={async () => {
+        <button style={{ ...S.button, ...(ruleDirty ? {} : S.buttonDisabled) }} disabled={!ruleDirty} onClick={async () => {
           try {
             const saved = await createConnectionRule(draftRule)
-            setSelRule(saved.iri)
-            setDraftRule({ ...saved })
+            const fresh = await load()
+            const rec = fresh?.rules.find((r) => r.iri === saved.iri)
+            if (rec) { setSelRule(rec.iri); setDraftRule({ ...rec }) }
             msg('Rule saved')
-            await load()
           } catch (err) { msg(`Save failed: ${err}`) }
         }}>Save</button>
       </div>

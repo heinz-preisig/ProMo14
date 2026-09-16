@@ -74,21 +74,23 @@ references to the transport nodes' output flow variables via ports.
 ## 5. Old variable types → role axis
 
 Old `type` column maps onto the new multi-axis classification
-(`role` axis + others):
+(`role` axis + others).  Updated 2026-09-16: the role axis names
+var/expr **graph positions** only — domain echoes removed (see
+`ontology-design-discussion-2026-09-16.md`).
 
-| Old type | New classification (proposal) |
+| Old type | New classification |
 |---|---|
 | `state` | role=state (emergent in BL — tagged as hint) |
-| `secondaryState` | role=state, secondary |
-| `diffState` | role=state, differential-form |
+| `secondaryState` | role=secondary-state (child of `derived`) |
+| `diffState` | role=differential-state (child of `state`) |
 | `effort` | role=effort |
 | `transport` | role=flow (24 vars — the fluxes/coefficients) |
-| `internalTransport` | role=flow, internal |
-| `properties` | role=property |
-| `conversion` | role=conversion |
-| `observation` | role=observation |
+| `internalTransport` | role=flow |
+| `properties` | role=derived — computed in the `properties` service subgraph; a `port` where the capacity consumes it |
+| `conversion` | role=derived — reaction rates computed in the `reactions` service subgraph |
+| `observation` | role=port — variable exposed on a `sensor` arc |
 | `frame` | role=frame (time, position) |
-| `network` | role=network-structure (selection matrices `S_*`, `F_*`, `I_*`, `A_*`) |
+| `network` | **eliminated** — `F`, `S_*`, `I_*`, `A_*` are model topology projected into equations at codegen, not variables |
 | `constant` | role=constant |
 
 ## 6. What the old assignment artefact tells us
@@ -109,18 +111,26 @@ richest example — good BL test case.
 
 Seed contents (`graph_store.seed_default_ontology`):
 
-- **Domains:** `physical`, `information` (roots only — user extends)
+- **Domains:** `root` (global scope) → `physical`, `information`
+  (user extends)
 - **Tokens:** energy, mass, momentum, charge, entropy, component_mass
-  (physical); signal (information)
-- **Role axis:** physical {state, effort, transport, frame, constant,
-  parameter}; information {state, input, output, constant, parameter}
-- **Scales:** time {molecular, nano, milli, macro} × {constant,
-  dynamic, event-dynamic}; length {infinitesimal{point, finite},
-  microscopic{uniform, distributed}, macroscopic{uniform,
-  distributed}, infinite{uniform}}
+  (kind=conserved, physical); signal {observation, manipulation}
+  (kind=reference, bound to `root` — inherited by every branch)
+- **Role axis:** physical {state{differential-state}, derived
+  {secondary-state}, effort, flow, port, frame, constant, parameter};
+  information {state, input, output, constant, parameter}
+- **Dimensions:** structural — time {molecular, nano, milli, macro} ×
+  {constant, dynamic, event-dynamic} (bound to `root` — global);
+  length {infinitesimal{point, finite}, microscopic{uniform,
+  distributed}, macroscopic{uniform, distributed}, infinite{uniform}}
+  (bound to `physical`).  Content — phase {solid, fluid{liquid, gas},
+  pseudo} (bound to `physical`; bound per node instance, consumed by
+  the properties domain)
 - **Entity types:** environment, lumped, distributed, point,
   transport_system, info_constant, info_dynamic, info_event
-- **Rules:** physical-same, physical-cross (bidir), signal (unidir)
+- **Rules:** physical-same (bidir, token-flow), access (phys→phys
+  reference), sensor (phys→info, carries observation), actuation
+  (info→phys, carries manipulation), signal (info→info)
 - **Indices:** species (→ component_mass token), node, arc
 - **Equation classes:** generic, instantiate, balance, empirical,
   user_function
@@ -135,16 +145,16 @@ Seed contents (`graph_store.seed_default_ontology`):
 | `pControl` event node | `info_event` | covered |
 | Reactions entity | `point` (event-dynamic/infinitesimal) | covered |
 | Signal link | `signal` rule + `info_*` types | covered |
-| Old var types: state, effort, transport, frame, constant | role terms exist | covered |
-| `secondaryState`, `diffState` | — | **Add child terms under `state`** |
-| `properties`, `conversion`, `observation`, `network` | — | **Add role terms** (property, conversion, observation, network-structure) |
+| Old var types: state, effort, transport, frame, constant | role terms exist (transport → `flow`) | covered |
+| `secondaryState`, `diffState` | `secondary-state` < `derived`, `differential-state` < `state` | covered |
+| `properties`, `conversion`, `observation`, `network` | `derived`, `port`; `network` eliminated (topology at codegen) | covered — no domain-echo terms |
 | Indices N, A, S | node, arc, species | covered |
 | Reaction index `q` | — | **Add index** with `conversion` source kind |
 | `Instantiate`, `Integral` equations | `instantiate`, `balance` classes | covered |
 
 **Verdict:** structurally the seed covers HAP. The ontology work is
-small and entirely in the editor: ~3 subdomains, ~5 role terms, 1
-index. No code changes needed.
+small and entirely in the editor: ~3 subdomains, 1 index. The role
+vocabulary is now graph-position only — no HAP-specific terms needed.
 
 ## 8. Open questions for review
 
@@ -238,14 +248,15 @@ index. No code changes needed.
    Service is a modelling pattern, not schema — nothing is
    hard-wired. Resulting tree:
 
-       physical
-       ├── macroscopic     capacity: mass, component_mass, energy
-       ├── transport       transport nodes (flat)
-       ├── reactions       service
-       ├── properties      service
-       └── geometry        service
-       information
-       └── control         pControl: signal
+       root                global scope: signal token, time scale
+       ├── physical
+       │   ├── macroscopic     capacity: mass, component_mass, energy
+       │   ├── transport       transport nodes (flat)
+       │   ├── reactions       service
+       │   ├── properties      service
+       │   └── geometry        service
+       └── information
+           └── control         pControl: signal
 5. **Control/signal branch** — mechanically RESOLVED (2026-09-15):
    the seeded `signal` rule is unconstrained + unidirectional, so it
    covers every accessibility-arc case (physical→information sensor,
@@ -275,9 +286,10 @@ index. No code changes needed.
    `actuation` (information→physical, loop closure; may be narrowed
    to →transport), `signal` (information→information). All
    unidirectional + reference; scope same|cross follows the branch
-   pair. The `signal` token lives on the information branch plus the
-   `transport` domain — the transport system is the physical node that
-   is measured/actuated. `physical-same` (bi, token-flow, scope=same)
+   pair. The `signal` token lives on `domain_root` — inherited by
+   every branch: any physical node can expose variables
+   (sensor/actuation/access) and the information branch processes
+   them (updated 2026-09-16: was information branch + transport). `physical-same` (bi, token-flow, scope=same)
    covers all intra-physical continuity including different
    subdomains (liquid–gas). `physical-cross` was retired 2026-09-15:
    token-flow + scope=cross can never apply (cross-branch pairs share

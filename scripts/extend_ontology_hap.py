@@ -3,13 +3,22 @@
 
 Adds (idempotent — safe to re-run):
 
+- root domain ``domain_root`` above both branches — the global scope
+  for tokens and scale dimensions (``time`` rebinds to it, ``signal``
+  moves to it); ``physical`` / ``information`` are reparented under it.
 - domains: ``macroscopic`` and ``reactions`` under ``physical``;
   ``control`` under ``information``.  Tokens are inherited additively
   from the parent, so no explicit token bindings are needed.
-- role terms on the physical role axis: ``property``, ``conversion``,
-  ``observation``, ``network-structure`` (top level);
-  ``secondary-state`` and ``differential-state`` as children of
-  ``state``.
+- role terms on the physical role axis: graph positions only
+  (``derived``, ``port``, ``flow``, ``secondary-state`` under
+  ``derived``, ``differential-state`` under ``state``).  Removes the
+  old domain-echo terms (``property``, ``conversion``, ``observation``,
+  ``network-structure``, ``transport``) — see
+  docs/ontology-design-discussion-2026-09-16.md.
+- token kinds (``conserved`` | ``reference``) and signal subtokens
+  ``observation`` / ``manipulation``.
+- dimension kinds (``structural`` | ``content``) and the ``phase``
+  content dimension (``solid``, ``fluid{liquid, gas}``, ``pseudo``).
 - index ``q``: reaction index with ``conversion`` source kind,
   belonging to the ``reactions`` domain.
 
@@ -49,10 +58,21 @@ def main() -> None:
     g = store.ontology_graph
     base = str(PROMO).rstrip("#")
 
+    root = URIRef(f"{base}#domain_root")
     phys = URIRef(f"{base}#domain_physical")
     info = URIRef(f"{base}#domain_information")
     role_phys = URIRef(f"{base}#axis_role_physical")
     state_term = URIRef(f"{base}#term_role_state")
+
+    # --- Root domain (global scope) ------------------------------------
+    # Tokens and scale dimensions bound to root are inherited by every
+    # branch.  physical / information are reparented under it.
+    if (root, None, None) not in g:
+        store.add_domain(g, "root", iri=root)
+        print("domain  root                 (created)")
+    for branch_root in (phys, info):
+        g.set((branch_root, PROMO["parent"], root))
+    print("domain  physical/information   reparented under root")
 
     # --- Domains -------------------------------------------------------
     # physical: macroscopic (capacity), transport (transport nodes),
@@ -71,12 +91,22 @@ def main() -> None:
         print(f"domain  {name:<12} parent={parent.split('#')[-1]}")
 
     # --- Role terms (physical axis) ------------------------------------
+    # Role = var/expr graph position only (2026-09-16 discussion).
+    # Drop the old domain-echo terms — a variable's domain is carried by
+    # its defining equation's domain, not by its role.
+    for frag in ("property", "conversion", "observation",
+                 "network_structure", "transport"):
+        term = URIRef(f"{base}#term_role_{frag}")
+        if (term, None, None) in g:
+            g.remove((term, None, None))
+            print(f"term    {frag:<20} (domain echo, removed)")
+
+    derived_term = URIRef(f"{base}#term_role_derived")
     for frag, label, parent in [
-        ("property", "property", None),
-        ("conversion", "conversion", None),
-        ("observation", "observation", None),
-        ("network_structure", "network-structure", None),
-        ("secondary_state", "secondary-state", state_term),
+        ("derived", "derived", None),
+        ("port", "port", None),
+        ("flow", "flow", None),
+        ("secondary_state", "secondary-state", derived_term),
         ("differential_state", "differential-state", state_term),
     ]:
         iri = store.mint_iri(base, f"term_role_{frag}")
@@ -88,6 +118,64 @@ def main() -> None:
     g.set((URIRef(f"{base}#token_component_mass"), PROMO["parent"],
            URIRef(f"{base}#token_mass")))
     print("token   component_mass       < token_mass")
+
+    # --- Token kinds (conserved | reference) ---------------------------
+    for frag in ("energy", "mass", "momentum", "charge", "entropy",
+                 "component_mass"):
+        g.set((URIRef(f"{base}#token_{frag}"), PROMO["tokenKind"],
+               Literal("conserved")))
+    signal_tok = URIRef(f"{base}#token_signal")
+    g.set((signal_tok, PROMO["tokenKind"], Literal("reference")))
+    print("token   *                    tokenKind patched")
+
+    # Signal subtokens: observation / manipulation.  Control-internal
+    # refinement (controller-state, state-estimate, control-error, …)
+    # deliberately deferred — see docs/ontology-design-discussion-2026-09-16.md
+    obs_tok = URIRef(f"{base}#token_observation")
+    man_tok = URIRef(f"{base}#token_manipulation")
+    for tok_iri, label in [(obs_tok, "Observation"),
+                           (man_tok, "Manipulation")]:
+        store.add_token(g, tok_iri, label, parent=signal_tok,
+                        kind="reference")
+        print(f"token   {label:<20} < token_signal")
+
+    # --- Dimension kinds + phase (content dimension) -------------------
+    for frag in ("scale_time", "scale_length"):
+        g.set((URIRef(f"{base}#{frag}"), PROMO["dimensionKind"],
+               Literal("structural")))
+    # Time is global (dynamic systems): rebind to the root domain so
+    # both branches inherit it.  Length stays bound to physical.
+    g.set((URIRef(f"{base}#scale_time"), PROMO["hasDomain"], root))
+    print("dim     time                 hasDomain → domain_root (global)")
+    phase_dim = URIRef(f"{base}#scale_phase")
+    if (phase_dim, None, None) in g:
+        print("dim     phase                (already present, skipped)")
+    else:
+        store.add_scale_dimension(g, phase_dim, "phase", phys,
+                                  kind="content")
+        phase_vals = {}
+        for frag, label, parent_key in [
+            ("solid", "solid", None),
+            ("fluid", "fluid", None),
+            ("fluid_liquid", "liquid", "fluid"),
+            ("fluid_gas", "gas", "fluid"),
+            ("pseudo", "pseudo", None),
+        ]:
+            val_iri = store.mint_iri(base, f"sval_phase_{frag}")
+            store.add_scale_value(g, val_iri, phase_dim, label,
+                                  parent=phase_vals.get(parent_key))
+            phase_vals[frag] = val_iri
+        print("dim     phase                kind=content + solid/fluid{liquid,gas}/pseudo")
+
+    # --- Entity types: drop physical scale values from info types ----
+    # The scale dimensions (time, length) are bound to the physical
+    # domain; information entity types classify via temporal_type only.
+    for frag in ("info_constant", "info_dynamic", "info_event"):
+        et = URIRef(f"{base}#etype_{frag}")
+        n = len(list(g.triples((et, PROMO["hasScaleValue"], None))))
+        if n:
+            g.remove((et, PROMO["hasScaleValue"], None))
+            print(f"etype   {frag:<20} physical scale values removed ({n})")
 
     # --- Connection-rule attributes (carrier / scope) ------------------
     # Arc semantics live in rule attributes, not in the type name.
@@ -152,8 +240,9 @@ def main() -> None:
             print(f"rule    rule_{name:<15} carrier=reference scope=cross")
 
     # Shared tokens: physical arcs share the physical token set;
-    # reference (accessibility) arcs share the signal token.
-    signal_tok = URIRef(f"{base}#token_signal")
+    # reference (accessibility) arcs share the signal token — sensor
+    # and actuation carry the specialised subtokens so token matching
+    # can discriminate observation from manipulation.
     physical_token_iris = [
         URIRef(f"{base}#token_{t}") for t in (
             "energy", "mass", "momentum", "charge", "entropy",
@@ -162,8 +251,8 @@ def main() -> None:
     for frag, tokens in [
         ("rule_physical-same", physical_token_iris),
         ("rule_access", [signal_tok]),
-        ("rule_sensor", [signal_tok]),
-        ("rule_actuation", [signal_tok]),
+        ("rule_sensor", [obs_tok]),
+        ("rule_actuation", [man_tok]),
         ("rule_signal", [signal_tok]),
     ]:
         rule_iri = URIRef(f"{base}#{frag}")
@@ -172,13 +261,16 @@ def main() -> None:
             g.add((rule_iri, PROMO["sharedTokens"], tok))
     print("rule    *                    sharedTokens normalised")
 
-    # The signal token is information-internal plus transport: the
-    # transport system is the physical node that is measured/actuated.
-    # Remove the old branch-wide binding on domain_physical.
+    # The signal token lives on the ROOT domain: any physical node can
+    # expose variables (sensor/actuation/access arcs) and the
+    # information branch processes them.  Remove the old branch-level
+    # and transport-only bindings — signal is now inherited everywhere.
     transport = URIRef(f"{base}#domain_transport")
+    g.add((root, PROMO["hasToken"], signal_tok))
     g.remove((phys, PROMO["hasToken"], signal_tok))
-    g.add((transport, PROMO["hasToken"], signal_tok))
-    print("token   signal               domain_physical → domain_transport")
+    g.remove((info, PROMO["hasToken"], signal_tok))
+    g.remove((transport, PROMO["hasToken"], signal_tok))
+    print("token   signal               branch roots → domain_root")
 
     # --- Extensity axis (physical) -------------------------------------
     ext_axis = URIRef(f"{base}#axis_extensity")

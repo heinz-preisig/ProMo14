@@ -115,6 +115,7 @@ export interface TokenRecord {
   iri: string
   label: string
   parent: string | null
+  kind: string | null // "conserved" | "reference"
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +134,7 @@ export interface ScaleDimensionRecord {
   name: string // e.g. "time", "length"
   domain: string // domain IRI where this scale is defined
   parent: string | null // inherited from parent domain
+  kind: string | null // "structural" | "content"
   values: ScaleValueRecord[]
 }
 

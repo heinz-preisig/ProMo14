@@ -46,10 +46,19 @@ XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 # Scale dimensions and values (first-class concept)
 #   promo:ScaleDimension   — a scale dimension (time scale, length scale, user-defined)
 #   promo:scaleName        — dimension name (e.g. "time", "length")
+#   promo:dimensionKind    — "structural" | "content"  (structural dims compose
+#                          entity types; content dims bind per model-node
+#                          instance, e.g. phase as constitutive selector)
 #   promo:hasDomain        — links a scale dimension to the domain where it is defined
 #   promo:ScaleValue       — a value in a scale dimension's hierarchical tree
 #   promo:hasScale         — links a scale value to its dimension
 #   promo:scaleValueLabel  — label for a scale value (e.g. "microscopic", "macroscopic")
+#
+# Tokens
+#   promo:Token            — a token type (what lives in a domain)
+#   promo:tokenKind        — "conserved" | "reference"  (conserved tokens
+#                          accumulate and ride token-flow arcs; reference
+#                          tokens expose variable access on reference arcs)
 #
 # Entity type taxonomy (CWA 17960 — seed/default, not hardcoded schema)
 #   promo:EntityType        — an entity type
@@ -189,14 +198,26 @@ class RdfStore:
         g = self.ontology_graph
         base = str(PROMO).rstrip("#")
 
-        # --- Domain tree: two branches ---
+        # --- Domain tree: root + two branches ---
+        # The root domain is the global scope: tokens and scale
+        # dimensions bound to it are inherited by every branch.
+        root_iri = self.mint_iri(base, "domain_root")
+        self.add_domain(g, "root", iri=root_iri)
+
         phys_iri = self.mint_iri(base, "domain_physical")
-        self.add_domain(g, "physical", iri=phys_iri, branch="physical")
+        self.add_domain(g, "physical", iri=phys_iri, parent=root_iri,
+                        branch="physical")
 
         info_iri = self.mint_iri(base, "domain_information")
-        self.add_domain(g, "information", iri=info_iri, branch="information")
+        self.add_domain(g, "information", iri=info_iri, parent=root_iri,
+                        branch="information")
 
         # --- Tokens ---
+        # Token kinds (promo:tokenKind):
+        #   conserved — accumulate in capacities, transferred by
+        #               token-flow arcs, appear in balances (F·fx)
+        #   reference — variable access; carried by reference arcs,
+        #               reading never depletes, no balance
         physical_tokens = {
             "energy": "Energy",
             "mass": "Mass",
@@ -207,23 +228,35 @@ class RdfStore:
         }
         for frag, label in physical_tokens.items():
             tok_iri = self.mint_iri(base, f"token_{frag}")
-            self.add_token(g, tok_iri, label)
+            self.add_token(g, tok_iri, label, kind="conserved")
 
         # component_mass is a subtoken of mass (mass decomposed by species).
         g.set((self.mint_iri(base, "token_component_mass"), PROMO["parent"],
                self.mint_iri(base, "token_mass")))
 
+        # signal = the reference-kind token: the currency of all
+        # reference-carrier arcs (sensor, actuation, access, signal).
+        # observation / manipulation are the seeded subtokens — the
+        # control-internal taxonomy (controller-state, state-estimate,
+        # control-error, …) is deliberately deferred.
         signal_iri = self.mint_iri(base, "token_signal")
-        self.add_token(g, signal_iri, "Signal")
+        self.add_token(g, signal_iri, "Signal", kind="reference")
+        signal_subtokens = {}
+        for frag, label in [("observation", "Observation"),
+                            ("manipulation", "Manipulation")]:
+            sub_iri = self.mint_iri(base, f"token_{frag}")
+            self.add_token(g, sub_iri, label, parent=signal_iri,
+                           kind="reference")
+            signal_subtokens[frag] = sub_iri
 
-        # Bind tokens to domains.
+        # Bind tokens to domains.  Conserved tokens live on the physical
+        # branch; signal lives on the ROOT — any physical node can
+        # expose variables (sensor/actuation/access arcs) and the
+        # information branch processes them.
         for frag in physical_tokens:
             tok_iri = self.mint_iri(base, f"token_{frag}")
             g.add((phys_iri, PROMO["hasToken"], tok_iri))
-        g.add((info_iri, PROMO["hasToken"], signal_iri))
-        # The signal token is information-branch only.  Physical domains
-        # that expose measurements (e.g. transport) add it themselves —
-        # see scripts/extend_ontology_hap.py.
+        g.add((root_iri, PROMO["hasToken"], signal_iri))
 
         # --- Classification axes: "role" axis on both branches ---
         role_phys_iri = self.mint_iri(base, "axis_role_physical")
@@ -231,10 +264,28 @@ class RdfStore:
         role_info_iri = self.mint_iri(base, "axis_role_information")
         self.add_classification_axis(g, role_info_iri, info_iri, "role")
 
-        physical_role_terms = ["state", "effort", "transport", "frame", "constant", "parameter"]
-        for term in physical_role_terms:
-            term_iri = self.mint_iri(base, f"term_role_{term}")
-            self.add_axis_term(g, term_iri, role_phys_iri, term)
+        # Role axis = var/expr graph position only — no domain echoes
+        # (see docs/ontology-design-discussion-2026-09-16.md).
+        physical_role_terms = [
+            ("state", None),
+            ("differential-state", "state"),
+            ("derived", None),
+            ("secondary-state", "derived"),
+            ("effort", None),
+            ("flow", None),
+            ("port", None),
+            ("frame", None),
+            ("constant", None),
+            ("parameter", None),
+        ]
+        role_term_iris: Dict[str, URIRef] = {}
+        for term, parent_label in physical_role_terms:
+            frag = term.replace("-", "_")
+            term_iri = self.mint_iri(base, f"term_role_{frag}")
+            parent_iri = role_term_iris.get(parent_label) if parent_label else None
+            self.add_axis_term(g, term_iri, role_phys_iri, term,
+                               parent=parent_iri)
+            role_term_iris[term] = term_iri
 
         information_role_terms = ["state", "input", "output", "constant", "parameter"]
         for term in information_role_terms:
@@ -247,8 +298,11 @@ class RdfStore:
         # Multi-scale stacking: lower level's constant = higher level's
         # event-dynamic.  Entity types reference the fine-grained children.
         # These are seeds — user can rename, restructure, add levels.
+        # Time is global (dynamic systems): bound to the root domain so
+        # both branches inherit it.  Length stays physical-only.
         time_scale_iri = self.mint_iri(base, "scale_time")
-        self.add_scale_dimension(g, time_scale_iri, "time", phys_iri)
+        self.add_scale_dimension(g, time_scale_iri, "time", root_iri,
+                                 kind="structural")
         time_val_iris = {}
         time_levels = ["molecular", "nano", "milli", "macro"]
         time_triple = ["constant", "dynamic", "event-dynamic"]
@@ -269,7 +323,8 @@ class RdfStore:
         # microscopic, macroscopic: uniform, distributed
         # infinite: uniform only
         length_scale_iri = self.mint_iri(base, "scale_length")
-        self.add_scale_dimension(g, length_scale_iri, "length", phys_iri)
+        self.add_scale_dimension(g, length_scale_iri, "length", phys_iri,
+                                 kind="structural")
         length_val_iris = {}
         length_levels = [
             ("infinitesimal", ["point", "finite"]),
@@ -287,6 +342,29 @@ class RdfStore:
                 self.add_scale_value(g, child_iri, length_scale_iri, sub,
                                      parent=level_iri)
                 length_val_iris[child_key] = child_iri
+
+        # --- Content dimensions ---
+        # Phase is a CONTENT dimension (kind="content"): it never
+        # composes entity types — it is bound per model-node instance
+        # and consumed by the properties domain for constitutive
+        # routing.  Pseudo-phases (averaged-mixture models) are just
+        # terms whose meaning is defined by the property network
+        # implementing them.
+        phase_iri = self.mint_iri(base, "scale_phase")
+        self.add_scale_dimension(g, phase_iri, "phase", phys_iri,
+                                 kind="content")
+        phase_vals: Dict[str, URIRef] = {}
+        for frag, label, parent_key in [
+            ("solid", "solid", None),
+            ("fluid", "fluid", None),
+            ("fluid_liquid", "liquid", "fluid"),
+            ("fluid_gas", "gas", "fluid"),
+            ("pseudo", "pseudo", None),
+        ]:
+            val_iri = self.mint_iri(base, f"sval_phase_{frag}")
+            self.add_scale_value(g, val_iri, phase_iri, label,
+                                 parent=phase_vals.get(parent_key))
+            phase_vals[frag] = val_iri
 
         # --- Entity types (CWA 17960 seed) ---
         # Entity types are compositions of fine-grained scale values.
@@ -310,15 +388,18 @@ class RdfStore:
             ("transport_system", "event-dynamic", "distributed", "finite", "physical",
              "Event-dynamic/distributed/finite — transport system (node, not arc)",
              ["time_molecular_event_dynamic", "length_microscopic_distributed"]),
+            # Information entity types carry no scale values: the scale
+            # dimensions are bound to the physical domain.  Their
+            # classification is the temporal_type triple only.
             ("info_constant", "constant", None, None, "information",
              "Constant information capacity",
-             ["time_macro_constant"]),
+             []),
             ("info_dynamic", "dynamic", None, None, "information",
              "Dynamic information capacity",
-             ["time_macro_dynamic"]),
+             []),
             ("info_event", "event-dynamic", None, None, "information",
              "Event-dynamic information capacity (instantaneous I/O)",
-             ["time_molecular_event_dynamic"]),
+             []),
         ]
         all_scale_vals = {**time_val_iris, **length_val_iris}
         for frag, temporal, spatial, size, branch, desc, scale_frags in entity_types:
@@ -373,17 +454,19 @@ class RdfStore:
 
         # signal is information-internal; sensor/actuation close the loop
         # across the branch boundary (scope=cross — no shared ancestor).
-        for name, src, tgt, desc in [
-            ("sensor", phys_iri, info_iri,
+        # They carry the specialised signal subtokens so token matching
+        # can discriminate observation from manipulation.
+        for name, src, tgt, shared, desc in [
+            ("sensor", phys_iri, info_iri, [signal_subtokens["observation"]],
              "Physical→information accessibility arc (measurement)"),
-            ("actuation", info_iri, phys_iri,
+            ("actuation", info_iri, phys_iri, [signal_subtokens["manipulation"]],
              "Information→physical accessibility arc (control loop closure)"),
         ]:
             self.add_connection_rule(
                 g, self.mint_iri(base, f"rule_{name}"), name,
                 direction="unidirectional", carrier="reference",
                 scope="cross", source_domain=src, target_domain=tgt,
-                shared_tokens=[signal_iri], description=desc)
+                shared_tokens=shared, description=desc)
 
         # --- Indices ---
         # species: enumerates chemical components, bound to component mass token.
@@ -613,10 +696,17 @@ class RdfStore:
 
         return iri
 
-    def add_token(self, graph: Graph, iri: URIRef, label: str, parent: Optional[URIRef] = None) -> URIRef:
-        """Add a token type to the graph."""
+    def add_token(self, graph: Graph, iri: URIRef, label: str, parent: Optional[URIRef] = None, kind: Optional[str] = None) -> URIRef:
+        """Add a token type to the graph.
+
+        ``kind`` is ``"conserved"`` or ``"reference"`` — conserved tokens
+        accumulate in capacities and ride token-flow arcs; reference
+        tokens expose variable access on reference arcs.
+        """
         graph.add((iri, RDF.type, PROMO["Token"]))
         self._set_literal(graph, iri, RDFS.label, label)
+        if kind is not None:
+            self._set_literal(graph, iri, PROMO["tokenKind"], kind)
         if parent is not None:
             graph.set((iri, PROMO["parent"], parent))
         return iri
@@ -672,10 +762,18 @@ class RdfStore:
         name: str,
         domain: Union[str, URIRef],
         parent: Optional[Union[str, URIRef]] = None,
+        kind: Optional[str] = None,
     ) -> URIRef:
-        """Add a scale dimension (time scale, length scale, user-defined)."""
+        """Add a scale dimension (time scale, length scale, user-defined).
+
+        ``kind`` is ``"structural"`` or ``"content"`` — structural
+        dimensions compose entity types; content dimensions (e.g. phase)
+        bind per model-node instance and never compose entity types.
+        """
         graph.add((iri, RDF.type, PROMO["ScaleDimension"]))
         self._set_literal(graph, iri, PROMO["scaleName"], name)
+        if kind is not None:
+            self._set_literal(graph, iri, PROMO["dimensionKind"], kind)
         if isinstance(domain, str):
             domain = URIRef(domain)
         graph.set((iri, PROMO["hasDomain"], domain))
@@ -715,6 +813,7 @@ class RdfStore:
         spatial_type: Optional[str] = None,
         spatial_size: Optional[str] = None,
         description: str = "",
+        scale_values: Optional[List[Union[str, URIRef]]] = None,
     ) -> URIRef:
         """Add an entity type (CWA 17960 taxonomy) to the graph."""
         graph.add((iri, RDF.type, PROMO["EntityType"]))
@@ -727,6 +826,12 @@ class RdfStore:
             self._set_literal(graph, iri, PROMO["spatialSize"], spatial_size)
         if description:
             self._set_literal(graph, iri, PROMO["doc"], description)
+        if scale_values is not None:
+            graph.remove((iri, PROMO["hasScaleValue"], None))
+            for sv in scale_values:
+                if isinstance(sv, str):
+                    sv = URIRef(sv)
+                graph.add((iri, PROMO["hasScaleValue"], sv))
         return iri
 
     def add_connection_rule(

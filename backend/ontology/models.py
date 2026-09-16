@@ -142,6 +142,7 @@ class TokenRecord(BaseModel):
     iri: str
     label: str
     parent: Optional[str] = None
+    kind: Optional[str] = None  # "conserved" | "reference"
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +155,7 @@ class ScaleDimensionRecord(BaseModel):
     name: str  # e.g. "time", "length"
     domain: str  # domain IRI where this scale is defined
     parent: Optional[str] = None  # inherited from parent domain
+    kind: Optional[str] = None  # "structural" | "content"
     values: List["ScaleValueRecord"] = Field(default_factory=list)
 
 
