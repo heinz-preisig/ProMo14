@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProMo Suite</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #1c1e21; }
+  header { background: #1c3a5e; color: #fff; padding: 14px 24px; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .8; }
+  main { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  table { width: 100%; border-collapse: collapse; background: #fff;
+          border-radius: 8px; overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  th, td { text-align: left; padding: 10px 14px; font-size: 14px;
+           border-bottom: 1px solid #eceef1; vertical-align: top; }
+  th { background: #fafbfc; font-size: 12px; text-transform: uppercase;
+       letter-spacing: .04em; color: #5a6068; }
+  tr:last-child td { border-bottom: 0; }
+  .type { display: inline-block; padding: 2px 8px; border-radius: 10px;
+          font-size: 12px; font-weight: 600; background: #e8eef5;
+          color: #1c3a5e; }
+  .status-draft { color: #0b7cbe; font-weight: 600; }
+  .status-frozen { color: #5a6068; }
+  .chip { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px;
+          border-radius: 10px; font-size: 11px; background: #eef3ee;
+          color: #2e8b57; font-family: ui-monospace, monospace; }
+  .ver { font-family: ui-monospace, monospace; font-size: 12px;
+         white-space: nowrap; }
+  .iri { font-family: ui-monospace, monospace; font-size: 11px;
+         color: #8a9098; word-break: break-all; }
+  button { margin-right: 6px; padding: 4px 10px; font-size: 12px;
+           border: 1px solid #cdd3da; border-radius: 6px;
+           background: #fff; cursor: pointer; }
+  button:hover { background: #f0f4f8; }
+  button.primary { background: #0b7cbe; border-color: #0b7cbe; color: #fff; }
+  button.primary:hover { background: #096aa5; }
+  #msg { margin: 12px 0; font-size: 13px; color: #a33; min-height: 1em; }
+  .empty { padding: 40px; text-align: center; color: #8a9098; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ProMo Suite</h1>
+  <p>Artefact catalogue — pick what to work on; the app follows from the artefact type.</p>
+</header>
+<main>
+  <div id="msg"></div>
+  <div id="catalogue"><div class="empty">Loading…</div></div>
+</main>
+<script>
+// Which app serves which artefact type (backend-served SPA paths).
+const APPS = {
+  ontology:   { path: '/ontology', label: 'Ontology Editor' },
+  library:    { path: '/equation', label: 'Equation Editor' },
+  assignment: { path: '/behaviour', label: 'Behaviour Linker' },
+  model:      { path: '/modeller', label: 'Modeller' },
+  glass:      { path: '/modeller', label: 'Modeller' },
+};
+
+const msg = (t) => { document.getElementById('msg').textContent = t || ''; };
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function openArtefact(line) {
+  const app = APPS[line.type];
+  if (!app) { msg(`No app for artefact type "${line.type}"`); return; }
+  window.location.href = `${app.path}/?graph=${encodeURIComponent(line.iri)}`;
+}
+
+function exportVersion(iri, version) {
+  const a = document.createElement('a');
+  a.href = `/api/ontology/export?version=${encodeURIComponent(version)}`;
+  a.download = `ontology-${version}.ttl`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function render(lines) {
+  const root = document.getElementById('catalogue');
+  if (!lines.length) {
+    root.innerHTML = '<div class="empty">No artefacts in the data directory.</div>';
+    return;
+  }
+  const rows = lines.map(l => {
+    const vers = l.versions.map(v =>
+      `<span class="ver">${esc(v.version)}</span>` +
+      (l.type === 'ontology'
+        ? ` <button onclick='exportVersion(${JSON.stringify(l.iri)},${JSON.stringify(v.version)})'>export</button>`
+        : '')
+    ).join('<br>');
+    const pins = l.usesOntology.map(p =>
+      `<span class="chip" title="${esc(p)}">${esc(p.split('#').pop().split('/').pop())}</span>`
+    ).join('');
+    const app = APPS[l.type];
+    const openBtn = app
+      ? `<button class="primary" onclick='openArtefact(${JSON.stringify(l)})'>Open</button>`
+      : '';
+    return `<tr>
+      <td><strong>${esc(l.label)}</strong><br><span class="iri">${esc(l.iri)}</span></td>
+      <td><span class="type">${esc(l.type)}</span></td>
+      <td class="status-${l.status}">${esc(l.status)}</td>
+      <td>${vers}</td>
+      <td>${pins}</td>
+      <td>${openBtn}</td>
+    </tr>`;
+  }).join('');
+  root.innerHTML = `<table>
+    <thead><tr><th>Artefact</th><th>Type</th><th>Status</th>
+    <th>Versions</th><th>Uses ontology</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+fetch('/api/catalogue')
+  .then(r => { if (!r.ok) throw new Error(`catalogue: ${r.status}`); return r.json(); })
+  .then(d => render(d.lines))
+  .catch(e => { msg(`Failed to load catalogue: ${e.message}`);
+                document.getElementById('catalogue').innerHTML = ''; });
+</script>
+</body>
+</html>

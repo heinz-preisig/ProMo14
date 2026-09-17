@@ -26,6 +26,11 @@ PROMO = Namespace("https://w3id.org/promo#")
 PROMOLG = Namespace("https://w3id.org/promo/language#")
 QUDT = Namespace("http://qudt.org/schema/qudt/")
 
+# Artefact-type markers (docs/versioning-and-session-design.md): every
+# artefact graph carries ``<graphIRI> a promo:<Type>`` so the catalogue
+# can classify it.  ``promo:Version`` marks frozen graphs separately.
+ARTEFACT_TYPES = ("Ontology", "Library", "Assignment", "Model", "Glass")
+
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
@@ -168,6 +173,13 @@ class RdfStore:
 
         if not len(self.ontology_graph):
             self.seed_default_ontology()
+        else:
+            # Idempotent marker migration: existing ontology.trig files
+            # predate artefact-type markers.
+            g = self.ontology_graph
+            marker = (g.identifier, RDF.type, PROMO["Ontology"])
+            if marker not in g:
+                g.add(marker)
 
         # Load any additional var/expr named graphs that are already in the
         # data directory, but do not replace the editable ontology graph.
@@ -498,6 +510,9 @@ class RdfStore:
             ec_iri = self.mint_iri(base, f"eqclass_{ec}")
             self.add_equation_class(g, ec_iri, ec)
 
+        # --- Artefact-type marker (self-description) ------------------
+        g.add((g.identifier, RDF.type, PROMO["Ontology"]))
+
         # --- Vocabulary declarations (rdfs:Class / rdf:Property) -------
         self.declare_vocabulary(g)
 
@@ -574,10 +589,18 @@ class RdfStore:
         # usesOntology / generatedFrom are declared unconditionally:
         # they are consumed by artefact graphs (var/expr, models,
         # assignments, generated code) pointing at a frozen version, so
-        # they never appear inside the ontology itself.
-        for term in (PROMO["usesOntology"], PROMO["generatedFrom"]):
+        # they never appear inside the ontology itself.  The artefact
+        # type classes are declared likewise — they mark graph IRIs,
+        # which live outside the ontology's own instance data.
+        for term in (PROMO["usesOntology"], PROMO["generatedFrom"],
+                     PROMO["versionOf"], PROMO["versionInfo"],
+                     PROMO["publishedOn"]):
             if (term, RDF.type, RDF.Property) not in graph:
                 graph.add((term, RDF.type, RDF.Property))
+                added += 1
+        for term in [PROMO["Version"]] + [PROMO[t] for t in ARTEFACT_TYPES]:
+            if (term, RDF.type, RDFS.Class) not in graph:
+                graph.add((term, RDF.type, RDFS.Class))
                 added += 1
         return added
 
@@ -609,6 +632,11 @@ class RdfStore:
         for triple in src_graph:
             vg.add(triple)
         vg.add((version_iri, RDF.type, PROMO["Version"]))
+        # The version graph carries the source's artefact-type marker(s)
+        # on its own IRI so the catalogue can classify frozen graphs.
+        for t in src_graph.objects(source, RDF.type):
+            if isinstance(t, URIRef) and str(t).startswith(str(PROMO)):
+                vg.add((version_iri, RDF.type, t))
         vg.add((version_iri, PROMO["versionOf"], source))
         vg.add((version_iri, PROMO["versionInfo"], Literal(version)))
         vg.add((version_iri, PROMO["publishedOn"], Literal(
@@ -622,6 +650,25 @@ class RdfStore:
         if isinstance(iri, str):
             iri = URIRef(iri)
         return self.dataset.graph(iri)
+
+    # ------------------------------------------------------------------
+    # Frozen-graph guard (R5: published versions are read-only)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def is_frozen(graph: Graph) -> bool:
+        """True iff ``graph`` is a published version (immutable)."""
+        return (graph.identifier, RDF.type, PROMO["Version"]) in graph
+
+    def assert_editable(self, graph: Graph) -> None:
+        """Raise ``ValueError`` if ``graph`` is a frozen version.
+
+        Enforcement point for R5 — call before any mutation once graph
+        selection (``?graph=``) lets requests reach arbitrary graphs.
+        """
+        if self.is_frozen(graph):
+            raise ValueError(
+                f"frozen graph is read-only: {graph.identifier}")
 
     # ------------------------------------------------------------------
     # IRI minting

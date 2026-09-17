@@ -13,9 +13,9 @@ entity types, rules) is read from the ontology graph only.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
-from rdflib import URIRef
+from rdflib import Graph, URIRef
 from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, RdfStore
@@ -92,11 +92,33 @@ class RdfContext(EquationContext):
 
     The context is a snapshot: it is built once when the provider is created
     and does not change while an expression is being checked.
+
+    ``graph_iris`` selects the resolution scope (design doc R4): the
+    graphs whose union supplies the ontology vocabulary *and* the
+    variable/index population — typically the subject artefact plus its
+    ``promo:usesOntology`` pin set.  ``None`` keeps the legacy scope:
+    vocabulary from the working ontology graph, variables from every
+    graph in the dataset.
     """
 
-    def __init__(self, store: RdfStore):
+    def __init__(
+        self,
+        store: RdfStore,
+        graph_iris: Optional[List[Union[str, URIRef]]] = None,
+    ):
         self.store = store
-        self._graph = store.ontology_graph
+        if graph_iris is None:
+            self._graph = store.ontology_graph
+            self._scope: Optional[List[Any]] = None
+        else:
+            graphs = [store.dataset.graph(URIRef(str(i)))
+                      for i in graph_iris]
+            union = Graph()
+            for g in graphs:
+                for t in g:
+                    union.add(t)
+            self._graph = union
+            self._scope = graphs
         self._variables = self._load_variables()
         self._indices = self._load_indices()
         self._tree, self._parent_of = self._load_network_tree()
@@ -106,7 +128,10 @@ class RdfContext(EquationContext):
         self._connection_rules = self._load_connection_rules()
 
     def _all_graphs(self) -> List[Any]:
-        """Every graph in the dataset (ontology + var/expr named graphs)."""
+        """Graphs in scope: the explicit ``graph_iris`` set, or every
+        graph in the dataset when unscoped (ontology + var/expr graphs)."""
+        if self._scope is not None:
+            return self._scope
         return list(self.store.dataset.contexts())
 
     # ------------------------------------------------------------------

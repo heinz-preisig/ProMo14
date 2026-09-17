@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.behaviour import router as behaviour_router
+from backend.core.catalogue import router as catalogue_router
 from backend.equation.service import router as equation_router
 from backend.modeller import router as modeller_router
 from backend.ontology.service import router as ontology_router
@@ -23,6 +24,7 @@ app.include_router(ontology_router, prefix="/api/ontology", tags=["ontology"])
 app.include_router(equation_router, prefix="/api/equation", tags=["equation"])
 app.include_router(behaviour_router, prefix="/api/behaviour", tags=["behaviour"])
 app.include_router(modeller_router, prefix="/api/modeller", tags=["modeller"])
+app.include_router(catalogue_router, prefix="/api/catalogue", tags=["catalogue"])
 
 
 @app.get("/api/health")
@@ -65,10 +67,22 @@ def serve_ontology_spa(full_path: str = "") -> FileResponse:
     return FileResponse(str(ONTOLOGY_STATIC_DIR / "index.html"), status_code=404)
 
 
-@app.get("/{full_path:path}", include_in_schema=False)
-def serve_spa(full_path: str) -> FileResponse:
-    """Serve the built React SPA for every non-API, non-asset route."""
+@app.get("/equation", include_in_schema=False)
+@app.get("/equation/", include_in_schema=False)
+@app.get("/equation/{full_path:path}", include_in_schema=False)
+def serve_equation_spa(full_path: str = "") -> FileResponse:
+    """Serve the equation editor SPA for every /equation/* route."""
     index = STATIC_DIR / "index.html"
     if index.is_file():
         return FileResponse(str(index))
     return FileResponse(str(STATIC_DIR / "index.html"), status_code=404)
+
+
+HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_hub(full_path: str = "") -> FileResponse:
+    """Serve the suite hub (artefact catalogue) as the entry point."""
+    return FileResponse(str(HUB_PAGE))

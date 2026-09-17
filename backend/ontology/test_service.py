@@ -17,6 +17,7 @@ from rdflib.namespace import RDF
 
 from backend.core import graph_store
 from backend.main import app
+from backend.ontology.rdf_context import RdfContext
 
 
 def _iri_path(iri: str) -> str:
@@ -777,6 +778,66 @@ def test_export_version(client):
     assert "promo:Version" in r.text
     r = client.get("/api/ontology/export?version=9.9")
     assert r.status_code == 404
+
+
+def test_artefact_type_markers(client):
+    """Graphs self-describe: the working ontology is typed
+    promo:Ontology; a frozen version carries both promo:Version and the
+    source's artefact type on its own IRI."""
+    store = graph_store.get_store()
+    g = store.ontology_graph
+    assert (g.identifier, RDF.type, graph_store.PROMO["Ontology"]) in g
+    v_iri = store.freeze_version("8.8-test")
+    vg = store.dataset.graph(v_iri)
+    assert (v_iri, RDF.type, graph_store.PROMO["Version"]) in vg
+    assert (v_iri, RDF.type, graph_store.PROMO["Ontology"]) in vg
+
+
+def test_frozen_graph_read_only(client):
+    """R5: assert_editable rejects frozen version graphs."""
+    store = graph_store.get_store()
+    store.assert_editable(store.ontology_graph)  # draft: no raise
+    v_iri = store.freeze_version("7.7-test")
+    vg = store.dataset.graph(v_iri)
+    assert store.is_frozen(vg)
+    with pytest.raises(ValueError):
+        store.assert_editable(vg)
+
+
+def test_catalogue(client):
+    """The catalogue groups drafts with their frozen versions."""
+    r = client.get("/api/catalogue")
+    assert r.status_code == 200
+    lines = r.json()["lines"]
+    onto = [l for l in lines
+            if l["iri"] == str(graph_store.RdfStore.ONTOLOGY_GRAPH_IRI)]
+    assert len(onto) == 1
+    assert onto[0]["type"] == "ontology"
+    assert onto[0]["status"] == "draft"
+    assert onto[0]["versions"] == []
+
+    client.post("/api/ontology/publish", json={"version": "1.1"})
+    lines = client.get("/api/catalogue").json()["lines"]
+    onto = [l for l in lines
+            if l["iri"] == str(graph_store.RdfStore.ONTOLOGY_GRAPH_IRI)][0]
+    assert [v["version"] for v in onto["versions"]] == ["1.1"]
+    assert onto["versions"][0]["iri"].endswith("/1.1")
+
+
+def test_rdf_context_scoped(client):
+    """R4: graph_iris scopes resolution — vocabulary comes from the
+    given graph(s), not the working draft."""
+    store = graph_store.get_store()
+    v_iri = store.freeze_version("6.6-test")
+
+    scoped = RdfContext(store, graph_iris=[v_iri])
+    assert len(scoped.domains()) > 0  # frozen copy supplies vocabulary
+
+    # An empty foreign graph yields an empty vocabulary — the working
+    # draft does not leak into a scoped context.
+    empty = RdfContext(store, graph_iris=["https://example.org/empty"])
+    assert empty.domains() == []
+    assert empty.entity_types() == []
 
 
 def test_entity_type_branch_checked(client):
