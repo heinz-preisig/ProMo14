@@ -1,6 +1,6 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-11 (end of session)
+**Last updated:** 2026-09-17 (end of session)
 
 ## Current state
 
@@ -21,7 +21,7 @@ tested; the React + TypeScript + Vite frontend in
 | Context protocol | `context.py` | ✅ Complete — `EquationContext` + `DictContext` |
 | Units | `units.py` | ✅ Complete — 8-exponent SI vector |
 | Errors | `errors.py` | ✅ Complete |
-| FastAPI service | `service.py` | ✅ Complete — `/parse`, `/check` endpoints |
+| FastAPI service | `service.py` | ✅ Complete — `/parse`, `/check`, `/context`, `/variables` |
 
 ## API endpoints
 
@@ -29,10 +29,15 @@ tested; the React + TypeScript + Vite frontend in
 |----------|--------|---------|
 | `/api/equation/parse` | POST | Syntax-only parse; returns AST as JSON |
 | `/api/equation/check` | POST | Parse + semantic check; returns units, indices, incidence |
+| `/api/equation/context` | GET | Variables, indices, network tree for the selected graph's pin set |
+| `/api/equation/variables` | POST/PUT/DELETE | Variable CRUD in the selected artefact graph |
 
-The check endpoint accepts the context (variables, indices, network
-tree) in the request body.  Once the ontology graph store is available,
-it will resolve the context from a graph IRI instead.
+All endpoints accept `?graph=<iri>` (2026-09-17).  The context resolves
+against the artefact plus its transitive `usesOntology` closure
+(`RdfStore.resolution_scope`, R4); variable writes land in the selected
+artefact graph and mint IRIs under `{graphIRI}#`; frozen version graphs
+are rejected with 403.  Without `?graph=` the legacy dataset-wide scope
+applies and writes go to the working ontology.
 
 ## Tests
 
@@ -94,6 +99,12 @@ Implemented as a React + TypeScript + Vite app in
 - ~~Wire the frontend to the real ontology graph store~~ **Done:** the
   frontend already calls `GET /api/equation/context`; verified
   end-to-end (variable create → context → `/check` infers units).
+- ~~`?graph=` session param~~ **Done (2026-09-17):** `api.ts` reads the
+  hub's `?graph=<iri>` once and appends it to every call; the backend
+  scopes context to the artefact's pin set and writes to the artefact
+  graph.
+- Persistence UX: variables created via POST live in memory until the
+  ontology's Save / `POST /save` — dirty-state handling still pending.
 - Code generation targets (Python, Matlab, LaTeX).
 - RDF vocabulary finalization for equations, operators, variables.
 

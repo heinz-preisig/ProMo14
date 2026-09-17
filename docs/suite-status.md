@@ -1,20 +1,46 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-15 (end of session)
+**Last updated:** 2026-09-17 (end of session)
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution | React UI with all v1 tabs | TypeScript + Vite build pass | **v1 verified end-to-end**; inheritance + cascade delete done |
-| Equation Editor | Parser + checker + service | React + TypeScript + Vite app | 4 test files | Backend and frontend functional |
+| Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork` | `backend/static/hub.html` at `/` | covered by service tests | **Working** — artefact lines, pins, fork, open-in-app |
+| Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
+| Equation Editor | Parser + checker + service; `?graph=` pin-scoped context + artefact-graph writes | React + TypeScript + Vite app | 4 test files | Backend and frontend functional; `?graph=` wired |
 | Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
-| Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending |
+| Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending; no backend calls yet |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
-| Shared (`backend/core`) | `RdfStore`, full ontology CRUD | — | — | Ontology CRUD complete; shared IRI minting done; legacy loader archived to `archive/loader.py` |
+| Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope), catalogue, full ontology CRUD | — | — | Legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
 | Instantiation | — | — | — | Not started |
 | Code Generation | — | — | — | Not started |
+
+## Versioning & graph selection (2026-09-17)
+
+Implemented per `docs/versioning-and-session-design.md` (commits
+`3bdb63d`, `0197117`, `0489b5d`):
+
+- **Artefact types** — `promo:Ontology | Library | Assignment | Model |
+  Glass` stamped on every graph; `promo:Version` on frozen graphs.
+- **Catalogue** — `GET /api/catalogue` groups drafts + frozen versions
+  into artefact lines with `usesOntology` pins; `POST /api/catalogue/new`
+  and `/fork` create lines (fork re-homes instance IRIs).
+- **Hub** — `backend/static/hub.html` at `/` lists artefact lines with
+  Open/Fork/Publish/Export; apps launched as `app?graph=<iri>`.
+- **Versioning** — `RdfStore.freeze_version(v)` copies the working graph
+  to `{graphIRI}/{v}` (immutable); `GET /api/ontology/versions`,
+  `POST /api/ontology/publish`, `GET /api/ontology/export?version=`;
+  `scripts/export_ontology.py --repo` writes the ProMo-ontologies layout.
+- **Graph selection** — `?graph=` on all ontology + equation endpoints;
+  `editable_param` rejects frozen graphs with 403.  Resolution context
+  = artefact + transitive `usesOntology` closure
+  (`RdfStore.resolution_scope`, R4).  Shared helpers
+  `graph_param`/`editable_param`/`resolve_graph`/`scoped_context` live in
+  `backend/ontology/service.py`.
+- **w3id live** — `https://w3id.org/promo` redirects to the ProMo
+  Ontologies landing page (perma-id/w3id.org#6700 merged).
 
 ## Module details
 
@@ -52,21 +78,23 @@
   cascade delete; ancestor-aware connection rule resolution.
 - **Namespace:** `https://w3id.org/promo#` throughout
   (`backend/core/graph_store.py`: `PROMO`, `PROMOLG`,
-  `ONTOLOGY_GRAPH_IRI`).  Publishing pipeline live: exported
+  `ONTOLOGY_GRAPH_IRI`).  Publishing pipeline live end-to-end: exported
   `ontology.ttl` → `heinz-preisig/ProMo-ontologies` (GitHub Pages) →
-  w3id redirect pending merge of perma-id/w3id.org PR #6700.  See
+  w3id redirect **verified live** (PR #6700 merged).  See
   `publish/README.md`.
 - **Next:** Consume `resolve-connection` from the modeller's
-  `ConnectionRuleResolver`.  (Equation editor → `RdfContext` wiring is
-  done — all named graphs, ProMo14 vocabulary only; legacy loader
-  archived.)
+  `ConnectionRuleResolver`; auto-stamp `usesOntology` at artefact
+  creation; SHACL shape checks at the publish boundary (ADR-006).
 
 ### Equation Editor
 
 - **Backend:** Fully functional parser, checker, compile space, units,
   context protocol, and FastAPI service.  Replaces ProMo13 TPG with a
   hand-written recursive-descent parser.
-- **API:** `POST /api/equation/parse`, `POST /api/equation/check`.
+- **API:** `POST /api/equation/parse`, `POST /api/equation/check`,
+  `GET /api/equation/context`, `POST/PUT/DELETE /api/equation/variables`
+  — all accept `?graph=<iri>`; writes land in the selected artefact
+  graph (default: working ontology), frozen graphs rejected with 403.
 - **Tests:** Parser, checker, compile space, units — all passing.
   The ProMo13 corpus replay (73 expressions, 70/73) has been archived
   to `archive/test_corpus.py`; the new regression baseline will be
@@ -75,8 +103,10 @@
   Features port/dependent variable creation, expression input with a
   single **Check** action, LaTeX preview, error display, variable
   palette with cascade delete, equation list, and a debug equation
-  context JSON editor.
-- **Next:** Wire the frontend to the ontology graph store.
+  context JSON editor.  `api.ts` reads `?graph=` from the URL once and
+  appends it to every call.
+- **Next:** Persistence UX (variables created via POST live in memory
+  until Save); codegen targets.
 
 ### Behaviour Linker
 

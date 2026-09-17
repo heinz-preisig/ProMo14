@@ -1,6 +1,8 @@
 # Versioning & Session Design — Artefact Lines, Pins, and the Hub
 
-Status: ruled 2026-09-17 (design discussion), implementation in progress.
+Status: ruled 2026-09-17 (design discussion); **implemented 2026-09-17**
+(commits `3bdb63d`, `0197117`, `0489b5d`).  Remaining gaps are listed
+under Deferred + the handoff doc.
 
 Extends ADR-006 (ontology evolution) and the artefact-chain ruling in
 `ontology-review-2026-09-17.md` §3 item 7.
@@ -117,10 +119,27 @@ line appears in the catalogue.
   lands.
 - Reference index for "deletion only if unreferenced".
 
-## Implementation order
+## Implementation order — all landed 2026-09-17
 
-1. Type markers + `GET /api/catalogue`
-2. `RdfContext(store, graph_iris)` + write-block on frozen graphs
-3. Hub page (backend-served static page at `/`)
-4. `?graph=` params in the apps
-5. Fork endpoint
+1. ✅ Type markers + `GET /api/catalogue` (`backend/core/catalogue.py`;
+   `ARTEFACT_TYPES` stamped in seed, migrated on load, copied to frozen
+   graphs in `freeze_version`)
+2. ✅ `RdfContext(store, graph_iris)` + write-block on frozen graphs
+   (`is_frozen`/`assert_editable` on `RdfStore`)
+3. ✅ Hub page (`backend/static/hub.html`, served at `/`; equation SPA
+   moved to `/equation`, ontology stays `/ontology`)
+4. ✅ `?graph=` params in the apps — ontology editor + equation editor
+   (`api.ts` reads the param once, appends to every call); backend
+   helpers `graph_param`/`editable_param`/`resolve_graph`/
+   `scoped_context` in `backend/ontology/service.py` are public and
+   shared with `backend/equation/service.py`
+5. ✅ Fork endpoint (`POST /api/catalogue/fork` re-homes instance IRIs
+   to the new graph's namespace; `POST /api/catalogue/new` accepts a
+   `uses` pin list)
+
+**R4 refinement beyond the original sketch:** the resolution context is
+not just the artefact graph — it is the artefact plus its *transitive*
+`usesOntology` closure, computed by `RdfStore.resolution_scope()` (BFS,
+cycle-safe, artefact first).  `scoped_context()` builds `RdfContext`
+over that set; `?graph=` absent keeps the legacy dataset-wide scope.
+Regression test: `test_equation_context_scoped_by_pins`.

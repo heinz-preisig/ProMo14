@@ -1,6 +1,6 @@
 # Ontology Editor — Implementation Status
 
-**Last updated:** 2026-09-14
+**Last updated:** 2026-09-17
 
 ## Current state
 
@@ -102,10 +102,23 @@ FastAPI router scaffold.  The provider is functional and tested.
    `/check`.  Legacy v8 loader archived to `archive/loader.py`.
 2. Wire modeller `ConnectionRuleResolver` to
    `GET /api/ontology/resolve-connection`.
-3. Implement ontology versioning and change classification (ADR-006).
-4. Add publication export functionality.
+3. ~~Implement ontology versioning~~ **Done (2026-09-17):**
+   `RdfStore.freeze_version(v)` → immutable `{graphIRI}/{v}` named
+   graph; `GET /versions`, `POST /publish`, `GET /export?version=`;
+   Publish button in the UI auto-downloads frozen Turtle;
+   `scripts/export_ontology.py --repo` writes the ProMo-ontologies
+   layout.  Change classification (ADR-006) still to be enforced —
+   SHACL shapes at the publish boundary are the endorsed mechanism.
+4. ~~Add publication export functionality~~ **Done (2026-09-17)** — see
+   item 3.
 5. Persist `ontology.trig` automatically or prompt on unsaved changes
    (currently manual via Save ontology button).
+6. **Graph selection (done 2026-09-17):** every endpoint accepts
+   `?graph=<iri>`; `editable_param` rejects frozen version graphs with
+   403; `scoped_context` resolves the artefact + transitive
+   `usesOntology` pin set (R4).  Editor reads `?graph=` from the URL.
+   Remaining: auto-stamp `usesOntology` when artefacts are created
+   outside `POST /api/catalogue/new`.
 
 ## Implementation plan
 
