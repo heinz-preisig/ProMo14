@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
+from rdflib.namespace import RDF
 
 from backend.core import graph_store
 from backend.main import app
@@ -229,9 +230,10 @@ def test_domain_create_list_delete(client):
 
 
 def test_domain_create_with_tokens(client):
-    # Create a token first
+    # Create a token first (label must not collide with a seed token —
+    # auto-mint collisions are 409 under the unified namespace).
     r = client.post("/api/ontology/tokens", json={
-        "iri": "", "label": "Entropy", "parent": None,
+        "iri": "", "label": "Test Quantity", "parent": None,
     })
     tok_iri = r.json()["iri"]
 
@@ -496,14 +498,16 @@ def test_entity_type_information_branch(client):
 # ---------------------------------------------------------------------------
 
 def test_connection_rule_create_list_delete(client):
+    # rule_type must not collide with a seed rule — auto-mint
+    # collisions are 409 under the unified namespace.
     r = client.post("/api/ontology/connection-rules", json={
-        "iri": "", "rule_type": "signal", "source_domain": None,
+        "iri": "", "rule_type": "signal-test", "source_domain": None,
         "target_domain": None, "shared_tokens": [],
         "direction": "unidirectional", "description": "Test signal rule",
     })
     assert r.status_code == 200
     rule = r.json()
-    assert rule["rule_type"] == "signal"
+    assert rule["rule_type"] == "signal-test"
     assert rule["direction"] == "unidirectional"
     iri = rule["iri"]
 
@@ -551,6 +555,240 @@ def test_connection_rule_with_domains_and_tokens(client):
     assert rule["source_domain"] == dom_a
     assert rule["target_domain"] == dom_b
     assert tok_iri in rule["shared_tokens"]
+
+
+# ---------------------------------------------------------------------------
+# Connection rule resolution
+# ---------------------------------------------------------------------------
+
+def _domain_iri(client, name: str) -> str:
+    r = client.get("/api/ontology/domains")
+    return next(d["iri"] for d in r.json() if d["name"] == name)
+
+
+def _token_iri(client, label: str) -> str:
+    r = client.get("/api/ontology/tokens")
+    return next(t["iri"] for t in r.json() if t["label"] == label)
+
+
+def _resolve(client, source: str, target: str):
+    r = client.get("/api/ontology/resolve-connection",
+                   params={"source": source, "target": target})
+    assert r.status_code == 200
+    return r.json()["rules"]
+
+
+def test_resolve_same_branch(client):
+    phys = _domain_iri(client, "physical")
+    rules = _resolve(client, phys, phys)
+    types = {r["rule_type"] for r in rules}
+    assert types == {"physical-same", "access"}
+    ps = next(r for r in rules if r["rule_type"] == "physical-same")
+    assert ps["matched_tokens"]  # licensed physical tokens reported
+
+
+def test_resolve_cross_branch(client):
+    """scope=cross must fire across the branch boundary (C1 contract)."""
+    phys = _domain_iri(client, "physical")
+    info = _domain_iri(client, "information")
+    rules = _resolve(client, phys, info)
+    assert [r["rule_type"] for r in rules] == ["sensor"]
+    rules = _resolve(client, info, phys)
+    assert [r["rule_type"] for r in rules] == ["actuation"]
+
+
+def test_resolve_information_same_branch(client):
+    info = _domain_iri(client, "information")
+    rules = _resolve(client, info, info)
+    assert [r["rule_type"] for r in rules] == ["signal"]
+
+
+def test_resolve_bidirectional_swapped_match(client):
+    """An asymmetric bidirectional rule matching only via the swapped
+    pair must resolve (previously crashed with ValueError -> 500)."""
+    phys = _domain_iri(client, "physical")
+    info = _domain_iri(client, "information")
+    signal = _token_iri(client, "Signal")
+    r = client.post("/api/ontology/connection-rules", json={
+        "iri": "", "rule_type": "bidir-x",
+        "source_domain": phys, "target_domain": info,
+        "shared_tokens": [signal],
+        "direction": "bidirectional", "carrier": "reference",
+        "scope": "any", "description": "asymmetric bidirectional",
+    })
+    assert r.status_code == 200
+    rule_iri = r.json()["iri"]
+    # Query swapped: info->phys matches only via the bidirectional swap.
+    rules = _resolve(client, info, phys)
+    assert rule_iri in {r["iri"] for r in rules}
+
+
+def test_resolve_empty_shared_tokens_never_applies(client):
+    """Empty sharedTokens = no token licensed = rule never applies."""
+    phys = _domain_iri(client, "physical")
+    r = client.post("/api/ontology/connection-rules", json={
+        "iri": "", "rule_type": "dead-rule",
+        "source_domain": phys, "target_domain": phys,
+        "shared_tokens": [],
+        "direction": "bidirectional", "carrier": "token-flow",
+        "scope": "same", "description": "no token licensed",
+    })
+    assert r.status_code == 200
+    dead_iri = r.json()["iri"]
+    rules = _resolve(client, phys, phys)
+    assert dead_iri not in {r["iri"] for r in rules}
+
+
+def test_resolve_unrelated_token_not_licensed(client):
+    """A rule token on a disjoint token tree licenses nothing."""
+    phys = _domain_iri(client, "physical")
+    r = client.post("/api/ontology/tokens", json={
+        "iri": "", "label": "Alien Quantity", "parent": None})
+    assert r.status_code == 200
+    alien = r.json()["iri"]
+    r = client.post("/api/ontology/connection-rules", json={
+        "iri": "", "rule_type": "alien-rule",
+        "source_domain": phys, "target_domain": phys,
+        "shared_tokens": [alien],
+        "direction": "bidirectional", "carrier": "token-flow",
+        "scope": "same", "description": "token bound nowhere",
+    })
+    assert r.status_code == 200
+    alien_rule = r.json()["iri"]
+    rules = _resolve(client, phys, phys)
+    assert alien_rule not in {r["iri"] for r in rules}
+
+
+# ---------------------------------------------------------------------------
+# Validation (contract invariants)
+# ---------------------------------------------------------------------------
+
+def test_domain_cycle_rejected(client):
+    r = client.post("/api/ontology/domains", json={
+        "iri": "", "name": "cyc_a", "parent": None,
+        "branch": None, "children": [], "tokens": []})
+    a = r.json()["iri"]
+    r = client.post("/api/ontology/domains", json={
+        "iri": "", "name": "cyc_b", "parent": a,
+        "branch": None, "children": [], "tokens": []})
+    b = r.json()["iri"]
+    # Reparenting a under b would create a cycle.
+    r = client.post("/api/ontology/domains", json={
+        "iri": a, "name": "cyc_a", "parent": b,
+        "branch": None, "children": [], "tokens": []})
+    assert r.status_code == 422
+
+
+def test_domain_branch_invariant(client):
+    phys = _domain_iri(client, "physical")
+    # Unset branch is inherited from the top-level ancestor.
+    r = client.post("/api/ontology/domains", json={
+        "iri": "", "name": "thermal_sub", "parent": phys,
+        "branch": None, "children": [], "tokens": []})
+    assert r.status_code == 200
+    assert r.json()["branch"] == "physical"
+    # A mismatching branch is rejected.
+    r = client.post("/api/ontology/domains", json={
+        "iri": "", "name": "bad_branch", "parent": phys,
+        "branch": "information", "children": [], "tokens": []})
+    assert r.status_code == 422
+
+
+def test_domain_dangling_refs_rejected(client):
+    bogus = "https://w3id.org/promo/ontology#nonexistent"
+    r = client.post("/api/ontology/domains", json={
+        "iri": "", "name": "orphan_x", "parent": bogus,
+        "branch": None, "children": [], "tokens": []})
+    assert r.status_code == 422
+    r = client.post("/api/ontology/domains", json={
+        "iri": "", "name": "bad_tok", "parent": None,
+        "branch": None, "children": [], "tokens": [bogus]})
+    assert r.status_code == 422
+
+
+def test_iri_collision_409(client):
+    payload = {"iri": "", "label": "Dup Token", "parent": None}
+    r = client.post("/api/ontology/tokens", json=payload)
+    assert r.status_code == 200
+    # Same label auto-mints the same IRI -> collision.
+    r = client.post("/api/ontology/tokens", json=payload)
+    assert r.status_code == 409
+
+
+def test_vocab_literal_rejected(client):
+    r = client.post("/api/ontology/connection-rules", json={
+        "iri": "", "rule_type": "bad-scope",
+        "source_domain": None, "target_domain": None,
+        "shared_tokens": [], "direction": "unidirectional",
+        "carrier": "reference", "scope": "bogus", "description": ""})
+    assert r.status_code == 422
+
+
+def test_entity_type_temporal_consistency(client):
+    """temporal_type must agree with a bound temporal-triple leaf."""
+    r = client.get("/api/ontology/scale-values")
+    dyn = next(v["iri"] for v in r.json() if v["label"] == "dynamic")
+    base = {"iri": "", "label": "Temporal Check", "spatial_type": None,
+            "spatial_size": None, "branch": "physical",
+            "scale_values": [dyn], "description": ""}
+    r = client.post("/api/ontology/entity-types",
+                    json={**base, "temporal_type": "constant"})
+    assert r.status_code == 422
+    r = client.post("/api/ontology/entity-types",
+                    json={**base, "temporal_type": "dynamic"})
+    assert r.status_code == 200
+
+
+def test_freeze_version(client):
+    """freeze_version copies the working graph under a version IRI and
+    refuses to re-freeze (published versions are immutable)."""
+    store = graph_store.get_store()
+    working = store.ontology_graph
+    v_iri = store.freeze_version("9.9-test")
+    vg = store.dataset.graph(v_iri)
+    assert len(vg) >= len(working)
+    assert (v_iri, RDF.type,
+            graph_store.PROMO["Version"]) in vg
+    assert (v_iri, graph_store.PROMO["versionOf"],
+            store.ONTOLOGY_GRAPH_IRI) in vg
+    with pytest.raises(ValueError):
+        store.freeze_version("9.9-test")
+
+
+def test_entity_type_branch_checked(client):
+    r = client.post("/api/ontology/entity-types", json={
+        "iri": "", "label": "Bad Branch", "temporal_type": "dynamic",
+        "spatial_type": None, "spatial_size": None,
+        "branch": "bogus", "scale_values": [], "description": ""})
+    assert r.status_code == 422
+
+
+def test_rule_dangling_refs_rejected(client):
+    bogus = "https://w3id.org/promo/ontology#nonexistent"
+    r = client.post("/api/ontology/connection-rules", json={
+        "iri": "", "rule_type": "bad-src",
+        "source_domain": bogus, "target_domain": None,
+        "shared_tokens": [], "direction": "unidirectional",
+        "carrier": "reference", "scope": "any", "description": ""})
+    assert r.status_code == 422
+    r = client.post("/api/ontology/connection-rules", json={
+        "iri": "", "rule_type": "bad-tok",
+        "source_domain": None, "target_domain": None,
+        "shared_tokens": [bogus], "direction": "unidirectional",
+        "carrier": "reference", "scope": "any", "description": ""})
+    assert r.status_code == 422
+
+
+def test_token_cycle_rejected(client):
+    r = client.post("/api/ontology/tokens", json={
+        "iri": "", "label": "Tok A", "parent": None})
+    a = r.json()["iri"]
+    r = client.post("/api/ontology/tokens", json={
+        "iri": "", "label": "Tok B", "parent": a})
+    b = r.json()["iri"]
+    r = client.post("/api/ontology/tokens", json={
+        "iri": a, "label": "Tok A", "parent": b})
+    assert r.status_code == 422
 
 
 # ---------------------------------------------------------------------------

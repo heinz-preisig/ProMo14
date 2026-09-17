@@ -7,7 +7,7 @@ VariableRecord and EquationRecord extend the existing data model from
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -142,7 +142,7 @@ class TokenRecord(BaseModel):
     iri: str
     label: str
     parent: Optional[str] = None
-    kind: Optional[str] = None  # "conserved" | "reference"
+    kind: Optional[Literal["conserved", "reference"]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ class ScaleDimensionRecord(BaseModel):
     name: str  # e.g. "time", "length"
     domain: str  # domain IRI where this scale is defined
     parent: Optional[str] = None  # inherited from parent domain
-    kind: Optional[str] = None  # "structural" | "content"
+    kind: Optional[Literal["structural", "content"]] = None
     values: List["ScaleValueRecord"] = Field(default_factory=list)
 
 
@@ -174,10 +174,10 @@ class ScaleValueRecord(BaseModel):
 class EntityTypeRecord(BaseModel):
     iri: str
     label: str
-    temporal_type: str  # "constant" | "dynamic" | "event-dynamic"
-    spatial_type: Optional[str] = None  # "uniform" | "distributed" (physical only)
-    spatial_size: Optional[str] = None  # "infinite" | "finite" | "infinitesimal"
-    branch: str  # "physical" | "information"
+    temporal_type: Literal["constant", "dynamic", "event-dynamic"]
+    spatial_type: Optional[Literal["uniform", "distributed"]] = None  # physical only
+    spatial_size: Optional[Literal["infinite", "finite", "infinitesimal"]] = None
+    branch: str  # must match a top-level domain's branch label
     scale_values: List[str] = Field(default_factory=list)  # scale value IRIs
     description: str = ""
 
@@ -193,9 +193,9 @@ class ConnectionRuleRecord(BaseModel):
     source_domain: Optional[str] = None  # optional domain constraint
     target_domain: Optional[str] = None
     shared_tokens: List[str] = Field(default_factory=list)  # token IRIs
-    direction: Optional[str] = None  # "bidirectional" | "unidirectional"
-    carrier: Optional[str] = None  # "token-flow" | "reference"
-    scope: Optional[str] = None  # "same" | "cross" | "any"
+    direction: Optional[Literal["bidirectional", "unidirectional"]] = None
+    carrier: Optional[Literal["token-flow", "reference"]] = None
+    scope: Optional[Literal["same", "cross", "any"]] = None
     description: str = ""
 
 

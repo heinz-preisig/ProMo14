@@ -16,7 +16,7 @@ import json
 from typing import Any, Dict, List, Optional, Set
 
 from rdflib import URIRef
-from rdflib.namespace import RDF
+from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, RdfStore
 from backend.equation.compile_space import Index, Variable
@@ -130,9 +130,14 @@ class RdfContext(EquationContext):
         return self._connection_rules
 
     def domain_tokens(self, domain_iri: str) -> List[str]:
-        """Return token IRIs bound to a domain."""
+        """Return token IRIs bound directly to a domain (``hasToken``)."""
         subject = URIRef(domain_iri)
         return [str(t) for t in self._graph.objects(subject, PROMO["hasToken"])]
+
+    def effective_tokens(self, domain_iri: str) -> List[str]:
+        """Return tokens active in a domain: own plus inherited ancestors'."""
+        return [str(t) for t in self.store.effective_tokens(
+            self._graph, URIRef(domain_iri))]
 
     # ------------------------------------------------------------------
     # EquationContext protocol
@@ -196,7 +201,7 @@ class RdfContext(EquationContext):
 
         var = Variable(
             iri=iri,
-            label=_one_literal(graph, s, PROMO["label"]) or iri,
+            label=_one_literal(graph, s, RDFS.label) or iri,
             network=_network(_one_literal(graph, s, PROMO["network"], "root")),
             type=_one_literal(graph, s, PROMO["variableClass"], "state"),
             units=Units.from_list(
@@ -270,7 +275,7 @@ class RdfContext(EquationContext):
         fragment = iri.split("#")[-1].split("/")[-1]
         if fragment and "global_ID" not in aliases:
             aliases["global_ID"] = fragment
-        label = _one_literal(graph, s, PROMO["label"]) or fragment or iri
+        label = _one_literal(graph, s, RDFS.label) or fragment or iri
         # The short name is the surface token used in expressions; fall
         # back to the label when no explicit shortName is stored.
         short = _one_literal(graph, s, PROMO["shortName"]) or label
@@ -374,12 +379,15 @@ class RdfContext(EquationContext):
             parent = self._graph.value(s, PROMO["parent"])
             branch = self._graph.value(s, PROMO["branch"])
             tokens = [str(t) for t in self._graph.objects(s, PROMO["hasToken"])]
+            effective = [str(t) for t in self.store.effective_tokens(
+                self._graph, s)]
             domains.append({
                 "iri": str(s),
                 "name": name,
                 "parent": str(parent) if parent else None,
                 "branch": str(branch) if branch else None,
                 "tokens": tokens,
+                "effective_tokens": effective,
             })
         return domains
 
@@ -387,13 +395,13 @@ class RdfContext(EquationContext):
         """Load classification axes from the graph."""
         axes: List[Dict[str, Any]] = []
         for s in self._graph.subjects(RDF.type, PROMO["ClassificationAxis"]):
-            name = _one_literal(self._graph, s, PROMO["axisName"])
+            name = _one_literal(self._graph, s, PROMO["name"])
             domain = self._graph.value(s, PROMO["hasDomain"])
             parent = self._graph.value(s, PROMO["parent"])
             # Load terms for this axis.
             terms: List[Dict[str, str]] = []
             for term_s in self._graph.subjects(PROMO["hasAxis"], s):
-                term_label = _one_literal(self._graph, term_s, PROMO["label"])
+                term_label = _one_literal(self._graph, term_s, RDFS.label)
                 term_parent = self._graph.value(term_s, PROMO["parent"])
                 terms.append({
                     "iri": str(term_s),
@@ -413,7 +421,7 @@ class RdfContext(EquationContext):
         """Load entity types (CWA 17960) from the graph."""
         entity_types: List[Dict[str, Any]] = []
         for s in self._graph.subjects(RDF.type, PROMO["EntityType"]):
-            label = _one_literal(self._graph, s, PROMO["label"])
+            label = _one_literal(self._graph, s, RDFS.label)
             temporal = _one_literal(self._graph, s, PROMO["temporalType"])
             spatial_type = self._graph.value(s, PROMO["spatialType"])
             spatial_size = self._graph.value(s, PROMO["spatialSize"])
@@ -436,6 +444,8 @@ class RdfContext(EquationContext):
         for s in self._graph.subjects(RDF.type, PROMO["ConnectionRule"]):
             rule_type = _one_literal(self._graph, s, PROMO["ruleType"])
             direction = self._graph.value(s, PROMO["direction"])
+            carrier = self._graph.value(s, PROMO["carrier"])
+            scope = self._graph.value(s, PROMO["scope"])
             source = self._graph.value(s, PROMO["sourceDomain"])
             target = self._graph.value(s, PROMO["targetDomain"])
             tokens = [str(t) for t in self._graph.objects(s, PROMO["sharedTokens"])]
@@ -447,6 +457,8 @@ class RdfContext(EquationContext):
                 "target_domain": str(target) if target else None,
                 "shared_tokens": tokens,
                 "direction": str(direction) if direction else None,
+                "carrier": str(carrier) if carrier else None,
+                "scope": str(scope) if scope else None,
                 "description": doc,
             })
         return rules

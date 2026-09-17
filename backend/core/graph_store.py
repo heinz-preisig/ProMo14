@@ -196,7 +196,9 @@ class RdfStore:
         Called when no ``ontology.trig`` exists.
         """
         g = self.ontology_graph
-        base = str(PROMO).rstrip("#")
+        # Namespace discipline (contract D1): promo# is vocabulary only;
+        # instances mint under the owning graph's namespace.
+        base = str(self.ONTOLOGY_GRAPH_IRI)
 
         # --- Domain tree: root + two branches ---
         # The root domain is the global scope: tokens and scale
@@ -496,6 +498,9 @@ class RdfStore:
             ec_iri = self.mint_iri(base, f"eqclass_{ec}")
             self.add_equation_class(g, ec_iri, ec)
 
+        # --- Vocabulary declarations (rdfs:Class / rdf:Property) -------
+        self.declare_vocabulary(g)
+
     # ------------------------------------------------------------------
     # Named graph helpers
     # ------------------------------------------------------------------
@@ -504,6 +509,113 @@ class RdfStore:
     def ontology_graph(self) -> Graph:
         """Return the default editable ontology named graph."""
         return self.dataset.graph(self.ONTOLOGY_GRAPH_IRI)
+
+    # ------------------------------------------------------------------
+    # Ancestor chains and effective tokens (shared read helpers)
+    # ------------------------------------------------------------------
+
+    def ancestor_chain(self, graph: Graph, iri: URIRef) -> List[URIRef]:
+        """Return ``[iri, parent, grandparent, ...]`` walking ``promo:parent``.
+
+        Terminates on a missing parent or a cycle (silently truncated).
+        """
+        chain: List[URIRef] = []
+        seen: set = set()
+        current = iri
+        while current is not None and current not in seen:
+            seen.add(current)
+            chain.append(current)
+            current = graph.value(current, PROMO["parent"])
+        return chain
+
+    def effective_tokens(self, graph: Graph, domain_iri: URIRef) -> List[URIRef]:
+        """Tokens active in a domain: own ``hasToken`` plus all ancestors'.
+
+        Order preserved, deduplicated (own tokens first, then inherited
+        nearest-ancestor-first).
+        """
+        tokens: List[URIRef] = []
+        for d in self.ancestor_chain(graph, domain_iri):
+            for t in graph.objects(d, PROMO["hasToken"]):
+                if t not in tokens:
+                    tokens.append(t)
+        return tokens
+
+    def tokens_comparable(self, graph: Graph, a: URIRef, b: URIRef) -> bool:
+        """True iff ``a`` and ``b`` lie on the same root-to-leaf token path.
+
+        Comparability = one is ancestor-or-self of the other (contract:
+        binding a parent activates its refinements; a subtoken alone
+        activates only that refinement).
+        """
+        return (a == b
+                or a in self.ancestor_chain(graph, b)
+                or b in self.ancestor_chain(graph, a))
+
+    def declare_vocabulary(self, graph: Graph) -> int:
+        """Declare every ``promo#`` term used in ``graph``.
+
+        Predicates become ``rdf:Property``, ``rdf:type`` objects become
+        ``rdfs:Class`` — RDF/RDFS level only, no OWL.  Self-maintaining:
+        the vocabulary is whatever the data uses.  Returns the number of
+        declarations added (idempotent).
+        """
+        added = 0
+        for p in list(graph.predicates()):
+            if (str(p).startswith(str(PROMO))
+                    and (p, RDF.type, RDF.Property) not in graph):
+                graph.add((p, RDF.type, RDF.Property))
+                added += 1
+        for c in list(graph.objects(None, RDF.type)):
+            if (isinstance(c, URIRef) and str(c).startswith(str(PROMO))
+                    and (c, RDF.type, RDFS.Class) not in graph):
+                graph.add((c, RDF.type, RDFS.Class))
+                added += 1
+        # usesOntology / generatedFrom are declared unconditionally:
+        # they are consumed by artefact graphs (var/expr, models,
+        # assignments, generated code) pointing at a frozen version, so
+        # they never appear inside the ontology itself.
+        for term in (PROMO["usesOntology"], PROMO["generatedFrom"]):
+            if (term, RDF.type, RDF.Property) not in graph:
+                graph.add((term, RDF.type, RDF.Property))
+                added += 1
+        return added
+
+    def freeze_version(
+        self,
+        version: str,
+        graph_iri: Optional[Union[str, URIRef]] = None,
+    ) -> URIRef:
+        """Freeze a named graph as an immutable version.
+
+        Copies every triple of the source graph (default: the working
+        ontology) into a new named graph ``{source}/{version}`` and
+        stamps version metadata on the version IRI.  Applies to any
+        artefact graph — the var/expr library is a vocabulary artefact
+        under the same ADR-006 discipline as the ontology.  Raises
+        ``ValueError`` if the source is empty or the version graph
+        already exists — published versions are immutable.
+        Returns the version graph IRI.
+        """
+        source = (URIRef(graph_iri) if graph_iri is not None
+                  else URIRef(self.ONTOLOGY_GRAPH_IRI))
+        src_graph = self.dataset.graph(source)
+        if not len(src_graph):
+            raise ValueError(f"nothing to freeze: {source} is empty")
+        version_iri = URIRef(f"{source}/{version}")
+        vg = self.dataset.graph(version_iri)
+        if len(vg):
+            raise ValueError(f"version already published: {version_iri}")
+        for triple in src_graph:
+            vg.add(triple)
+        vg.add((version_iri, RDF.type, PROMO["Version"]))
+        vg.add((version_iri, PROMO["versionOf"], source))
+        vg.add((version_iri, PROMO["versionInfo"], Literal(version)))
+        vg.add((version_iri, PROMO["publishedOn"], Literal(
+            datetime.date.today().isoformat(), datatype=XSD.date)))
+        # The frozen artefact is self-describing.
+        self.declare_vocabulary(vg)
+        return version_iri
 
     def graph(self, iri: Union[str, URIRef]) -> Graph:
         """Return or create a named graph."""
@@ -632,7 +744,7 @@ class RdfStore:
         """
         iri = URIRef(var["iri"])
         graph.add((iri, RDF.type, PROMO["Variable"]))
-        self._set_literal(graph, iri, PROMO["label"], var.get("label"))
+        self._set_literal(graph, iri, RDFS.label, var.get("label"))
         self._set_literal(graph, iri, PROMO["internalID"], var.get("internal_id"))
         self._set_literal(graph, iri, PROMO["network"], var.get("network"))
         self._set_literal(graph, iri, PROMO["doc"], var.get("doc"))
@@ -681,7 +793,7 @@ class RdfStore:
         """Add an index record to the graph using the ProMo14 schema."""
         iri = URIRef(idx["iri"])
         graph.add((iri, RDF.type, PROMO["Index"]))
-        self._set_literal(graph, iri, PROMO["label"], idx.get("label"))
+        self._set_literal(graph, iri, RDFS.label, idx.get("label"))
         self._set_literal(graph, iri, PROMO["internalID"], idx.get("internal_id"))
         self._set_literal(graph, iri, PROMO["shortName"], idx.get("short_name"))
         self._set_literal(graph, iri, PROMO["network"], idx.get("network"))
@@ -725,7 +837,7 @@ class RdfStore:
     ) -> URIRef:
         """Add a classification axis definition to the graph."""
         graph.add((iri, RDF.type, PROMO["ClassificationAxis"]))
-        self._set_literal(graph, iri, PROMO["axisName"], name)
+        self._set_literal(graph, iri, PROMO["name"], name)
         if isinstance(domain, str):
             domain = URIRef(domain)
         graph.set((iri, PROMO["hasDomain"], domain))
@@ -745,7 +857,7 @@ class RdfStore:
     ) -> URIRef:
         """Add a term to a classification axis hierarchy."""
         graph.add((iri, RDF.type, PROMO["AxisTerm"]))
-        self._set_literal(graph, iri, PROMO["label"], label)
+        self._set_literal(graph, iri, RDFS.label, label)
         if isinstance(axis, str):
             axis = URIRef(axis)
         graph.set((iri, PROMO["hasAxis"], axis))
@@ -771,7 +883,7 @@ class RdfStore:
         bind per model-node instance and never compose entity types.
         """
         graph.add((iri, RDF.type, PROMO["ScaleDimension"]))
-        self._set_literal(graph, iri, PROMO["scaleName"], name)
+        self._set_literal(graph, iri, PROMO["name"], name)
         if kind is not None:
             self._set_literal(graph, iri, PROMO["dimensionKind"], kind)
         if isinstance(domain, str):
@@ -793,7 +905,7 @@ class RdfStore:
     ) -> URIRef:
         """Add a value to a scale dimension's hierarchical tree."""
         graph.add((iri, RDF.type, PROMO["ScaleValue"]))
-        self._set_literal(graph, iri, PROMO["scaleValueLabel"], label)
+        self._set_literal(graph, iri, RDFS.label, label)
         if isinstance(dimension, str):
             dimension = URIRef(dimension)
         graph.set((iri, PROMO["hasScale"], dimension))
@@ -817,7 +929,7 @@ class RdfStore:
     ) -> URIRef:
         """Add an entity type (CWA 17960 taxonomy) to the graph."""
         graph.add((iri, RDF.type, PROMO["EntityType"]))
-        self._set_literal(graph, iri, PROMO["label"], label)
+        self._set_literal(graph, iri, RDFS.label, label)
         self._set_literal(graph, iri, PROMO["temporalType"], temporal_type)
         self._set_literal(graph, iri, PROMO["branch"], branch)
         if spatial_type is not None:
@@ -883,7 +995,7 @@ class RdfStore:
     ) -> URIRef:
         """Add an equation class node to the hierarchy."""
         graph.add((iri, RDF.type, PROMO["EquationClass"]))
-        self._set_literal(graph, iri, PROMO["label"], label)
+        self._set_literal(graph, iri, RDFS.label, label)
         if parent is not None:
             if isinstance(parent, str):
                 parent = URIRef(parent)

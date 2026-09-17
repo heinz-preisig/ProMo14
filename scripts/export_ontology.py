@@ -22,6 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.core.graph_store import PROMO, PROMOLG, QUDT, RdfStore  # noqa: E402
+from rdflib import URIRef  # noqa: E402
 from rdflib.namespace import RDF, RDFS  # noqa: E402
 
 
@@ -37,12 +38,28 @@ def main() -> None:
         default="ontology.ttl",
         help="Output Turtle file (default: ontology.ttl)",
     )
+    parser.add_argument(
+        "--version",
+        default=None,
+        help="Freeze the working ontology as this version (e.g. 1.0) "
+             "and export the frozen graph.  Re-running with an existing "
+             "version re-exports it (frozen graphs are immutable).",
+    )
     args = parser.parse_args()
 
     store = RdfStore(args.data_dir)
     store.load()
 
-    graph = store.ontology_graph
+    if args.version:
+        version_iri = URIRef(
+            f"{store.ONTOLOGY_GRAPH_IRI}/{args.version}")
+        if not len(store.dataset.graph(version_iri)):
+            store.freeze_version(args.version)
+            store.save()
+            print(f"Froze ontology as {version_iri}")
+        graph = store.dataset.graph(version_iri)
+    else:
+        graph = store.ontology_graph
     # Bind prefixes on the graph itself so the Turtle is readable.
     graph.bind("promo", PROMO)
     graph.bind("promolg", PROMOLG)

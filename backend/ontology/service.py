@@ -8,7 +8,7 @@ state lives in the shared ``RdfStore``; the ontology graph is saved to
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -62,6 +62,57 @@ def _cascade_delete(graph, subject: URIRef) -> None:
     graph.remove((None, None, subject))   # incoming references
     for child in children:
         _cascade_delete(graph, child)
+
+
+# ---------------------------------------------------------------------------
+# Validation helpers (contract invariants — see docs/ontology-review-2026-09-17)
+# ---------------------------------------------------------------------------
+
+
+def _require_typed(graph, iri: Optional[str], rdf_type, what: str) -> None:
+    """422 unless ``iri`` is None or names a resource of ``rdf_type``."""
+    if iri is None:
+        return
+    if (URIRef(iri), RDF.type, rdf_type) not in graph:
+        raise HTTPException(status_code=422,
+                            detail=f"{what} not found: {iri}")
+
+
+def _require_exists(graph, iri: Optional[str], what: str) -> None:
+    """422 unless ``iri`` is None or names an existing resource."""
+    if iri is None:
+        return
+    if (URIRef(iri), None, None) not in graph:
+        raise HTTPException(status_code=422,
+                            detail=f"{what} not found: {iri}")
+
+
+def _mint_fresh(store, fragment: str) -> str:
+    """Mint an ontology IRI; 409 if it already exists (name collision).
+
+    Applies only to auto-minted IRIs — an explicitly supplied ``record.iri``
+    keeps the upsert (create-or-update) semantics.
+    """
+    iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+    if (URIRef(iri), None, None) in store.ontology_graph:
+        raise HTTPException(status_code=409,
+                            detail=f"IRI already exists: {iri}")
+    return iri
+
+
+def _check_no_cycle(store, graph, iri: str, parent: Optional[str],
+                    what: str) -> None:
+    """422 if making ``parent`` the parent of ``iri`` creates a cycle."""
+    if not parent:
+        return
+    if URIRef(iri) in store.ancestor_chain(graph, URIRef(parent)):
+        raise HTTPException(status_code=422,
+                            detail=f"{what} parent would create a cycle")
+
+
+# The temporal triple lives as leaf values inside the time-scale
+# hierarchy (constant / dynamic / event-dynamic under each level).
+_TEMPORAL_TRIPLE = {"constant", "dynamic", "event-dynamic"}
 
 
 def _variable_to_record(v) -> Dict[str, Any]:
@@ -152,8 +203,27 @@ def create_domain(record: DomainRecord) -> DomainRecord:
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Domain name must not be empty")
     store = get_store()
+    graph = store.ontology_graph
     if not record.iri:
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, f"domain_{record.name.strip()}"))
+        record.iri = _mint_fresh(store, f"domain_{record.name.strip()}")
+    if record.parent:
+        _require_typed(graph, record.parent, PROMO["Domain"], "Parent domain")
+        _check_no_cycle(store, graph, record.iri, record.parent, "Domain")
+        # Branch invariant: branch == top-level ancestor's branch label.
+        # None means "unset" — inherit it; a mismatch is rejected.
+        p_chain = store.ancestor_chain(graph, URIRef(record.parent))
+        holder = p_chain[-2] if len(p_chain) >= 2 else p_chain[0]
+        expected = graph.value(holder, PROMO["branch"])
+        if expected is not None:
+            if record.branch is None:
+                record.branch = str(expected)
+            elif record.branch != str(expected):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"branch must be '{expected}' "
+                           "(top-level ancestor's branch)")
+    for tok in record.tokens or []:
+        _require_typed(graph, tok, PROMO["Token"], "Token")
     store.add_domain(
         store.ontology_graph,
         record.name,
@@ -234,7 +304,10 @@ def create_index(record: IndexRecord) -> IndexRecord:
         raise HTTPException(status_code=422, detail="Index label must not be empty")
     store = get_store()
     if not record.iri:
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, record.internal_id or store.next_internal_id("I")))
+        record.iri = _mint_fresh(
+            store, record.internal_id or store.next_internal_id("I"))
+    _require_typed(store.ontology_graph, record.token, PROMO["Token"],
+                   "Token")
     if not record.aliases.get("global_ID"):
         record.aliases["global_ID"] = store.next_internal_id("I")
     if not record.aliases.get("internal_code"):
@@ -267,7 +340,7 @@ def list_tokens() -> List[TokenRecord]:
     graph = store.ontology_graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["Token"]):
-        label = graph.value(s, PROMO["label"]) or graph.value(s, RDFS.label)
+        label = graph.value(s, RDFS.label)
         parent = graph.value(s, PROMO["parent"])
         kind = graph.value(s, PROMO["tokenKind"])
         records.append(
@@ -289,7 +362,11 @@ def create_token(record: TokenRecord) -> TokenRecord:
     store = get_store()
     if not record.iri:
         fragment = record.label.strip().lower().replace(" ", "_")
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, f"token_{fragment}"))
+        record.iri = _mint_fresh(store, f"token_{fragment}")
+    _require_typed(store.ontology_graph, record.parent, PROMO["Token"],
+                   "Parent token")
+    _check_no_cycle(store, store.ontology_graph, record.iri,
+                    record.parent, "Token")
     store.add_token(
         store.ontology_graph,
         URIRef(record.iri),
@@ -332,7 +409,10 @@ def create_axis(record: ClassificationAxisRecord) -> ClassificationAxisRecord:
     store = get_store()
     if not record.iri:
         fragment = f"axis_{record.name.strip()}"
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+        record.iri = _mint_fresh(store, fragment)
+    _require_typed(store.ontology_graph, record.domain, PROMO["Domain"],
+                   "Domain")
+    _require_exists(store.ontology_graph, record.parent, "Parent axis")
     store.add_classification_axis(
         store.ontology_graph,
         URIRef(record.iri),
@@ -362,7 +442,7 @@ def list_axis_terms() -> List[AxisTermRecord]:
     graph = store.ontology_graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["AxisTerm"]):
-        label = graph.value(s, PROMO["label"])
+        label = graph.value(s, RDFS.label)
         axis = graph.value(s, PROMO["hasAxis"])
         parent = graph.value(s, PROMO["parent"])
         records.append(
@@ -384,7 +464,13 @@ def create_axis_term(record: AxisTermRecord) -> AxisTermRecord:
     store = get_store()
     if not record.iri:
         fragment = f"term_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+        record.iri = _mint_fresh(store, fragment)
+    _require_typed(store.ontology_graph, record.axis,
+                   PROMO["ClassificationAxis"], "Axis")
+    _require_typed(store.ontology_graph, record.parent, PROMO["AxisTerm"],
+                   "Parent term")
+    _check_no_cycle(store, store.ontology_graph, record.iri,
+                    record.parent, "Axis term")
     store.add_axis_term(
         store.ontology_graph,
         URIRef(record.iri),
@@ -427,7 +513,11 @@ def create_scale_dimension(record: ScaleDimensionRecord) -> ScaleDimensionRecord
     store = get_store()
     if not record.iri:
         fragment = f"scale_{record.name.strip()}"
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+        record.iri = _mint_fresh(store, fragment)
+    _require_typed(store.ontology_graph, record.domain, PROMO["Domain"],
+                   "Domain")
+    _require_exists(store.ontology_graph, record.parent,
+                    "Parent scale dimension")
     store.add_scale_dimension(
         store.ontology_graph,
         URIRef(record.iri),
@@ -458,7 +548,7 @@ def list_scale_values() -> List[ScaleValueRecord]:
     graph = store.ontology_graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["ScaleValue"]):
-        label = graph.value(s, PROMO["scaleValueLabel"])
+        label = graph.value(s, RDFS.label)
         dimension = graph.value(s, PROMO["hasScale"])
         parent = graph.value(s, PROMO["parent"])
         records.append(
@@ -480,7 +570,13 @@ def create_scale_value(record: ScaleValueRecord) -> ScaleValueRecord:
     store = get_store()
     if not record.iri:
         fragment = f"sval_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+        record.iri = _mint_fresh(store, fragment)
+    _require_typed(store.ontology_graph, record.dimension,
+                   PROMO["ScaleDimension"], "Scale dimension")
+    _require_typed(store.ontology_graph, record.parent, PROMO["ScaleValue"],
+                   "Parent scale value")
+    _check_no_cycle(store, store.ontology_graph, record.iri,
+                    record.parent, "Scale value")
     store.add_scale_value(
         store.ontology_graph,
         URIRef(record.iri),
@@ -521,9 +617,40 @@ def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Entity type label must not be empty")
     store = get_store()
+    graph = store.ontology_graph
     if not record.iri:
         fragment = f"etype_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+        record.iri = _mint_fresh(store, fragment)
+    for sv in record.scale_values or []:
+        _require_typed(graph, sv, PROMO["ScaleValue"], "Scale value")
+    # temporal_type must agree with a bound temporal-triple scale value
+    # (canonical definition = the scale composition; temporal_type is a
+    # legacy convenience field).  No temporal leaf bound -> it stands
+    # alone (information entity types carry no scale values).
+    temporal_labels = {
+        str(lbl) for sv in record.scale_values or []
+        for lbl in [graph.value(URIRef(sv), RDFS.label)]
+        if lbl is not None and str(lbl) in _TEMPORAL_TRIPLE
+    }
+    if len(temporal_labels) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail="multiple temporal scale values bound: "
+                   f"{sorted(temporal_labels)}")
+    if temporal_labels and record.temporal_type not in temporal_labels:
+        raise HTTPException(
+            status_code=422,
+            detail=f"temporal_type '{record.temporal_type}' disagrees "
+                   f"with bound time scale value "
+                   f"'{next(iter(temporal_labels))}'")
+    # branch must match a branch label carried by some domain (dynamic
+    # vocabulary — new top-level domains define new branches).
+    branches = {str(b) for d in graph.subjects(RDF.type, PROMO["Domain"])
+                for b in graph.objects(d, PROMO["branch"])}
+    if record.branch not in branches:
+        raise HTTPException(
+            status_code=422,
+            detail=f"branch must be one of {sorted(branches)}")
     store.add_entity_type(
         store.ontology_graph,
         URIRef(record.iri),
@@ -571,7 +698,14 @@ def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord
     if not record.iri:
         slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", record.rule_type.strip().lower())
         fragment = f"rule_{slug or 'unnamed'}"
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
+        record.iri = _mint_fresh(store, fragment)
+    graph = store.ontology_graph
+    _require_typed(graph, record.source_domain, PROMO["Domain"],
+                   "Source domain")
+    _require_typed(graph, record.target_domain, PROMO["Domain"],
+                   "Target domain")
+    for tok in record.shared_tokens or []:
+        _require_typed(graph, tok, PROMO["Token"], "Shared token")
     store.add_connection_rule(
         store.ontology_graph,
         URIRef(record.iri),
@@ -616,14 +750,28 @@ def _domain_ancestor_chain(graph, iri: str) -> List[str]:
     return chain
 
 
-def _rule_domain_match(rule: ConnectionRuleRecord,
-                       src_chain: List[str],
-                       tgt_chain: List[str]) -> bool:
-    """Check a rule's domain constraints against ancestor chains.
+def _top_branch(chain: List[str]) -> str:
+    """Branch of a domain = the child of its topmost ancestor.
 
-    A constrained rule applies when its ``source_domain``/``target_domain``
-    is the actual domain or one of its ancestors.  Bidirectional rules also
-    match the swapped pair.
+    ``chain`` is ``[domain, parent, ..., top]``; the branch is the
+    second-to-last element.  A top-level domain (incl. ``domain_root``)
+    is its own singleton branch.
+    """
+    return chain[-2] if len(chain) >= 2 else chain[0]
+
+
+def _rule_match_orientation(rule: ConnectionRuleRecord,
+                            src_chain: List[str],
+                            tgt_chain: List[str]) -> Optional[str]:
+    """Return ``"forward"``/``"swapped"`` if the rule's domain
+    constraints match the pair, else ``None``.
+
+    A constrained rule applies when its ``source_domain``/
+    ``target_domain`` is the actual domain or one of its ancestors.
+    Bidirectional rules also match the swapped pair — the orientation
+    tells the caller which chains the constraints matched, so
+    specificity must be computed against those (not blindly against
+    src/tgt, which crashes on swapped-only matches).
     """
     def ok(s_chain: List[str], t_chain: List[str]) -> bool:
         return (
@@ -632,10 +780,10 @@ def _rule_domain_match(rule: ConnectionRuleRecord,
         )
 
     if ok(src_chain, tgt_chain):
-        return True
-    if rule.direction == "bidirectional":
-        return ok(tgt_chain, src_chain)
-    return False
+        return "forward"
+    if rule.direction == "bidirectional" and ok(tgt_chain, src_chain):
+        return "swapped"
+    return None
 
 
 @router.get("/resolve-connection")
@@ -644,49 +792,69 @@ def resolve_connection(source: str, target: str) -> Dict[str, Any]:
 
     Rules stay attached to the domain where they are defined; a rule applies
     to a pair when its domain constraints are ancestors (or self) of the
-    actual endpoint domains.  Rules are filtered by their ``scope``
-    attribute: ``same`` requires the endpoints to share a common ancestor
-    domain, ``cross`` requires they do not, ``any`` imposes no branch
-    constraint.  Rules without a ``scope`` attribute fall back to the
-    legacy rule-type names.  Results are ordered most-specific first
-    (closest ancestor match wins).
+    actual endpoint domains.  ``scope`` is **branch-relative**: ``same``
+    requires the endpoints' top-level ancestors (children of
+    ``domain_root``) to coincide, ``cross`` requires them to differ,
+    ``any`` imposes no branch constraint; a missing ``scope`` means
+    ``any``.  A rule must also license a token: some ``shared_tokens``
+    entry must be comparable (same root-to-leaf token path) to a
+    comparable effective-token pair, one bound on each endpoint — an
+    empty ``shared_tokens`` therefore never applies.  Results are the
+    full set of licensed connection kinds, ordered most-specific first
+    (closest ancestor match wins), ties broken by IRI.
     """
     store = get_store()
     graph = store.ontology_graph
     src_chain = _domain_ancestor_chain(graph, source)
     tgt_chain = _domain_ancestor_chain(graph, target)
-    common = set(src_chain) & set(tgt_chain)
+    src_branch = _top_branch(src_chain)
+    tgt_branch = _top_branch(tgt_chain)
+    src_eff = store.effective_tokens(graph, URIRef(source))
+    tgt_eff = store.effective_tokens(graph, URIRef(target))
 
     ctx = RdfContext(store)
     scored = []
     for rule in _list_connection_rule_records(ctx):
-        if not _rule_domain_match(rule, src_chain, tgt_chain):
+        orientation = _rule_match_orientation(rule, src_chain, tgt_chain)
+        if orientation is None:
             continue
-        scope = rule.scope
-        if scope is None:
-            # Legacy rules without a scope attribute: derive it from the
-            # rule-type name (pre-attribute vocabulary).
-            scope = {"physical-same": "same",
-                     "physical-cross": "cross"}.get(rule.rule_type, "any")
-        if scope == "same" and not common:
+        scope = rule.scope or "any"
+        if scope == "same" and src_branch != tgt_branch:
             continue
-        if scope == "cross" and common:
+        if scope == "cross" and src_branch == tgt_branch:
             continue
-        # Specificity: distance of the constrained domains up the chains.
-        # Unconstrained rules sort last.
+        # Token licensing: effective tokens of either endpoint that take
+        # part in a comparable pair licensed by a comparable rule token.
+        matched = sorted({
+            str(x)
+            for s in src_eff for t in tgt_eff
+            if store.tokens_comparable(graph, s, t)
+            and any(store.tokens_comparable(graph, URIRef(r), s)
+                    for r in rule.shared_tokens)
+            for x in (s, t)
+        })
+        if not matched:
+            continue
+        # Specificity: distance of the constrained domains up the chains
+        # that actually matched.  Unconstrained rules sort last.
+        s_chain, t_chain = (src_chain, tgt_chain) if orientation == "forward" \
+            else (tgt_chain, src_chain)
         spec = (
-            src_chain.index(rule.source_domain)
-            if rule.source_domain else len(src_chain)
+            s_chain.index(rule.source_domain)
+            if rule.source_domain else len(s_chain)
         ) + (
-            tgt_chain.index(rule.target_domain)
-            if rule.target_domain else len(tgt_chain)
+            t_chain.index(rule.target_domain)
+            if rule.target_domain else len(t_chain)
         )
-        scored.append((spec, rule))
-    scored.sort(key=lambda m: m[0])
+        scored.append((spec, rule.iri, rule, matched))
+    scored.sort(key=lambda m: (m[0], m[1]))
     return {
         "source": source,
         "target": target,
-        "rules": [r.model_dump() for _, r in scored],
+        "rules": [
+            {**r.model_dump(), "matched_tokens": matched}
+            for _, _, r, matched in scored
+        ],
     }
 
 
@@ -750,13 +918,13 @@ def _list_axis_records(ctx) -> List[ClassificationAxisRecord]:
     graph = store.ontology_graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["ClassificationAxis"]):
-        name = graph.value(s, PROMO["axisName"])
+        name = graph.value(s, PROMO["name"])
         domain = graph.value(s, PROMO["hasDomain"])
         parent = graph.value(s, PROMO["parent"])
         # Load terms for this axis
         terms = []
         for term_s in graph.subjects(PROMO["hasAxis"], s):
-            term_label = graph.value(term_s, PROMO["label"]) or graph.value(term_s, RDFS.label)
+            term_label = graph.value(term_s, RDFS.label)
             term_parent = graph.value(term_s, PROMO["parent"])
             terms.append(
                 AxisTermRecord(
@@ -784,14 +952,14 @@ def _list_scale_dimension_records(ctx) -> List[ScaleDimensionRecord]:
     graph = store.ontology_graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["ScaleDimension"]):
-        name = graph.value(s, PROMO["scaleName"])
+        name = graph.value(s, PROMO["name"])
         domain = graph.value(s, PROMO["hasDomain"])
         parent = graph.value(s, PROMO["parent"])
         kind = graph.value(s, PROMO["dimensionKind"])
         # Load values for this dimension
         values = []
         for val_s in graph.subjects(PROMO["hasScale"], s):
-            val_label = graph.value(val_s, PROMO["scaleValueLabel"])
+            val_label = graph.value(val_s, RDFS.label)
             val_parent = graph.value(val_s, PROMO["parent"])
             values.append(
                 ScaleValueRecord(
@@ -820,7 +988,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
     graph = store.ontology_graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["EntityType"]):
-        label = graph.value(s, PROMO["label"])
+        label = graph.value(s, RDFS.label)
         temporal = graph.value(s, PROMO["temporalType"])
         spatial_type = graph.value(s, PROMO["spatialType"])
         spatial_size = graph.value(s, PROMO["spatialSize"])

@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.core.graph_store import PROMO, RdfStore  # noqa: E402
 from rdflib import Literal, URIRef  # noqa: E402
+from rdflib.namespace import RDF, RDFS  # noqa: E402
 
 
 def main() -> None:
@@ -56,7 +57,60 @@ def main() -> None:
     store = RdfStore(args.data_dir)
     store.load()
     g = store.ontology_graph
-    base = str(PROMO).rstrip("#")
+    # Namespace discipline (contract D1): promo# is vocabulary only;
+    # instances mint under the owning graph's namespace.
+    base = str(store.ONTOLOGY_GRAPH_IRI)
+
+    # --- Instance IRI migration: promo# -> promo/ontology# -------------
+    # Vocabulary = predicates and rdf:type objects; every other promo#
+    # IRI is an instance and is rehomed, references included.  Runs
+    # first so all patches below see the new IRIs, and covers every
+    # named graph (var/expr graphs may reference ontology instances).
+    # Idempotent: after one run no promo# instance IRIs remain.
+    # NB: Dataset.predicates()/objects() only see the (empty) default
+    # graph — iterate the named graphs explicitly.
+    vocab = set()
+    for gr in store.dataset.graphs():
+        vocab |= {p for p in gr.predicates()
+                  if str(p).startswith(str(PROMO))}
+        vocab |= {o for o in gr.objects(None, RDF.type)
+                  if isinstance(o, URIRef) and str(o).startswith(str(PROMO))}
+
+    def _migrated(node):
+        if (isinstance(node, URIRef)
+                and str(node).startswith(str(PROMO))
+                and node not in vocab):
+            return URIRef(f"{base}#{str(node).split('#')[-1]}")
+        return node
+
+    total = 0
+    for gr in store.dataset.graphs():
+        moved = [(s, p, o) for s, p, o in gr
+                 if _migrated(s) is not s or _migrated(o) is not o]
+        for s, p, o in moved:
+            gr.remove((s, p, o))
+            gr.add((_migrated(s), p, _migrated(o)))
+        total += len(moved)
+    if total:
+        print(f"iri     {total} triples rehomed promo# -> ontology#")
+
+    # --- Label-predicate consolidation ---------------------------------
+    # Canonical: rdfs:label = display label, promo:name = key-ish name.
+    # Retired: promo:label, promo:scaleValueLabel (-> rdfs:label),
+    #          promo:axisName, promo:scaleName (-> promo:name).
+    for old, new in [(PROMO["label"], RDFS.label),
+                     (PROMO["scaleValueLabel"], RDFS.label),
+                     (PROMO["axisName"], PROMO["name"]),
+                     (PROMO["scaleName"], PROMO["name"])]:
+        n = 0
+        for gr in store.dataset.graphs():
+            for s, o in list(gr.subject_objects(old)):
+                gr.remove((s, old, o))
+                gr.add((s, new, o))
+                n += 1
+        if n:
+            print(f"label   {str(old).split('#')[-1]:<16} -> "
+                  f"{str(new).split('#')[-1]} ({n} triples)")
 
     root = URIRef(f"{base}#domain_root")
     phys = URIRef(f"{base}#domain_physical")
@@ -177,6 +231,22 @@ def main() -> None:
             g.remove((et, PROMO["hasScaleValue"], None))
             print(f"etype   {frag:<20} physical scale values removed ({n})")
 
+    # --- Entity types: complete CWA 17960 scale-value compositions -----
+    # point (4.1.4 event-dynamic / infinitesimal) was missing its time
+    # value; transport_system (4.1.5 event-dynamic / distributed) had
+    # no scale values at all.
+    for frag, svals in [
+        ("etype_point", ["sval_time_macro_event_dynamic"]),
+        ("etype_transport_system", ["sval_time_macro_event_dynamic",
+                                    "sval_length_macroscopic_distributed"]),
+    ]:
+        et = URIRef(f"{base}#{frag}")
+        for sv in svals:
+            sv_iri = URIRef(f"{base}#{sv}")
+            if (et, PROMO["hasScaleValue"], sv_iri) not in g:
+                g.add((et, PROMO["hasScaleValue"], sv_iri))
+                print(f"etype   {frag:<20} + {sv}")
+
     # --- Connection-rule attributes (carrier / scope) ------------------
     # Arc semantics live in rule attributes, not in the type name.
     # Patch the seeded rules in existing data files (new seeds already
@@ -281,6 +351,31 @@ def main() -> None:
                 g, URIRef(f"{base}#term_extensity_{frag}"), ext_axis, frag)
         print("axis    Extensity          + extensive/intensive")
 
+    # --- Dedupe axes -----------------------------------------------------
+    # A UI-created duplicate ("axis_Extensity") coexisted with the
+    # seeded axis_extensity.  For any (axisName, hasDomain) pair with
+    # more than one axis, keep the seed-convention IRI (all-lowercase
+    # fragment) and remove the rest together with their terms.
+    by_key = {}
+    for a in g.subjects(RDF.type, PROMO["ClassificationAxis"]):
+        key = (str(g.value(a, PROMO["name"])),
+               g.value(a, PROMO["hasDomain"]))
+        by_key.setdefault(key, []).append(a)
+    for (name, _dom), axes in by_key.items():
+        if len(axes) < 2:
+            continue
+        axes.sort(key=lambda a: (
+            str(a).split("#")[-1] != str(a).split("#")[-1].lower(),
+            str(a)))
+        for dup in axes[1:]:
+            for term in list(g.subjects(PROMO["hasAxis"], dup)):
+                g.remove((term, None, None))
+                g.remove((None, None, term))
+            g.remove((dup, None, None))
+            g.remove((None, None, dup))
+            print(f"axis    {name:<20} duplicate removed: "
+                  f"{dup}")
+
     # --- Index q (reaction index, conversion source) -------------------
     q_iri = store.mint_iri(base, "idx_reaction_q")
     if (q_iri, None, None) in g:
@@ -298,6 +393,11 @@ def main() -> None:
             "doc": "Reaction index (conversion source), reactions domain",
         })
         print(f"index   q                    {internal_id}")
+
+    # --- Vocabulary declarations (rdfs:Class / rdf:Property, no OWL) ---
+    n = store.declare_vocabulary(g)
+    if n:
+        print(f"vocab   {n} terms declared (rdfs:Class / rdf:Property)")
 
     out = store.save()
     print(f"\nSaved {len(g)} triples to {out}")
