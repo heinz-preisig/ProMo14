@@ -40,6 +40,7 @@
   button.primary:hover { background: #096aa5; }
   #msg { margin: 12px 0; font-size: 13px; color: #a33; min-height: 1em; }
   .empty { padding: 40px; text-align: center; color: #8a9098; }
+  .toolbar { margin-bottom: 14px; }
 </style>
 </head>
 <body>
@@ -48,6 +49,9 @@
   <p>Artefact catalogue — pick what to work on; the app follows from the artefact type.</p>
 </header>
 <main>
+  <div class="toolbar">
+    <button onclick="newArtefact()">New artefact…</button>
+  </div>
   <div id="msg"></div>
   <div id="catalogue"><div class="empty">Loading…</div></div>
 </main>
@@ -76,9 +80,48 @@ function openArtefact(line) {
 
 function exportVersion(iri, version) {
   const a = document.createElement('a');
-  a.href = `/api/ontology/export?version=${encodeURIComponent(version)}`;
+  a.href = `/api/ontology/export?version=${encodeURIComponent(version)}` +
+           `&graph=${encodeURIComponent(iri)}`;
   a.download = `ontology-${version}.ttl`;
   document.body.appendChild(a); a.click(); a.remove();
+}
+
+async function post(path, body) {
+  const r = await fetch(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body) });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || `${path}: ${r.status}`);
+  }
+  return r.json();
+}
+
+async function forkArtefact(iri) {
+  const newIri = prompt('IRI for the forked artefact:', `${iri}-fork`);
+  if (!newIri) return;
+  const label = prompt('Label (optional):', '');
+  try {
+    await post('/api/catalogue/fork',
+               { source: iri, new_iri: newIri, label: label || null });
+    location.reload();
+  } catch (e) { msg(e.message); }
+}
+
+async function newArtefact() {
+  const type = prompt('Artefact type (ontology, library, assignment, model, glass):', 'ontology');
+  if (!type) return;
+  const iri = prompt('Graph IRI for the new artefact:', `https://w3id.org/promo/${type}s/`);
+  if (!iri) return;
+  const label = prompt('Label (optional):', '');
+  const uses = prompt('Ontology pins — comma-separated graph IRIs (optional):',
+                      'https://w3id.org/promo/ontology');
+  try {
+    await post('/api/catalogue/new', {
+      iri, type, label: label || null,
+      uses: uses ? uses.split(',').map(s => s.trim()).filter(Boolean) : [] });
+    location.reload();
+  } catch (e) { msg(e.message); }
 }
 
 function render(lines) {
@@ -101,13 +144,14 @@ function render(lines) {
     const openBtn = app
       ? `<button class="primary" onclick='openArtefact(${JSON.stringify(l)})'>Open</button>`
       : '';
+    const forkBtn = `<button onclick='forkArtefact(${JSON.stringify(l.iri)})'>Fork</button>`;
     return `<tr>
       <td><strong>${esc(l.label)}</strong><br><span class="iri">${esc(l.iri)}</span></td>
       <td><span class="type">${esc(l.type)}</span></td>
       <td class="status-${l.status}">${esc(l.status)}</td>
       <td>${vers}</td>
       <td>${pins}</td>
-      <td>${openBtn}</td>
+      <td>${openBtn}${forkBtn}</td>
     </tr>`;
   }).join('');
   root.innerHTML = `<table>

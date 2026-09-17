@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
@@ -35,6 +35,41 @@ from .models import (
 )
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Graph selection (docs/versioning-and-session-design.md R4/R5)
+# ---------------------------------------------------------------------------
+
+
+def _graph_param(graph: Optional[str] = None) -> Optional[str]:
+    """FastAPI dependency: the ``?graph=`` query param (a graph IRI)."""
+    return graph
+
+
+def _editable_param(graph: Optional[str] = None) -> Optional[str]:
+    """Like ``_graph_param`` but rejects frozen version graphs (R5)."""
+    store = get_store()
+    g = store.ontology_graph if graph is None else store.graph(graph)
+    try:
+        store.assert_editable(g)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    return graph
+
+
+def _resolve(store, graph_iri: Optional[str]):
+    """Resolve an optional graph IRI to a dataset graph (default: the
+    working ontology)."""
+    return store.ontology_graph if graph_iri is None \
+        else store.dataset.graph(URIRef(graph_iri))
+
+
+def _ctx(store, graph_iri: Optional[str]) -> RdfContext:
+    """Build the resolution context: scoped to ``graph_iri`` when given,
+    legacy dataset-wide scope otherwise."""
+    return RdfContext(store) if graph_iri is None \
+        else RdfContext(store, graph_iris=[graph_iri])
 
 
 # Predicates that define containment: deleting the object also deletes the
@@ -88,14 +123,14 @@ def _require_exists(graph, iri: Optional[str], what: str) -> None:
                             detail=f"{what} not found: {iri}")
 
 
-def _mint_fresh(store, fragment: str) -> str:
-    """Mint an ontology IRI; 409 if it already exists (name collision).
+def _mint_fresh(store, graph, fragment: str) -> str:
+    """Mint an IRI under ``graph``'s namespace; 409 on name collision.
 
     Applies only to auto-minted IRIs — an explicitly supplied ``record.iri``
     keeps the upsert (create-or-update) semantics.
     """
-    iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, fragment))
-    if (URIRef(iri), None, None) in store.ontology_graph:
+    iri = str(store.mint_iri(graph.identifier, fragment))
+    if (URIRef(iri), None, None) in graph:
         raise HTTPException(status_code=409,
                             detail=f"IRI already exists: {iri}")
     return iri
@@ -171,9 +206,11 @@ class ContextResponse(BaseModel):
 
 
 @router.get("/context", response_model=ContextResponse)
-def get_context() -> ContextResponse:
+def get_context(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> ContextResponse:
     """Return the current ontology context (variables, indices, domains, axes, entity types, connection rules)."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return ContextResponse(
         variables=[_variable_to_record(v) for v in ctx.variables().values()],
         indices=[_index_to_record(i) for i in ctx.indices().values()],
@@ -192,21 +229,26 @@ def get_context() -> ContextResponse:
 
 
 @router.get("/domains", response_model=List[DomainRecord])
-def list_domains() -> List[DomainRecord]:
+def list_domains(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[DomainRecord]:
     """List all domains with branch and token bindings."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return _list_domain_records(ctx)
 
 
 @router.post("/domains", response_model=DomainRecord)
-def create_domain(record: DomainRecord) -> DomainRecord:
+def create_domain(
+    record: DomainRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> DomainRecord:
     """Create or update a domain with branch and token bindings."""
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Domain name must not be empty")
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     if not record.iri:
-        record.iri = _mint_fresh(store, f"domain_{record.name.strip()}")
+        record.iri = _mint_fresh(store, graph, f"domain_{record.name.strip()}")
     if record.parent:
         _require_typed(graph, record.parent, PROMO["Domain"], "Parent domain")
         _check_no_cycle(store, graph, record.iri, record.parent, "Domain")
@@ -226,7 +268,7 @@ def create_domain(record: DomainRecord) -> DomainRecord:
     for tok in record.tokens or []:
         _require_typed(graph, tok, PROMO["Token"], "Token")
     store.add_domain(
-        store.ontology_graph,
+        graph,
         record.name,
         iri=URIRef(record.iri),
         parent=record.parent,
@@ -237,10 +279,13 @@ def create_domain(record: DomainRecord) -> DomainRecord:
 
 
 @router.delete("/domains/{iri:path}")
-def delete_domain(iri: str) -> Dict[str, str]:
+def delete_domain(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete a domain and all its subdomains from the ontology graph."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Domain not found")
@@ -254,17 +299,20 @@ def delete_domain(iri: str) -> Dict[str, str]:
 
 
 @router.get("/networks", response_model=List[NetworkRecord])
-def list_networks() -> List[NetworkRecord]:
+def list_networks(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[NetworkRecord]:
     """List all networks as a flat list with parent/children references."""
     store = get_store()
-    ctx = RdfContext(store)
+    ctx = _ctx(store, graph_iri)
+    base = _resolve(store, graph_iri).identifier
     tree = ctx.tree()
     parent_of = ctx._parent_of
     records = []
     for name, children in tree.items():
         records.append(
             NetworkRecord(
-                iri=f"{store.ONTOLOGY_GRAPH_IRI}#network_{name}",
+                iri=f"{base}#network_{name}",
                 name=name,
                 parent=parent_of.get(name),
                 children=children,
@@ -274,11 +322,14 @@ def list_networks() -> List[NetworkRecord]:
 
 
 @router.post("/networks", response_model=NetworkRecord)
-def create_network(record: NetworkRecord) -> NetworkRecord:
+def create_network(
+    record: NetworkRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> NetworkRecord:
     """Create or update a network and its parent/children relationships."""
     store = get_store()
     store.add_network(
-        store.ontology_graph,
+        _resolve(store, graph_iri),
         record.name,
         parent=record.parent,
         children=record.children or [],
@@ -292,36 +343,45 @@ def create_network(record: NetworkRecord) -> NetworkRecord:
 
 
 @router.get("/indices", response_model=List[IndexRecord])
-def list_indices() -> List[IndexRecord]:
+def list_indices(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[IndexRecord]:
     """List all indices in the ontology."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return [IndexRecord(**_index_to_record(i)) for i in ctx.indices().values()]
 
 
 @router.post("/indices", response_model=IndexRecord)
-def create_index(record: IndexRecord) -> IndexRecord:
+def create_index(
+    record: IndexRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> IndexRecord:
     """Create a new index in the ontology graph."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Index label must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         record.iri = _mint_fresh(
-            store, record.internal_id or store.next_internal_id("I"))
-    _require_typed(store.ontology_graph, record.token, PROMO["Token"],
+            store, graph, record.internal_id or store.next_internal_id("I"))
+    _require_typed(graph, record.token, PROMO["Token"],
                    "Token")
     if not record.aliases.get("global_ID"):
         record.aliases["global_ID"] = store.next_internal_id("I")
     if not record.aliases.get("internal_code"):
         record.aliases["internal_code"] = record.short_name or (record.label[0] if record.label else "I")
-    store.add_index_dict(store.ontology_graph, record.model_dump())
+    store.add_index_dict(graph, record.model_dump())
     return record
 
 
 @router.delete("/indices/{iri:path}")
-def delete_index(iri: str) -> Dict[str, str]:
+def delete_index(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete an index from the ontology graph."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Index not found")
@@ -335,10 +395,12 @@ def delete_index(iri: str) -> Dict[str, str]:
 
 
 @router.get("/tokens", response_model=List[TokenRecord])
-def list_tokens() -> List[TokenRecord]:
+def list_tokens(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[TokenRecord]:
     """List token types defined in the ontology."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     records = []
     for s in graph.subjects(RDF.type, PROMO["Token"]):
         label = graph.value(s, RDFS.label)
@@ -356,20 +418,24 @@ def list_tokens() -> List[TokenRecord]:
 
 
 @router.post("/tokens", response_model=TokenRecord)
-def create_token(record: TokenRecord) -> TokenRecord:
+def create_token(
+    record: TokenRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> TokenRecord:
     """Create or update a token type."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Token label must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         fragment = record.label.strip().lower().replace(" ", "_")
-        record.iri = _mint_fresh(store, f"token_{fragment}")
-    _require_typed(store.ontology_graph, record.parent, PROMO["Token"],
+        record.iri = _mint_fresh(store, graph, f"token_{fragment}")
+    _require_typed(graph, record.parent, PROMO["Token"],
                    "Parent token")
-    _check_no_cycle(store, store.ontology_graph, record.iri,
+    _check_no_cycle(store, graph, record.iri,
                     record.parent, "Token")
     store.add_token(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.label,
         parent=URIRef(record.parent) if record.parent else None,
@@ -379,10 +445,13 @@ def create_token(record: TokenRecord) -> TokenRecord:
 
 
 @router.delete("/tokens/{iri:path}")
-def delete_token(iri: str) -> Dict[str, str]:
+def delete_token(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete a token type and all child tokens from the ontology graph."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Token not found")
@@ -396,26 +465,32 @@ def delete_token(iri: str) -> Dict[str, str]:
 
 
 @router.get("/axes", response_model=List[ClassificationAxisRecord])
-def list_axes() -> List[ClassificationAxisRecord]:
+def list_axes(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[ClassificationAxisRecord]:
     """List all classification axes."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return _list_axis_records(ctx)
 
 
 @router.post("/axes", response_model=ClassificationAxisRecord)
-def create_axis(record: ClassificationAxisRecord) -> ClassificationAxisRecord:
+def create_axis(
+    record: ClassificationAxisRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> ClassificationAxisRecord:
     """Create or update a classification axis."""
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Axis name must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         fragment = f"axis_{record.name.strip()}"
-        record.iri = _mint_fresh(store, fragment)
-    _require_typed(store.ontology_graph, record.domain, PROMO["Domain"],
+        record.iri = _mint_fresh(store, graph, fragment)
+    _require_typed(graph, record.domain, PROMO["Domain"],
                    "Domain")
-    _require_exists(store.ontology_graph, record.parent, "Parent axis")
+    _require_exists(graph, record.parent, "Parent axis")
     store.add_classification_axis(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.domain,
         record.name,
@@ -425,10 +500,13 @@ def create_axis(record: ClassificationAxisRecord) -> ClassificationAxisRecord:
 
 
 @router.delete("/axes/{iri:path}")
-def delete_axis(iri: str) -> Dict[str, str]:
+def delete_axis(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete a classification axis."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Axis not found")
@@ -437,10 +515,12 @@ def delete_axis(iri: str) -> Dict[str, str]:
 
 
 @router.get("/axis-terms", response_model=List[AxisTermRecord])
-def list_axis_terms() -> List[AxisTermRecord]:
+def list_axis_terms(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[AxisTermRecord]:
     """List all axis terms."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     records = []
     for s in graph.subjects(RDF.type, PROMO["AxisTerm"]):
         label = graph.value(s, RDFS.label)
@@ -458,22 +538,26 @@ def list_axis_terms() -> List[AxisTermRecord]:
 
 
 @router.post("/axis-terms", response_model=AxisTermRecord)
-def create_axis_term(record: AxisTermRecord) -> AxisTermRecord:
+def create_axis_term(
+    record: AxisTermRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> AxisTermRecord:
     """Create or update an axis term."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Axis term label must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         fragment = f"term_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = _mint_fresh(store, fragment)
-    _require_typed(store.ontology_graph, record.axis,
+        record.iri = _mint_fresh(store, graph, fragment)
+    _require_typed(graph, record.axis,
                    PROMO["ClassificationAxis"], "Axis")
-    _require_typed(store.ontology_graph, record.parent, PROMO["AxisTerm"],
+    _require_typed(graph, record.parent, PROMO["AxisTerm"],
                    "Parent term")
-    _check_no_cycle(store, store.ontology_graph, record.iri,
+    _check_no_cycle(store, graph, record.iri,
                     record.parent, "Axis term")
     store.add_axis_term(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.axis,
         record.label,
@@ -483,10 +567,13 @@ def create_axis_term(record: AxisTermRecord) -> AxisTermRecord:
 
 
 @router.delete("/axis-terms/{iri:path}")
-def delete_axis_term(iri: str) -> Dict[str, str]:
+def delete_axis_term(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete an axis term and all its child terms."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Axis term not found")
@@ -500,27 +587,33 @@ def delete_axis_term(iri: str) -> Dict[str, str]:
 
 
 @router.get("/scale-dimensions", response_model=List[ScaleDimensionRecord])
-def list_scale_dimensions() -> List[ScaleDimensionRecord]:
+def list_scale_dimensions(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[ScaleDimensionRecord]:
     """List all scale dimensions with their values."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return _list_scale_dimension_records(ctx)
 
 
 @router.post("/scale-dimensions", response_model=ScaleDimensionRecord)
-def create_scale_dimension(record: ScaleDimensionRecord) -> ScaleDimensionRecord:
+def create_scale_dimension(
+    record: ScaleDimensionRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> ScaleDimensionRecord:
     """Create or update a scale dimension."""
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Scale dimension name must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         fragment = f"scale_{record.name.strip()}"
-        record.iri = _mint_fresh(store, fragment)
-    _require_typed(store.ontology_graph, record.domain, PROMO["Domain"],
+        record.iri = _mint_fresh(store, graph, fragment)
+    _require_typed(graph, record.domain, PROMO["Domain"],
                    "Domain")
-    _require_exists(store.ontology_graph, record.parent,
+    _require_exists(graph, record.parent,
                     "Parent scale dimension")
     store.add_scale_dimension(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.name,
         record.domain,
@@ -531,10 +624,13 @@ def create_scale_dimension(record: ScaleDimensionRecord) -> ScaleDimensionRecord
 
 
 @router.delete("/scale-dimensions/{iri:path}")
-def delete_scale_dimension(iri: str) -> Dict[str, str]:
+def delete_scale_dimension(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete a scale dimension."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Scale dimension not found")
@@ -543,10 +639,12 @@ def delete_scale_dimension(iri: str) -> Dict[str, str]:
 
 
 @router.get("/scale-values", response_model=List[ScaleValueRecord])
-def list_scale_values() -> List[ScaleValueRecord]:
+def list_scale_values(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[ScaleValueRecord]:
     """List all scale values."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     records = []
     for s in graph.subjects(RDF.type, PROMO["ScaleValue"]):
         label = graph.value(s, RDFS.label)
@@ -564,22 +662,26 @@ def list_scale_values() -> List[ScaleValueRecord]:
 
 
 @router.post("/scale-values", response_model=ScaleValueRecord)
-def create_scale_value(record: ScaleValueRecord) -> ScaleValueRecord:
+def create_scale_value(
+    record: ScaleValueRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> ScaleValueRecord:
     """Create or update a scale value."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Scale value label must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         fragment = f"sval_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = _mint_fresh(store, fragment)
-    _require_typed(store.ontology_graph, record.dimension,
+        record.iri = _mint_fresh(store, graph, fragment)
+    _require_typed(graph, record.dimension,
                    PROMO["ScaleDimension"], "Scale dimension")
-    _require_typed(store.ontology_graph, record.parent, PROMO["ScaleValue"],
+    _require_typed(graph, record.parent, PROMO["ScaleValue"],
                    "Parent scale value")
-    _check_no_cycle(store, store.ontology_graph, record.iri,
+    _check_no_cycle(store, graph, record.iri,
                     record.parent, "Scale value")
     store.add_scale_value(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.dimension,
         record.label,
@@ -589,10 +691,13 @@ def create_scale_value(record: ScaleValueRecord) -> ScaleValueRecord:
 
 
 @router.delete("/scale-values/{iri:path}")
-def delete_scale_value(iri: str) -> Dict[str, str]:
+def delete_scale_value(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete a scale value and all its child values."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Scale value not found")
@@ -606,22 +711,27 @@ def delete_scale_value(iri: str) -> Dict[str, str]:
 
 
 @router.get("/entity-types", response_model=List[EntityTypeRecord])
-def list_entity_types() -> List[EntityTypeRecord]:
+def list_entity_types(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[EntityTypeRecord]:
     """List all entity types."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return _list_entity_type_records(ctx)
 
 
 @router.post("/entity-types", response_model=EntityTypeRecord)
-def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
+def create_entity_type(
+    record: EntityTypeRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> EntityTypeRecord:
     """Create or update an entity type."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Entity type label must not be empty")
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         fragment = f"etype_{record.label.strip().lower().replace(' ', '_')}"
-        record.iri = _mint_fresh(store, fragment)
+        record.iri = _mint_fresh(store, graph, fragment)
     for sv in record.scale_values or []:
         _require_typed(graph, sv, PROMO["ScaleValue"], "Scale value")
     # temporal_type must agree with a bound temporal-triple scale value
@@ -653,7 +763,7 @@ def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
             status_code=422,
             detail=f"branch must be one of {sorted(branches)}")
     store.add_entity_type(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.label,
         record.temporal_type,
@@ -667,10 +777,13 @@ def create_entity_type(record: EntityTypeRecord) -> EntityTypeRecord:
 
 
 @router.delete("/entity-types/{iri:path}")
-def delete_entity_type(iri: str) -> Dict[str, str]:
+def delete_entity_type(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete an entity type."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Entity type not found")
@@ -684,23 +797,28 @@ def delete_entity_type(iri: str) -> Dict[str, str]:
 
 
 @router.get("/connection-rules", response_model=List[ConnectionRuleRecord])
-def list_connection_rules() -> List[ConnectionRuleRecord]:
+def list_connection_rules(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> List[ConnectionRuleRecord]:
     """List all connection rules."""
-    ctx = RdfContext(get_store())
+    ctx = _ctx(get_store(), graph_iri)
     return _list_connection_rule_records(ctx)
 
 
 @router.post("/connection-rules", response_model=ConnectionRuleRecord)
-def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord:
+def create_connection_rule(
+    record: ConnectionRuleRecord,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> ConnectionRuleRecord:
     """Create or update a connection rule."""
     if not record.rule_type or not record.rule_type.strip():
         raise HTTPException(status_code=422, detail="Connection rule type must not be empty")
     store = get_store()
+    graph = _resolve(store, graph_iri)
     if not record.iri:
         slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", record.rule_type.strip().lower())
         fragment = f"rule_{slug or 'unnamed'}"
-        record.iri = _mint_fresh(store, fragment)
-    graph = store.ontology_graph
+        record.iri = _mint_fresh(store, graph, fragment)
     _require_typed(graph, record.source_domain, PROMO["Domain"],
                    "Source domain")
     _require_typed(graph, record.target_domain, PROMO["Domain"],
@@ -708,7 +826,7 @@ def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord
     for tok in record.shared_tokens or []:
         _require_typed(graph, tok, PROMO["Token"], "Shared token")
     store.add_connection_rule(
-        store.ontology_graph,
+        graph,
         URIRef(record.iri),
         record.rule_type,
         direction=record.direction,
@@ -723,10 +841,13 @@ def create_connection_rule(record: ConnectionRuleRecord) -> ConnectionRuleRecord
 
 
 @router.delete("/connection-rules/{iri:path}")
-def delete_connection_rule(iri: str) -> Dict[str, str]:
+def delete_connection_rule(
+    iri: str,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
     """Delete a connection rule."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Connection rule not found")
@@ -788,7 +909,11 @@ def _rule_match_orientation(rule: ConnectionRuleRecord,
 
 
 @router.get("/resolve-connection")
-def resolve_connection(source: str, target: str) -> Dict[str, Any]:
+def resolve_connection(
+    source: str,
+    target: str,
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> Dict[str, Any]:
     """Return connection rules applicable to a source→target domain pair.
 
     Rules stay attached to the domain where they are defined; a rule applies
@@ -805,7 +930,7 @@ def resolve_connection(source: str, target: str) -> Dict[str, Any]:
     (closest ancestor match wins), ties broken by IRI.
     """
     store = get_store()
-    graph = store.ontology_graph
+    graph = _resolve(store, graph_iri)
     src_chain = _domain_ancestor_chain(graph, source)
     tgt_chain = _domain_ancestor_chain(graph, target)
     src_branch = _top_branch(src_chain)
@@ -813,7 +938,7 @@ def resolve_connection(source: str, target: str) -> Dict[str, Any]:
     src_eff = store.effective_tokens(graph, URIRef(source))
     tgt_eff = store.effective_tokens(graph, URIRef(target))
 
-    ctx = RdfContext(store)
+    ctx = _ctx(store, graph_iri)
     scored = []
     for rule in _list_connection_rule_records(ctx):
         orientation = _rule_match_orientation(rule, src_chain, tgt_chain)
@@ -882,12 +1007,17 @@ def _version_graphs(store) -> List:
 
 
 @router.get("/versions")
-def list_versions() -> Dict[str, Any]:
-    """List frozen ontology versions and suggest the next one."""
+def list_versions(
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> Dict[str, Any]:
+    """List frozen versions of the selected ontology and suggest next."""
     store = get_store()
+    base = _resolve(store, graph_iri).identifier
     versions = []
     best = (0, 0)
     for g in _version_graphs(store):
+        if g.value(g.identifier, PROMO["versionOf"]) != base:
+            continue
         info = g.value(g.identifier, PROMO["versionInfo"])
         published = g.value(g.identifier, PROMO["publishedOn"])
         versions.append({
@@ -905,8 +1035,11 @@ def list_versions() -> Dict[str, Any]:
 
 
 @router.post("/publish")
-def publish_ontology(req: PublishRequest) -> Dict[str, str]:
-    """Freeze the working ontology as an immutable version and save.
+def publish_ontology(
+    req: PublishRequest,
+    graph_iri: Optional[str] = Depends(_editable_param),
+) -> Dict[str, str]:
+    """Freeze the selected ontology as an immutable version and save.
 
     The frozen graph lands in ``data/ontology.trig`` alongside the
     working draft; exporting + committing to ProMo-ontologies makes it
@@ -918,7 +1051,8 @@ def publish_ontology(req: PublishRequest) -> Dict[str, str]:
             detail="version must be numeric semver, e.g. 1.0 or 1.2.3")
     store = get_store()
     try:
-        version_iri = store.freeze_version(req.version.strip())
+        version_iri = store.freeze_version(
+            req.version.strip(), graph_iri=graph_iri)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     path = store.save()
@@ -926,18 +1060,21 @@ def publish_ontology(req: PublishRequest) -> Dict[str, str]:
 
 
 @router.get("/export")
-def export_ontology_graph(version: Optional[str] = None) -> Response:
+def export_ontology_graph(
+    version: Optional[str] = None,
+    graph_iri: Optional[str] = Depends(_graph_param),
+) -> Response:
     """Serialise a frozen version (or the working draft) as Turtle."""
     store = get_store()
+    base = _resolve(store, graph_iri).identifier
     if version:
-        graph = store.dataset.graph(
-            URIRef(f"{store.ONTOLOGY_GRAPH_IRI}/{version}"))
+        graph = store.dataset.graph(URIRef(f"{base}/{version}"))
         if not len(graph):
             raise HTTPException(
                 status_code=404, detail=f"no such version: {version}")
         filename = f"ontology-{version}.ttl"
     else:
-        graph = store.ontology_graph
+        graph = _resolve(store, graph_iri)
         filename = "ontology.ttl"
     for prefix, ns in (("promo", PROMO), ("promolg", PROMOLG),
                        ("qudt", QUDT), ("rdf", RDF), ("rdfs", RDFS)):
@@ -957,8 +1094,7 @@ def export_ontology_graph(version: Optional[str] = None) -> Response:
 
 def _list_domain_records(ctx) -> List[DomainRecord]:
     """Load domain records from the graph, resolving inherited tokens."""
-    store = get_store()
-    graph = store.ontology_graph
+    graph = ctx.graph
 
     def _own_tokens(iri: URIRef) -> List[str]:
         return [str(t) for t in graph.objects(iri, PROMO["hasToken"])]
@@ -993,8 +1129,7 @@ def _list_domain_records(ctx) -> List[DomainRecord]:
 
 def _list_axis_records(ctx) -> List[ClassificationAxisRecord]:
     """Load classification axes with their terms from the graph."""
-    store = get_store()
-    graph = store.ontology_graph
+    graph = ctx.graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["ClassificationAxis"]):
         name = graph.value(s, PROMO["name"])
@@ -1027,8 +1162,7 @@ def _list_axis_records(ctx) -> List[ClassificationAxisRecord]:
 
 def _list_scale_dimension_records(ctx) -> List[ScaleDimensionRecord]:
     """Load scale dimensions with their values from the graph."""
-    store = get_store()
-    graph = store.ontology_graph
+    graph = ctx.graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["ScaleDimension"]):
         name = graph.value(s, PROMO["name"])
@@ -1063,8 +1197,7 @@ def _list_scale_dimension_records(ctx) -> List[ScaleDimensionRecord]:
 
 def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
     """Load entity types from the graph."""
-    store = get_store()
-    graph = store.ontology_graph
+    graph = ctx.graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["EntityType"]):
         label = graph.value(s, RDFS.label)
@@ -1091,8 +1224,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
 
 def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
     """Load connection rules from the graph."""
-    store = get_store()
-    graph = store.ontology_graph
+    graph = ctx.graph
     records = []
     for s in graph.subjects(RDF.type, PROMO["ConnectionRule"]):
         rule_type = graph.value(s, PROMO["ruleType"])

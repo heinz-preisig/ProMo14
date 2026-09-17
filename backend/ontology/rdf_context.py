@@ -134,6 +134,12 @@ class RdfContext(EquationContext):
             return self._scope
         return list(self.store.dataset.contexts())
 
+    @property
+    def graph(self) -> Any:
+        """The vocabulary view: the working ontology graph, or a union
+        copy of ``graph_iris`` when scoped."""
+        return self._graph
+
     # ------------------------------------------------------------------
     # New ontology entity accessors
     # ------------------------------------------------------------------

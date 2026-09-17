@@ -25,6 +25,7 @@ import {
   listVersions,
   publishOntology,
   exportOntology,
+  GRAPH_IRI,
 } from './api'
 import type {
   AxisTermRecord,
@@ -984,6 +985,12 @@ export default function App() {
     <div style={S.app}>
       <div style={S.header}>
         <span style={{ fontWeight: 'bold', marginRight: 12, fontSize: 14 }}>ProMo14 Ontology Editor</span>
+        {GRAPH_IRI && (
+          <span style={{ fontSize: 11, opacity: 0.75, marginRight: 8 }}
+                title={GRAPH_IRI}>
+            {GRAPH_IRI}
+          </span>
+        )}
         {stages.map((s) => (
           <button
             key={s.key}

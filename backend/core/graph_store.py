@@ -651,6 +651,95 @@ class RdfStore:
             iri = URIRef(iri)
         return self.dataset.graph(iri)
 
+    def create_artefact_graph(
+        self,
+        iri: Union[str, URIRef],
+        artefact_type: str,
+        label: Optional[str] = None,
+        uses: Optional[List[Union[str, URIRef]]] = None,
+    ) -> URIRef:
+        """Create an empty artefact graph with type marker and pins.
+
+        ``artefact_type`` is one of ``ARTEFACT_TYPES`` (case-insensitive).
+        ``uses`` stamps ``promo:usesOntology`` pins — the ontology set the
+        artefact is checked against (R2).  Raises ``ValueError`` if the
+        graph already exists or the type is unknown.
+        """
+        if artefact_type.lower() not in {t.lower() for t in ARTEFACT_TYPES}:
+            raise ValueError(
+                f"unknown artefact type: {artefact_type} "
+                f"(expected one of {ARTEFACT_TYPES})")
+        iri = URIRef(str(iri))
+        g = self.dataset.graph(iri)
+        if len(g):
+            raise ValueError(f"graph already exists: {iri}")
+        g.add((iri, RDF.type,
+               PROMO[artefact_type.lower().capitalize()]))
+        if label:
+            g.add((iri, RDFS.label, Literal(label)))
+        for pin in uses or []:
+            g.add((iri, PROMO["usesOntology"], URIRef(str(pin))))
+        self.declare_vocabulary(g)
+        return iri
+
+    def fork_graph(
+        self,
+        source_iri: Union[str, URIRef],
+        new_iri: Union[str, URIRef],
+        label: Optional[str] = None,
+    ) -> URIRef:
+        """Fork a graph into a new artefact line.
+
+        Copies every triple, re-homing instance IRIs minted under the
+        source graph's namespace (``{source}#…``) to the new graph's
+        namespace (``{new}#…``) — required by D1: shared IRIs would merge
+        under union semantics.  The source's self-description triples
+        (artefact type, version stamps, pins) are not copied; the fork is
+        stamped fresh with the source's artefact type, its pins, a
+        ``promo:versionOf`` provenance link, and an optional label.
+        Raises ``ValueError`` if the source is empty or the target
+        exists.
+        """
+        source = URIRef(str(source_iri))
+        new = URIRef(str(new_iri))
+        src = self.dataset.graph(source)
+        if not len(src):
+            raise ValueError(f"nothing to fork: {source} is empty")
+        dst = self.dataset.graph(new)
+        if len(dst):
+            raise ValueError(f"graph already exists: {new}")
+
+        old_ns = f"{source}#"
+        new_ns = f"{new}#"
+
+        def rehome(term):
+            if not isinstance(term, URIRef):
+                return term
+            if term == source:
+                return new
+            if str(term).startswith(old_ns):
+                return URIRef(new_ns + str(term)[len(old_ns):])
+            return term
+
+        for s, p, o in src:
+            if s == source:
+                continue  # source self-description: re-stamped below
+            dst.add((rehome(s), p, rehome(o)))
+
+        # Fresh self-description: artefact type(s) minus Version, pins,
+        # provenance, label.
+        for t in src.objects(source, RDF.type):
+            if (isinstance(t, URIRef) and str(t).startswith(str(PROMO))
+                    and t != PROMO["Version"]):
+                dst.add((new, RDF.type, t))
+        for pin in src.objects(source, PROMO["usesOntology"]):
+            dst.add((new, PROMO["usesOntology"], pin))
+        dst.add((new, PROMO["versionOf"], source))
+        if label:
+            dst.add((new, RDFS.label, Literal(label)))
+        self.declare_vocabulary(dst)
+        return new
+
     # ------------------------------------------------------------------
     # Frozen-graph guard (R5: published versions are read-only)
     # ------------------------------------------------------------------

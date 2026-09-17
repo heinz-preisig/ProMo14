@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
@@ -90,3 +91,56 @@ def catalogue() -> Dict[str, Any]:
     for line in lines.values():
         line["versions"].sort(key=lambda v: v["version"])
     return {"lines": sorted(lines.values(), key=lambda l: l["iri"])}
+
+
+class NewArtefactRequest(BaseModel):
+    iri: str
+    type: str
+    label: Optional[str] = None
+    uses: List[str] = []
+
+
+class ForkRequest(BaseModel):
+    source: str
+    new_iri: Optional[str] = None
+    label: Optional[str] = None
+
+
+@router.post("/new")
+def new_artefact(req: NewArtefactRequest) -> Dict[str, Any]:
+    """Create an empty artefact line: type marker + ontology pins.
+
+    Pins are born at creation (design doc: never retrofitted).  The new
+    graph is persisted immediately so it survives restarts.
+    """
+    store = get_store()
+    try:
+        iri = store.create_artefact_graph(
+            req.iri, req.type, label=req.label, uses=req.uses)
+    except ValueError as exc:
+        detail = str(exc)
+        code = 422 if "unknown artefact type" in detail else 409
+        raise HTTPException(status_code=code, detail=detail)
+    store.save()
+    return {"iri": str(iri)}
+
+
+@router.post("/fork")
+def fork_artefact(req: ForkRequest) -> Dict[str, Any]:
+    """Fork an artefact graph into a new editable line.
+
+    Copies the source (draft or frozen version), re-homes instance IRIs
+    to the new graph's namespace, and stamps provenance
+    (``promo:versionOf`` → source).  Default target IRI:
+    ``{source}-fork``.
+    """
+    store = get_store()
+    new_iri = req.new_iri or f"{req.source}-fork"
+    try:
+        iri = store.fork_graph(req.source, new_iri, label=req.label)
+    except ValueError as exc:
+        detail = str(exc)
+        code = 404 if "nothing to fork" in detail else 409
+        raise HTTPException(status_code=code, detail=detail)
+    store.save()
+    return {"iri": str(iri)}

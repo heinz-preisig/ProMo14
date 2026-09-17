@@ -12,20 +12,36 @@ import type {
   TokenRecord,
 } from './types'
 
+/** The artefact graph this session edits — from the hub's ?graph= link.
+ *  Undefined means the default working ontology. */
+export const GRAPH_IRI =
+  new URLSearchParams(window.location.search).get('graph') || undefined
+
+/** Append the session's graph param to an API path. */
+function q(path: string): string {
+  if (!GRAPH_IRI) return path
+  const sep = path.includes('?') ? '&' : '?'
+  return `${path}${sep}graph=${encodeURIComponent(GRAPH_IRI)}`
+}
+
+function apiFetch(path: string, init?: RequestInit) {
+  return fetch(q(path), init)
+}
+
 export async function loadOntologyContext(): Promise<OntologyContext> {
-  const res = await fetch('/api/ontology/context')
+  const res = await apiFetch('/api/ontology/context')
   if (!res.ok) throw new Error(`Failed to load context: ${res.status}`)
   return res.json()
 }
 
 export async function listNetworks(): Promise<NetworkRecord[]> {
-  const res = await fetch('/api/ontology/networks')
+  const res = await apiFetch('/api/ontology/networks')
   if (!res.ok) throw new Error(`Failed to load networks: ${res.status}`)
   return res.json()
 }
 
 export async function createNetwork(record: NetworkRecord): Promise<NetworkRecord> {
-  const res = await fetch('/api/ontology/networks', {
+  const res = await apiFetch('/api/ontology/networks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -35,13 +51,13 @@ export async function createNetwork(record: NetworkRecord): Promise<NetworkRecor
 }
 
 export async function listIndices(): Promise<IndexRecord[]> {
-  const res = await fetch('/api/ontology/indices')
+  const res = await apiFetch('/api/ontology/indices')
   if (!res.ok) throw new Error(`Failed to load indices: ${res.status}`)
   return res.json()
 }
 
 export async function createIndex(record: IndexRecord): Promise<IndexRecord> {
-  const res = await fetch('/api/ontology/indices', {
+  const res = await apiFetch('/api/ontology/indices', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -51,7 +67,7 @@ export async function createIndex(record: IndexRecord): Promise<IndexRecord> {
 }
 
 export async function deleteIndex(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/indices/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/indices/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete index: ${res.status}`)
@@ -59,13 +75,13 @@ export async function deleteIndex(iri: string): Promise<{ deleted: string }> {
 }
 
 export async function listTokens(): Promise<TokenRecord[]> {
-  const res = await fetch('/api/ontology/tokens')
+  const res = await apiFetch('/api/ontology/tokens')
   if (!res.ok) throw new Error(`Failed to load tokens: ${res.status}`)
   return res.json()
 }
 
 export async function createToken(record: TokenRecord): Promise<TokenRecord> {
-  const res = await fetch('/api/ontology/tokens', {
+  const res = await apiFetch('/api/ontology/tokens', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -75,7 +91,7 @@ export async function createToken(record: TokenRecord): Promise<TokenRecord> {
 }
 
 export async function deleteToken(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/tokens/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/tokens/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete token: ${res.status}`)
@@ -87,13 +103,13 @@ export async function deleteToken(iri: string): Promise<{ deleted: string }> {
 // ---------------------------------------------------------------------------
 
 export async function listDomains(): Promise<DomainRecord[]> {
-  const res = await fetch('/api/ontology/domains')
+  const res = await apiFetch('/api/ontology/domains')
   if (!res.ok) throw new Error(`Failed to load domains: ${res.status}`)
   return res.json()
 }
 
 export async function createDomain(record: DomainRecord): Promise<DomainRecord> {
-  const res = await fetch('/api/ontology/domains', {
+  const res = await apiFetch('/api/ontology/domains', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -103,7 +119,7 @@ export async function createDomain(record: DomainRecord): Promise<DomainRecord> 
 }
 
 export async function deleteDomain(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/domains/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/domains/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete domain: ${res.status}`)
@@ -115,13 +131,13 @@ export async function deleteDomain(iri: string): Promise<{ deleted: string }> {
 // ---------------------------------------------------------------------------
 
 export async function listAxes(): Promise<ClassificationAxisRecord[]> {
-  const res = await fetch('/api/ontology/axes')
+  const res = await apiFetch('/api/ontology/axes')
   if (!res.ok) throw new Error(`Failed to load axes: ${res.status}`)
   return res.json()
 }
 
 export async function createAxis(record: ClassificationAxisRecord): Promise<ClassificationAxisRecord> {
-  const res = await fetch('/api/ontology/axes', {
+  const res = await apiFetch('/api/ontology/axes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -131,7 +147,7 @@ export async function createAxis(record: ClassificationAxisRecord): Promise<Clas
 }
 
 export async function deleteAxis(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/axes/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/axes/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete axis: ${res.status}`)
@@ -139,13 +155,13 @@ export async function deleteAxis(iri: string): Promise<{ deleted: string }> {
 }
 
 export async function listAxisTerms(): Promise<AxisTermRecord[]> {
-  const res = await fetch('/api/ontology/axis-terms')
+  const res = await apiFetch('/api/ontology/axis-terms')
   if (!res.ok) throw new Error(`Failed to load axis terms: ${res.status}`)
   return res.json()
 }
 
 export async function createAxisTerm(record: AxisTermRecord): Promise<AxisTermRecord> {
-  const res = await fetch('/api/ontology/axis-terms', {
+  const res = await apiFetch('/api/ontology/axis-terms', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -155,7 +171,7 @@ export async function createAxisTerm(record: AxisTermRecord): Promise<AxisTermRe
 }
 
 export async function deleteAxisTerm(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/axis-terms/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/axis-terms/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete axis term: ${res.status}`)
@@ -167,13 +183,13 @@ export async function deleteAxisTerm(iri: string): Promise<{ deleted: string }> 
 // ---------------------------------------------------------------------------
 
 export async function listScaleDimensions(): Promise<ScaleDimensionRecord[]> {
-  const res = await fetch('/api/ontology/scale-dimensions')
+  const res = await apiFetch('/api/ontology/scale-dimensions')
   if (!res.ok) throw new Error(`Failed to load scale dimensions: ${res.status}`)
   return res.json()
 }
 
 export async function createScaleDimension(record: ScaleDimensionRecord): Promise<ScaleDimensionRecord> {
-  const res = await fetch('/api/ontology/scale-dimensions', {
+  const res = await apiFetch('/api/ontology/scale-dimensions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -183,7 +199,7 @@ export async function createScaleDimension(record: ScaleDimensionRecord): Promis
 }
 
 export async function deleteScaleDimension(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/scale-dimensions/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/scale-dimensions/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete scale dimension: ${res.status}`)
@@ -191,13 +207,13 @@ export async function deleteScaleDimension(iri: string): Promise<{ deleted: stri
 }
 
 export async function listScaleValues(): Promise<ScaleValueRecord[]> {
-  const res = await fetch('/api/ontology/scale-values')
+  const res = await apiFetch('/api/ontology/scale-values')
   if (!res.ok) throw new Error(`Failed to load scale values: ${res.status}`)
   return res.json()
 }
 
 export async function createScaleValue(record: ScaleValueRecord): Promise<ScaleValueRecord> {
-  const res = await fetch('/api/ontology/scale-values', {
+  const res = await apiFetch('/api/ontology/scale-values', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -207,7 +223,7 @@ export async function createScaleValue(record: ScaleValueRecord): Promise<ScaleV
 }
 
 export async function deleteScaleValue(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/scale-values/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/scale-values/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete scale value: ${res.status}`)
@@ -219,13 +235,13 @@ export async function deleteScaleValue(iri: string): Promise<{ deleted: string }
 // ---------------------------------------------------------------------------
 
 export async function listEntityTypes(): Promise<EntityTypeRecord[]> {
-  const res = await fetch('/api/ontology/entity-types')
+  const res = await apiFetch('/api/ontology/entity-types')
   if (!res.ok) throw new Error(`Failed to load entity types: ${res.status}`)
   return res.json()
 }
 
 export async function createEntityType(record: EntityTypeRecord): Promise<EntityTypeRecord> {
-  const res = await fetch('/api/ontology/entity-types', {
+  const res = await apiFetch('/api/ontology/entity-types', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -235,7 +251,7 @@ export async function createEntityType(record: EntityTypeRecord): Promise<Entity
 }
 
 export async function deleteEntityType(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/entity-types/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/entity-types/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete entity type: ${res.status}`)
@@ -247,13 +263,13 @@ export async function deleteEntityType(iri: string): Promise<{ deleted: string }
 // ---------------------------------------------------------------------------
 
 export async function listConnectionRules(): Promise<ConnectionRuleRecord[]> {
-  const res = await fetch('/api/ontology/connection-rules')
+  const res = await apiFetch('/api/ontology/connection-rules')
   if (!res.ok) throw new Error(`Failed to load connection rules: ${res.status}`)
   return res.json()
 }
 
 export async function createConnectionRule(record: ConnectionRuleRecord): Promise<ConnectionRuleRecord> {
-  const res = await fetch('/api/ontology/connection-rules', {
+  const res = await apiFetch('/api/ontology/connection-rules', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
@@ -263,7 +279,7 @@ export async function createConnectionRule(record: ConnectionRuleRecord): Promis
 }
 
 export async function deleteConnectionRule(iri: string): Promise<{ deleted: string }> {
-  const res = await fetch(`/api/ontology/connection-rules/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/ontology/connection-rules/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete connection rule: ${res.status}`)
@@ -271,7 +287,7 @@ export async function deleteConnectionRule(iri: string): Promise<{ deleted: stri
 }
 
 export async function saveOntology(filename: string): Promise<{ saved: string }> {
-  const res = await fetch('/api/ontology/save', {
+  const res = await apiFetch('/api/ontology/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename }),
@@ -287,13 +303,13 @@ export interface OntologyVersion {
 }
 
 export async function listVersions(): Promise<{ versions: OntologyVersion[]; suggested_next: string }> {
-  const res = await fetch('/api/ontology/versions')
+  const res = await apiFetch('/api/ontology/versions')
   if (!res.ok) throw new Error(`Failed to list versions: ${res.status}`)
   return res.json()
 }
 
 export async function publishOntology(version: string): Promise<{ version_iri: string; saved: string }> {
-  const res = await fetch('/api/ontology/publish', {
+  const res = await apiFetch('/api/ontology/publish', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ version }),
@@ -307,9 +323,9 @@ export async function publishOntology(version: string): Promise<{ version_iri: s
 
 /** Download the ontology as Turtle (a frozen version, or the working draft). */
 export function exportOntology(version?: string): void {
-  const url = version
+  const url = q(version
     ? `/api/ontology/export?version=${encodeURIComponent(version)}`
-    : '/api/ontology/export'
+    : '/api/ontology/export')
   const a = document.createElement('a')
   a.href = url
   a.download = version ? `ontology-${version}.ttl` : 'ontology.ttl'

@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
+from rdflib import URIRef
 from rdflib.namespace import RDF
 
 from backend.core import graph_store
@@ -838,6 +839,83 @@ def test_rdf_context_scoped(client):
     empty = RdfContext(store, graph_iris=["https://example.org/empty"])
     assert empty.domains() == []
     assert empty.entity_types() == []
+
+
+def test_graph_param_scopes_reads(client):
+    """?graph= selects the artefact a request operates on."""
+    store = graph_store.get_store()
+    v_iri = store.freeze_version("5.5-test")
+    r = client.get(f"/api/ontology/domains?graph={v_iri}")
+    assert r.status_code == 200
+    assert len(r.json()) > 0  # frozen copy serves reads
+    r = client.get("/api/ontology/domains?graph=https://example.org/none")
+    assert r.json() == []  # unknown graph: empty, not the working draft
+
+
+def test_graph_param_blocks_frozen_writes(client):
+    """R5 enforced: mutations with ?graph=<frozen> get 403."""
+    store = graph_store.get_store()
+    v_iri = store.freeze_version("4.4-test")
+    r = client.post(
+        f"/api/ontology/tokens?graph={v_iri}",
+        json={"iri": "", "label": "X", "parent": None, "kind": None})
+    assert r.status_code == 403
+    r = client.delete(f"/api/ontology/domains/"
+                      f"{_iri_path('https://w3id.org/promo/ontology#domain_root')}"
+                      f"?graph={v_iri}")
+    assert r.status_code == 403
+
+
+def test_catalogue_new_and_fork(client):
+    """POST /new creates a pinned artefact line; POST /fork copies a
+    graph with re-homed IRIs and provenance."""
+    store = graph_store.get_store()
+    base = str(store.ONTOLOGY_GRAPH_IRI)
+
+    r = client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/lib1", "type": "library",
+        "label": "My library", "uses": [base]})
+    assert r.status_code == 200
+    g = store.dataset.graph("https://example.org/lib1")
+    assert (g.identifier, RDF.type, graph_store.PROMO["Library"]) in g
+    assert (g.identifier, graph_store.PROMO["usesOntology"],
+            URIRef(base)) in g
+
+    # unknown type -> 422; existing graph -> 409
+    assert client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/x", "type": "bogus"}).status_code == 422
+    assert client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/lib1",
+        "type": "library"}).status_code == 409
+
+    # Fork the working ontology: instance IRIs re-homed, provenance set.
+    r = client.post("/api/catalogue/fork", json={
+        "source": base, "new_iri": "https://example.org/my-onto",
+        "label": "My ontology"})
+    assert r.status_code == 200
+    fg = store.dataset.graph("https://example.org/my-onto")
+    assert len(fg) > 0
+    assert (fg.identifier, RDF.type, graph_store.PROMO["Ontology"]) in fg
+    assert (fg.identifier, graph_store.PROMO["versionOf"],
+            URIRef(base)) in fg
+    # Instance IRIs re-homed: no subject under the source namespace.
+    assert not any(str(s).startswith(f"{base}#") for s in fg.subjects())
+    assert any(str(s).startswith("https://example.org/my-onto#")
+               for s in fg.subjects())
+
+    # Catalogue shows the new line as a draft ontology.
+    lines = client.get("/api/catalogue").json()["lines"]
+    forked = [l for l in lines if l["iri"] == "https://example.org/my-onto"]
+    assert len(forked) == 1
+    assert forked[0]["type"] == "ontology"
+    assert forked[0]["status"] == "draft"
+
+    # Forking a frozen version works too (frozen graphs are read-only
+    # sources, not un-forkable).
+    v_iri = store.freeze_version("3.3-test")
+    r = client.post("/api/catalogue/fork", json={"source": str(v_iri)})
+    assert r.status_code == 200
+    assert r.json()["iri"] == f"{v_iri}-fork"
 
 
 def test_entity_type_branch_checked(client):
