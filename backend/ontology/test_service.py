@@ -918,6 +918,45 @@ def test_catalogue_new_and_fork(client):
     assert r.json()["iri"] == f"{v_iri}-fork"
 
 
+def test_equation_context_scoped_by_pins(client):
+    """R4 end-to-end: /api/equation/context?graph=<lib> resolves the
+    library plus its transitive usesOntology pins — and nothing else."""
+    store = graph_store.get_store()
+    base = str(store.ONTOLOGY_GRAPH_IRI)
+
+    # A library pinned to the working ontology.
+    client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/lib", "type": "library",
+        "uses": [base]})
+    r = client.get("/api/equation/context?graph=https://example.org/lib")
+    assert r.status_code == 200
+    # The pinned ontology's vocabulary is in scope (its indices are
+    # visible); an unrelated graph's would not be.
+    assert len(r.json()["indices"]) > 0
+
+    # A library with no pins sees only its own (empty) content.
+    client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/lonely", "type": "library"})
+    r = client.get(
+        "/api/equation/context?graph=https://example.org/lonely")
+    assert r.json()["indices"] == []
+    assert r.json()["variables"] == []
+
+    # Writes land in the library graph, not the ontology.
+    r = client.post(
+        "/api/equation/variables?graph=https://example.org/lib",
+        json={"iri": "", "label": "Lv", "network": "root",
+              "type": "state", "units": [0] * 8, "index_structures": [],
+              "aliases": {}, "doc": "", "port_variable": False,
+              "tokens": [], "equations": {}})
+    assert r.status_code == 200
+    assert r.json()["iri"].startswith("https://example.org/lib#")
+    lib = store.dataset.graph("https://example.org/lib")
+    assert any(s.startswith("https://example.org/lib#")
+               for s in map(str, lib.subjects(
+                   RDF.type, graph_store.PROMO["Variable"])))
+
+
 def test_entity_type_branch_checked(client):
     r = client.post("/api/ontology/entity-types", json={
         "iri": "", "label": "Bad Branch", "temporal_type": "dynamic",

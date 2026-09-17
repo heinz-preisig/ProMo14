@@ -42,13 +42,13 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _graph_param(graph: Optional[str] = None) -> Optional[str]:
+def graph_param(graph: Optional[str] = None) -> Optional[str]:
     """FastAPI dependency: the ``?graph=`` query param (a graph IRI)."""
     return graph
 
 
-def _editable_param(graph: Optional[str] = None) -> Optional[str]:
-    """Like ``_graph_param`` but rejects frozen version graphs (R5)."""
+def editable_param(graph: Optional[str] = None) -> Optional[str]:
+    """Like ``graph_param`` but rejects frozen version graphs (R5)."""
     store = get_store()
     g = store.ontology_graph if graph is None else store.graph(graph)
     try:
@@ -58,18 +58,19 @@ def _editable_param(graph: Optional[str] = None) -> Optional[str]:
     return graph
 
 
-def _resolve(store, graph_iri: Optional[str]):
+def resolve_graph(store, graph_iri: Optional[str]):
     """Resolve an optional graph IRI to a dataset graph (default: the
     working ontology)."""
     return store.ontology_graph if graph_iri is None \
         else store.dataset.graph(URIRef(graph_iri))
 
 
-def _ctx(store, graph_iri: Optional[str]) -> RdfContext:
-    """Build the resolution context: scoped to ``graph_iri`` when given,
-    legacy dataset-wide scope otherwise."""
+def scoped_context(store, graph_iri: Optional[str]) -> RdfContext:
+    """Build the resolution context: the artefact plus its transitive
+    ``usesOntology`` pin set when ``graph_iri`` is given (R4), legacy
+    dataset-wide scope otherwise."""
     return RdfContext(store) if graph_iri is None \
-        else RdfContext(store, graph_iris=[graph_iri])
+        else RdfContext(store, graph_iris=store.resolution_scope(graph_iri))
 
 
 # Predicates that define containment: deleting the object also deletes the
@@ -207,10 +208,10 @@ class ContextResponse(BaseModel):
 
 @router.get("/context", response_model=ContextResponse)
 def get_context(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> ContextResponse:
     """Return the current ontology context (variables, indices, domains, axes, entity types, connection rules)."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return ContextResponse(
         variables=[_variable_to_record(v) for v in ctx.variables().values()],
         indices=[_index_to_record(i) for i in ctx.indices().values()],
@@ -230,23 +231,23 @@ def get_context(
 
 @router.get("/domains", response_model=List[DomainRecord])
 def list_domains(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[DomainRecord]:
     """List all domains with branch and token bindings."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return _list_domain_records(ctx)
 
 
 @router.post("/domains", response_model=DomainRecord)
 def create_domain(
     record: DomainRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> DomainRecord:
     """Create or update a domain with branch and token bindings."""
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Domain name must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         record.iri = _mint_fresh(store, graph, f"domain_{record.name.strip()}")
     if record.parent:
@@ -281,11 +282,11 @@ def create_domain(
 @router.delete("/domains/{iri:path}")
 def delete_domain(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete a domain and all its subdomains from the ontology graph."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Domain not found")
@@ -300,12 +301,12 @@ def delete_domain(
 
 @router.get("/networks", response_model=List[NetworkRecord])
 def list_networks(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[NetworkRecord]:
     """List all networks as a flat list with parent/children references."""
     store = get_store()
-    ctx = _ctx(store, graph_iri)
-    base = _resolve(store, graph_iri).identifier
+    ctx = scoped_context(store, graph_iri)
+    base = resolve_graph(store, graph_iri).identifier
     tree = ctx.tree()
     parent_of = ctx._parent_of
     records = []
@@ -324,12 +325,12 @@ def list_networks(
 @router.post("/networks", response_model=NetworkRecord)
 def create_network(
     record: NetworkRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> NetworkRecord:
     """Create or update a network and its parent/children relationships."""
     store = get_store()
     store.add_network(
-        _resolve(store, graph_iri),
+        resolve_graph(store, graph_iri),
         record.name,
         parent=record.parent,
         children=record.children or [],
@@ -344,23 +345,23 @@ def create_network(
 
 @router.get("/indices", response_model=List[IndexRecord])
 def list_indices(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[IndexRecord]:
     """List all indices in the ontology."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return [IndexRecord(**_index_to_record(i)) for i in ctx.indices().values()]
 
 
 @router.post("/indices", response_model=IndexRecord)
 def create_index(
     record: IndexRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> IndexRecord:
     """Create a new index in the ontology graph."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Index label must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         record.iri = _mint_fresh(
             store, graph, record.internal_id or store.next_internal_id("I"))
@@ -377,11 +378,11 @@ def create_index(
 @router.delete("/indices/{iri:path}")
 def delete_index(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete an index from the ontology graph."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Index not found")
@@ -396,11 +397,11 @@ def delete_index(
 
 @router.get("/tokens", response_model=List[TokenRecord])
 def list_tokens(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[TokenRecord]:
     """List token types defined in the ontology."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     records = []
     for s in graph.subjects(RDF.type, PROMO["Token"]):
         label = graph.value(s, RDFS.label)
@@ -420,13 +421,13 @@ def list_tokens(
 @router.post("/tokens", response_model=TokenRecord)
 def create_token(
     record: TokenRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> TokenRecord:
     """Create or update a token type."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Token label must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         fragment = record.label.strip().lower().replace(" ", "_")
         record.iri = _mint_fresh(store, graph, f"token_{fragment}")
@@ -447,11 +448,11 @@ def create_token(
 @router.delete("/tokens/{iri:path}")
 def delete_token(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete a token type and all child tokens from the ontology graph."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Token not found")
@@ -466,23 +467,23 @@ def delete_token(
 
 @router.get("/axes", response_model=List[ClassificationAxisRecord])
 def list_axes(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[ClassificationAxisRecord]:
     """List all classification axes."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return _list_axis_records(ctx)
 
 
 @router.post("/axes", response_model=ClassificationAxisRecord)
 def create_axis(
     record: ClassificationAxisRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> ClassificationAxisRecord:
     """Create or update a classification axis."""
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Axis name must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         fragment = f"axis_{record.name.strip()}"
         record.iri = _mint_fresh(store, graph, fragment)
@@ -502,11 +503,11 @@ def create_axis(
 @router.delete("/axes/{iri:path}")
 def delete_axis(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete a classification axis."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Axis not found")
@@ -516,11 +517,11 @@ def delete_axis(
 
 @router.get("/axis-terms", response_model=List[AxisTermRecord])
 def list_axis_terms(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[AxisTermRecord]:
     """List all axis terms."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     records = []
     for s in graph.subjects(RDF.type, PROMO["AxisTerm"]):
         label = graph.value(s, RDFS.label)
@@ -540,13 +541,13 @@ def list_axis_terms(
 @router.post("/axis-terms", response_model=AxisTermRecord)
 def create_axis_term(
     record: AxisTermRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> AxisTermRecord:
     """Create or update an axis term."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Axis term label must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         fragment = f"term_{record.label.strip().lower().replace(' ', '_')}"
         record.iri = _mint_fresh(store, graph, fragment)
@@ -569,11 +570,11 @@ def create_axis_term(
 @router.delete("/axis-terms/{iri:path}")
 def delete_axis_term(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete an axis term and all its child terms."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Axis term not found")
@@ -588,23 +589,23 @@ def delete_axis_term(
 
 @router.get("/scale-dimensions", response_model=List[ScaleDimensionRecord])
 def list_scale_dimensions(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[ScaleDimensionRecord]:
     """List all scale dimensions with their values."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return _list_scale_dimension_records(ctx)
 
 
 @router.post("/scale-dimensions", response_model=ScaleDimensionRecord)
 def create_scale_dimension(
     record: ScaleDimensionRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> ScaleDimensionRecord:
     """Create or update a scale dimension."""
     if not record.name or not record.name.strip():
         raise HTTPException(status_code=422, detail="Scale dimension name must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         fragment = f"scale_{record.name.strip()}"
         record.iri = _mint_fresh(store, graph, fragment)
@@ -626,11 +627,11 @@ def create_scale_dimension(
 @router.delete("/scale-dimensions/{iri:path}")
 def delete_scale_dimension(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete a scale dimension."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Scale dimension not found")
@@ -640,11 +641,11 @@ def delete_scale_dimension(
 
 @router.get("/scale-values", response_model=List[ScaleValueRecord])
 def list_scale_values(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[ScaleValueRecord]:
     """List all scale values."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     records = []
     for s in graph.subjects(RDF.type, PROMO["ScaleValue"]):
         label = graph.value(s, RDFS.label)
@@ -664,13 +665,13 @@ def list_scale_values(
 @router.post("/scale-values", response_model=ScaleValueRecord)
 def create_scale_value(
     record: ScaleValueRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> ScaleValueRecord:
     """Create or update a scale value."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Scale value label must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         fragment = f"sval_{record.label.strip().lower().replace(' ', '_')}"
         record.iri = _mint_fresh(store, graph, fragment)
@@ -693,11 +694,11 @@ def create_scale_value(
 @router.delete("/scale-values/{iri:path}")
 def delete_scale_value(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete a scale value and all its child values."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Scale value not found")
@@ -712,23 +713,23 @@ def delete_scale_value(
 
 @router.get("/entity-types", response_model=List[EntityTypeRecord])
 def list_entity_types(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[EntityTypeRecord]:
     """List all entity types."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return _list_entity_type_records(ctx)
 
 
 @router.post("/entity-types", response_model=EntityTypeRecord)
 def create_entity_type(
     record: EntityTypeRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> EntityTypeRecord:
     """Create or update an entity type."""
     if not record.label or not record.label.strip():
         raise HTTPException(status_code=422, detail="Entity type label must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         fragment = f"etype_{record.label.strip().lower().replace(' ', '_')}"
         record.iri = _mint_fresh(store, graph, fragment)
@@ -779,11 +780,11 @@ def create_entity_type(
 @router.delete("/entity-types/{iri:path}")
 def delete_entity_type(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete an entity type."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Entity type not found")
@@ -798,23 +799,23 @@ def delete_entity_type(
 
 @router.get("/connection-rules", response_model=List[ConnectionRuleRecord])
 def list_connection_rules(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[ConnectionRuleRecord]:
     """List all connection rules."""
-    ctx = _ctx(get_store(), graph_iri)
+    ctx = scoped_context(get_store(), graph_iri)
     return _list_connection_rule_records(ctx)
 
 
 @router.post("/connection-rules", response_model=ConnectionRuleRecord)
 def create_connection_rule(
     record: ConnectionRuleRecord,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> ConnectionRuleRecord:
     """Create or update a connection rule."""
     if not record.rule_type or not record.rule_type.strip():
         raise HTTPException(status_code=422, detail="Connection rule type must not be empty")
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
         slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", record.rule_type.strip().lower())
         fragment = f"rule_{slug or 'unnamed'}"
@@ -843,11 +844,11 @@ def create_connection_rule(
 @router.delete("/connection-rules/{iri:path}")
 def delete_connection_rule(
     iri: str,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Delete a connection rule."""
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Connection rule not found")
@@ -912,7 +913,7 @@ def _rule_match_orientation(rule: ConnectionRuleRecord,
 def resolve_connection(
     source: str,
     target: str,
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> Dict[str, Any]:
     """Return connection rules applicable to a source→target domain pair.
 
@@ -930,7 +931,7 @@ def resolve_connection(
     (closest ancestor match wins), ties broken by IRI.
     """
     store = get_store()
-    graph = _resolve(store, graph_iri)
+    graph = resolve_graph(store, graph_iri)
     src_chain = _domain_ancestor_chain(graph, source)
     tgt_chain = _domain_ancestor_chain(graph, target)
     src_branch = _top_branch(src_chain)
@@ -938,7 +939,7 @@ def resolve_connection(
     src_eff = store.effective_tokens(graph, URIRef(source))
     tgt_eff = store.effective_tokens(graph, URIRef(target))
 
-    ctx = _ctx(store, graph_iri)
+    ctx = scoped_context(store, graph_iri)
     scored = []
     for rule in _list_connection_rule_records(ctx):
         orientation = _rule_match_orientation(rule, src_chain, tgt_chain)
@@ -1008,11 +1009,11 @@ def _version_graphs(store) -> List:
 
 @router.get("/versions")
 def list_versions(
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> Dict[str, Any]:
     """List frozen versions of the selected ontology and suggest next."""
     store = get_store()
-    base = _resolve(store, graph_iri).identifier
+    base = resolve_graph(store, graph_iri).identifier
     versions = []
     best = (0, 0)
     for g in _version_graphs(store):
@@ -1037,7 +1038,7 @@ def list_versions(
 @router.post("/publish")
 def publish_ontology(
     req: PublishRequest,
-    graph_iri: Optional[str] = Depends(_editable_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
     """Freeze the selected ontology as an immutable version and save.
 
@@ -1062,11 +1063,11 @@ def publish_ontology(
 @router.get("/export")
 def export_ontology_graph(
     version: Optional[str] = None,
-    graph_iri: Optional[str] = Depends(_graph_param),
+    graph_iri: Optional[str] = Depends(graph_param),
 ) -> Response:
     """Serialise a frozen version (or the working draft) as Turtle."""
     store = get_store()
-    base = _resolve(store, graph_iri).identifier
+    base = resolve_graph(store, graph_iri).identifier
     if version:
         graph = store.dataset.graph(URIRef(f"{base}/{version}"))
         if not len(graph):
@@ -1074,7 +1075,7 @@ def export_ontology_graph(
                 status_code=404, detail=f"no such version: {version}")
         filename = f"ontology-{version}.ttl"
     else:
-        graph = _resolve(store, graph_iri)
+        graph = resolve_graph(store, graph_iri)
         filename = "ontology.ttl"
     for prefix, ns in (("promo", PROMO), ("promolg", PROMOLG),
                        ("qudt", QUDT), ("rdf", RDF), ("rdfs", RDFS)):

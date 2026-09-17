@@ -740,6 +740,28 @@ class RdfStore:
         self.declare_vocabulary(dst)
         return new
 
+    def resolution_scope(
+        self, graph_iri: Union[str, URIRef]
+    ) -> List[URIRef]:
+        """An artefact's resolution context: itself plus the transitive
+        ``promo:usesOntology`` closure (R2/R4).  Cycle-safe; order is the
+        artefact first, then pins breadth-first."""
+        start = URIRef(str(graph_iri))
+        scope: List[URIRef] = []
+        seen: set = set()
+        stack = [start]
+        while stack:
+            iri = stack.pop()
+            if iri in seen:
+                continue
+            seen.add(iri)
+            scope.append(iri)
+            g = self.dataset.graph(iri)
+            for pin in g.objects(iri, PROMO["usesOntology"]):
+                if isinstance(pin, URIRef):
+                    stack.append(pin)
+        return scope
+
     # ------------------------------------------------------------------
     # Frozen-graph guard (R5: published versions are read-only)
     # ------------------------------------------------------------------

@@ -1,8 +1,24 @@
 import type { AstNode, CheckRequest, CheckResponse, ContextResponse, ParseRequest, ParseResponse, Variable } from './types'
 import type { SavedEquation } from './components/EquationList'
 
+/** The artefact graph this session edits — from the hub's ?graph= link.
+ *  Undefined means the default working ontology. */
+export const GRAPH_IRI =
+  new URLSearchParams(window.location.search).get('graph') || undefined
+
+/** Append the session's graph param to an API path. */
+function q(path: string): string {
+  if (!GRAPH_IRI) return path
+  const sep = path.includes('?') ? '&' : '?'
+  return `${path}${sep}graph=${encodeURIComponent(GRAPH_IRI)}`
+}
+
+function apiFetch(path: string, init?: RequestInit) {
+  return fetch(q(path), init)
+}
+
 export async function parseExpression(text: string): Promise<ParseResponse> {
-  const res = await fetch('/api/equation/parse', {
+  const res = await apiFetch('/api/equation/parse', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text } satisfies ParseRequest),
@@ -11,7 +27,7 @@ export async function parseExpression(text: string): Promise<ParseResponse> {
 }
 
 export async function checkExpression(req: CheckRequest): Promise<CheckResponse> {
-  const res = await fetch('/api/equation/check', {
+  const res = await apiFetch('/api/equation/check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -20,7 +36,7 @@ export async function checkExpression(req: CheckRequest): Promise<CheckResponse>
 }
 
 export async function loadContext(): Promise<ContextResponse> {
-  const res = await fetch('/api/equation/context')
+  const res = await apiFetch('/api/equation/context')
   return res.json() as Promise<ContextResponse>
 }
 
@@ -62,7 +78,7 @@ export async function saveVariable(v: Variable, equation?: SavedEquation): Promi
     created: null,
     modified: null,
   }
-  const res = await fetch('/api/equation/variables', {
+  const res = await apiFetch('/api/equation/variables', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -72,7 +88,7 @@ export async function saveVariable(v: Variable, equation?: SavedEquation): Promi
 }
 
 export async function deleteVariable(iri: string): Promise<void> {
-  const res = await fetch(`/api/equation/variables/${encodeURIComponent(iri)}`, {
+  const res = await apiFetch(`/api/equation/variables/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete variable: ${res.status}`)

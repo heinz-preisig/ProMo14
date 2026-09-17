@@ -17,13 +17,19 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from rdflib import URIRef
 
 from backend.core.graph_store import get_store
 from backend.ontology.models import VariableRecord
 from backend.ontology.rdf_context import RdfContext
+from backend.ontology.service import (
+    editable_param,
+    graph_param,
+    resolve_graph,
+    scoped_context,
+)
 
 from .checker import check
 from .compile_space import CompileSpace, Index, Variable
@@ -146,9 +152,16 @@ class ContextResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get("/context", response_model=ContextResponse)
-def context_endpoint() -> ContextResponse:
-    """Load the equation context from the RDF graph store in PROMO_DATA_DIR."""
-    ctx = RdfContext(get_store())
+def context_endpoint(
+    graph_iri: Optional[str] = Depends(graph_param),
+) -> ContextResponse:
+    """Load the equation context from the RDF graph store.
+
+    ``?graph=<iri>`` scopes resolution to the artefact plus its
+    transitive ``usesOntology`` pin set (R4); absent, the legacy
+    dataset-wide scope applies.
+    """
+    ctx = scoped_context(get_store(), graph_iri)
 
     variables = []
     for v in ctx.variables().values():
@@ -272,26 +285,35 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
 
 
 @router.post("/variables", response_model=VariableRecord)
-def create_variable(record: VariableRecord) -> VariableRecord:
-    """Create a new variable (with nested equations) in the ontology graph."""
+def create_variable(
+    record: VariableRecord,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> VariableRecord:
+    """Create a new variable (with nested equations) in the selected
+    artefact graph (default: the working ontology)."""
     store = get_store()
+    graph = resolve_graph(store, graph_iri)
     if not record.iri:
-        record.iri = str(store.mint_iri(store.ONTOLOGY_GRAPH_IRI, record.internal_id or store.next_internal_id("V")))
+        record.iri = str(store.mint_iri(graph.identifier, record.internal_id or store.next_internal_id("V")))
     if not record.internal_id:
         record.internal_id = store.next_internal_id("V")
 
     var = record.model_dump()
     if var.get("variable_class"):
         var["type"] = var["variable_class"]
-    store.add_variable_dict(store.ontology_graph, var)
+    store.add_variable_dict(graph, var)
     return record
 
 
 @router.put("/variables/{iri:path}", response_model=VariableRecord)
-def update_variable(iri: str, record: VariableRecord) -> VariableRecord:
-    """Replace a variable in the ontology graph."""
+def update_variable(
+    iri: str,
+    record: VariableRecord,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> VariableRecord:
+    """Replace a variable in the selected artefact graph."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = resolve_graph(store, graph_iri)
 
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
@@ -304,10 +326,13 @@ def update_variable(iri: str, record: VariableRecord) -> VariableRecord:
 
 
 @router.delete("/variables/{iri:path}")
-def delete_variable(iri: str) -> Dict[str, str]:
-    """Delete a variable from the ontology graph."""
+def delete_variable(
+    iri: str,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> Dict[str, str]:
+    """Delete a variable from the selected artefact graph."""
     store = get_store()
-    graph = store.ontology_graph
+    graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Variable not found")
