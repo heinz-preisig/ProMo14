@@ -26,14 +26,23 @@ How `https://w3id.org/promo#` becomes dereferenceable.  Three pieces:
 
 ## Publishing an ontology version
 
-```bash
-# Export the current ontology (PROMO_DATA_DIR/ontology.trig, or the
-# default seed when no saved ontology exists):
-uv run python scripts/export_ontology.py --out ontology.ttl
+From the Ontology Editor: **Publish…** freezes the working graph under
+the version IRI, saves `data/ontology.trig`, and downloads the frozen
+Turtle.  Or from the CLI — freeze (if new) and write straight into a
+ProMo-ontologies checkout:
 
-# Copy into the ProMo-ontologies repo and push:
-cp ontology.ttl /path/to/ProMo-ontologies/
-cd /path/to/ProMo-ontologies && git add ontology.ttl && git commit -m "Update ontology" && git push
+```bash
+uv run python scripts/export_ontology.py --version 1.1 --repo ~/1_Gits/ProMo-ontologies
+# writes ontology/1.1 and refreshes ontology.ttl
+
+cd ~/1_Gits/ProMo-ontologies && git add ontology.ttl ontology/1.1 \
+  && git commit -m "Ontology 1.1" && git push
+```
+
+Export without publishing (working draft):
+
+```bash
+uv run python scripts/export_ontology.py --out ontology.ttl
 ```
 
 ## Versioning (per ADR-006)
@@ -44,11 +53,11 @@ paths so existing IRIs never change meaning:
 ```
 ProMo-ontologies/
   ontology.ttl          # latest
-  v1/ontology.ttl       # frozen snapshot
-  v2/ontology.ttl
+  ontology/1.0          # frozen snapshot (extensionless; served via
+  ontology/1.1          #   the w3id catch-all for promo/ontology/{v})
 ```
 
-Tag releases in the ProMo-ontologies repo (`v1`, `v2`, ...) to match.
+Tag releases in the ProMo-ontologies repo (`v1.0`, `v1.1`, ...) to match.
 
 ## IRI layout
 

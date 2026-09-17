@@ -206,3 +206,7 @@ class ConnectionRuleRecord(BaseModel):
 
 class SaveRequest(BaseModel):
     filename: str = "ontology.trig"
+
+
+class PublishRequest(BaseModel):
+    version: str

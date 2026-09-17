@@ -22,6 +22,9 @@ import {
   listTokens,
   loadOntologyContext,
   saveOntology,
+  listVersions,
+  publishOntology,
+  exportOntology,
 } from './api'
 import type {
   AxisTermRecord,
@@ -221,6 +224,20 @@ export default function App() {
       msg(`Saved to ${result.saved}`)
     } catch (err) {
       msg(`Save failed: ${err}`)
+    }
+  }
+
+  const onPublish = async () => {
+    try {
+      const { suggested_next } = await listVersions()
+      const version = window.prompt('Version to publish (semver):', suggested_next)
+      if (!version) return
+      const v = version.trim()
+      const result = await publishOntology(v)
+      exportOntology(v)
+      msg(`Published ${result.version_iri} — downloaded ontology-${v}.ttl; copy to ProMo-ontologies/ontology/${v} + ontology.ttl`)
+    } catch (err) {
+      msg(`Publish failed: ${err}`)
     }
   }
 
@@ -980,6 +997,9 @@ export default function App() {
         <div style={{ flex: 1 }} />
         <button style={{ ...S.tab, background: '#0b7cbe' }} onClick={onSaveOntology}>
           Save ontology
+        </button>
+        <button style={{ ...S.tab, background: '#2e8b57' }} onClick={onPublish}>
+          Publish…
         </button>
       </div>
       <div style={S.body}>

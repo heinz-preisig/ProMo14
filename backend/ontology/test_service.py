@@ -755,6 +755,30 @@ def test_freeze_version(client):
         store.freeze_version("9.9-test")
 
 
+def test_publish_and_versions(client):
+    r = client.post("/api/ontology/publish", json={"version": "1.1"})
+    assert r.status_code == 200
+    assert r.json()["version_iri"].endswith("/1.1")
+    r = client.post("/api/ontology/publish", json={"version": "1.1"})
+    assert r.status_code == 409
+    r = client.post("/api/ontology/publish", json={"version": "v2"})
+    assert r.status_code == 422
+    r = client.get("/api/ontology/versions")
+    versions = r.json()["versions"]
+    assert any(v["version"] == "1.1" for v in versions)
+    assert r.json()["suggested_next"] == "1.2"
+
+
+def test_export_version(client):
+    client.post("/api/ontology/publish", json={"version": "1.1"})
+    r = client.get("/api/ontology/export?version=1.1")
+    assert r.status_code == 200
+    assert "text/turtle" in r.headers["content-type"]
+    assert "promo:Version" in r.text
+    r = client.get("/api/ontology/export?version=9.9")
+    assert r.status_code == 404
+
+
 def test_entity_type_branch_checked(client):
     r = client.post("/api/ontology/entity-types", json={
         "iri": "", "label": "Bad Branch", "temporal_type": "dynamic",

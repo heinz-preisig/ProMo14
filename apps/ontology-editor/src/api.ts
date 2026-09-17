@@ -279,3 +279,41 @@ export async function saveOntology(filename: string): Promise<{ saved: string }>
   if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`)
   return res.json()
 }
+
+export interface OntologyVersion {
+  iri: string
+  version: string
+  published_on: string | null
+}
+
+export async function listVersions(): Promise<{ versions: OntologyVersion[]; suggested_next: string }> {
+  const res = await fetch('/api/ontology/versions')
+  if (!res.ok) throw new Error(`Failed to list versions: ${res.status}`)
+  return res.json()
+}
+
+export async function publishOntology(version: string): Promise<{ version_iri: string; saved: string }> {
+  const res = await fetch('/api/ontology/publish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ version }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.detail || `Publish failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/** Download the ontology as Turtle (a frozen version, or the working draft). */
+export function exportOntology(version?: string): void {
+  const url = version
+    ? `/api/ontology/export?version=${encodeURIComponent(version)}`
+    : '/api/ontology/export'
+  const a = document.createElement('a')
+  a.href = url
+  a.download = version ? `ontology-${version}.ttl` : 'ontology.ttl'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}

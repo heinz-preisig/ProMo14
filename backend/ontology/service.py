@@ -10,12 +10,12 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
-from backend.core.graph_store import PROMO, get_store
+from backend.core.graph_store import PROMO, PROMOLG, QUDT, get_store
 from backend.ontology.rdf_context import RdfContext
 
 from .models import (
@@ -26,6 +26,7 @@ from .models import (
     EntityTypeRecord,
     IndexRecord,
     NetworkRecord,
+    PublishRequest,
     ScaleDimensionRecord,
     ScaleValueRecord,
     SaveRequest,
@@ -869,6 +870,84 @@ def save_ontology(req: SaveRequest) -> Dict[str, str]:
     store = get_store()
     path = store.save(req.filename)
     return {"saved": str(path)}
+
+
+_VERSION_RE = re.compile(r"\d+\.\d+(\.\d+)?")
+
+
+def _version_graphs(store) -> List:
+    """Frozen version graphs: identifier is a subject typed promo:Version."""
+    return [g for g in store.dataset.graphs()
+            if (g.identifier, RDF.type, PROMO["Version"]) in g]
+
+
+@router.get("/versions")
+def list_versions() -> Dict[str, Any]:
+    """List frozen ontology versions and suggest the next one."""
+    store = get_store()
+    versions = []
+    best = (0, 0)
+    for g in _version_graphs(store):
+        info = g.value(g.identifier, PROMO["versionInfo"])
+        published = g.value(g.identifier, PROMO["publishedOn"])
+        versions.append({
+            "iri": str(g.identifier),
+            "version": str(info) if info else "",
+            "published_on": str(published) if published else None,
+        })
+        m = _VERSION_RE.fullmatch(str(info or ""))
+        if m:
+            parts = tuple(int(p) for p in str(info).split(".")[:2])
+            best = max(best, parts)
+    versions.sort(key=lambda v: v["version"])
+    suggested = f"{best[0]}.{best[1] + 1}" if versions else "1.0"
+    return {"versions": versions, "suggested_next": suggested}
+
+
+@router.post("/publish")
+def publish_ontology(req: PublishRequest) -> Dict[str, str]:
+    """Freeze the working ontology as an immutable version and save.
+
+    The frozen graph lands in ``data/ontology.trig`` alongside the
+    working draft; exporting + committing to ProMo-ontologies makes it
+    public.
+    """
+    if not _VERSION_RE.fullmatch(req.version.strip()):
+        raise HTTPException(
+            status_code=422,
+            detail="version must be numeric semver, e.g. 1.0 or 1.2.3")
+    store = get_store()
+    try:
+        version_iri = store.freeze_version(req.version.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    path = store.save()
+    return {"version_iri": str(version_iri), "saved": str(path)}
+
+
+@router.get("/export")
+def export_ontology_graph(version: Optional[str] = None) -> Response:
+    """Serialise a frozen version (or the working draft) as Turtle."""
+    store = get_store()
+    if version:
+        graph = store.dataset.graph(
+            URIRef(f"{store.ONTOLOGY_GRAPH_IRI}/{version}"))
+        if not len(graph):
+            raise HTTPException(
+                status_code=404, detail=f"no such version: {version}")
+        filename = f"ontology-{version}.ttl"
+    else:
+        graph = store.ontology_graph
+        filename = "ontology.ttl"
+    for prefix, ns in (("promo", PROMO), ("promolg", PROMOLG),
+                       ("qudt", QUDT), ("rdf", RDF), ("rdfs", RDFS)):
+        graph.bind(prefix, ns)
+    return Response(
+        content=graph.serialize(format="turtle"),
+        media_type="text/turtle",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{filename}"'})
+
 
 
 # ---------------------------------------------------------------------------
