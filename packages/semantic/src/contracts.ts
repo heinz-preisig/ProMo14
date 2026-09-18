@@ -45,6 +45,10 @@ export interface BaseEntityDefinition {
   iri: Iri
   label: string
   typeIris: Iri[]
+  /** Domain IRIs this entity lives in — feeds the domain-based
+   *  connection-rule resolution (``resolve-connection`` matches rules
+   *  on domain pairs).  Empty for catalogue-only placeholder types. */
+  domainTypeIris?: Iri[]
   interfaceIri?: Iri
   graphicalDefinitionIri?: Iri
   classifications: Classification[]
@@ -126,4 +130,12 @@ export interface SemanticCatalogue {
 
 export interface ConnectionRuleResolver {
   resolve(query: ConnectionRuleQuery): ConnectionRuleResult
+}
+
+/** A resolver that can also answer asynchronously (e.g. backed by the
+ *  ontology service).  ``resolve`` stays synchronous — typically reading a
+ *  cache warmed by earlier ``resolveAsync``/prefetch calls — so hover
+ *  feedback never blocks on the network. */
+export interface AsyncConnectionRuleResolver extends ConnectionRuleResolver {
+  resolveAsync(query: ConnectionRuleQuery): Promise<ConnectionRuleResult>
 }

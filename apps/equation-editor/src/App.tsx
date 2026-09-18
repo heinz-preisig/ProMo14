@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { indexShortLabel } from './latex'
-import { deleteVariable, loadContext, saveVariable } from './api'
+import { deleteVariable, documentUrl, loadContext, saveOntology, saveVariable } from './api'
+import { useStoreDirty } from './useStoreDirty'
 import type { Index, NetworkTree, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
@@ -29,7 +30,22 @@ export default function App() {
 
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
+  const [latexDraft, setLatexDraft] = useState('')
+  const [latexMsg, setLatexMsg] = useState('')
   const [debugOpen, setDebugOpen] = useState(false)
+  const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
+  const [saveMsg, setSaveMsg] = useState('')
+
+  const onSave = useCallback(async () => {
+    try {
+      await saveOntology()
+      refreshDirty()
+      setSaveMsg('Saved')
+      setTimeout(() => setSaveMsg(''), 3000)
+    } catch (err) {
+      setSaveMsg(`Save failed: ${err}`)
+    }
+  }, [refreshDirty])
 
   useEffect(() => {
     loadContext()
@@ -107,6 +123,31 @@ export default function App() {
     setDeleteTarget(null)
   }, [])
 
+  // Sync the LaTeX draft field whenever a different variable is opened.
+  useEffect(() => {
+    setLatexDraft(selectedVariable?.aliases?.latex ?? '')
+    setLatexMsg('')
+  }, [selectedVariable])
+
+  const saveLatexAlias = useCallback(async () => {
+    if (!selectedVariable) return
+    const aliases = { ...(selectedVariable.aliases ?? {}) }
+    if (latexDraft.trim()) aliases.latex = latexDraft.trim()
+    else delete aliases.latex
+    try {
+      await saveVariable({ ...selectedVariable, aliases })
+      const ctx = await loadContext()
+      setVariables(ctx.variables)
+      setIndices(ctx.indices)
+      setNetworkTree(ctx.network_tree)
+      setSelectedVariable((prev) => (prev ? { ...prev, aliases } : prev))
+      setLatexMsg('Saved')
+      setTimeout(() => setLatexMsg(''), 3000)
+    } catch (err) {
+      setLatexMsg(`Save failed: ${err}`)
+    }
+  }, [selectedVariable, latexDraft])
+
   const updateContext = useCallback((ctx: {
     variables: Variable[]
     indices: Index[]
@@ -140,6 +181,25 @@ export default function App() {
         }}
       >
         <strong>ProMo14 — Equation Editor</strong>
+        <div style={{ flex: 1 }} />
+        {storeDirty && (
+          <span style={{ fontSize: 12, color: '#b8860b' }} title="Unsaved changes in the store">
+            ● unsaved
+          </span>
+        )}
+        {saveMsg && <span style={{ fontSize: 12, color: '#2e8b57' }}>{saveMsg}</span>}
+        <a
+          href={documentUrl()}
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 12 }}
+          title="Open the printable LaTeX document (variables & equations)"
+        >
+          LaTeX doc
+        </a>
+        <button type="button" onClick={onSave} style={{ fontSize: 12 }}>
+          Save
+        </button>
       </div>
 
       <div
@@ -346,6 +406,19 @@ export default function App() {
                 })
                 .join(', ') ?? '—'} <br />
               <strong>Units:</strong> {JSON.stringify(selectedVariable.units)} <br />
+              <strong>LaTeX symbol:</strong>{' '}
+              <input
+                type="text"
+                value={latexDraft}
+                onChange={(e) => setLatexDraft(e.target.value)}
+                placeholder="e.g. \\rho — defaults to label"
+                style={{ width: 160, fontSize: 12 }}
+              />{' '}
+              <button type="button" onClick={saveLatexAlias} style={{ fontSize: 12 }}>
+                Save
+              </button>{' '}
+              {latexMsg && <span style={{ fontSize: 12, color: '#2e8b57' }}>{latexMsg}</span>}
+              <br />
               {selectedVariable.doc && (
                 <>
                   <strong>Doc:</strong> {selectedVariable.doc}

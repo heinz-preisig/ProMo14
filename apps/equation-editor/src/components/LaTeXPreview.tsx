@@ -7,6 +7,8 @@ export interface LaTeXPreviewProps {
   variables?: Variable[]
   indices?: Index[]
   expressionNetwork?: string
+  /** Label of the variable being defined — the LHS of Instantiate. */
+  lhs?: string
 }
 
 export default function LaTeXPreview({
@@ -14,12 +16,13 @@ export default function LaTeXPreview({
   variables = [],
   indices = [],
   expressionNetwork = '',
+  lhs,
 }: LaTeXPreviewProps) {
   if (!ast) {
     return <div style={{ color: '#888', fontSize: 13 }}>Parse an expression to see a preview.</div>
   }
 
-  const latex = astToLatex(ast, { variables, indices, expressionNetwork })
+  const latex = astToLatex(ast, { variables, indices, expressionNetwork, lhs })
   const html = renderLatex(latex)
 
   return (

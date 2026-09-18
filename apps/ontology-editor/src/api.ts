@@ -296,6 +296,17 @@ export async function saveOntology(filename: string): Promise<{ saved: string }>
   return res.json()
 }
 
+export interface StoreStatus {
+  dirty: boolean
+  last_saved: string | null
+}
+
+export async function getStoreStatus(): Promise<StoreStatus> {
+  const res = await apiFetch('/api/ontology/status')
+  if (!res.ok) throw new Error(`Failed to load store status: ${res.status}`)
+  return res.json()
+}
+
 export interface OntologyVersion {
   iri: string
   version: string

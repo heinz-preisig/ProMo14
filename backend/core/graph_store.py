@@ -145,6 +145,11 @@ class RdfStore:
             self.data_dir = Path(data_dir)
         self.dataset = Dataset()
         self._id_counters: Dict[str, int] = {}
+        # Persistence state: True when in-memory triples diverge from the
+        # last saved TriG file.  Set by the mutation middleware in main.py
+        # (and directly by store-level writes); cleared by save().
+        self.dirty: bool = False
+        self.last_saved: Optional[datetime.datetime] = None
 
         # Bind common prefixes so serialised TriG is readable.
         self.dataset.bind("promo", PROMO)
@@ -199,7 +204,13 @@ class RdfStore:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         path = self.data_dir / filename
         self.dataset.serialize(str(path), format="trig")
+        self.dirty = False
+        self.last_saved = datetime.datetime.now(datetime.timezone.utc)
         return path
+
+    def mark_dirty(self) -> None:
+        """Flag the dataset as having unsaved changes."""
+        self.dirty = True
 
     def seed_default_ontology(self) -> None:
         """Seed the default ProMo14 ontology (two-branch domain tree,
@@ -486,10 +497,10 @@ class RdfStore:
         # species: enumerates chemical components, bound to component mass token.
         # node / arc: index the network graph topology.
         seed_indices = [
-            ("idx_species", "species", "s", "physical", "index",
+            ("idx_species", "species", "S", "physical", "index",
              "token_component_mass"),
-            ("idx_node", "node", "n", "physical", "node", None),
-            ("idx_arc", "arc", "a", "physical", "arc", None),
+            ("idx_node", "node", "N", "physical", "node", None),
+            ("idx_arc", "arc", "A", "physical", "arc", None),
         ]
         for frag, label, short, network, iclass, token_frag in seed_indices:
             internal_id = self.next_internal_id("I")
@@ -935,7 +946,11 @@ class RdfStore:
         for token in var.get("tokens", []):
             graph.add((iri, PROMO["carriesToken"], URIRef(token)))
 
-        if var.get("aliases"):
+        # Aliases use replace semantics: the direct predicates are cleared
+        # first so an alias removed by the caller does not linger.
+        if var.get("aliases") is not None:
+            for key in ("internal_code", "latex", "matlab"):
+                graph.remove((iri, PROMO[key], None))
             self._add_aliases(graph, iri, var["aliases"])
 
         # Nested equations (dict of E_N -> equation record)

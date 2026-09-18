@@ -17,7 +17,16 @@ contracts.
   tokens, interfaces, graphical definitions.  Resolved at runtime
   through `SemanticCatalogue` (`packages/semantic/src/contracts.ts`).
 - **Connection rules** — which entity types may connect via which arc
-  types.  Resolved through `ConnectionRuleResolver` (same package).
+  types.  Resolved through `ConnectionRuleResolver` (same package) →
+  `GET /api/ontology/resolve-connection` with the endpoint entity types'
+  `domainTypeIris`.  The backend walks domain ancestor chains, filters by
+  branch-relative `scope` (same | cross | any), then requires a licensed
+  `sharedTokens` entry comparable to a comparable effective-token pair on
+  the endpoints — returns matching rules + `matched_tokens`,
+  most-specific first.  The rule's `carrier` (token-flow | reference)
+  maps to `arcTypeIri = promo:ArcType/<carrier>`; the rule name
+  (physical-same, signal, access, sensor, actuation) is the connection
+  *kind*, not the arc type.
 - **Graphical definitions** — shapes, fills, strokes, port positions.
   Resolved from the catalogue; the Modeller itself is domain-independent.
 

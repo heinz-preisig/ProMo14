@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo, useReducer } from 'react'
+import { useState, useEffect, useMemo, useReducer, useCallback } from 'react'
 import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
-import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition } from '@promo/semantic'
-import { placeholderCatalogue, placeholderRuleResolver, resolveConnection } from '@promo/semantic'
+import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
+import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
+import { GRAPH_IRI, catalogueFetchers, loadModel, saveModel, saveOntology } from './api'
+import { deserializeState, hasContent, serializeState } from './modelPersistence'
 import type { Command } from './state/ModelState'
 import { computeGraphView } from './tree/computeGraphView'
 import type { AppState } from './state/ModelState'
@@ -15,16 +17,6 @@ import type { SceneObject } from './scene/types'
 const TOOLBAR_HEIGHT = 40
 const BOTTOM_BAR_HEIGHT = 24
 const PALETTE_WIDTH = 140
-
-const NODE_TYPES = placeholderCatalogue.getBaseEntities().map((entity) => {
-  const g = placeholderCatalogue.getGraphicalDefinition(entity.graphicalDefinitionIri!) as NodeGraphicalDefinition
-  return { id: entity.iri, label: entity.label, fill: g.fill, stroke: g.stroke }
-})
-
-const ARC_TYPES = placeholderCatalogue.getArcTypes().map((arcType) => {
-  const g = placeholderCatalogue.getGraphicalDefinition(arcType.graphicalDefinitionIri!) as ArcGraphicalDefinition
-  return { id: arcType.iri, label: arcType.label, stroke: g.stroke, dash: g.dash }
-})
 
 function reducer(state: AppState, cmd: Command): AppState {
   // console.log('Command:', cmd)
@@ -42,9 +34,62 @@ export default function App() {
     currentY: number
   } | null>(null)
 
+  // --- Semantic catalogue: placeholder until the ontology-backed one loads ---
+  const [catalogue, setCatalogue] = useState<SemanticCatalogue>(placeholderCatalogue)
+
+  useEffect(() => {
+    let cancelled = false
+    RemoteCatalogue.load(catalogueFetchers, placeholderCatalogue).then((cat) => {
+      if (!cancelled) setCatalogue(cat)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // Load the persisted model document once on start (ADR-007).
+  useEffect(() => {
+    let cancelled = false
+    loadModel()
+      .then((doc) => {
+        if (!cancelled && hasContent(doc)) {
+          dispatch({ type: 'loadState', state: deserializeState(doc) })
+        }
+      })
+      .catch(() => { /* backend down or empty artefact — start fresh */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const onSave = useCallback(async () => {
+    try {
+      await saveModel(serializeState(state))
+      await saveOntology()
+    } catch (err) {
+      console.error('Failed to save model:', err)
+    }
+  }, [state])
+
+  const NODE_TYPES = useMemo(() => catalogue.getBaseEntities().map((entity) => {
+    const g = catalogue.getGraphicalDefinition(entity.graphicalDefinitionIri!) as NodeGraphicalDefinition | undefined
+    return { id: entity.iri, label: entity.label, fill: g?.fill ?? '#eee', stroke: g?.stroke ?? '#333' }
+  }), [catalogue])
+
+  const ARC_TYPES = useMemo(() => catalogue.getArcTypes().map((arcType) => {
+    const g = catalogue.getGraphicalDefinition(arcType.graphicalDefinitionIri!) as ArcGraphicalDefinition | undefined
+    return { id: arcType.iri, label: arcType.label, stroke: g?.stroke ?? '#333', dash: g?.dash }
+  }), [catalogue])
+
   // --- Palette state (UI only, not part of model) ---
   const [activeNodeType, setActiveNodeType] = useState<NodeType>('promo:TypeA')
   const [activeArcType, setActiveArcType] = useState<ArcType>('promo:ArcType1')
+
+  // Keep the active palette selection valid when the catalogue swaps.
+  useEffect(() => {
+    if (NODE_TYPES.length && !NODE_TYPES.some((t) => t.id === activeNodeType)) {
+      setActiveNodeType(NODE_TYPES[0].id as NodeType)
+    }
+    if (ARC_TYPES.length && !ARC_TYPES.some((t) => t.id === activeArcType)) {
+      setActiveArcType(ARC_TYPES[0].id as ArcType)
+    }
+  }, [NODE_TYPES, ARC_TYPES, activeNodeType, activeArcType])
 
   const [stageSize, setStageSize] = useState({
     width: window.innerWidth - PALETTE_WIDTH * 2,
@@ -64,6 +109,19 @@ export default function App() {
     sourceModelIri: string
     sourceEntityType: string
   } | null>(null)
+
+  // --- Connection rule resolver: remote (ontology backend) with the
+  // placeholder allow-all as fallback while the backend is unreachable.
+  // cacheBump re-renders hover feedback when an async answer lands.
+  const [cacheBump, setCacheBump] = useState(0)
+  const [ruleResolver] = useState(
+    () =>
+      new RemoteRuleResolver({
+        graphIri: GRAPH_IRI,
+        fallback: placeholderRuleResolver,
+        onUpdate: () => setCacheBump((v) => v + 1),
+      }),
+  )
 
   useEffect(() => {
     const handleResize = () => {
@@ -104,17 +162,22 @@ export default function App() {
     const result = resolveConnection(
       sourceEntityType,
       targetNode.entityType,
-      placeholderCatalogue,
-      placeholderRuleResolver,
+      catalogue,
+      ruleResolver,
     )
     if (result.status === 'forbidden') {
       return { hoveredHighlight: 'invalid' as const, validArcTypes: [] as Iri[] }
+    }
+    if (result.connections.length === 0) {
+      // Cache miss — remote answer in flight; no highlight yet.
+      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
     }
     return {
       hoveredHighlight: 'valid' as const,
       validArcTypes: result.connections.map((c) => c.arcTypeIri),
     }
-  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump])
 
   // --- Three-panel zone boundaries ---
   const leftZoneX = -stageSize.width / 2 + 80
@@ -131,9 +194,9 @@ export default function App() {
       draggingOpenArc,
       hoveredNodeId,
       hoveredHighlight,
-      catalogue: placeholderCatalogue,
+      catalogue,
     }),
-    [graphView, state.selectedVisibleNodeId, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight]
+    [graphView, state.selectedVisibleNodeId, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue]
   )
 
   // --- Canvas event handlers (isolated from rendering) ---
@@ -146,7 +209,7 @@ export default function App() {
     handleStageWheel,
     groupSelectedNodes,
     sceneHandlers,
-  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject, pendingConnection, setPendingConnection)
+  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject, pendingConnection, setPendingConnection, ruleResolver, catalogue)
 
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
   const selectedArc = graphView.arcs.find((a) => a.modelArcIri === state.selectedModelArcIri)
@@ -169,7 +232,7 @@ export default function App() {
         <span style={{ fontSize: 13, color: '#555' }}>Model: untitled</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 13 }}>
           <span style={{ color: '#555' }}>View: {state.tree.nodes.get(state.currentViewNodeId)?.label ?? 'Root'}</span>
-          <button style={{ fontSize: 12 }}>Save</button>
+          <button style={{ fontSize: 12 }} onClick={onSave}>Save</button>
           <button style={{ fontSize: 12 }}>Screenshot</button>
         </div>
       </div>

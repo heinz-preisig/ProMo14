@@ -27,6 +27,7 @@ import {
   exportOntology,
   GRAPH_IRI,
 } from './api'
+import { useStoreDirty } from './useStoreDirty'
 import type {
   AxisTermRecord,
   ClassificationAxisRecord,
@@ -132,6 +133,7 @@ function buildTree<T extends { iri: string; parent: string | null }>(
 export default function App() {
   const [stage, setStage] = useState<Stage>('tokens')
   const [message, setMessage] = useState('')
+  const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
 
   // Data
   const [tokens, setTokens] = useState<TokenRecord[]>([])
@@ -222,6 +224,7 @@ export default function App() {
   const onSaveOntology = async () => {
     try {
       const result = await saveOntology('ontology.trig')
+      refreshDirty()
       msg(`Saved to ${result.saved}`)
     } catch (err) {
       msg(`Save failed: ${err}`)
@@ -235,6 +238,7 @@ export default function App() {
       if (!version) return
       const v = version.trim()
       const result = await publishOntology(v)
+      refreshDirty()
       exportOntology(v)
       msg(`Published ${result.version_iri} — downloaded ontology-${v}.ttl; copy to ProMo-ontologies/ontology/${v} + ontology.ttl`)
     } catch (err) {
@@ -1002,6 +1006,11 @@ export default function App() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
+        {storeDirty && (
+          <span style={{ fontSize: 12, color: '#f0c040' }} title="Unsaved changes in the store">
+            ● unsaved
+          </span>
+        )}
         <button style={{ ...S.tab, background: '#0b7cbe' }} onClick={onSaveOntology}>
           Save ontology
         </button>

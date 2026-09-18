@@ -1,0 +1,141 @@
+{% raw %}
+% automatically generated - do not edit
+%
+% =======================================
+
+\documentclass[landscape]{article}
+\usepackage[T1]{fontenc}
+\usepackage{longtable}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+
+\usepackage[text={\textwidth,10cm},
+		a4paper,
+		headsep=0.7cm,
+		top=2cm,
+		bottom=2cm,
+		left=2cm,
+		right=2cm,
+		nomarginpar
+		]{geometry}
+\usepackage[%
+        backref,
+        final,
+        pdfauthor={ProMo},
+        pdfsubject={CAM},
+        colorlinks=true,
+        linkcolor=red,
+        citecolor=blue,
+        anchorcolor=blue,
+        hyperindex=true,
+        bookmarks,
+        bookmarksopen=true,
+        bookmarksnumbered=true,
+        bookmarksdepth=10,
+        hyperfigures=true,
+        linktocpage=true,
+        pageanchor=true,
+        ]{hyperref}
+
+\usepackage{enumitem}
+
+%% math packages
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{titlesec}
+
+%% >>>>>>>>>>>>>>>> user definitions BIBLIOGRAPHY & DEFS <<<<<<<<<<<<<<<<<<<<<<<<
+%% vendored from old-ProMo RepositoryInfrastructure/LaTeX/resources;
+%% document.py inlines the file contents so the served .tex is standalone.
+\input{./resources/defs}
+\input{./resources/defvars}
+
+\parindent=0pt
+
+\newenvironment{variables}{
+	\begin{itemize}[leftmargin=4cm, align=left, labelwidth=3cm, noitemsep]
+	}
+	{\end{itemize}}
+\newenvironment{lay}{\catcode`\_=12}{\catcode`\_=8}
+\newenvironment{IND}{\catcode`\&=12\catcode`\_=12}{\catcode`\&=4\catcode`\_=8}
+\newenvironment{eq}{\begin{minipage}{15cm}$}{$\end{minipage} }
+
+\newcolumntype{P}[1]{>{$}p{#1}<{$}}
+
+
+% ==================================== body  =====================================
+\begin{document}
+\title{Variables \& Equations}
+\author{ProMo}
+\maketitle
+\tableofcontents
+\pagebreak
+
+\section{Variables}
+{% endraw %}
+
+{% for net in var_groups %}
+\subsection{ {{ net }} }
+{% raw %}
+\renewcommand{\arraystretch}{1.5}
+
+\begin{longtable}{|p{1cm}|p{2.5cm}|p{4.5cm}|p{8cm}|p{3.0cm}|p{3cm}|p{1cm}|}\hline
+ &var & \text{symbol} &documentation &type &units &eqs \\\hline\hline
+\endhead
+\hline \multicolumn{4}{r}{\textit{Continued on next page}} \\
+\endfoot
+\hline
+\endlastfoot
+{% endraw %}
+{% for v in var_groups[net] -%}
+    {{ v.num }}
+             & \hypertarget{"v:{{v.num}}"}{ $ {{ v.symbol }} $}
+             & \verb|{{ v.label }}|
+             & {{ v.doc }}
+             & \begin{lay}{{ v.type }}\end{lay}
+             & $ {{ v.units }} $
+             & {% for e in v.eq_ids -%}
+                \hyperlink{"e:{{e}}"}{ {{e}} }
+                 {% endfor -%} \\
+{% endfor -%}
+{% raw %}
+\end{longtable}
+{% endraw %}
+
+{% endfor %}
+
+{% raw %}
+\section{Equations}
+{% endraw %}
+
+{% for net in eq_groups %}
+\subsection{ {{ net }} }
+{% raw %}
+\renewcommand{\arraystretch}{2}
+
+\begin{longtable}{|p{1cm}|p{15cm}|p{6cm}|p{3cm}|}\hline
+no & equation &documentation &layer \\\hline\hline
+\endhead
+\hline \multicolumn{4}{r}{\textit{Continued on next page}} \\
+\endfoot
+\hline
+\endlastfoot
+{% endraw %}
+{% for e in eq_groups[net] -%}
+    \hyperlink{"v:{{ e.var_num }}"}{ {{e.num}} }\hypertarget{"e:{{e.num}}"}{ {{""}} } &
+    \begin{eq}{{ e.lhs }} := {{ e.rhs }}\end{eq} &
+    \begin{lay}{{ e.doc }}\end{lay} &
+    \begin{lay}{{ e.network }}\end{lay} \\
+{% endfor -%}
+{% raw %}
+\hline
+\end{longtable}
+{% endraw %}
+
+{% endfor %}
+
+{% raw %}
+\end{document}
+% ================================== end =========================================
+{% endraw %}

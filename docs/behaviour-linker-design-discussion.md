@@ -1119,7 +1119,109 @@ order — no topological sort needed at code generation time.
 - **Single graph**: one assignment named graph for all entity types
   (simpler to query, and entity types are independent).
 
-### Remaining open question
+### Remaining open question — resolved (2026-09-18)
 
 - How are port variables linked to connection rules? The port variable
   needs to match a token type when connected in the Modeller.
+
+  **Resolution:** the vocabulary already exists — it just isn't wired
+  yet.  Variables declare `promo:carriesToken` (the `tokens` field on
+  `VariableRecord`) — which token the variable rides on.  A resolved
+  connection rule exposes `matched_tokens` — the tokens licensed to flow
+  on that arc.  **Port satisfaction** is the check the Modeller does not
+  yet perform: a BL port variable is satisfied by an arc iff its token is
+  in (or comparable to) the arc's `matched_tokens`.
+
+  Semantics per carrier:
+
+  - **token-flow arc** (`physical-same`) — ports are the flow + effort
+    pair per licensed conserved token (mass flow + pressure, heat flow +
+    temperature, …).
+  - **reference arc** (`signal`, `access`, `sensor`, `actuation`) —
+    ports are the accessed variables; the signal *subtokens*
+    discriminate direction: `observation` for sensor (read-only),
+    `manipulation` for actuation (write), plain `signal` for
+    access/signal.
+
+  Missing piece: variables must actually declare their token (the field
+  exists but is mostly empty), and the Modeller needs the port-token
+  check on connect.  To be pinned down in ADR-008 alongside the
+  assignment artefact.
+
+## 14. Token semantics for exchange variables (2026-09-18)
+
+### The token lifecycle
+
+Tokens live in the **domain** — they are the conserved/exchangeable
+quantities.  Variables are their *manifestations* in the equation
+system.  The same token appears in three roles:
+
+- **Accumulate** → *state variable* — amount of token held in the
+  entity (`n`, `U`, `m`).  The balance equation's LHS: `d(token)/dt`.
+- **Move** → *flow variable* — token transport across the boundary
+  (`F`, `Q`).  The RHS fluxes.
+- **Drive** → *effort variable* — the token's potential (`p`, `T`,
+  `μ`).  What pushes the flow.
+
+The pattern is **uniform across branches**: on the information branch,
+signal "accumulates" as information state and "moves" as transmission.
+Same abstraction, different domain — argues for uniform token handling
+rather than splitting by carrier.
+
+Consequence: the assignment's variable roles (state / port / parameter)
+*are* the token's manifestation modes — accumulation, transport, none.
+
+### `carriesToken` is definitional, not an annotation
+
+Choosing a flow variable implicitly chooses its token — the link is
+part of what the variable *is*, not optional metadata:
+
+- **Exchange variables** (state/flow/effort that cross boundaries) —
+  token link is intrinsic and required.
+- **Internal variables** (geometry, parameters like `k`) — no token;
+  they never ride an arc.  If one is later exposed via an `access`
+  arc, it carries `signal` — accessed *as information*.
+
+### `port_variable` vs the BL port role
+
+Two different concepts, both needed:
+
+- **`port_variable` (flag on `VariableRecord`)** — *structural*: a
+  boundary node in the entity's bipartite (variable↔equation) graph —
+  where another entity's equation system can attach.  Direction-
+  agnostic capability ("*can* be exchanged").
+- **BL port role (`promo:hasPortVariable`)** — *directional*: consumed
+  as external input in this entity's assignment ("*is* exchanged, and
+  in which direction").
+
+The same physical quantity appears on both sides of an arc: exposed
+output (`port_variable`) on the source entity, BL port (input) on the
+target entity.  The arc joins them.
+
+### Token suggestion in the equation editor
+
+`carriesToken` should be *suggested*, not silently defaulted:
+
+- **Units match a conserved-token signature** (`kg` → mass, `mol` →
+  amount, `J` → energy) → suggest that token.  Units are a consistency
+  check, not a reliable key — store the link explicitly.
+- **Exchange-marked but no unit match** (signals usually have no
+  units) → offer the **signal family as a picklist**:
+  - `signal` (recommended default) — direction-agnostic; comparable to
+    both `observation` (sensor) and `manipulation` (actuation) arcs,
+    since `tokens_comparable` is ancestor-or-self.
+  - `observation` — tighter: read-only, sensor arcs only.
+  - `manipulation` — tighter: write-only, actuation arcs only.
+  The subtoken choice is a deliberate narrowing, not a guess — the
+  observation/manipulation discrimination lives on the arc/rule side,
+  so a variable carrying plain `signal` stays direction-agnostic.
+- **Otherwise** → no token (internal variable).
+
+### Port satisfaction (recap from §13)
+
+A BL port variable is satisfied by an arc iff its token is in (or
+comparable to) the arc's `matched_tokens`.  With `carriesToken`
+intrinsic, this check is definitional rather than annotation-
+dependent.  Remaining work for ADR-008: the Modeller-side check on
+connect, and whether `carriesToken` becomes required for
+`port_variable` variables.

@@ -1,4 +1,4 @@
-import type { AstNode, CheckRequest, CheckResponse, ContextResponse, ParseRequest, ParseResponse, Variable } from './types'
+import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, Variable } from './types'
 import type { SavedEquation } from './components/EquationList'
 
 /** The artefact graph this session edits — from the hub's ?graph= link.
@@ -87,11 +87,49 @@ export async function saveVariable(v: Variable, equation?: SavedEquation): Promi
   return res.json()
 }
 
+export async function generateExpression(req: GenerateRequest): Promise<GenerateResponse> {
+  const res = await apiFetch('/api/equation/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error(`Failed to generate: ${res.status}`)
+  return res.json()
+}
+
+/** URL of the printable LaTeX document (variables + equations) for the
+ *  current graph scope — opened in a new tab for print/compile. */
+export function documentUrl(): string {
+  return q('/api/equation/document')
+}
+
 export async function deleteVariable(iri: string): Promise<void> {
   const res = await apiFetch(`/api/equation/variables/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`Failed to delete variable: ${res.status}`)
+}
+
+export interface StoreStatus {
+  dirty: boolean
+  last_saved: string | null
+}
+
+export async function getStoreStatus(): Promise<StoreStatus> {
+  const res = await apiFetch('/api/ontology/status')
+  if (!res.ok) throw new Error(`Failed to load store status: ${res.status}`)
+  return res.json()
+}
+
+/** Persist the whole dataset (ontology + artefact graphs) to ontology.trig. */
+export async function saveOntology(filename = 'ontology.trig'): Promise<{ saved: string }> {
+  const res = await apiFetch('/api/ontology/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename }),
+  })
+  if (!res.ok) throw new Error(`Failed to save: ${res.status}`)
+  return res.json()
 }
 
 export function nodeToString(node: AstNode): string {
@@ -114,7 +152,7 @@ export function nodeToString(node: AstNode): string {
     case 'Power':
       return `${nodeToString(node.base as AstNode)} ^ ${nodeToString(node.exponent as AstNode)}`
     case 'Instantiate':
-      return `Instantiate( ${nodeToString(node.var as AstNode)} , ${nodeToString(node.value as AstNode)} )`
+      return `Instantiate( ${nodeToString(node.expr as AstNode)} , ${nodeToString(node.shape as AstNode)} )`
     case 'Integral':
       return `Integral( ${nodeToString(node.body as AstNode)} :: ${nodeToString(node.var as AstNode)} in [ ${nodeToString(node.lower as AstNode)} , ${nodeToString(node.upper as AstNode)} ] )`
     case 'Product':

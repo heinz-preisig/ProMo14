@@ -15,7 +15,7 @@ export function computeGraphView(
   modelArcs: Map<string, ModelArc>,
   layoutStore: Map<number, Map<string, { x: number; y: number }>>,
   openArcs: Map<number, OpenArc[]>,
-  knotStore: Map<string, Knot[]>,
+  knotStore: Map<number, Map<string, Knot[]>>,
   stageWidth: number,
   stageHeight: number
 ): GraphView {
@@ -143,7 +143,7 @@ export function computeGraphView(
         targetId: targetVisibleId,
         arcType,
         modelArcType: arc.arcType,
-        knots: knotStore.get(arc.iri) ?? [],
+        knots: knotStore.get(viewNodeId)?.get(arc.iri) ?? [],
       })
     }
   }
@@ -163,7 +163,7 @@ export function computeGraphView(
           targetId: openArc.isSource ? externalVisibleId : compositeVisibleId,
           arcType: 'open',
           modelArcType: openArc.arcType,
-          knots: [],
+          knots: knotStore.get(viewNodeId)?.get(openArc.iri) ?? [],
           openEndId: compositeVisibleId,
           openEndTreeNodeId: compositeId,
         })

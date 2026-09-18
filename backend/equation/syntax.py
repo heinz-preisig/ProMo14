@@ -62,9 +62,12 @@ class Power:
 
 @dataclass(frozen=True)
 class Instantiate:
-    """``Instantiate(var, value)`` — only valid at expression top level."""
-    var: "Node"
-    value: "Node"
+    """``Instantiate(expr, shape)`` — the equation ``lhs := expr`` where
+    ``shape`` supplies the units and index structure.  The left-hand side is
+    the declared variable being defined, not a node in the expression.
+    Only valid at expression top level."""
+    expr: "Node"
+    shape: "Node"
 
 
 @dataclass(frozen=True)

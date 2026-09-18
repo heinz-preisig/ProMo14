@@ -334,6 +334,7 @@ is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
 - `docs/ADR-004-model-and-graphical-architecture.md` — model composition, graphical assignment, shared Graphic Object Editor
 - `docs/ADR-005-equation-editor.md` — equation language, parser, browser architecture
 - `docs/ADR-006-ontology-evolution.md` — ontology versioning and change classification
+- `docs/ADR-007-model-persistence.md` — modeller RDF topology, hierarchy/layout persistence boundaries
 
 ### Detailed technical references
 - `docs/equation-context-contract.md` — EquationContext protocol and CompileSpace resolution rules

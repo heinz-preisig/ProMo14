@@ -3,7 +3,8 @@ import type { KonvaEventObject } from 'konva/lib/Node'
 import type { AppState, Command } from '../state/ModelState'
 import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
-import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, pickArcType } from '@promo/semantic'
+import { resolveConnectionAsync, pickArcType } from '@promo/semantic'
+import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 
 export interface CanvasEventHandlers {
   handleStageClick: (e: KonvaEventObject<MouseEvent>) => void
@@ -34,6 +35,8 @@ export function useCanvasEvents(
   setHoveredObject: (obj: SceneObject | null) => void,
   pendingConnection: { sourceModelIri: string; sourceEntityType: string } | null,
   setPendingConnection: (v: { sourceModelIri: string; sourceEntityType: string } | null) => void,
+  ruleResolver: ConnectionRuleResolver,
+  catalogue: SemanticCatalogue,
 ): CanvasEventHandlers {
   const wasDragged = useRef(false)
   const lastClickTime = useRef(0)
@@ -132,7 +135,7 @@ export function useCanvasEvents(
     }
   }
 
-  const onSceneRightClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
+  const onSceneRightClick = async (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
     e.evt.preventDefault()
     e.cancelBubble = true
     if (wasDragged.current) return
@@ -154,11 +157,11 @@ export function useCanvasEvents(
         dispatch({ type: 'selectNode', id: null })
         return
       }
-      const result = resolveConnection(
+      const result = await resolveConnectionAsync(
         pendingConnection.sourceEntityType,
         obj.entityType,
-        placeholderCatalogue,
-        placeholderRuleResolver,
+        catalogue,
+        ruleResolver,
       )
       const arcType = pickArcType(result, activeArcType)
       if (arcType) {
@@ -187,11 +190,11 @@ export function useCanvasEvents(
         sourceNode.entityType &&
         targetNode.entityType
       ) {
-        const result = resolveConnection(
+        const result = await resolveConnectionAsync(
           sourceNode.entityType,
           targetNode.entityType,
-          placeholderCatalogue,
-          placeholderRuleResolver,
+          catalogue,
+          ruleResolver,
         )
         const arcType = pickArcType(result, activeArcType)
         if (arcType) {
@@ -300,7 +303,7 @@ export function useCanvasEvents(
     }
   }
 
-  const onSceneDragEnd = (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
+  const onSceneDragEnd = async (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
     setTimeout(() => { wasDragged.current = false }, 50)
 
     if (obj.kind === 'openArcHandle') {
@@ -331,11 +334,11 @@ export function useCanvasEvents(
             const sourceEntityType = oa.isSource ? targetNode.entityType : externalEntityType
             const targetEntityType = oa.isSource ? externalEntityType : targetNode.entityType
 
-            const result = resolveConnection(
+            const result = await resolveConnectionAsync(
               sourceEntityType,
               targetEntityType,
-              placeholderCatalogue,
-              placeholderRuleResolver,
+              catalogue,
+              ruleResolver,
             )
             const arcType = pickArcType(result, oa.arcType)
             if (arcType) {

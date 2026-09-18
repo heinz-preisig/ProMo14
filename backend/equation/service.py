@@ -18,6 +18,7 @@ from dataclasses import fields, is_dataclass
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from rdflib import URIRef
 
@@ -32,8 +33,10 @@ from backend.ontology.service import (
 )
 
 from .checker import check
+from .codegen import TARGETS, render
 from .compile_space import CompileSpace, Index, Variable
 from .context import DictContext
+from .document import build_document
 
 from .errors import VarError
 from .parser import ParseError, parse
@@ -141,6 +144,18 @@ class CheckResponse(BaseModel):
     candidates: Optional[List[Dict[str, Any]]] = None  # AmbiguousVariableError
 
 
+class GenerateRequest(CheckRequest):
+    target: str = "python"  # "python" | "matlab" | "latex"
+
+
+class GenerateResponse(BaseModel):
+    ok: bool
+    code: Optional[str] = None
+    error: Optional[str] = None
+    error_kind: Optional[str] = None
+    candidates: Optional[List[Dict[str, Any]]] = None
+
+
 class ContextResponse(BaseModel):
     variables: List[VariableIn] = Field(default_factory=list)
     indices: List[IndexIn] = Field(default_factory=list)
@@ -215,8 +230,8 @@ def parse_endpoint(req: ParseRequest) -> ParseResponse:
     return ParseResponse(ok=True, ast=node_to_dict(node))
 
 
-@router.post("/check", response_model=CheckResponse)
-def check_endpoint(req: CheckRequest) -> CheckResponse:
+def _build_space(req: CheckRequest) -> CompileSpace:
+    """Assemble the ``CompileSpace`` a request's expression runs against."""
     variables = {
         v.iri: Variable(
             iri=v.iri,
@@ -245,7 +260,7 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
         for i in req.indices
     }
     ctx = DictContext(variables, indices, tree=req.network_tree)
-    space = CompileSpace(
+    return CompileSpace(
         ctx.variables(),
         ctx.indices(),
         variable_definition_network=req.variable_definition_network,
@@ -254,6 +269,11 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
             req.expression_definition_network
         ),
     )
+
+
+@router.post("/check", response_model=CheckResponse)
+def check_endpoint(req: CheckRequest) -> CheckResponse:
+    space = _build_space(req)
 
     try:
         node = parse(req.text)
@@ -276,6 +296,55 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
         indices=checked.indices,
         incidence=sorted(checked.incidence),
         label=checked.label,
+    )
+
+
+@router.post("/generate", response_model=GenerateResponse)
+def generate_endpoint(req: GenerateRequest) -> GenerateResponse:
+    """Parse + check + render an expression to a codegen target.
+
+    Same context contract as ``/check``; the target selects the output
+    language (``python`` | ``matlab`` | ``latex``).
+    """
+    if req.target not in TARGETS:
+        return GenerateResponse(
+            ok=False,
+            error="unknown target %r (expected one of %s)" % (req.target, TARGETS),
+            error_kind="target",
+        )
+    space = _build_space(req)
+
+    try:
+        node = parse(req.text)
+        lhs = Var(req.lhs) if req.lhs else None
+        checked = check(node, space, lhs)
+        code = render(checked, space, req.target, lhs=req.lhs)
+    except ParseError as e:
+        return GenerateResponse(ok=False, error=str(e), error_kind="parse")
+    except VarError as e:
+        resp = GenerateResponse(
+            ok=False, error=str(e), error_kind=type(e).__name__
+        )
+        if hasattr(e, "candidates"):
+            resp.candidates = e.candidates
+        return resp
+
+    return GenerateResponse(ok=True, code=code)
+
+
+@router.get("/document")
+def document_endpoint(
+    graph_iri: Optional[str] = Depends(graph_param),
+) -> PlainTextResponse:
+    """Printable LaTeX document of the context's variables and equations.
+
+    Ported from old-ProMo's EquationEditor_v01 Jinja templates: a
+    landscape article with hyperlinked variable/equation tables sectioned
+    by network.  ``?graph=`` scopes the context as in ``/context``.
+    """
+    ctx = scoped_context(get_store(), graph_iri)
+    return PlainTextResponse(
+        build_document(ctx), media_type="application/x-latex"
     )
 
 

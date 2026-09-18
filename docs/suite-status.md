@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-17 (end of session)
+**Last updated:** 2026-09-18 (end of session)
 
 ## Summary
 
@@ -8,7 +8,7 @@
 |--------|---------|----------|-------|--------|
 | Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork` | `backend/static/hub.html` at `/` | covered by service tests | **Working** — artefact lines, pins, fork, open-in-app |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
-| Equation Editor | Parser + checker + service; `?graph=` pin-scoped context + artefact-graph writes | React + TypeScript + Vite app | 4 test files | Backend and frontend functional; `?graph=` wired |
+| Equation Editor | Parser + checker + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes | React + TypeScript + Vite app | 6 test files, 119 tests | Backend and frontend functional; `?graph=` wired |
 | Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
 | Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending; no backend calls yet |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
@@ -52,13 +52,13 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `docs/ontology-data-model.md`, ADR-004, ADR-006.
   Key decisions: two-branch domain tree (physical/information),
   multi-axis variable classification (variable_class → "role" axis),
-  entity types from CWA 17960, 3 connection rule types, transport system
+  entity types from CWA 17960, 5 connection rules, transport system
   as node (not arc), event dynamics fits existing taxonomy.
 - **Backend:** All v1 steps implemented and verified:
   - `backend/core/graph_store.py` — PROMO vocabulary for Domain,
     ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
     EquationClass. CRUD methods for all. `seed_default_ontology()`
-    bootstraps two-branch tree, 7 tokens, role axes, 8 entity types, 3
+    bootstraps two-branch tree, 7 tokens, role axes, 8 entity types, 5
     connection rules, 5 equation classes, 3 indices (species/node/arc).
     `add_domain`/`add_connection_rule` use replace semantics for
     `hasToken`/`sharedTokens`.
@@ -76,15 +76,29 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   (hierarchical terms), Scales, Entity Types, Indices, Rules.
 - **Semantics:** token inheritance down the domain tree (additive only);
   cascade delete; ancestor-aware connection rule resolution.
+- **Connection rules (5 seeded):** `physical-same` (bidirectional,
+  token-flow, same-branch, physical↔physical, licenses all conserved
+  tokens), `signal` (reference, same-branch, information-internal),
+  `access` (reference, same-branch, physical↔physical service coupling),
+  `sensor` (reference, cross-branch, physical→information, observation
+  subtoken), `actuation` (reference, cross-branch, information→physical,
+  manipulation subtoken).  Rule attributes: `direction`, `carrier`
+  (token-flow | reference), `scope` (same | cross | any, branch-relative),
+  `sharedTokens` (the license).  `GET /resolve-connection` walks domain
+  ancestor chains, filters by scope, then requires a licensed token to be
+  comparable to a comparable effective-token pair on the endpoints —
+  returns matching rules + `matched_tokens`, most-specific first.
+  `carrier` → `arcTypeIri = promo:ArcType/<carrier>` (arcs are typed
+  token-flow or reference; the rule name is the kind, not the arc type).
 - **Namespace:** `https://w3id.org/promo#` throughout
   (`backend/core/graph_store.py`: `PROMO`, `PROMOLG`,
   `ONTOLOGY_GRAPH_IRI`).  Publishing pipeline live end-to-end: exported
   `ontology.ttl` → `heinz-preisig/ProMo-ontologies` (GitHub Pages) →
   w3id redirect **verified live** (PR #6700 merged).  See
   `publish/README.md`.
-- **Next:** Consume `resolve-connection` from the modeller's
-  `ConnectionRuleResolver`; auto-stamp `usesOntology` at artefact
-  creation; SHACL shape checks at the publish boundary (ADR-006).
+- **Next:** Auto-stamp `usesOntology` at artefact creation; SHACL shape
+  checks at the publish boundary (ADR-006).  (Modeller consumes
+  `resolve-connection` since 2026-09-18 — see Modeller section.)
 
 ### Equation Editor
 
@@ -105,8 +119,22 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   palette with cascade delete, equation list, and a debug equation
   context JSON editor.  `api.ts` reads `?graph=` from the URL once and
   appends it to every call.
-- **Next:** Persistence UX (variables created via POST live in memory
-  until Save); codegen targets.
+- **Codegen (2026-09-18):** `POST /api/equation/generate` renders the
+  checked tree to python (NumPy, provisional), matlab (`MultiDimVar`
+  Einstein library, vendored at `runtime/matlab/@MultiDimVar`), and
+  LaTeX; `GET /api/equation/document` renders a printable landscape
+  article (Jinja2, variables + equations tables by network).
+- **LaTeX symbols (2026-09-18):** per-variable `promo:latex` alias —
+  editable in every variable-definition GUI (wizard, both editors,
+  detail modal); preview + codegen + document render it verbatim.
+  Index short names capitalised (S/N/A/Q) in seed + persisted data.
+- **`Instantiate` semantics corrected (2026-09-18):**
+  `Instantiate(expr, shape)` — arg1 is the RHS, arg2 supplies
+  units/indices; the LHS is the declared variable (was mistreated as
+  arg1, silently generating assignments to the wrong variable).
+- **Next:** RDF vocabulary finalization for equations/operators;
+  LaTeX→image cache deferred.  (Persistence UX done 2026-09-18:
+  store-global dirty tracking + Save button + unsaved badge.)
 
 ### Behaviour Linker
 
@@ -134,8 +162,26 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   three-panel hierarchy navigation, composite grouping, open-arc
   reconnection, pan/zoom, catalogue-resolved graphics,
   connection-rule enforcement.
-- **Next:** RDF topology and hierarchy/layout persistence boundaries;
-  then composition and scale.
+- **Resolver:** `RemoteRuleResolver` (`packages/semantic`) consumes
+  `GET /api/ontology/resolve-connection` — sync cache for hover
+  feedback, `resolveAsync` for connect actions, `carrier` →
+  `promo:ArcType/<carrier>` mapping, placeholder fallback when the
+  backend is down (2026-09-18).
+- **Catalogue:** `RemoteCatalogue` (`packages/semantic`) loads
+  entity-types/domains/tokens/connection-rules over injected fetchers
+  and exposes them via the sync `SemanticCatalogue` interface —
+  entity `branch` → top-level domain IRI → `domainTypeIris` (new field
+  on `BaseEntityDefinition`), arc types synthesised from rule carriers,
+  graphicals delegated to the placeholder catalogue, whole-catalogue
+  fallback when the backend is down (2026-09-18).  `buildConnectionQuery`
+  now populates domain IRIs, so `resolve-connection` gets real domain
+  pairs.  8 tests in `remoteCatalogue.test.ts`.
+- **Persistence:** ADR-007 — artefact graph = one model document;
+  `GET`/`PUT /api/modeller/model` (2026-09-18).
+- **Next:** composition and scale (reusable composite insertion,
+  provenance, port mapping; on-demand graph access for large models).
+  Note: entity types carry only their top-level branch — rules scoped
+  to subdomains won't match until entities get finer domain assignment.
 - **Details:** See `docs/modeller-status.md`.
 
 ### Shared infrastructure

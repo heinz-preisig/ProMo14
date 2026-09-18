@@ -72,13 +72,20 @@ compiles clean.
 ### Phase 4 — Graph editing (partially)
 
 - ✅ Interactive knot scene objects and waypoint commands.
-- ❌ Serialization boundaries for flat RDF topology, hierarchy/layout
-  data, and graphical assignments.
+- ✅ Serialization boundaries for flat RDF topology, hierarchy/layout
+  data (ADR-007, `GET`/`PUT /api/modeller/model`).  Graphical
+  assignments still pending.
 
 ## Pending items
 
-- Define RDF topology and separate hierarchy/layout persistence
-  boundaries (current next step).
+- ~~Define RDF topology and separate hierarchy/layout persistence
+  boundaries~~ **Done (2026-09-18):** ADR-007 — artefact graph = one
+  model document; `promo:ModelNode`/`promo:ModelArc` resources for the
+  flat topology, `promo:Composite` with `children`/`layout`/`openArcs`
+  JSON literals for hierarchy + view data, `promo:Model` root with
+  counters.  `GET`/`PUT /api/modeller/model` (document save/load);
+  frontend `modelPersistence.ts` serializes `AppState`, `loadState`
+  command rebuilds it, Save button writes model + TriG.  3 tests.
 - Design reusable composite and instantiated-model insertion,
   provenance, parameter preservation/overrides, and graphical port
   mapping.
@@ -86,8 +93,13 @@ compiles clean.
   browser memory.
 - Direct arc endpoint reconnection for regular arcs.
 - Drag-to-create-arc interaction.
-- Real ontology backend integration (placeholder catalogue and resolver
-  are in place).
+- ~~Real ontology backend integration (placeholder catalogue and resolver
+  are in place).~~ **Done (2026-09-18):** `RemoteCatalogue` loads
+  entity-types/domains/tokens/connection-rules; entity `branch` → domain
+  IRI feeds `domainTypeIris` into `buildConnectionQuery`; arc types from
+  rule carriers; placeholder fallback when the backend is down.  Caveat:
+  entity types carry only top-level branch — subdomain-scoped rules
+  won't match until entities get finer domain assignment.
 
 ## Known issues
 

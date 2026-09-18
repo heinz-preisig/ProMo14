@@ -1,5 +1,6 @@
 import type {
   Iri,
+  AsyncConnectionRuleResolver,
   ConnectionRuleQuery,
   ConnectionRuleResult,
   ConnectionRuleResolver,
@@ -11,8 +12,8 @@ import type {
 //
 // Both arc creation (insertArc) and open-arc reconnection (reconnectOpenArc)
 // go through this service so that a single resolver decides validity and
-// picks the arc type.  The placeholder resolver currently allows everything;
-// a real ontology backend can later supply the same interface.
+// picks the arc type.  Entity ``domainTypeIris`` feed the domain-based
+// backend resolution; catalogue-only placeholder types leave them empty.
 // ---------------------------------------------------------------------------
 
 export function buildConnectionQuery(
@@ -30,8 +31,8 @@ export function buildConnectionQuery(
     targetEntityTypeIris: targetEntity?.typeIris.length
       ? targetEntity.typeIris
       : [targetEntityType],
-    sourceDomainTypeIris: [],
-    targetDomainTypeIris: [],
+    sourceDomainTypeIris: sourceEntity?.domainTypeIris ?? [],
+    targetDomainTypeIris: targetEntity?.domainTypeIris ?? [],
     sourceTokenTypeIris: [],
     targetTokenTypeIris: [],
     domainRelation: 'internal',
@@ -45,6 +46,22 @@ export function resolveConnection(
   resolver: ConnectionRuleResolver,
 ): ConnectionRuleResult {
   const query = buildConnectionQuery(sourceEntityType, targetEntityType, catalogue)
+  return resolver.resolve(query)
+}
+
+/** Async variant for connect actions (insert arc, reconnect open arc) that
+ *  need the authoritative answer.  Falls back to the sync ``resolve`` for
+ *  resolvers without an async path. */
+export async function resolveConnectionAsync(
+  sourceEntityType: Iri,
+  targetEntityType: Iri,
+  catalogue: SemanticCatalogue,
+  resolver: ConnectionRuleResolver,
+): Promise<ConnectionRuleResult> {
+  const query = buildConnectionQuery(sourceEntityType, targetEntityType, catalogue)
+  if ('resolveAsync' in resolver) {
+    return (resolver as AsyncConnectionRuleResolver).resolveAsync(query)
+  }
   return resolver.resolve(query)
 }
 

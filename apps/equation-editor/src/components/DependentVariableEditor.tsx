@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { checkExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, Index, NetworkTree, Variable } from '../types'
+import { checkExpression, generateExpression, parseExpression } from '../api'
+import type { AstNode, CheckRequest, CheckResponse, CodegenTarget, Index, NetworkTree, Variable } from '../types'
 import ExpressionInput from './ExpressionInput'
 import LaTeXPreview from './LaTeXPreview'
 import NetworkTreeSelect from './NetworkTreeSelect'
@@ -42,6 +42,7 @@ export default function DependentVariableEditor({
   const [domain, setDomain] = useState(initialDomain)
   const [variableClass, setVariableClass] = useState(initialClass)
   const [name, setName] = useState('')
+  const [latexSym, setLatexSym] = useState('')
 
   const [text, setText] = useState('')
   const [ast, setAst] = useState<AstNode | null>(null)
@@ -50,12 +51,16 @@ export default function DependentVariableEditor({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
+  const [genTarget, setGenTarget] = useState<CodegenTarget>('python')
+  const [genCode, setGenCode] = useState<string | null>(null)
+  const [genLoading, setGenLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
       setDomain(initialDomain)
       setVariableClass(initialClass)
       setName('')
+      setLatexSym('')
       setText('')
       setAst(null)
       setParseError(null)
@@ -63,6 +68,8 @@ export default function DependentVariableEditor({
       setError(null)
       setDoc('')
       setLoading(false)
+      setGenCode(null)
+      setGenLoading(false)
     }
   }, [open])
 
@@ -71,7 +78,8 @@ export default function DependentVariableEditor({
     setParseError(null)
     setCheckResult(null)
     setError(null)
-  }, [name, domain, variableClass, text])
+    setGenCode(null)
+  }, [name, domain, variableClass, text, latexSym])
 
   const handleCheck = useCallback(async () => {
     setLoading(true)
@@ -89,28 +97,7 @@ export default function DependentVariableEditor({
         return
       }
 
-      const lhs = name.trim()
-      const draft: Variable = {
-        iri: `promo:${lhs.toLowerCase()}`,
-        label: lhs,
-        network: domain,
-        type: variableClass,
-        units: [0, 0, 0, 0, 0, 0, 0, 0],
-        index_structures: [],
-        internal_id: nextInternalId(variables),
-        port_variable: false,
-      }
-
-      const req: CheckRequest = {
-        text,
-        variables: [...variables, draft],
-        indices,
-        variable_definition_network: domain,
-        expression_definition_network: domain,
-        lhs: lhs || null,
-        network_tree: networkTree,
-      }
-      const res = await checkExpression(req)
+      const res = await checkExpression(buildRequest())
       setCheckResult(res)
     } catch (e) {
       setError(String(e))
@@ -119,21 +106,62 @@ export default function DependentVariableEditor({
     }
   }, [text, variables, indices, domain, name, variableClass, networkTree])
 
-  const handleAccept = () => {
+  /** The draft LHS variable — shared by /check, /generate, accept and the
+   *  LaTeX preview so all see the same record (incl. the latex alias). */
+  const draftVariable = useCallback((): Variable => {
     const lhs = name.trim()
-    if (!lhs || !domain || !variableClass || !checkResult?.ok) return
-
-    const draft: Variable = {
+    return {
       iri: `promo:${lhs.toLowerCase()}`,
       label: lhs,
       network: domain,
       type: variableClass,
-      units: checkResult.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
-      index_structures: checkResult.indices ?? [],
+      units: checkResult?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
+      index_structures: checkResult?.indices ?? [],
       internal_id: nextInternalId(variables),
       port_variable: false,
+      aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
       doc,
     }
+  }, [name, domain, variableClass, variables, checkResult, latexSym, doc])
+
+  /** The check request for the current inputs — shared by /check and
+   *  /generate so both see the same draft LHS variable. */
+  const buildRequest = useCallback((): CheckRequest => {
+    const lhs = name.trim()
+    return {
+      text,
+      variables: [...variables, draftVariable()],
+      indices,
+      variable_definition_network: domain,
+      expression_definition_network: domain,
+      lhs: lhs || null,
+      network_tree: networkTree,
+    }
+  }, [text, variables, indices, domain, name, variableClass, networkTree, draftVariable])
+
+  const handleGenerate = useCallback(async () => {
+    setGenLoading(true)
+    setGenCode(null)
+    setError(null)
+    try {
+      const res = await generateExpression({ ...buildRequest(), target: genTarget })
+      if (res.ok && res.code) {
+        setGenCode(res.code)
+      } else {
+        setError(res.error ?? 'Generate failed')
+      }
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setGenLoading(false)
+    }
+  }, [buildRequest, genTarget])
+
+  const handleAccept = () => {
+    const lhs = name.trim()
+    if (!lhs || !domain || !variableClass || !checkResult?.ok) return
+
+    const draft = draftVariable()
 
     const eq: SavedEquation = {
       id: `${Date.now()}`,
@@ -222,6 +250,17 @@ export default function DependentVariableEditor({
             />
           </label>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            LaTeX:
+            <input
+              type="text"
+              value={latexSym}
+              onChange={(e) => setLatexSym(e.target.value)}
+              placeholder="e.g. \\rho — defaults to name"
+              style={{ width: 140 }}
+            />
+          </label>
+
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button type="button" onClick={onClose}>
               Cancel
@@ -287,12 +326,48 @@ export default function DependentVariableEditor({
 
             <LaTeXPreview
               ast={ast}
-              variables={variables}
+              variables={[...variables, draftVariable()]}
               indices={indices}
               expressionNetwork={domain}
+              lhs={name.trim() || undefined}
             />
 
             <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} />
+
+            {checkResult?.ok && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <strong style={{ fontSize: 13 }}>Generate:</strong>
+                  <select
+                    value={genTarget}
+                    onChange={(e) => { setGenTarget(e.target.value as CodegenTarget); setGenCode(null) }}
+                  >
+                    <option value="python">Python</option>
+                    <option value="matlab">Matlab</option>
+                    <option value="latex">LaTeX</option>
+                  </select>
+                  <button type="button" onClick={handleGenerate} disabled={genLoading}>
+                    {genLoading ? 'Generating…' : 'Generate'}
+                  </button>
+                </div>
+                {genCode && (
+                  <pre
+                    style={{
+                      margin: 0,
+                      padding: 10,
+                      background: '#f5f5f5',
+                      border: '1px solid #ddd',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      overflowX: 'auto',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {genCode}
+                  </pre>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>

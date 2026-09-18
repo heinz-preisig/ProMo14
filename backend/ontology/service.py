@@ -998,6 +998,16 @@ def save_ontology(req: SaveRequest) -> Dict[str, str]:
     return {"saved": str(path)}
 
 
+@router.get("/status")
+def store_status() -> Dict[str, Any]:
+    """Persistence status: ``dirty`` = unsaved in-memory changes."""
+    store = get_store()
+    return {
+        "dirty": store.dirty,
+        "last_saved": store.last_saved.isoformat() if store.last_saved else None,
+    }
+
+
 _VERSION_RE = re.compile(r"\d+\.\d+(\.\d+)?")
 
 

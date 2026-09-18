@@ -73,6 +73,7 @@ export default function VariableWizard({
   const [variableClass, setVariableClass] = useState(initialClass)
 
   const [portName, setPortName] = useState('')
+  const [portLatex, setPortLatex] = useState('')
   const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
   const [selectedIndices, setSelectedIndices] = useState<Set<string>>(new Set())
 
@@ -83,6 +84,7 @@ export default function VariableWizard({
       setKind(initialKind)
       setVariableClass(initialClass)
       setPortName('')
+      setPortLatex('')
       setUnits([0, 0, 0, 0, 0, 0, 0, 0])
       setSelectedIndices(new Set())
     }
@@ -113,6 +115,7 @@ export default function VariableWizard({
       index_structures: Array.from(selectedIndices),
       internal_id: nextInternalId(variables),
       port_variable: true,
+      aliases: portLatex.trim() ? { latex: portLatex.trim() } : {},
       doc: 'Port variable',
     }
     onAddPort(v)
@@ -241,6 +244,16 @@ export default function VariableWizard({
             value={portName}
             onChange={(e) => setPortName(e.target.value)}
             placeholder="e.g. rho"
+          />
+        </label>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          LaTeX symbol
+          <input
+            type="text"
+            value={portLatex}
+            onChange={(e) => setPortLatex(e.target.value)}
+            placeholder="e.g. \\rho or \\dot{m} — defaults to the name"
           />
         </label>
 

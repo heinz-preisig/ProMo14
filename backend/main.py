@@ -14,11 +14,39 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.behaviour import router as behaviour_router
 from backend.core.catalogue import router as catalogue_router
+from backend.core.graph_store import get_store
 from backend.equation.service import router as equation_router
 from backend.modeller import router as modeller_router
 from backend.ontology.service import router as ontology_router
 
 app = FastAPI(title="ProMo Suite Backend")
+
+# POSTs that do not mutate the dataset (read-only checks) or that persist it
+# themselves (save/publish clear the dirty flag via RdfStore.save).
+_NON_MUTATING_POSTS = {
+    "/api/equation/parse",
+    "/api/equation/check",
+    "/api/ontology/save",
+    "/api/ontology/publish",
+}
+
+
+@app.middleware("http")
+async def track_store_dirty(request, call_next):
+    """Flag the shared RdfStore dirty after any successful mutating call.
+
+    Covers every present and future CRUD endpoint across the ontology,
+    equation, and catalogue routers — the frontends poll
+    ``GET /api/ontology/status`` to show an unsaved-changes badge.
+    """
+    response = await call_next(request)
+    if (
+        request.method in {"POST", "PUT", "DELETE"}
+        and response.status_code < 400
+        and request.url.path not in _NON_MUTATING_POSTS
+    ):
+        get_store().mark_dirty()
+    return response
 
 app.include_router(ontology_router, prefix="/api/ontology", tags=["ontology"])
 app.include_router(equation_router, prefix="/api/equation", tags=["equation"])

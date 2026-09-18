@@ -28,12 +28,14 @@ export default function DependentVariableDialog({
   onAdd,
 }: DependentVariableDialogProps) {
   const [label, setLabel] = useState('')
+  const [latexSym, setLatexSym] = useState('')
   const [network, setNetwork] = useState('')
   const [variableClass, setVariableClass] = useState('')
 
   useEffect(() => {
     if (open) {
       setLabel('')
+      setLatexSym('')
       setNetwork('')
       setVariableClass('')
     }
@@ -53,6 +55,7 @@ export default function DependentVariableDialog({
       index_structures: [],
       internal_id: nextInternalId(variables),
       port_variable: false,
+      aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
       doc: '',
     }
     onAdd(v)
@@ -122,6 +125,16 @@ export default function DependentVariableDialog({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g. kinetic_energy"
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            LaTeX symbol
+            <input
+              type="text"
+              value={latexSym}
+              onChange={(e) => setLatexSym(e.target.value)}
+              placeholder="e.g. \\rho — defaults to the name"
             />
           </label>
 

@@ -5,6 +5,10 @@ dist
 *.log
 logs/
 
+# IDE settings
+.idea/
+.vscode/
+
 __pycache__/
 *.pyc
 

@@ -100,8 +100,14 @@ FastAPI router scaffold.  The provider is functional and tested.
    builds the domain tree from `promo:Domain`/`promo:parent` with a
    synthetic `root`; verified end-to-end via `/api/equation/context` +
    `/check`.  Legacy v8 loader archived to `archive/loader.py`.
-2. Wire modeller `ConnectionRuleResolver` to
-   `GET /api/ontology/resolve-connection`.
+2. ~~Wire modeller `ConnectionRuleResolver` to
+   `GET /api/ontology/resolve-connection`~~ **Done (2026-09-18):**
+   `RemoteRuleResolver` in `packages/semantic` — sync cache for hover,
+   `resolveAsync` for connect actions, `carrier` →
+   `promo:ArcType/<carrier>`, placeholder fallback when backend is down.
+   Remaining gap: modeller palette still feeds placeholder entity types;
+   rules match on domains + token licensing, so real matches need
+   ontology-backed entity/domain types.
 3. ~~Implement ontology versioning~~ **Done (2026-09-17):**
    `RdfStore.freeze_version(v)` → immutable `{graphIRI}/{v}` named
    graph; `GET /versions`, `POST /publish`, `GET /export?version=`;
@@ -111,8 +117,14 @@ FastAPI router scaffold.  The provider is functional and tested.
    SHACL shapes at the publish boundary are the endorsed mechanism.
 4. ~~Add publication export functionality~~ **Done (2026-09-17)** — see
    item 3.
-5. Persist `ontology.trig` automatically or prompt on unsaved changes
-   (currently manual via Save ontology button).
+5. ~~Persist `ontology.trig` automatically or prompt on unsaved changes~~
+   **Done (2026-09-18):** store-global dirty tracking — mutation middleware
+   in `backend/main.py` flags `RdfStore.dirty` on any successful
+   POST/PUT/DELETE; `GET /api/ontology/status` exposes it; both editors
+   poll via `useStoreDirty`, show an "● unsaved" badge, and warn on tab
+   close (`beforeunload`).  `save()` clears the flag and stamps
+   `last_saved`.  Full autosave deliberately not implemented — Save
+   remains an explicit user action.
 6. **Graph selection (done 2026-09-17):** every endpoint accepts
    `?graph=<iri>`; `editable_param` rejects frozen version graphs with
    403; `scoped_context` resolves the artefact + transitive

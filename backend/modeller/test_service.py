@@ -1,0 +1,77 @@
+"""Tests for the modeller model persistence endpoints (ADR-007)."""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.main import app
+
+
+@pytest.fixture()
+def client():
+    with TestClient(app) as c:
+        yield c
+
+
+def _doc():
+    return {
+        "nodes": [
+            {"iri": "promo:Model/Node_1", "entityType": "promo:EntityType/capacity", "label": "Reactor"},
+            {"iri": "promo:Model/Node_2", "entityType": "promo:EntityType/capacity", "label": "Tank"},
+        ],
+        "arcs": [
+            {"iri": "promo:Arc/Arc_1", "sourceIri": "promo:Model/Node_1",
+             "targetIri": "promo:Model/Node_2", "arcType": "promo:ArcType/token-flow"},
+        ],
+        "composites": [
+            {"treeId": 0, "label": "Root", "parentTreeId": None,
+             "children": [{"id": 1, "iri": "promo:Model/Node_1"}, {"id": 2}],
+             "layout": {"1": {"x": 0.0, "y": 0.0}, "2": {"x": 100.0, "y": 50.0}},
+             "knots": {"promo:Arc/Arc_1": [{"x": 10.0, "y": 20.0}]},
+             "openArcs": []},
+            {"treeId": 2, "label": "Group", "parentTreeId": 0,
+             "children": [{"id": 3, "iri": "promo:Model/Node_2"}],
+             "layout": {"3": {"x": 5.0, "y": 5.0}}, "knots": {},
+             "openArcs": [{"iri": "promo:Arc/Arc_9", "externalIri": "promo:Model/Node_1",
+                           "arcType": "promo:ArcType/token-flow", "isSource": True}]},
+        ],
+        "rootTreeId": 0, "nextTreeId": 4, "arcCounter": 2,
+    }
+
+
+def test_empty_model(client):
+    r = client.get("/api/modeller/model")
+    assert r.status_code == 200
+    doc = r.json()
+    assert doc["nodes"] == [] and doc["arcs"] == [] and doc["composites"] == []
+
+
+def test_put_get_roundtrip(client):
+    doc = _doc()
+    assert client.put("/api/modeller/model", json=doc).status_code == 200
+
+    got = client.get("/api/modeller/model").json()
+    assert {n["iri"] for n in got["nodes"]} == {"promo:Model/Node_1", "promo:Model/Node_2"}
+    assert got["rootTreeId"] == 0
+    assert got["nextTreeId"] == 4
+    assert got["arcCounter"] == 2
+
+    by_id = {c["treeId"]: c for c in got["composites"]}
+    assert by_id[2]["parentTreeId"] == 0
+    assert by_id[0]["children"] == [
+        {"id": 1, "iri": "promo:Model/Node_1"}, {"id": 2, "iri": None}]
+    assert by_id[0]["layout"]["2"] == {"x": 100.0, "y": 50.0}
+    assert by_id[0]["knots"]["promo:Arc/Arc_1"] == [{"x": 10.0, "y": 20.0}]
+    assert by_id[2]["openArcs"][0]["externalIri"] == "promo:Model/Node_1"
+
+
+def test_put_replaces(client):
+    """A second PUT wipes the previous model content."""
+    client.put("/api/modeller/model", json=_doc())
+    client.put("/api/modeller/model", json={
+        "nodes": [], "arcs": [], "composites": [
+            {"treeId": 0, "label": "Root", "parentTreeId": None,
+             "children": [], "layout": {}, "knots": {}, "openArcs": []}],
+        "rootTreeId": 0, "nextTreeId": 1, "arcCounter": 1})
+    got = client.get("/api/modeller/model").json()
+    assert got["nodes"] == [] and got["arcs"] == []
+    assert len(got["composites"]) == 1

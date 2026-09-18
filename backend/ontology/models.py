@@ -72,7 +72,7 @@ class EquationRecord(BaseModel):
     internal_id: Optional[str] = None  # E_N code name
     lhs: str = ""  # variable IRI being defined
     rhs: str = ""  # token stream (global_ID form)
-    rhs_latex: str = ""  # generated LaTeX, cached
+    rhs_latex: Optional[str] = None  # generated LaTeX, cached (nullable)
     equation_class: str = "generic"  # IRI of EquationClass node (hierarchical)
     network: str = "root"  # expression definition network
     incidence_list: List[str] = Field(default_factory=list)  # derived, cached

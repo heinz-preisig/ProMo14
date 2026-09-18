@@ -5,6 +5,8 @@ export interface LatexContext {
   variables?: Variable[]
   indices?: Index[]
   expressionNetwork?: string
+  /** Label of the variable being defined — the LHS of Instantiate. */
+  lhs?: string
 }
 
 function needsBraces(node: AstNode): boolean {
@@ -59,8 +61,10 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
   switch (node.type) {
     case 'Var': {
       const name = String(node.name)
-      const base = name.replace(/!/g, '\\!')
       const v = resolveVariable(name, ctx)
+      // A latex alias is raw LaTeX (e.g. "\\rho", "0") — render verbatim;
+      // otherwise fall back to the surface token the user typed.
+      const base = v?.aliases?.latex ?? name.replace(/!/g, '\\!')
       if (v?.index_structures && v.index_structures.length > 0) {
         return `${base}${indexSubscripts(v.index_structures, ctx)}`
       }
@@ -84,8 +88,15 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
     }
     case 'Power':
       return `${wrap(node.base as AstNode, ctx, true)}^{${astToLatex(node.exponent as AstNode, ctx)}}`
-    case 'Instantiate':
-      return `${astToLatex(node.var as AstNode, ctx)} := ${astToLatex(node.value as AstNode, ctx)}`
+    case 'Instantiate': {
+      // ``lhs := expr`` — the LHS is the declared variable (ctx.lhs),
+      // rendered through the Var path so its latex alias and index
+      // subscripts apply; ``shape`` only supplied units/indices.
+      const lhs = ctx?.lhs
+        ? astToLatex({ type: 'Var', name: ctx.lhs } as AstNode, ctx)
+        : '?'
+      return `${lhs} := ${astToLatex(node.expr as AstNode, ctx)}`
+    }
     case 'Integral':
       return `\\int_{${astToLatex(node.lower as AstNode, ctx)}}^{${astToLatex(node.upper as AstNode, ctx)}} ${astToLatex(node.body as AstNode, ctx)} \\, d${astToLatex(node.var as AstNode, ctx)}`
     case 'Product':

@@ -31,6 +31,7 @@ export default function VariableEditor({
   onAdd,
 }: VariableEditorProps) {
   const [label, setLabel] = useState('')
+  const [latexSym, setLatexSym] = useState('')
   const [network, setNetwork] = useState('')
   const [variableClass, setVariableClass] = useState('')
   const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
@@ -39,6 +40,7 @@ export default function VariableEditor({
   useEffect(() => {
     if (open) {
       setLabel('')
+      setLatexSym('')
       setNetwork('')
       setVariableClass('')
       setUnits([0, 0, 0, 0, 0, 0, 0, 0])
@@ -69,6 +71,7 @@ export default function VariableEditor({
       index_structures: Array.from(selectedIndices),
       internal_id: nextInternalId(variables),
       port_variable: true,
+      aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
       doc: 'Port variable',
     }
     onAdd(v)
@@ -134,6 +137,16 @@ export default function VariableEditor({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g. rho"
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            LaTeX symbol
+            <input
+              type="text"
+              value={latexSym}
+              onChange={(e) => setLatexSym(e.target.value)}
+              placeholder="e.g. \\rho or \\dot{m} — defaults to the name"
             />
           </label>
 

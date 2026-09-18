@@ -288,15 +288,18 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         )
 
     if isinstance(node, Instantiate):
-        var = check(node.var, space, lhs)
-        value = check(node.value, space, lhs)
+        # ``Instantiate(expr, shape)`` — ``lhs := expr`` where ``shape``
+        # supplies the units and index structure.  The left-hand side is
+        # the declared variable being defined, not part of the expression.
+        expr = check(node.expr, space, lhs)
+        shape = check(node.shape, space, lhs)
         return Checked(
             node=node,
-            units=var.units,
-            indices=var.indices,
+            units=shape.units,
+            indices=shape.indices,
             label=space.new_temp(),
-            incidence=var.incidence | value.incidence,
-            children=[var, value],
+            incidence=expr.incidence | shape.incidence,
+            children=[expr, shape],
         )
 
     if isinstance(node, Integral):

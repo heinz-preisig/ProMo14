@@ -69,6 +69,20 @@ export interface CheckResponse {
   candidates?: Array<Record<string, unknown>> | null
 }
 
+export type CodegenTarget = 'python' | 'matlab' | 'latex'
+
+export interface GenerateRequest extends CheckRequest {
+  target: CodegenTarget
+}
+
+export interface GenerateResponse {
+  ok: boolean
+  code?: string | null
+  error?: string | null
+  error_kind?: string | null
+  candidates?: Array<Record<string, unknown>> | null
+}
+
 export interface ParseRequest {
   text: string
 }
@@ -87,7 +101,7 @@ export type AstNode =
   | { type: 'Hadamard'; left: AstNode; right: AstNode }
   | { type: 'Reduce'; left: AstNode; right: AstNode; index?: AstNode | null }
   | { type: 'Power'; base: AstNode; exponent: AstNode }
-  | { type: 'Instantiate'; var: AstNode; value: AstNode }
+  | { type: 'Instantiate'; expr: AstNode; shape: AstNode }
   | { type: 'Integral'; body: AstNode; var: AstNode; lower: AstNode; upper: AstNode }
   | { type: 'Product'; body: AstNode; index: AstNode }
   | { type: 'Root'; body: AstNode }

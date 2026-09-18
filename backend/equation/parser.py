@@ -29,8 +29,10 @@ Grammar (revised with the POWER precedence fix):
     Index      -> Variable
     Identifier -> Variable
 
-``Instantiate`` is only valid where a full Expression starts (top level,
-inside brackets, function arguments) — not as an infix right operand.
+``Instantiate(expr, shape)`` is only valid where a full Expression starts
+(top level, inside brackets, function arguments) — not as an infix right
+operand.  ``expr`` is the equation's right-hand side; ``shape`` supplies
+units and index structure; the left-hand side is the declared variable.
 """
 
 from __future__ import annotations
@@ -236,11 +238,11 @@ class Parser:
         # infix right operand.
         if min_prec == 1 and self._accept("kw", "Instantiate"):
             self._expect("lparen")
-            var = self._expression()
+            expr = self._expression()
             self._expect("comma")
-            value = self._expression()
+            shape = self._expression()
             self._expect("rparen")
-            return Instantiate(var, value)
+            return Instantiate(expr, shape)
 
         left = self._factor()
         while True:
