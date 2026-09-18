@@ -94,6 +94,15 @@ def main() -> None:
     if total:
         print(f"iri     {total} triples rehomed promo# -> ontology#")
 
+    # --- Legacy graph removal ------------------------------------------
+    # Pre-namespace-migration snapshot(s) under example.org — fully
+    # superseded by the promo/ontology graph; keeping them only adds a
+    # stray untyped line to the catalogue.
+    for gr in list(store.dataset.graphs()):
+        if str(gr.identifier).startswith("http://example.org"):
+            store.dataset.remove_context(gr)
+            print(f"graph   {gr.identifier} removed (legacy snapshot)")
+
     # --- Label-predicate consolidation ---------------------------------
     # Canonical: rdfs:label = display label, promo:name = key-ish name.
     # Retired: promo:label, promo:scaleValueLabel (-> rdfs:label),
