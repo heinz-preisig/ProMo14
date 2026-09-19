@@ -14,12 +14,13 @@ instead.
 
 from __future__ import annotations
 
+import re
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
@@ -97,6 +98,13 @@ class EquationIn(BaseModel):
     modified: Optional[str] = None
 
 
+# Variable labels must be valid expression-language identifiers — the
+# same rule the lexer applies (parser.py): letters, digits, underscore,
+# not starting with a digit.  The ``!`` qualifier is for references,
+# never part of a variable's own label.
+_VARIABLE_LABEL_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
 class VariableIn(BaseModel):
     iri: str
     label: str
@@ -111,6 +119,16 @@ class VariableIn(BaseModel):
     tokens: List[str] = Field(default_factory=list)
     value: Optional[str] = None  # pre-bound promo:value (constants)
     equations: Dict[str, EquationIn] = Field(default_factory=dict)
+
+    @field_validator("label")
+    @classmethod
+    def _label_is_identifier(cls, v: str) -> str:
+        if not _VARIABLE_LABEL_RE.match(v):
+            raise ValueError(
+                f"invalid variable label {v!r}: must match "
+                "[a-zA-Z_][a-zA-Z0-9_]*"
+            )
+        return v
 
 
 class IndexIn(BaseModel):

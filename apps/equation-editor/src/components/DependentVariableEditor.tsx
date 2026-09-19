@@ -7,8 +7,12 @@ import NetworkTreeSelect from './NetworkTreeSelect'
 import ResultPanel from './ResultPanel'
 import VariablePalette from './VariablePalette'
 import type { SavedEquation } from './EquationList'
-
-const VARIABLE_CLASSES = ['state', 'effort', 'transport', 'frame', 'network', 'constant', 'parameter']
+import {
+  findNameCollision,
+  isValidVariableName,
+  VARIABLE_CLASSES,
+  VARIABLE_NAME_HINT,
+} from '../validation'
 
 /** Classes allowed on the LHS of ``Instantiate(proto)`` — an instance is
  *  a bound-value slot, not a computed quantity (ADR-008). */
@@ -22,6 +26,7 @@ export interface DependentVariableEditorProps {
   networkTree: NetworkTree
   initialDomain: string
   initialClass: string
+  onDefaultsChange?: (domain: string, variableClass: string) => void
   onAccept: (v: Variable, eq: SavedEquation) => void
 }
 
@@ -41,6 +46,7 @@ export default function DependentVariableEditor({
   networkTree,
   initialDomain,
   initialClass,
+  onDefaultsChange,
   onAccept,
 }: DependentVariableEditorProps) {
   const [domain, setDomain] = useState(initialDomain)
@@ -85,6 +91,12 @@ export default function DependentVariableEditor({
     setGenCode(null)
   }, [name, domain, variableClass, text, latexSym])
 
+  // Report the current domain/class so the app can offer them as
+  // defaults next time either variable editor is opened.
+  useEffect(() => {
+    onDefaultsChange?.(domain, variableClass)
+  }, [domain, variableClass])
+
   // Instantiate RHS → LHS class restricted to constant|parameter.  The
   // text heuristic covers the pre-check state (ast only exists after a
   // successful parse); the backend checker stays authoritative (ADR-008).
@@ -94,6 +106,10 @@ export default function DependentVariableEditor({
     isInstantiate && !INSTANTIATE_CLASSES.includes(variableClass)
       ? 'parameter'
       : variableClass
+
+  // Names must be valid expression-language identifiers (lexer rule).
+  const nameValid = isValidVariableName(name)
+  const collision = findNameCollision(variables, name)
 
   const handleCheck = useCallback(async () => {
     setLoading(true)
@@ -130,7 +146,9 @@ export default function DependentVariableEditor({
   const draftVariable = useCallback((): Variable => {
     const lhs = name.trim()
     return {
-      iri: `promo:${lhs.toLowerCase()}`,
+      // Case-sensitive IRI: the language treats `rho` and `Rho` as
+      // distinct identifiers, so the IRI must preserve case too.
+      iri: `promo:${lhs}`,
       label: lhs,
       network: domain,
       type: effectiveClass,
@@ -265,8 +283,25 @@ export default function DependentVariableEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="LHS name"
-              style={{ width: 120 }}
+              title={VARIABLE_NAME_HINT}
+              style={{
+                width: 120,
+                borderColor: name.trim() && !nameValid ? '#c62828' : undefined,
+              }}
             />
+            {name.trim() && !nameValid && (
+              <span style={{ fontSize: 11, color: '#c62828' }}>{VARIABLE_NAME_HINT}</span>
+            )}
+            {nameValid && collision === 'exact' && (
+              <span style={{ fontSize: 11, color: '#c62828' }}>
+                A variable named {name.trim()} already exists — saving overwrites it
+              </span>
+            )}
+            {nameValid && collision === 'similar' && (
+              <span style={{ fontSize: 11, color: '#b8860b' }}>
+                Differs only by case from an existing variable — names are case-sensitive
+              </span>
+            )}
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -284,7 +319,20 @@ export default function DependentVariableEditor({
             <button type="button" onClick={onClose}>
               Cancel
             </button>
-            <button type="button" onClick={handleAccept} disabled={!checkResult?.ok || !name.trim()}>
+            <button
+              type="button"
+              onClick={handleAccept}
+              disabled={!nameValid || !domain || !effectiveClass || !checkResult?.ok}
+              title={
+                !nameValid
+                  ? `Invalid name — ${VARIABLE_NAME_HINT}`
+                  : !domain || !effectiveClass
+                    ? 'Domain and class are required'
+                    : !checkResult?.ok
+                      ? 'Run Check on the RHS first'
+                      : undefined
+              }
+            >
               Accept
             </button>
           </div>

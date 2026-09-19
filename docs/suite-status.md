@@ -125,7 +125,7 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   LaTeX; `GET /api/equation/document` renders a printable landscape
   article (Jinja2, variables + equations tables by network).
 - **LaTeX symbols (2026-09-18):** per-variable `promo:latex` alias —
-  editable in every variable-definition GUI (wizard, both editors,
+  editable in every variable-definition GUI (port + dependent editors,
   detail modal); preview + codegen + document render it verbatim.
   Index short names capitalised (S/N/A/Q) in seed + persisted data.
 - **`Instantiate` redesigned (2026-09-19, ADR-008):**

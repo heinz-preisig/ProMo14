@@ -47,7 +47,7 @@ export default function DependentVariableDialog({
     if (!canAdd) return
     const trimmed = label.trim()
     const v: Variable = {
-      iri: `promo:${trimmed.toLowerCase()}`,
+      iri: `promo:${trimmed}`,
       label: trimmed,
       network,
       type: variableClass,

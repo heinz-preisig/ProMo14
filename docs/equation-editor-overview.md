@@ -82,31 +82,37 @@ Full grammar and token table: see ADR-005.
 
 A port variable carries physical meaning directly; it has no defining RHS expression.
 
-1. Click **New variable…** in the left sidebar.
-2. Choose **Port variable**.
-3. In the multi-step wizard:
-   - Select a **domain / network** from the tree.
-   - Select a **variable class**.
-   - Enter a **name**.
-   - Enter the **SI unit vector**.
-   - Select the **index structures** from the ProMo ontology indices.  Each index shows its `short_name` (e.g. `N` for `node`) for quick reading.
-4. Click **Add variable**. The variable appears in the left palette.
+1. Click **New port variable…** in the left sidebar.
+2. In the dialog header, select a **domain / network** from the tree, a
+   **variable class**, and enter a **name** (letters, digits and
+   underscore; must not start with a digit — names are case-sensitive).
+   Optionally set a **LaTeX symbol**.
+3. In the body, enter the **SI unit vector** and select the **index
+   structures** from the ProMo ontology indices.  Each index shows its
+   `short_name` (e.g. `N` for `node`) for quick reading.
+4. Click **Add variable** — enabled once name, domain and class are
+   set. The variable appears in the left palette.
 
 ### 2. Dependent variable (RHS definition)
 
 A dependent variable is defined by a checked RHS expression over existing variables.
 
-1. Click **New variable…**.
-2. Choose **Dependent variable**.
-3. In the wizard, select a **domain / network**, a **variable class**, and enter a **name**.
-4. The **Dependent variable editor** opens:
-   - The LHS name is already set.
-   - Type the RHS expression using the variable palette and the operator/function buttons.
-   - Click **Check** (or `Ctrl/Cmd + Enter`) to parse and semantically check the RHS in one step.
+1. Click **New dependent variable…** in the left sidebar.
+2. In the editor header, select a **domain / network**, a **variable
+   class**, and enter the **LHS name** (same identifier rules as port
+   variables).  Optionally set a **LaTeX symbol**.
+3. Type the RHS expression using the variable palette and the operator/function buttons.
+4. Click **Check** (or `Ctrl/Cmd + Enter`) to parse and semantically check the RHS in one step.
    - The **LaTeX preview** shows the expression with index subscripts using the index `short_name`.
    - The **result panel** shows the LHS name, inferred units, index structure, and incidence.
 5. Add **documentation** for the variable.
-6. Click **Accept** to store the checked equation and create the dependent variable.
+6. Click **Accept** — enabled once name, domain and class are set and
+   the RHS has passed Check — to store the equation and create the
+   dependent variable.
+
+Both editors remember the last domain/class choice and warn when the
+name collides with an existing variable (exact match overwrites; a
+case-only difference is flagged since names are case-sensitive).
 
 ### 3. Inspecting, editing and deleting variables
 
@@ -161,8 +167,8 @@ backend/equation/
 
 The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 
-- **Variable wizard** (`VariableWizard`) — multi-step flow for creating port or dependent variables (domain → class → kind → details).
-- **Dependent variable editor** (`DependentVariableEditor`) — expression input, single **Check** action that parses then semantically checks, LaTeX preview with index subscripts, and result panel.
+- **Port variable editor** (`PortVariableEditor`) — single dialog: domain tree, class, name, LaTeX symbol, SI unit vector, index structures.
+- **Dependent variable editor** (`DependentVariableEditor`) — same header widgets plus expression input, single **Check** action that parses then semantically checks, LaTeX preview with index subscripts, and result panel.
 - **Variable palette** (`VariablePalette`) — grouped by network; click to view details, click `×` to delete with cascade impact analysis.
 - **Expression input** (`ExpressionInput`) — operator/function buttons and keyboard shortcuts; one **Check** button triggers parse + check.
 - **LaTeX preview** (`LaTeXPreview`) — rendered expression, including index subscripts from each variable's `index_structures` mapped through the `short_name` of the index.

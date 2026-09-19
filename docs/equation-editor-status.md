@@ -66,7 +66,7 @@ Implemented as a React + TypeScript + Vite app in
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `VariableWizard` | `components/VariableWizard.tsx` | Multi-step flow for creating port or dependent variables (domain → class → details). |
+| `PortVariableEditor` | `components/PortVariableEditor.tsx` | Single-dialog port variable definition: domain tree, class, name, LaTeX symbol, SI units, index structures. |
 | `VariableEditor` | `components/VariableEditor.tsx` | Direct port-variable editor — currently unreferenced (kept for the debug context popup). |
 | `DependentVariableEditor` | `components/DependentVariableEditor.tsx` | RHS expression input, Check, LaTeX preview, and result panel. |
 | `VariablePalette` | `components/VariablePalette.tsx` | Variable list grouped by network; click to view details, click `×` to delete with cascade impact. |
@@ -198,6 +198,25 @@ Implemented as a React + TypeScript + Vite app in
   as a migration for pre-existing `ontology.trig`.  Codegen inlines
   `promo:value` when present (`half . M` → `0.5 * V_3`); unbound
   parameters keep their `V_N` slot until the instantiation stage.
+- **Variable-definition UX (2026-09-19):** the sidebar now has two
+  buttons — *New port variable…* and *New dependent variable…* — that
+  open their editors directly (the multi-step `VariableWizard` is
+  gone).  `PortVariableEditor.tsx` is a single dialog with the same
+  header widgets as the dependent editor (domain tree, class, name,
+  LaTeX symbol) plus the SI unit vector, index-structure picker and a
+  doc field.  Accept/Add is gated on the base requirements: port —
+  name + domain + class (units default to dimensionless, indices to
+  scalar); dependent — name + domain + class + a successful check.
+  Names are validated against the lexer identifier rule
+  `[a-zA-Z_][a-zA-Z0-9_]*` (shared `validation.ts`, enforced again by
+  a `VariableIn.label` validator in `service.py`); the last
+  domain/class choice is remembered across both editors.
+  **Names are case-sensitive end-to-end:** the minted IRI preserves
+  case (`promo:Rho` ≠ `promo:rho`), matching the lexer and the
+  `rdfs:label` lookup — previously `toLowerCase()` in the mint made
+  `Rho`/`rho` silently collide on one IRI.  Both editors warn on an
+  exact-name collision (save overwrites) and on a case-only variant
+  (`findNameCollision` in `validation.ts`).
 - LaTeX→image cache (deferred, noted 2026-09-18): old-ProMo rendered
   per-variable/equation PNGs (`V_N.png`/`E_N.png`, standalone .tex →
   latex → pnglatex.bash) into the ontology's LaTeX dir, invalidated by

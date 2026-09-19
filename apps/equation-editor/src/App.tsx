@@ -8,8 +8,8 @@ import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
 import EquationList, { type SavedEquation } from './components/EquationList'
+import PortVariableEditor from './components/PortVariableEditor'
 import VariablePalette from './components/VariablePalette'
-import VariableWizard from './components/VariableWizard'
 
 export default function App() {
   const [variables, setVariables] = useState<Variable[]>([])
@@ -19,14 +19,12 @@ export default function App() {
 
   const [equations, setEquations] = useState<SavedEquation[]>([])
 
-  const [wizardOpen, setWizardOpen] = useState(false)
-  const [wizardDomain, setWizardDomain] = useState('')
-  const [wizardKind, setWizardKind] = useState<'port' | 'dependent'>('port')
-  const [wizardClass, setWizardClass] = useState('')
-
+  const [portOpen, setPortOpen] = useState(false)
   const [dependentOpen, setDependentOpen] = useState(false)
-  const [dependentDomain, setDependentDomain] = useState('')
-  const [dependentClass, setDependentClass] = useState('')
+  // Last domain/class picked in either variable editor — offered as
+  // defaults the next time one is opened.
+  const [lastDomain, setLastDomain] = useState('')
+  const [lastClass, setLastClass] = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
@@ -85,12 +83,6 @@ export default function App() {
     } catch (err) {
       console.error('Failed to save variable:', err)
     }
-  }, [])
-
-  const startDependent = useCallback((domain: string, variableClass: string) => {
-    setDependentDomain(domain)
-    setDependentClass(variableClass)
-    setDependentOpen(true)
   }, [])
 
   const acceptDependent = useCallback(async (v: Variable, eq: SavedEquation) => {
@@ -221,13 +213,14 @@ export default function App() {
             gap: 16,
           }}
         >
-          <button
-            type="button"
-            onClick={() => setWizardOpen(true)}
-            style={{ alignSelf: 'flex-start' }}
-          >
-            New variable…
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignSelf: 'stretch' }}>
+            <button type="button" onClick={() => setPortOpen(true)}>
+              New port variable…
+            </button>
+            <button type="button" onClick={() => setDependentOpen(true)}>
+              New dependent variable…
+            </button>
+          </div>
           <VariablePalette
             variables={variables}
             onDelete={setDeleteTarget}
@@ -260,9 +253,10 @@ export default function App() {
               color: '#0d47a1',
             }}
           >
-            This is the repository view. Click <strong>New variable</strong> in the
-            sidebar to start the wizard and define a port or dependent variable.
-            Click a variable to see its details.
+            This is the repository view. Use the sidebar buttons to define a
+            <strong>port variable</strong> (foundation: name, units, index
+            structure) or a <strong>dependent variable</strong> (defined by a
+            checked RHS expression). Click a variable to see its details.
           </div>
 
           <button
@@ -275,22 +269,19 @@ export default function App() {
         </div>
       </div>
 
-      <VariableWizard
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
+      <PortVariableEditor
+        open={portOpen}
+        onClose={() => setPortOpen(false)}
         variables={variables}
         indices={indices}
         networkTree={networkTree}
-        initialDomain={wizardDomain}
-        initialKind={wizardKind}
-        initialClass={wizardClass}
-        onDefaultsChange={(d, k, c) => {
-          setWizardDomain(d)
-          setWizardKind(k)
-          setWizardClass(c)
+        initialDomain={lastDomain}
+        initialClass={lastClass}
+        onDefaultsChange={(d, c) => {
+          setLastDomain(d)
+          setLastClass(c)
         }}
-        onAddPort={addPortVariable}
-        onStartDependent={startDependent}
+        onAccept={addPortVariable}
       />
 
       <DeleteVariableDialog
@@ -308,8 +299,12 @@ export default function App() {
         variables={variables}
         indices={indices}
         networkTree={networkTree}
-        initialDomain={dependentDomain}
-        initialClass={dependentClass}
+        initialDomain={lastDomain}
+        initialClass={lastClass}
+        onDefaultsChange={(d, c) => {
+          setLastDomain(d)
+          setLastClass(c)
+        }}
         onAccept={acceptDependent}
       />
 
