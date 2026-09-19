@@ -247,14 +247,33 @@ def test_ufunc_loose():
 
 def test_instantiate():
     space = _space()
-    node = parse("Instantiate(rho, value)")
-    # 'value' is not in space -> resolves to global unique? no.
-    # Since 'value' is not declared, this raises VarError. That's expected.
+    # ADR-008: Instantiate(proto) — the instance inherits the prototype's
+    # units and index structure; incidence is empty (the prototype is a
+    # type-level reference, not a value dependency).  'one' is class
+    # constant — an allowed LHS.
+    c = check(parse("Instantiate(rho)"), space, parse("one"))
+    assert c.units == Units(mass=1, length=-3)
+    assert c.indices == ["http://promo.example/index/N"]
+    assert c.incidence == frozenset()
+
+
+def test_instantiate_lhs_class_enforced():
+    space = _space()
+    # 'rho' is class state — an instance must be constant|parameter.
     try:
-        check(node, space)
+        check(parse("Instantiate(M)"), space, parse("rho"))
     except VarError:
         return
-    raise AssertionError("expected VarError for unknown value")
+    raise AssertionError("expected VarError for state-class LHS")
+
+
+def test_instantiate_unknown_proto():
+    space = _space()
+    try:
+        check(parse("Instantiate(nosuch)"), space, parse("one"))
+    except VarError:
+        return
+    raise AssertionError("expected VarError for unknown prototype")
 
 
 def test_total_diff():

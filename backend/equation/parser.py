@@ -12,8 +12,9 @@ need only a table entry plus a factory case in ``_make_infix``.
 
 Grammar (revised with the POWER precedence fix):
 
-    Expression -> 'Instantiate' '(' Expression ',' Expression ')'
-                | Factor ( INFIX Factor )*        # precedence-climbed
+    Equation   -> 'Instantiate' '(' Identifier ')'   # whole RHS only
+                | Expression
+    Expression -> Factor ( INFIX Factor )*        # precedence-climbed
     Factor     -> '(' Expression ')'
                 | 'Integral' '(' Expression '::' Identifier 'in'
                       '[' Identifier ',' Identifier ']' ')'
@@ -29,10 +30,10 @@ Grammar (revised with the POWER precedence fix):
     Index      -> Variable
     Identifier -> Variable
 
-``Instantiate(expr, shape)`` is only valid where a full Expression starts
-(top level, inside brackets, function arguments) — not as an infix right
-operand.  ``expr`` is the equation's right-hand side; ``shape`` supplies
-units and index structure; the left-hand side is the declared variable.
+``Instantiate(proto)`` declares the LHS variable as a new instance of the
+prototype variable ``proto`` (ADR-008).  It is a declaration, not a
+value-producing subexpression: it is only valid as the entire right-hand
+side — never nested in brackets, function arguments, or infix operands.
 """
 
 from __future__ import annotations
@@ -226,6 +227,14 @@ class Parser:
 
     def parse(self) -> Node:
         """Parse the entire token stream and return the AST."""
+        # 'Instantiate' '(' Identifier ')' — a whole-equation declaration,
+        # only valid as the entire expression, never nested (ADR-008).
+        if self._accept("kw", "Instantiate"):
+            self._expect("lparen")
+            var = self._var()
+            self._expect("rparen")
+            self._expect("eof")
+            return Instantiate(var)
         node = self._expression()
         self._expect("eof")
         return node
@@ -233,17 +242,6 @@ class Parser:
     # Grammar entry points ----------------------------------------------------
 
     def _expression(self, min_prec: int = 1) -> Node:
-        # 'Instantiate' '(' Expression ',' Expression ')' — only where a full
-        # Expression starts (top level, brackets, function args), not as an
-        # infix right operand.
-        if min_prec == 1 and self._accept("kw", "Instantiate"):
-            self._expect("lparen")
-            expr = self._expression()
-            self._expect("comma")
-            shape = self._expression()
-            self._expect("rparen")
-            return Instantiate(expr, shape)
-
         left = self._factor()
         while True:
             tok = self._current

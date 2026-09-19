@@ -128,10 +128,14 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   editable in every variable-definition GUI (wizard, both editors,
   detail modal); preview + codegen + document render it verbatim.
   Index short names capitalised (S/N/A/Q) in seed + persisted data.
-- **`Instantiate` semantics corrected (2026-09-18):**
-  `Instantiate(expr, shape)` — arg1 is the RHS, arg2 supplies
-  units/indices; the LHS is the declared variable (was mistreated as
-  arg1, silently generating assignments to the wrong variable).
+- **`Instantiate` redesigned (2026-09-19, ADR-008):**
+  `Instantiate(proto)` — single `Var` argument, whole-RHS declaration
+  only; the LHS variable becomes a new *instance* of the prototype
+  (inherits units + index structure, empty incidence, LHS class
+  enforced to `constant`/`parameter`).  Universal constants
+  `zero`/`one`/`half` seeded with pre-bound `promo:value`;
+  `promo:instanceOf` provenance + `equation_class="instantiate"`
+  written at save.
 - **Next:** RDF vocabulary finalization for equations/operators;
   LaTeX→image cache deferred.  (Persistence UX done 2026-09-18:
   store-global dirty tracking + Save button + unsaved badge.)

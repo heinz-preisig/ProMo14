@@ -31,6 +31,17 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 # can classify it.  ``promo:Version`` marks frozen graphs separately.
 ARTEFACT_TYPES = ("Ontology", "Library", "Assignment", "Model", "Glass")
 
+# Universal constants seeded into every ontology (ADR-008): pre-bound
+# value slots, class ``constant``, network ``root`` — visible from every
+# expression network via ancestor-chain resolution.  ``value`` is the
+# code-surface literal; ``latex`` is the document-surface alias.
+#   (fragment, label, value, latex alias)
+SEED_CONSTANTS = (
+    ("const_zero", "zero", "0", "0"),
+    ("const_one", "one", "1", "1"),
+    ("const_half", "half", "0.5", r"\frac{1}{2}"),
+)
+
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
@@ -185,6 +196,9 @@ class RdfStore:
             marker = (g.identifier, RDF.type, PROMO["Ontology"])
             if marker not in g:
                 g.add(marker)
+            # Idempotent seed migration: universal constants (ADR-008)
+            # postdate existing ontology.trig files.
+            self._seed_constants(g, str(self.ONTOLOGY_GRAPH_IRI))
 
         # Load any additional var/expr named graphs that are already in the
         # data directory, but do not replace the editable ontology graph.
@@ -515,6 +529,11 @@ class RdfStore:
                 "token": str(self.mint_iri(base, token_frag)) if token_frag else None,
             })
 
+        # --- Universal constants (ADR-008) ---
+        # Pre-bound value slots living on the root network — visible from
+        # every expression network via ancestor-chain resolution.
+        self._seed_constants(g, base)
+
         # --- Equation classes (top-level hierarchy) ---
         eq_classes = ["generic", "instantiate", "balance", "empirical", "user_function"]
         for ec in eq_classes:
@@ -526,6 +545,30 @@ class RdfStore:
 
         # --- Vocabulary declarations (rdfs:Class / rdf:Property) -------
         self.declare_vocabulary(g)
+
+    def _seed_constants(self, g: Graph, base: str) -> None:
+        """Add the universal constants (``zero``, ``one``, ``half``).
+
+        Idempotent by deterministic IRI — also called from ``load()`` as
+        a migration for stores that predate ADR-008.  Constants carry a
+        pre-bound ``promo:value`` (permanent: fixed by mathematics) and a
+        latex alias so documents render numerals, not labels.
+        """
+        for frag, label, value, latex in SEED_CONSTANTS:
+            iri = self.mint_iri(base, frag)
+            if (iri, RDF.type, PROMO["Variable"]) in g:
+                continue
+            internal_id = self.next_internal_id("V")
+            self.add_variable_dict(g, {
+                "iri": str(iri),
+                "label": label,
+                "network": "root",
+                "type": "constant",
+                "internal_id": internal_id,
+                "aliases": {"global_ID": internal_id, "latex": latex},
+                "value": value,
+                "doc": "Universal constant",
+            })
 
     # ------------------------------------------------------------------
     # Named graph helpers
@@ -928,6 +971,9 @@ class RdfStore:
         vc = var.get("variable_class") or var.get("type")
         if vc:
             self._set_literal(graph, iri, PROMO["variableClass"], vc)
+
+        # Pre-bound value slot (universal constants; ADR-008).
+        self._set_literal(graph, iri, PROMO["value"], var.get("value"))
 
         # New multi-axis classifications (map of axis IRI → axis term IRI).
         classifications = var.get("classifications")

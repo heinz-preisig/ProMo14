@@ -84,10 +84,11 @@ def _rhs_latex(eq: Any, var: Any, ctx: Any) -> str:
             )
             checked = check(parse(rhs), space, Var(var.label))
             # The equations table renders ``lhs := rhs`` itself — for an
-            # Instantiate the rhs column is just the expression (arg1);
-            # arg2 only supplied units/indices.
+            # Instantiate the rhs column is ``inst(proto)`` (ADR-008).
             if isinstance(checked.node, Instantiate):
-                checked = checked.children[0]
+                proto = Renderer(space, "latex", lhs=var.label).render(
+                    checked.children[0])
+                return r"\mathrm{inst}\left( %s \right)" % proto
             return Renderer(space, "latex", lhs=var.label).render(checked)
         except Exception:
             pass

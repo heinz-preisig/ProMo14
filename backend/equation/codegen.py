@@ -122,6 +122,14 @@ class Renderer:
         ch = c.children
 
         if isinstance(node, Var):
+            var = self.space.resolve(node.name).variable
+            # A variable with a pre-bound ``promo:value`` (universal
+            # constants) renders as the literal in code targets — never
+            # as its own LHS symbol though (ADR-008).
+            if (self.target in ("python", "matlab")
+                    and getattr(var, "value", None)
+                    and node.name != self.lhs):
+                return var.value
             return self._var_name(node)
 
         if isinstance(node, Group):
@@ -165,13 +173,19 @@ class Renderer:
             return "{%s}^{%s}" % (base, exp)
 
         if isinstance(node, Instantiate):
-            # ``lhs := expr`` — the left-hand side is the declared variable
-            # (``self.lhs``); ``ch[1]`` (shape) only carried units/indices.
-            expr = self.render(ch[0])
+            # ``lhs := inst(proto)`` — declares lhs as an instance of
+            # proto: a bound-value slot filled at instantiation, not a
+            # computed assignment (ADR-008).
+            proto = self.render(ch[0])
             lhs_name = self._var_name(Var(self.lhs)) if self.lhs else "x"
             if self.target == "latex":
-                return r"%s := %s" % (lhs_name, expr)
-            return "%s = %s" % (lhs_name, expr)
+                return (r"%s := \mathrm{inst}\left( %s \right)"
+                        % (lhs_name, proto))
+            if self.target == "matlab":
+                return ("%s = []; %% parameter: instance of %s"
+                        % (lhs_name, proto))
+            return ("%s = None  # parameter: instance of %s"
+                    % (lhs_name, proto))
 
         if isinstance(node, Integral):
             body, var, lo, hi = (self.render(x) for x in ch)

@@ -89,13 +89,13 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
     case 'Power':
       return `${wrap(node.base as AstNode, ctx, true)}^{${astToLatex(node.exponent as AstNode, ctx)}}`
     case 'Instantiate': {
-      // ``lhs := expr`` — the LHS is the declared variable (ctx.lhs),
-      // rendered through the Var path so its latex alias and index
-      // subscripts apply; ``shape`` only supplied units/indices.
+      // ``lhs := inst(proto)`` — declares the LHS variable (ctx.lhs) as a
+      // new instance of the prototype; the instance's own symbol is the
+      // user's latex alias (ADR-008).
       const lhs = ctx?.lhs
         ? astToLatex({ type: 'Var', name: ctx.lhs } as AstNode, ctx)
         : '?'
-      return `${lhs} := ${astToLatex(node.expr as AstNode, ctx)}`
+      return `${lhs} := \\mathrm{inst}\\left( ${astToLatex(node.var as AstNode, ctx)} \\right)`
     }
     case 'Integral':
       return `\\int_{${astToLatex(node.lower as AstNode, ctx)}}^{${astToLatex(node.upper as AstNode, ctx)}} ${astToLatex(node.body as AstNode, ctx)} \\, d${astToLatex(node.var as AstNode, ctx)}`

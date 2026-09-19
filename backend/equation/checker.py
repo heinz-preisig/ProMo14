@@ -43,6 +43,10 @@ from .syntax import (
 )
 from .units import Units
 
+#: Variable classes allowed on the LHS of ``Instantiate(proto)`` — an
+#: instance is a bound-value slot, not a computed quantity (ADR-008).
+INSTANTIATE_CLASSES = ("constant", "parameter")
+
 
 @dataclass
 class Checked:
@@ -288,18 +292,32 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         )
 
     if isinstance(node, Instantiate):
-        # ``Instantiate(expr, shape)`` — ``lhs := expr`` where ``shape``
-        # supplies the units and index structure.  The left-hand side is
-        # the declared variable being defined, not part of the expression.
-        expr = check(node.expr, space, lhs)
-        shape = check(node.shape, space, lhs)
+        # ``Instantiate(proto)`` — declares the LHS variable as a new
+        # instance of the prototype: it inherits ``proto``'s units and
+        # index structure (ADR-008).  The prototype is a type-level
+        # reference, not a value dependency — the equation's incidence is
+        # empty.  The LHS must be a bound-value class (constant/parameter):
+        # an instance is a slot filled at instantiation, not a computed
+        # quantity.
+        proto = check(node.var, space, lhs)
+        if lhs is not None:
+            try:
+                lhs_type = space.resolve(lhs.name).variable.type
+            except VarError:
+                lhs_type = None
+            if lhs_type is not None and lhs_type not in INSTANTIATE_CLASSES:
+                raise VarError(
+                    "Instantiate declares an instance — the LHS variable "
+                    "must be class 'constant' or 'parameter', got %r"
+                    % lhs_type
+                )
         return Checked(
             node=node,
-            units=shape.units,
-            indices=shape.indices,
+            units=proto.units,
+            indices=proto.indices,
             label=space.new_temp(),
-            incidence=expr.incidence | shape.incidence,
-            children=[expr, shape],
+            incidence=frozenset(),
+            children=[proto],
         )
 
     if isinstance(node, Integral):

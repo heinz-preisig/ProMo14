@@ -78,6 +78,7 @@ class Variable:
     internal_id: Optional[str] = None  # e.g. "V_12"
     aliases: Dict[str, str] = field(default_factory=dict)
     tokens: List[str] = field(default_factory=list)  # token-type IRIs
+    value: Optional[str] = None  # pre-bound promo:value (universal constants)
 
 
 @dataclass(frozen=True)

@@ -68,7 +68,7 @@ references to the transport nodes' output flow variables via ports.
 | `F * N x` | arc-indexed → node-indexed effort/flow pair | same projection machinery |
 | `* S x` | species-index expansion | token/species index source |
 | `>>> net` equations | cross-network projection | **ports** — no equation; binding declared in assignment artefact |
-| `Instantiate(x, value)` | constant/initial value | `promo:Instantiate` — unchanged |
+| `Instantiate(x, value)` | constant/initial value | `Instantiate(proto)` — instance declaration (ADR-008); the value binds at the instantiation stage, universal constants carry `promo:value` |
 | `Integral(f :: t in [to,te])` | state integration | unchanged — marks state variable |
 
 ## 5. Old variable types → role axis

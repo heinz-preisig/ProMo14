@@ -246,6 +246,7 @@ class RdfContext(EquationContext):
             or iri,
             aliases=aliases,
             tokens=_literal_list(graph, s, PROMO["carriesToken"]),
+            value=_one_literal(graph, s, PROMO["value"]) or None,
         )
         setattr(var, "classifications", classifications)
         setattr(

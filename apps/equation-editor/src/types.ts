@@ -24,6 +24,8 @@ export interface Variable {
   doc?: string
   port_variable?: boolean
   tokens?: string[]
+  /** Pre-bound promo:value — universal constants carry it permanently. */
+  value?: string | null
   equations?: Record<string, EquationRecord>
 }
 
@@ -101,7 +103,7 @@ export type AstNode =
   | { type: 'Hadamard'; left: AstNode; right: AstNode }
   | { type: 'Reduce'; left: AstNode; right: AstNode; index?: AstNode | null }
   | { type: 'Power'; base: AstNode; exponent: AstNode }
-  | { type: 'Instantiate'; expr: AstNode; shape: AstNode }
+  | { type: 'Instantiate'; var: AstNode }
   | { type: 'Integral'; body: AstNode; var: AstNode; lower: AstNode; upper: AstNode }
   | { type: 'Product'; body: AstNode; index: AstNode }
   | { type: 'Root'; body: AstNode }

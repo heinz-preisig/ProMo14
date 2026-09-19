@@ -86,7 +86,9 @@ Now `a * b^c` parses as `a * (b^c)` and `a^b * c` as `(a^b) * c`.
   grammar gives `^` its own level above the product operators and makes it
   right-associative.
 - **No numeric literals** — the grammar intentionally has no numbers; constants
-  are introduced via `Instantiate(var, value)` or defined as variables.
+  are defined as variables.  *(Superseded by ADR-008: `Instantiate` is now a
+  single-argument instance declaration; numeric symbols are variables —
+  universal constants `zero`/`one`/`half` carry a pre-bound `promo:value`.)*
 - **Function-call syntax only** — `Integral`, `Product`, `Root`, `MaxMin`,
   `TotalDiff`, `ParDiff`, `reduceSum`, and unary functions all use `Name(args)`.
 - **No unary minus** — negation is the `neg(...)` function, not a prefix `-`.

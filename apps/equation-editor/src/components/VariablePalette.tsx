@@ -57,7 +57,12 @@ export default function VariablePalette({
                     activeNetwork && v.network !== activeNetwork
                       ? `${v.network}!${v.label}`
                       : v.label
-                  const title = `${v.iri}${v.type ? ' — class: ' + v.type : ''}${v.doc ? ' — ' + v.doc : ''}`
+                  // Pre-bound value (universal constants, ADR-008): show
+                  // the value badge and never offer delete — they are
+                  // permanent fixtures of the ontology.
+                  const bound = v.value != null && v.value !== ''
+                  const display = bound ? `${label}=${v.value}` : label
+                  const title = `${v.iri}${v.type ? ' — class: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}`
                   const style = {
                     fontSize: 12,
                     padding: '3px 6px',
@@ -78,7 +83,7 @@ export default function VariablePalette({
                       title={title}
                       style={style as React.CSSProperties}
                     >
-                      {label}
+                      {display}
                     </button>
                   ) : onDelete ? (
                     <div key={v.iri} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -87,26 +92,28 @@ export default function VariablePalette({
                         style={selectStyle as React.CSSProperties}
                         onClick={() => onSelect?.(v)}
                       >
-                        {label}
+                        {display}
                       </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDelete(v)
-                        }}
-                        title={`Delete ${label}`}
-                        style={{
-                          fontSize: 11,
-                          color: '#c62828',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '0 2px',
-                        }}
-                      >
-                        ×
-                      </button>
+                      {!bound && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDelete(v)
+                          }}
+                          title={`Delete ${label}`}
+                          style={{
+                            fontSize: 11,
+                            color: '#c62828',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0 2px',
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <span
@@ -115,7 +122,7 @@ export default function VariablePalette({
                       style={selectStyle as React.CSSProperties}
                       onClick={() => onSelect?.(v)}
                     >
-                      {label}
+                      {display}
                     </span>
                   )
                 })}

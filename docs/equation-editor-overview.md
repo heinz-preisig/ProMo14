@@ -56,7 +56,13 @@ from the bottom up.
 The ProMo math language is a context-free expression language with
 index-structured tensor operations.  Key characteristics:
 
-- No numeric literals (constants are variables or `Instantiate`).
+- No numeric literals — numeric symbols are variables: universal
+  constants (`zero`, `one`, `half`) are seeded with pre-bound
+  `promo:value`; model constants/parameters get values at the
+  instantiation stage (ADR-008).
+- `Instantiate(proto)` declares the LHS variable as a new instance of
+  the prototype variable `proto` — whole-RHS declaration only, LHS must
+  be class `constant` or `parameter` (ADR-008).
 - Function-call syntax only (`Integral(...)`, `Product(...)`, etc.).
 - No unary minus (negation is `neg(...)`).
 - Operators: `+`/`-` (sum), `*` (Einstein reduce product), `:` (expand
@@ -122,7 +128,7 @@ The checker runs during AST construction (not as a separate pass):
 | `Integral` | Integration variable and limits share index structure |
 | `TotalDiff` / `ParDiff` | Units = dx − dy; indices = union |
 | `Root` | Target variable must appear in dependency set |
-| `Instantiate` | Copies units and indices from source variable |
+| `Instantiate` | Argument is a single `Var`; instance inherits the prototype's units and index structure; incidence empty; LHS class must be `constant`/`parameter` |
 
 Units are 8-exponent SI vectors (`time, length, amount, mass,
 temperature, current, light, nil`).

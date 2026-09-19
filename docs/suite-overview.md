@@ -335,6 +335,7 @@ is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
 - `docs/ADR-005-equation-editor.md` — equation language, parser, browser architecture
 - `docs/ADR-006-ontology-evolution.md` — ontology versioning and change classification
 - `docs/ADR-007-model-persistence.md` — modeller RDF topology, hierarchy/layout persistence boundaries
+- `docs/ADR-008-instantiate-and-constants.md` — `Instantiate(proto)` instance declaration, universal constants, three-layer binding model
 
 ### Detailed technical references
 - `docs/equation-context-contract.md` — EquationContext protocol and CompileSpace resolution rules

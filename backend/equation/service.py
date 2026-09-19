@@ -21,8 +21,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from rdflib import URIRef
+from rdflib.namespace import RDF, RDFS
 
-from backend.core.graph_store import get_store
+from backend.core.graph_store import PROMO, get_store
 from backend.ontology.models import VariableRecord
 from backend.ontology.rdf_context import RdfContext
 from backend.ontology.service import (
@@ -40,7 +41,7 @@ from .document import build_document
 
 from .errors import VarError
 from .parser import ParseError, parse
-from .syntax import Node, Var
+from .syntax import Instantiate, Node, Var
 from .units import Units
 
 router = APIRouter()
@@ -108,6 +109,7 @@ class VariableIn(BaseModel):
     doc: str = ""
     port_variable: bool = False
     tokens: List[str] = Field(default_factory=list)
+    value: Optional[str] = None  # pre-bound promo:value (constants)
     equations: Dict[str, EquationIn] = Field(default_factory=dict)
 
 
@@ -193,6 +195,7 @@ def context_endpoint(
                 doc=v.doc,
                 port_variable=v.port_variable,
                 tokens=v.tokens,
+                value=getattr(v, "value", None),
                 equations=getattr(v, "equations", {}),
             )
         )
@@ -245,6 +248,7 @@ def _build_space(req: CheckRequest) -> CompileSpace:
             doc=v.doc,
             port_variable=v.port_variable,
             tokens=v.tokens,
+            value=v.value,
         )
         for v in req.variables
     }
@@ -353,6 +357,47 @@ def document_endpoint(
 # ---------------------------------------------------------------------------
 
 
+def _instantiate_protos(record: VariableRecord) -> List[str]:
+    """Auto-classify ``Instantiate`` equations on the record and return the
+    prototype labels they reference (ADR-008)."""
+    protos: List[str] = []
+    for eq in record.equations.values():
+        try:
+            node = parse(eq.rhs or "")
+        except ParseError:
+            continue
+        if isinstance(node, Instantiate):
+            eq.equation_class = "instantiate"
+            protos.append(node.var.name)
+    return protos
+
+
+def _proto_iri(graph, label: str, network: Optional[str]) -> Optional[URIRef]:
+    """Resolve a prototype label to a variable IRI in ``graph`` —
+    same-network match preferred."""
+    candidates = [
+        s for s in graph.subjects(RDF.type, PROMO["Variable"])
+        if str(graph.value(s, RDFS.label) or "") == label
+    ]
+    if not candidates:
+        return None
+    for s in candidates:
+        if str(graph.value(s, PROMO["network"]) or "") == (network or ""):
+            return s
+    return candidates[0]
+
+
+def _link_instances(graph, var_iri: URIRef, protos: List[str],
+                    network: str) -> None:
+    """Write ``promo:instanceOf`` links from the new variable to each
+    prototype it instantiates (ADR-008)."""
+    for name in protos:
+        qnet, _, qlabel = name.partition("!")
+        proto = _proto_iri(graph, qlabel or name, qnet or network)
+        if proto is not None:
+            graph.add((var_iri, PROMO["instanceOf"], proto))
+
+
 @router.post("/variables", response_model=VariableRecord)
 def create_variable(
     record: VariableRecord,
@@ -367,10 +412,12 @@ def create_variable(
     if not record.internal_id:
         record.internal_id = store.next_internal_id("V")
 
+    protos = _instantiate_protos(record)
     var = record.model_dump()
     if var.get("variable_class"):
         var["type"] = var["variable_class"]
-    store.add_variable_dict(graph, var)
+    var_iri = store.add_variable_dict(graph, var)
+    _link_instances(graph, var_iri, protos, record.network)
     return record
 
 
@@ -390,7 +437,9 @@ def update_variable(
 
     graph.remove((subject, None, None))
     record.iri = iri
-    store.add_variable_dict(graph, record.model_dump())
+    protos = _instantiate_protos(record)
+    var_iri = store.add_variable_dict(graph, record.model_dump())
+    _link_instances(graph, var_iri, protos, record.network)
     return record
 
 

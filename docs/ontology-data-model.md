@@ -444,11 +444,18 @@ Grouped by purpose, mirroring the ``Variable`` dataclass.
 | `promo:doc` | xsd:string | `Variable.doc` |
 | `promo:units` | xsd:string or `rdf:List` of 8 ints | `Variable.units` |
 | `promo:has_token` | `promo:Token` (multiple) | `Variable.tokens` |
+| `promo:value` | xsd:string | `Variable.value` — pre-bound value slot; universal constants carry it permanently, parameters get it at the instantiation stage (ADR-008) |
+| `promo:instanceOf` | `promo:Variable` (IRI) | provenance — this variable was declared an instance of the linked prototype by an `Instantiate` equation (ADR-008) |
 
 `promo:units` is an 8-integer SI exponent vector.  Keep it simple: an
 `rdf:List` ``[0, 0, 0, 1, -3, 0, 0, 0]`` (order: time, length, amount,
 mass, temperature, current, light, nil) and the loader converts it to
 `Units`.
+
+The universal constants `zero`, `one`, `half` are seeded into every
+ontology (network `root`, class `constant`, deterministic IRIs
+`…#const_zero` / `…#const_one` / `…#const_half`) with `promo:value`
+pre-bound — see ADR-008.
 
 #### Index structure
 

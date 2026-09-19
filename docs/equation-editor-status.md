@@ -178,19 +178,26 @@ Implemented as a React + TypeScript + Vite app in
   `\mathit{label}`.  `add_variable_dict` clears the direct-alias
   predicates before writing → replace semantics (clearing the field
   removes `promo:latex`).
-- ~~`Instantiate` operand semantics.~~ **Corrected (2026-09-18):**
-  `Instantiate(expr, shape)` — arg1 is the equation's right-hand side,
-  arg2 supplies units and index structure; the left-hand side is the
-  declared variable being defined, not a node in the expression.
-  Previously arg1 was (mis)treated as the LHS variable, so
-  `Instantiate(value, value)` under `zero` checked fine but codegen
-  emitted `value = value`.  Now: `syntax.py` fields renamed
-  `var`/`value` → `expr`/`shape`; checker takes units/indices from
-  `shape`; codegen renders `lhs := expr` from the declared `lhs`;
-  `document.py` unwraps `Instantiate` so the equations table's rhs
-  column shows only the expression; frontend `latex.ts` renders
-  `ctx.lhs := expr` (new `lhs` prop on `LaTeXPreview`, fed by the
-  dependent editor's Name field).
+- ~~`Instantiate(expr, shape)` unit-borrowing form.~~ **Redesigned
+  (2026-09-19, ADR-008):** `Instantiate(proto)` — single `Var`
+  argument, valid only as the entire RHS.  Declares the LHS variable
+  as a new *instance* of the prototype: inherits the prototype's units
+  and index structure, incidence is empty (type-level reference, not a
+  value dependency), LHS class enforced to `constant`/`parameter`
+  (checker + restricted class dropdown in `DependentVariableEditor`,
+  defaulting to `parameter`).  Codegen renders a parameter placeholder
+  (`V_x = None  # parameter: instance of V_t`); LaTeX renders
+  `lhs := \mathrm{inst}(proto)` — the instance's symbol is the user's
+  latex alias.  Saving writes `promo:instanceOf` → prototype IRI and
+  auto-classifies `equation_class = "instantiate"`.
+- **Universal constants (ADR-008):** `zero`, `one`, `half` seeded in
+  the ontology (network `root`, class `constant`) with pre-bound
+  `promo:value` (`0`/`1`/`0.5`) and latex aliases — permanent,
+  non-deletable in the palette (shown with a `=value` badge).
+  `RdfStore._seed_constants` is idempotent and also runs from `load()`
+  as a migration for pre-existing `ontology.trig`.  Codegen inlines
+  `promo:value` when present (`half . M` → `0.5 * V_3`); unbound
+  parameters keep their `V_N` slot until the instantiation stage.
 - LaTeX→image cache (deferred, noted 2026-09-18): old-ProMo rendered
   per-variable/equation PNGs (`V_N.png`/`E_N.png`, standalone .tex →
   latex → pnglatex.bash) into the ontology's LaTeX dir, invalidated by

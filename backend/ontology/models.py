@@ -101,6 +101,9 @@ class VariableRecord(BaseModel):
     doc: str = ""
     units: List[int] = Field(default_factory=lambda: [0] * 8)
     tokens: List[str] = Field(default_factory=list)
+    # Pre-bound value slot — universal constants carry it permanently;
+    # parameters get it at the instantiation stage (ADR-008).
+    value: Optional[str] = None
 
     # Index structure
     index_structures: List[str] = Field(default_factory=list)

@@ -21,10 +21,10 @@ def _space():
     n_idx = Index(iri=N, label="species", network="thermo",
                   aliases={"internal_code": "N"})
 
-    def var(iri, iid, label, units, idx):
+    def var(iri, iid, label, units, idx, type="state", value=None):
         return Variable(iri=iri, internal_id=iid, label=label,
-                        network="thermo", type="state", units=units,
-                        index_structures=idx)
+                        network="thermo", type=type, units=units,
+                        index_structures=idx, value=value)
 
     variables = {v.iri: v for v in [
         var("http://promo.example/var/rho", "V_1", "rho",
@@ -37,7 +37,10 @@ def _space():
             Units(length=1), [T]),
         var("http://promo.example/var/rhoT", "V_7", "rhoT",
             Units(mass=1, length=-3), [T]),
-        var("http://promo.example/var/one", "V_8", "one", Units(), []),
+        var("http://promo.example/var/one", "V_8", "one", Units(), [],
+            type="constant"),
+        var("http://promo.example/var/half", "V_10", "half", Units(), [],
+            type="constant", value="0.5"),
     ]}
     indices = {i.iri: i for i in [t_idx, n_idx]}
     return CompileSpace(
@@ -98,9 +101,16 @@ def test_python_ufunc():
 
 
 def test_python_instantiate():
-    # Instantiate(expr, shape): LHS is the declared variable, arg1 is the
-    # RHS, arg2 only supplies units/indices.
-    assert gen("Instantiate(M, one)", "python", lhs="rho") == "V_1 = V_3"
+    # ADR-008: Instantiate(proto) declares lhs as an instance — a
+    # bound-value slot rendered as a parameter placeholder, never a copy
+    # of the prototype's value.
+    assert gen("Instantiate(M)", "python", lhs="one") == \
+        "V_8 = None  # parameter: instance of V_3"
+
+
+def test_python_constant_value_inlined():
+    # A variable with a pre-bound promo:value renders as the literal.
+    assert gen("half . M", "python") == "0.5 * V_3"
 
 
 def test_python_integral():
@@ -225,8 +235,8 @@ def test_latex_pardiff():
 
 
 def test_latex_instantiate():
-    assert gen("Instantiate(M, one)", "latex", lhs="rho") == \
-        r"\mathit{rho}_{N} := \mathit{M}"
+    assert gen("Instantiate(M)", "latex", lhs="one") == \
+        r"\mathit{one} := \mathrm{inst}\left( \mathit{M} \right)"
 
 
 # -- imported variables -------------------------------------------------------

@@ -71,6 +71,7 @@ export async function saveVariable(v: Variable, equation?: SavedEquation): Promi
     doc: v.doc ?? '',
     units: v.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
     tokens: v.tokens ?? [],
+    value: v.value ?? null,
     index_structures: v.index_structures ?? [],
     equations,
     compiled_lhs: null,
@@ -152,7 +153,7 @@ export function nodeToString(node: AstNode): string {
     case 'Power':
       return `${nodeToString(node.base as AstNode)} ^ ${nodeToString(node.exponent as AstNode)}`
     case 'Instantiate':
-      return `Instantiate( ${nodeToString(node.expr as AstNode)} , ${nodeToString(node.shape as AstNode)} )`
+      return `Instantiate( ${nodeToString(node.var as AstNode)} )`
     case 'Integral':
       return `Integral( ${nodeToString(node.body as AstNode)} :: ${nodeToString(node.var as AstNode)} in [ ${nodeToString(node.lower as AstNode)} , ${nodeToString(node.upper as AstNode)} ] )`
     case 'Product':

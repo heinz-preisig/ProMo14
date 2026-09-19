@@ -10,6 +10,10 @@ import type { SavedEquation } from './EquationList'
 
 const VARIABLE_CLASSES = ['state', 'effort', 'transport', 'frame', 'network', 'constant', 'parameter']
 
+/** Classes allowed on the LHS of ``Instantiate(proto)`` — an instance is
+ *  a bound-value slot, not a computed quantity (ADR-008). */
+const INSTANTIATE_CLASSES = ['constant', 'parameter']
+
 export interface DependentVariableEditorProps {
   open: boolean
   onClose: () => void
@@ -81,6 +85,16 @@ export default function DependentVariableEditor({
     setGenCode(null)
   }, [name, domain, variableClass, text, latexSym])
 
+  // Instantiate RHS → LHS class restricted to constant|parameter.  The
+  // text heuristic covers the pre-check state (ast only exists after a
+  // successful parse); the backend checker stays authoritative (ADR-008).
+  const isInstantiate =
+    ast?.type === 'Instantiate' || /^\s*Instantiate\s*\(/.test(text)
+  const effectiveClass =
+    isInstantiate && !INSTANTIATE_CLASSES.includes(variableClass)
+      ? 'parameter'
+      : variableClass
+
   const handleCheck = useCallback(async () => {
     setLoading(true)
     setParseError(null)
@@ -91,6 +105,11 @@ export default function DependentVariableEditor({
       const parseRes = await parseExpression(text)
       if (parseRes.ok && parseRes.ast) {
         setAst(parseRes.ast)
+        // Instantiate LHS must be constant|parameter — sync the select so
+        // the request below already carries an allowed class (ADR-008).
+        if (parseRes.ast.type === 'Instantiate' && !INSTANTIATE_CLASSES.includes(variableClass)) {
+          setVariableClass('parameter')
+        }
       } else {
         setParseError(parseRes.error ?? 'Parse failed')
         setLoading(false)
@@ -114,7 +133,7 @@ export default function DependentVariableEditor({
       iri: `promo:${lhs.toLowerCase()}`,
       label: lhs,
       network: domain,
-      type: variableClass,
+      type: effectiveClass,
       units: checkResult?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
       index_structures: checkResult?.indices ?? [],
       internal_id: nextInternalId(variables),
@@ -122,7 +141,7 @@ export default function DependentVariableEditor({
       aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
       doc,
     }
-  }, [name, domain, variableClass, variables, checkResult, latexSym, doc])
+  }, [name, domain, effectiveClass, variables, checkResult, latexSym, doc])
 
   /** The check request for the current inputs — shared by /check and
    *  /generate so both see the same draft LHS variable. */
@@ -159,7 +178,7 @@ export default function DependentVariableEditor({
 
   const handleAccept = () => {
     const lhs = name.trim()
-    if (!lhs || !domain || !variableClass || !checkResult?.ok) return
+    if (!lhs || !domain || !effectiveClass || !checkResult?.ok) return
 
     const draft = draftVariable()
 
@@ -229,9 +248,9 @@ export default function DependentVariableEditor({
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             Class:
-            <select value={variableClass} onChange={(e) => setVariableClass(e.target.value)}>
+            <select value={effectiveClass} onChange={(e) => setVariableClass(e.target.value)}>
               <option value="">Select…</option>
-              {VARIABLE_CLASSES.map((c) => (
+              {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

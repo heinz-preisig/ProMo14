@@ -1,5 +1,7 @@
 """Tests for the recursive-descent ProMo expression parser."""
 
+import pytest
+
 from .parser import ParseError, parse
 from .syntax import (
     Add, Expand, Group, Hadamard, Instantiate, Integral, MaxMin, ParDiff,
@@ -99,13 +101,36 @@ def test_max_min():
 
 
 def test_instantiate():
-    assert parse("Instantiate(t, value)") == Instantiate(Var("t"), Var("value"))
+    # ADR-008: Instantiate(proto) — single Var argument, whole RHS only.
+    assert parse("Instantiate(t)") == Instantiate(Var("t"))
 
 
-def test_instantiate_nested_sum():
-    assert parse("Instantiate(x + y, value)") == Instantiate(
-        Add("+", Var("x"), Var("y")), Var("value")
-    )
+def test_instantiate_qualified_proto():
+    assert parse("Instantiate(physical!t)") == Instantiate(Var("physical!t"))
+
+
+def test_instantiate_rejects_expression_arg():
+    with pytest.raises(ParseError):
+        parse("Instantiate(x + y)")
+
+
+def test_instantiate_rejects_two_args():
+    with pytest.raises(ParseError):
+        parse("Instantiate(t, value)")
+
+
+def test_instantiate_rejects_nested():
+    # A declaration, not a subexpression — never inside brackets, calls,
+    # or infix operands.
+    for text in (
+        "( Instantiate(t) )",
+        "sin(Instantiate(t))",
+        "x + Instantiate(t)",
+        "Instantiate(t) + x",
+        "x * Instantiate(t)",
+    ):
+        with pytest.raises(ParseError):
+            parse(text)
 
 
 def test_integral():

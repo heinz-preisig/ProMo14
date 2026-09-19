@@ -62,12 +62,12 @@ class Power:
 
 @dataclass(frozen=True)
 class Instantiate:
-    """``Instantiate(expr, shape)`` — the equation ``lhs := expr`` where
-    ``shape`` supplies the units and index structure.  The left-hand side is
-    the declared variable being defined, not a node in the expression.
-    Only valid at expression top level."""
-    expr: "Node"
-    shape: "Node"
+    """``Instantiate(proto)`` — declares the LHS variable as a new instance
+    of the prototype variable ``proto``: it inherits ``proto``'s units and
+    index structure but is a distinct bound-value variable (a parameter
+    slot).  Only valid as the entire right-hand side of an equation —
+    never nested inside another expression (ADR-008)."""
+    var: Var
 
 
 @dataclass(frozen=True)
