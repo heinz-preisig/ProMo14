@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import type { Variable } from '../types'
 
 export interface VariablePaletteProps {
@@ -15,24 +16,69 @@ export default function VariablePalette({
   onDelete,
   onSelect,
 }: VariablePaletteProps) {
-  const grouped = variables.reduce<Record<string, Variable[]>>((acc, v) => {
-    const net = v.network ?? 'root'
-    ;(acc[net] ??= []).push(v)
-    return acc
-  }, {})
+  const [filter, setFilter] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
+  const filtering = filter.trim().length > 0
+
+  const grouped = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    const acc: Record<string, Variable[]> = {}
+    for (const v of variables) {
+      if (
+        q &&
+        !v.label.toLowerCase().includes(q) &&
+        !(v.doc ?? '').toLowerCase().includes(q) &&
+        !(v.type ?? '').toLowerCase().includes(q) &&
+        !v.iri.toLowerCase().includes(q)
+      ) {
+        continue
+      }
+      const net = v.network ?? 'root'
+      ;(acc[net] ??= []).push(v)
+    }
+    for (const vars of Object.values(acc)) {
+      vars.sort((a, b) => a.label.localeCompare(b.label))
+    }
+    return acc
+  }, [variables, filter])
+
+  const shown = Object.values(grouped).reduce((n, vars) => n + vars.length, 0)
   const activeNetwork = expressionNetwork || ''
   const interactive = !!onInsert
 
+  const toggleGroup = (net: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(net)) next.delete(net)
+      else next.add(net)
+      return next
+    })
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <strong style={{ fontSize: 13 }}>Variables</strong>
+      <strong style={{ fontSize: 13 }}>
+        Variables ({filtering ? `${shown}/${variables.length}` : variables.length})
+      </strong>
+      <input
+        type="text"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        placeholder="Filter variables…"
+        style={{
+          fontSize: 12,
+          padding: '4px 6px',
+          border: '1px solid #bbb',
+          borderRadius: 4,
+        }}
+      />
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 6,
-          maxHeight: 220,
+          maxHeight: 300,
           overflowY: 'auto',
           padding: 4,
           border: '1px solid #ccc',
@@ -42,15 +88,37 @@ export default function VariablePalette({
       >
         {Object.keys(grouped).length === 0 ? (
           <div style={{ fontSize: 11, color: '#888', padding: 8 }}>
-            No variables yet. Use the <strong>New variable</strong> form above to
-            define one.
+            {filtering ? (
+              'No variables match the filter.'
+            ) : (
+              <>
+                No variables yet. Use the <strong>New variable</strong> form above
+                to define one.
+              </>
+            )}
           </div>
         ) : (
-          Object.entries(grouped).map(([network, vars]) => (
+          Object.entries(grouped)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([network, vars]) => {
+              const isCollapsed = collapsed.has(network) && !filtering
+              return (
             <div key={network}>
-              <div style={{ fontSize: 11, color: '#444', fontWeight: 'bold', marginBottom: 2 }}>
-                {network}
+              <div
+                onClick={() => toggleGroup(network)}
+                title={isCollapsed ? 'Expand group' : 'Collapse group'}
+                style={{
+                  fontSize: 11,
+                  color: '#444',
+                  fontWeight: 'bold',
+                  marginBottom: 2,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                {isCollapsed ? '▶' : '▼'} {network} ({vars.length})
               </div>
+              {!isCollapsed && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {vars.map((v) => {
                   const label =
@@ -127,8 +195,10 @@ export default function VariablePalette({
                   )
                 })}
               </div>
+              )}
             </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>

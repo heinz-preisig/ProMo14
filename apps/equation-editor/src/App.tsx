@@ -10,6 +10,7 @@ import DependentVariableEditor from './components/DependentVariableEditor'
 import EquationList, { type SavedEquation } from './components/EquationList'
 import PortVariableEditor from './components/PortVariableEditor'
 import VariablePalette from './components/VariablePalette'
+import VariableTable from './components/VariableTable'
 
 export default function App() {
   const [variables, setVariables] = useState<Variable[]>([])
@@ -243,29 +244,27 @@ export default function App() {
             gap: 16,
           }}
         >
-          <div
-            style={{
-              padding: 12,
-              background: '#e8f4fd',
-              border: '1px solid #b3d9f7',
-              borderRadius: 4,
-              fontSize: 13,
-              color: '#0d47a1',
-            }}
-          >
-            This is the repository view. Use the sidebar buttons to define a
-            <strong>port variable</strong> (foundation: name, units, index
-            structure) or a <strong>dependent variable</strong> (defined by a
-            checked RHS expression). Click a variable to see its details.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 12, color: '#666' }}>
+              {variables.length} variables ·{' '}
+              {variables.reduce((n, v) => n + Object.keys(v.equations ?? {}).length, 0)}{' '}
+              equations
+            </span>
+            <div style={{ flex: 1 }} />
+            <button
+              type="button"
+              onClick={() => setDebugOpen(true)}
+              style={{ fontSize: 12 }}
+            >
+              Debug equation context (JSON)…
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setDebugOpen(true)}
-            style={{ alignSelf: 'flex-start', fontSize: 12 }}
-          >
-            Debug equation context (JSON)…
-          </button>
+          <VariableTable
+            variables={variables}
+            indices={indices}
+            onSelect={setSelectedVariable}
+          />
         </div>
       </div>
 
