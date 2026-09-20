@@ -1,6 +1,6 @@
 # Ontology Editor — Implementation Status
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-20
 
 ## Current state
 
@@ -53,8 +53,33 @@ all working; manual UI testing done 2026-09-14.
   filled; backend returns 422 on empty labels; axis terms require a
   selected axis.
 - **Seed indices** — `species` (bound to `component_mass` token), `node`,
-  `arc` (network topology indices).
+  `arc` (network topology indices), plus arc sub-indices `A_mass`,
+  `A_energy`, `A_diff`, `A_conv`, `A_heat`, `A_rad`, `A_work`
+  (`promo:subIndexOf`/`promo:selector`, see below).
 - **Dev tooling** — `dev.sh` runs uvicorn with `--reload`.
+
+## Seeded structure & migrations (2026-09-20)
+
+- **Transport entity tree** — `transport_system` specialised by token:
+  `mass_transport` {`diffusion_transport`, `convection_transport`} and
+  `energy_transport` {`heat_transport`, `radiation_transport`,
+  `work_transport`}, linked by `promo:parent`.  Mechanism leaves bind
+  the continuum scale pair; grouping types carry no scale bindings.
+- **Arc sub-indices** — `Index` resources may carry `promo:subIndexOf`
+  (base index) + `promo:selector` (entity type defining membership via
+  the incident transport node).  Seven seeded under `arc`; the checker
+  sees plain distinct indices, instantiation resolves membership.
+  Design: BL doc §16.
+- **Scale regimes** — `particulate`|`continuum` grouping values top the
+  `length` and `time` trees; `length` gained a `molecular` level under
+  `particulate`.  Regime is derived by `promo:parent` ancestry; all
+  seeded entity types are continuum.  Design: BL doc §17.
+- **Seed contract** — `seed_default_ontology` writes initial state once
+  (empty graph); four idempotent migrations in `load()`
+  (`_seed_constants`, `_seed_scale_regimes`, `_seed_transport_mechanisms`,
+  `_seed_arc_sub_indices`) guarantee a floor on the core graph only —
+  floor deletions resurrect on restart, modifications persist, other
+  artefact graphs are never seeded.  Design: BL doc §17.
 
 ## Design
 

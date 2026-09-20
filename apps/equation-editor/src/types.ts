@@ -37,6 +37,10 @@ export interface Index {
   index_class?: string
   aliases?: Record<string, string>
   token?: string | null
+  /** IRI of the base index this is a subset of (§16 sub-index). */
+  sub_index_of?: string | null
+  /** IRI of the entity type/term selecting membership (§16). */
+  selector?: string | null
 }
 
 export interface NetworkTree {

@@ -53,6 +53,10 @@ class Index:
     aliases: Dict[str, str] = field(default_factory=dict)
     token: Optional[str] = None  # IRI of the token type this index carries
     internal_id: Optional[str] = None
+    # Sub-index partitioning (§16): IRI of the base index this is a
+    # subset of, and IRI of the entity type/term selecting membership.
+    sub_index_of: Optional[str] = None
+    selector: Optional[str] = None
 
     def alias(self, language: str = "internal_code") -> str:
         return self.aliases.get(language, self.label)

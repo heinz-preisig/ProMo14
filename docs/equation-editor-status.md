@@ -1,6 +1,6 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-18 (end of session)
+**Last updated:** 2026-09-20
 
 ## Current state
 
@@ -69,7 +69,8 @@ Implemented as a React + TypeScript + Vite app in
 | `PortVariableEditor` | `components/PortVariableEditor.tsx` | Single-dialog port variable definition: domain tree, class, name, LaTeX symbol, SI units, index structures. |
 | `VariableEditor` | `components/VariableEditor.tsx` | Direct port-variable editor — currently unreferenced (kept for the debug context popup). |
 | `DependentVariableEditor` | `components/DependentVariableEditor.tsx` | RHS expression input, Check, LaTeX preview, and result panel. |
-| `VariablePalette` | `components/VariablePalette.tsx` | Variable list grouped by network; click to view details, click `×` to delete with cascade impact. |
+| `VariablePalette` | `components/VariablePalette.tsx` | Variable list grouped by network — filter box, collapsible groups, alphabetical sort (2026-09-20); click to view details, `×` to delete with cascade impact. |
+| `VariableTable` | `components/VariableTable.tsx` | Sortable/filterable repository browser in the main pane; expandable rows show a variable's equations (2026-09-20). |
 | `ExpressionInput` | `components/ExpressionInput.tsx` | Operator/function buttons and keyboard input. |
 | `LaTeXPreview` | `components/LaTeXPreview.tsx` | Rendered expression with index subscripts. |
 | `ResultPanel` | `components/ResultPanel.tsx` | Check result with units, index structure, incidence, and candidate suggestions on error. |
@@ -87,6 +88,12 @@ Implemented as a React + TypeScript + Vite app in
 - LaTeX preview with index subscripts.
 - Save and reload checked equations.
 - Debug equation context (JSON) popup.
+- Index records carry optional `sub_index_of` / `selector` fields
+  (2026-09-20, BL doc §16) — plumbed through `IndexIn`, context
+  serialization, check-time `Index` construction, and the frontend
+  `Index` interface.  Seven arc sub-indices are seeded (`A_mass`,
+  `A_energy`, `A_diff`, `A_conv`, `A_heat`, `A_rad`, `A_work`); the
+  checker treats them as plain distinct indices.
 
 ## Pending items
 

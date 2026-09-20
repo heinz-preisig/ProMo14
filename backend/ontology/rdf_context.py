@@ -335,6 +335,8 @@ class RdfContext(EquationContext):
             internal_id=_one_literal(graph, s, PROMO["internalID"])
             or aliases.get("global_ID")
             or iri,
+            sub_index_of=_one_literal(graph, s, PROMO["subIndexOf"]) or None,
+            selector=_one_literal(graph, s, PROMO["selector"]) or None,
         )
 
     def _load_network_tree(self) -> "tuple[Dict[str, List[str]], Dict[str, str]]":

@@ -139,6 +139,8 @@ class IndexIn(BaseModel):
     aliases: Dict[str, str] = Field(default_factory=dict)
     token: Optional[str] = None
     short_name: Optional[str] = None
+    sub_index_of: Optional[str] = None
+    selector: Optional[str] = None
 
 
 class CheckRequest(BaseModel):
@@ -232,6 +234,8 @@ def context_endpoint(
                 aliases=i.aliases,
                 token=i.token,
                 short_name=short,
+                sub_index_of=i.sub_index_of,
+                selector=i.selector,
             )
         )
 
@@ -278,6 +282,8 @@ def _build_space(req: CheckRequest) -> CompileSpace:
             index_class=i.index_class,
             aliases=i.aliases,
             token=i.token,
+            sub_index_of=i.sub_index_of,
+            selector=i.selector,
         )
         for i in req.indices
     }

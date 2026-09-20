@@ -1328,3 +1328,138 @@ worthwhile when the latter is implemented.
   from topology + orientations; binds it to the symbolic `F` in
   conservation equations.
 - **Equation editor**: unchanged — equations stay orientation-free.
+
+## 16. Arc sub-indices by token and mechanism (2026-09-20)
+
+### The problem
+
+The algebra needs symbolic partitions of the arc index: a balance
+sums fluxes over the arcs carrying its token (`F_mass`, `F_energy`),
+and constitutive grouping needs the mechanism partition
+(`F_diff`, `F_conv`, …).  Hardcoding "diffusion"/"convection" into
+the index schema would fix the ontology to physics — the mechanism
+had to be abstracted.
+
+### Decision: `subIndexOf` + `selector`
+
+An `Index` may carry two optional predicates:
+
+- `promo:subIndexOf` — the base index this is a subset of (`arc`).
+- `promo:selector` — the entity type that defines membership: an arc
+  belongs to the sub-index iff the transport node it touches has that
+  entity type (or a subtype — transitive resolution is an
+  instantiation-time concern, not yet implemented).
+
+The checker treats a sub-index as a plain distinct index; only
+instantiation resolves the element set.  Nothing in the mechanism is
+physics-specific — any classification term can be a selector.
+
+### Entity tree: mechanisms grouped by token
+
+Mechanisms are per-token, not a symmetric cross product — mass
+transports by diffusion and convection, energy by heat (conduction),
+radiation and work (mechanical/volume):
+
+```
+transport_system
+├── mass_transport          → A_mass   (token partition)
+│   ├── diffusion_transport → A_diff
+│   └── convection_transport→ A_conv
+└── energy_transport        → A_energy (token partition)
+    ├── heat_transport      → A_heat
+    ├── radiation_transport → A_rad
+    └── work_transport      → A_work
+```
+
+The token-level grouping types carry no scale bindings; the mechanism
+leaves bind the continuum pair (`macro_event_dynamic` +
+`microscopic_distributed`).
+
+### Consequences
+
+- **The arc does not declare its token.**  Arc types encode only the
+  carrier category (`token-flow`|`reference`); the specific token is
+  implicit in the transport node's entity type.  A `promo:token` on
+  arcs is a separate, deferred decision.
+- **Balances write per-mechanism terms** — the standard form:
+  `d(mass)/dt = F_diff·J_diff + F_conv·m_conv`.  The token partition
+  falls out of summing mechanism terms; no index-union machinery.
+- **Coupled transport** (one phenomenon carrying mass and heat)
+  becomes two parallel transport nodes.
+- **Reclassification is safe**: equations never see entity types —
+  changing a transport's type moves its arcs between sub-indices at
+  instantiation; equations still check clean.
+
+### Deferred
+
+- Instantiation resolver: arc → incident transport → entity type →
+  sub-index membership, including transitive subtype resolution
+  (`A_mass` over the leaves of `mass_transport`).
+- The F-builder that turns membership + orientations (§15) into the
+  numeric matrices.
+
+## 17. Scale regimes and the seed contract (2026-09-20)
+
+### Regime: particulate | continuum
+
+Macroscopic-and-below scales differ fundamentally from molecular —
+continuum assumption vs discrete particles.  The distinction is a
+*scale* distinction, so it lives in the scale-value trees as a
+grouping level, not as a parallel classification that could
+contradict the scale binding:
+
+```
+scale_length                          scale_time
+├── particulate                       ├── particulate
+│   └── molecular → {point, finite}   │   └── molecular → {…}
+└── continuum                        └── continuum
+    ├── infinitesimal → {point,fin.}      ├── nano → {…}
+    ├── microscopic → {unif.,distr.}      ├── milli → {…}
+    ├── macroscopic → {unif.,distr.}      └── macro → {…}
+    └── infinite → {uniform}
+```
+
+Entity types keep binding leaf values; **regime is derived** by
+walking `promo:parent` ancestry — single source of truth.  All seeded
+entity types are continuum; the molecular time binding the transport
+types briefly carried was removed (it predates the regime layer and
+would have misclassified them as particulate).
+
+Downstream value: behaviour applicability.  The §16 transport tree
+is implicitly continuum-only; particulate wants different equation
+forms (population balances, MD-style).  The BL can constrain
+behaviours by regime without enumerating scales.
+
+### The seed contract
+
+Seeds come in two tiers:
+
+- **Initial-state seeds** — everything `seed_default_ontology`
+  writes into an empty graph (domains, tokens, base entity types,
+  base indices, rules, scale dimensions, axes, equation classes).
+  One-time initial state: modify or delete freely, never resurrected.
+- **Floor seeds** — what the idempotent migrations ensure on every
+  load (constants, transport mechanism types, arc sub-indices, scale
+  regime structure).  Deleting one resurrects it on next backend
+  start; modifications persist.  Each migration is guarded by its
+  anchor — deleting `idx_arc` or `scale_length` retires that whole
+  floor section.
+
+**Scope**: the floor applies only to the core ontology graph
+(`ONTOLOGY_GRAPH_IRI`).  Other artefact graphs load untouched — no
+seeding, no migrations.  So the suite stays open: the newcomer's
+core is self-repairing, while the advanced user's own line (hub →
+New empty, Fork, or a `.trig` dropped into `data/`) is completely
+free.  The choice is *which artefact line you work in*, not what the
+seed contains.
+
+### Deferred
+
+- **Tombstones** — record deleted floor IRIs so migrations skip
+  them.  Only when in-place deletion from core becomes a real need;
+  fork covers the realistic case.
+- **Floor marker** — a `promo:seeded`-style flag so the ontology
+  editor can badge floor items instead of letting users discover
+  resurrection by surprise.
+- **`seedFrom`** on `New` — copy a chosen graph as starting point
+  (fork without lineage) if non-empty non-fork starts are wanted.

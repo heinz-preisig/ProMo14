@@ -199,6 +199,15 @@ class RdfStore:
             # Idempotent seed migration: universal constants (ADR-008)
             # postdate existing ontology.trig files.
             self._seed_constants(g, str(self.ONTOLOGY_GRAPH_IRI))
+            # Idempotent seed migration: transport mechanism subtypes and
+            # arc sub-indices (§16) postdate existing ontology.trig files.
+            # Scale regime layer (particulate|continuum) first — it
+            # creates scale values the transport migration binds.
+            self._seed_scale_regimes(g, str(self.ONTOLOGY_GRAPH_IRI))
+            # Idempotent seed migration: transport mechanism subtypes and
+            # arc sub-indices (§16) postdate existing ontology.trig files.
+            self._seed_transport_mechanisms(g, str(self.ONTOLOGY_GRAPH_IRI))
+            self._seed_arc_sub_indices(g, str(self.ONTOLOGY_GRAPH_IRI))
 
         # Load any additional var/expr named graphs that are already in the
         # data directory, but do not replace the editable ontology graph.
@@ -450,6 +459,9 @@ class RdfStore:
                 if sf in all_scale_vals:
                     g.add((et_iri, PROMO["hasScaleValue"], all_scale_vals[sf]))
 
+        # Transport mechanism subtypes (design doc §16).
+        self._seed_transport_mechanisms(g, base)
+
         # --- Connection rules ---
         # Arc semantics live in rule attributes, not in the type name:
         #   direction : unidirectional | bidirectional
@@ -529,6 +541,13 @@ class RdfStore:
                 "token": str(self.mint_iri(base, token_frag)) if token_frag else None,
             })
 
+        # Arc sub-indices partitioned by transport mechanism (§16).
+        self._seed_arc_sub_indices(g, base)
+
+        # Scale regime layer: particulate|continuum grouping over the
+        # scale levels seeded above.
+        self._seed_scale_regimes(g, base)
+
         # --- Universal constants (ADR-008) ---
         # Pre-bound value slots living on the root network — visible from
         # every expression network via ancestor-chain resolution.
@@ -569,6 +588,208 @@ class RdfStore:
                 "value": value,
                 "doc": "Universal constant",
             })
+
+    def _seed_transport_mechanisms(self, g: Graph, base: str) -> None:
+        """Add transport mechanism entity subtypes, grouped by token.
+
+        Idempotent by deterministic IRI — also called from ``load()`` as
+        a migration for stores that predate §16.  Mechanisms are
+        per-token: mass transports by diffusion and convection, energy
+        by heat (conduction), radiation and work (mechanical/volume).
+        The token-level grouping types give the balance equations their
+        incidence partition; the leaves give the constitutive-law
+        partition.  Arcs derive membership from the transport node they
+        touch.
+        """
+        root = self.mint_iri(base, "etype_transport_system")
+        if (root, RDF.type, PROMO["EntityType"]) not in g:
+            return
+        # Continuum regime bindings — transport is continuum-domain;
+        # the molecular time level would misclassify it as particulate.
+        scales = [
+            self.mint_iri(base, "sval_time_macro_event_dynamic"),
+            self.mint_iri(base, "sval_length_microscopic_distributed"),
+        ]
+        # (frag, label, parent_frag, bind_scales) — parents first.
+        tree = [
+            ("mass_transport", "Mass Transport", "transport_system", False),
+            ("energy_transport", "Energy Transport", "transport_system", False),
+            ("diffusion_transport", "Diffusion Transport", "mass_transport", True),
+            ("convection_transport", "Convection Transport", "mass_transport", True),
+            ("heat_transport", "Heat Transport", "energy_transport", True),
+            ("radiation_transport", "Radiation Transport", "energy_transport", True),
+            ("work_transport", "Work Transport", "energy_transport", True),
+        ]
+        for frag, label, parent_frag, bind_scales in tree:
+            iri = self.mint_iri(base, f"etype_{frag}")
+            parent_iri = self.mint_iri(base, f"etype_{parent_frag}")
+            if (iri, RDF.type, PROMO["EntityType"]) in g:
+                # Migration: reparent seeds that predate the token
+                # grouping (they sit directly under transport_system).
+                # A parent set to anything else is a deliberate user
+                # edit — leave it alone.
+                cur = g.value(iri, PROMO["parent"])
+                if cur is None or cur == root:
+                    g.set((iri, PROMO["parent"], parent_iri))
+                if bind_scales:
+                    # Regime migration: drop the molecular time binding
+                    # (predates the regime layer) and ensure the
+                    # continuum bindings landed — older stores may
+                    # lack the length value at original seed time.
+                    g.remove((iri, PROMO["hasScaleValue"], self.mint_iri(
+                        base, "sval_time_molecular_event_dynamic")))
+                    for sv in scales:
+                        if (sv, None, None) in g:
+                            g.add((iri, PROMO["hasScaleValue"], sv))
+                continue
+            self.add_entity_type(
+                g, iri, label,
+                "event-dynamic", "physical",
+                spatial_type="distributed", spatial_size="finite",
+                description=f"Transport system — {label.lower()} mechanism",
+                scale_values=[sv for sv in scales
+                              if bind_scales and (sv, None, None) in g],
+                parent=parent_iri,
+            )
+
+    def _seed_arc_sub_indices(self, g: Graph, base: str) -> None:
+        """Add arc sub-indices partitioned by token and mechanism.
+
+        Idempotent by deterministic IRI — migration for stores that
+        predate §16.  ``A_mass``/``A_energy`` select the token-level
+        grouping entity types (membership over leaf subtypes — needs
+        transitive resolution at instantiation); the rest select a
+        single mechanism leaf.  Instantiation resolves membership, the
+        checker sees plain distinct indices.  Short names use
+        underscore — ``^`` is the power operator.
+        """
+        arc_iri = self.mint_iri(base, "idx_arc")
+        if (arc_iri, RDF.type, PROMO["Index"]) not in g:
+            return
+        for frag, label, short, sel_frag in [
+            ("idx_arc_mass", "mass arc", "A_mass",
+             "etype_mass_transport"),
+            ("idx_arc_energy", "energy arc", "A_energy",
+             "etype_energy_transport"),
+            ("idx_arc_diffusion", "diffusion arc", "A_diff",
+             "etype_diffusion_transport"),
+            ("idx_arc_convection", "convection arc", "A_conv",
+             "etype_convection_transport"),
+            ("idx_arc_heat", "heat arc", "A_heat",
+             "etype_heat_transport"),
+            ("idx_arc_radiation", "radiation arc", "A_rad",
+             "etype_radiation_transport"),
+            ("idx_arc_work", "work arc", "A_work",
+             "etype_work_transport"),
+        ]:
+            iri = self.mint_iri(base, frag)
+            if (iri, RDF.type, PROMO["Index"]) in g:
+                continue
+            internal_id = self.next_internal_id("I")
+            self.add_index_dict(g, {
+                "iri": str(iri),
+                "label": label,
+                "short_name": short,
+                "network": "physical",
+                "index_class": "arc",
+                "internal_id": internal_id,
+                "aliases": {"global_ID": internal_id, "internal_code": short},
+                "sub_index_of": str(arc_iri),
+                "selector": str(self.mint_iri(base, sel_frag)),
+            })
+
+    def _seed_scale_regimes(self, g: Graph, base: str) -> None:
+        """Group scale levels under regime values (particulate|continuum).
+
+        Idempotent — also called from ``load()`` as a migration for
+        stores that predate the regime layer.  Regime is a scale
+        distinction: particulate = discrete matter (molecular level),
+        continuum = continuum assumption (all other levels).  Entity
+        types keep binding leaf values; regime is derived by walking
+        ``promo:parent`` ancestry — no separate classification that
+        could contradict the scale binding.
+        """
+        length_iri = self.mint_iri(base, "scale_length")
+        if (length_iri, RDF.type, PROMO["ScaleDimension"]) not in g:
+            return
+        time_iri = self.mint_iri(base, "scale_time")
+
+        # Regime grouping values — new top level of each structural tree.
+        regimes = {}
+        for dim_iri, frag, label in [
+            (length_iri, "length_particulate", "particulate"),
+            (length_iri, "length_continuum", "continuum"),
+            (time_iri, "time_particulate", "particulate"),
+            (time_iri, "time_continuum", "continuum"),
+        ]:
+            if (dim_iri, RDF.type, PROMO["ScaleDimension"]) not in g:
+                continue
+            iri = self.mint_iri(base, f"sval_{frag}")
+            if (iri, RDF.type, PROMO["ScaleValue"]) not in g:
+                self.add_scale_value(g, iri, dim_iri, label)
+            regimes[frag] = iri
+
+        # Level specs: (level frag, regime frag, [children]).  The
+        # particulate length level (molecular) is new — a particle is
+        # point/finite, mirroring infinitesimal's spatial children.
+        specs = [
+            (length_iri, [
+                ("length_molecular", "length_particulate",
+                 ["point", "finite"]),
+                ("length_infinitesimal", "length_continuum",
+                 ["point", "finite"]),
+                ("length_microscopic", "length_continuum",
+                 ["uniform", "distributed"]),
+                ("length_macroscopic", "length_continuum",
+                 ["uniform", "distributed"]),
+                ("length_infinite", "length_continuum", ["uniform"]),
+            ]),
+            (time_iri, [
+                ("time_molecular", "time_particulate",
+                 ["constant", "dynamic", "event-dynamic"]),
+                ("time_nano", "time_continuum",
+                 ["constant", "dynamic", "event-dynamic"]),
+                ("time_milli", "time_continuum",
+                 ["constant", "dynamic", "event-dynamic"]),
+                ("time_macro", "time_continuum",
+                 ["constant", "dynamic", "event-dynamic"]),
+            ]),
+        ]
+        for dim_iri, levels in specs:
+            if (dim_iri, RDF.type, PROMO["ScaleDimension"]) not in g:
+                continue
+            for level_frag, regime_frag, children in levels:
+                regime_iri = regimes.get(regime_frag)
+                if regime_iri is None:
+                    continue
+                level_iri = self.mint_iri(base, f"sval_{level_frag}")
+                if (level_iri, RDF.type, PROMO["ScaleValue"]) not in g:
+                    # Missing level (older store) — create under regime.
+                    self.add_scale_value(
+                        g, level_iri, dim_iri,
+                        level_frag.split("_", 1)[1], parent=regime_iri)
+                elif g.value(level_iri, PROMO["parent"]) is None:
+                    # Existing top level — group it under its regime.
+                    # A user-set parent is a deliberate edit: untouched.
+                    g.set((level_iri, PROMO["parent"], regime_iri))
+                # Ensure children exist — older stores may lack them.
+                for sub in children:
+                    child_iri = self.mint_iri(
+                        base,
+                        f"sval_{level_frag}_{sub.replace('-', '_')}")
+                    if (child_iri, RDF.type, PROMO["ScaleValue"]) not in g:
+                        self.add_scale_value(g, child_iri, dim_iri, sub,
+                                             parent=level_iri)
+
+        # Regime migration: nothing seeded is particulate — drop the
+        # molecular time binding from continuum entity types (it
+        # predates the regime layer and would misclassify them).
+        # Mechanism leaves are handled in _seed_transport_mechanisms.
+        molecular_time = self.mint_iri(
+            base, "sval_time_molecular_event_dynamic")
+        for frag in ("etype_point", "etype_transport_system"):
+            g.remove((self.mint_iri(base, frag),
+                      PROMO["hasScaleValue"], molecular_time))
 
     # ------------------------------------------------------------------
     # Named graph helpers
@@ -1022,6 +1243,15 @@ class RdfStore:
         if idx.get("token"):
             graph.set((iri, PROMO["token"], URIRef(idx["token"])))
 
+        # Sub-index partitioning (§16): promo:subIndexOf points at the
+        # base index, promo:selector at the entity type/classification
+        # term defining membership.  Instantiation resolves the element
+        # set; the checker treats a sub-index as a plain distinct index.
+        if idx.get("sub_index_of"):
+            graph.set((iri, PROMO["subIndexOf"], URIRef(idx["sub_index_of"])))
+        if idx.get("selector"):
+            graph.set((iri, PROMO["selector"], URIRef(idx["selector"])))
+
         if idx.get("aliases"):
             self._add_aliases(graph, iri, idx["aliases"])
 
@@ -1145,12 +1375,17 @@ class RdfStore:
         spatial_size: Optional[str] = None,
         description: str = "",
         scale_values: Optional[List[Union[str, URIRef]]] = None,
+        parent: Optional[Union[str, URIRef]] = None,
     ) -> URIRef:
         """Add an entity type (CWA 17960 taxonomy) to the graph."""
         graph.add((iri, RDF.type, PROMO["EntityType"]))
         self._set_literal(graph, iri, RDFS.label, label)
         self._set_literal(graph, iri, PROMO["temporalType"], temporal_type)
         self._set_literal(graph, iri, PROMO["branch"], branch)
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = URIRef(parent)
+            graph.set((iri, PROMO["parent"], parent))
         if spatial_type is not None:
             self._set_literal(graph, iri, PROMO["spatialType"], spatial_type)
         if spatial_size is not None:

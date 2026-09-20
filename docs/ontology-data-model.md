@@ -399,21 +399,27 @@ promo:expression_list_E_1 rdf:_0 promo:Instantiate ;
   the variable's own network is present.
 - The domain tree is not exported at all.
 
-## 3. Proposed ProMo14 RDF topology
+## 3. ProMo14 RDF topology (implemented)
 
-We keep the existing predicates where they already work and add the missing
-fields.  Everything lives in a single named graph per ontology version, e.g.
-``<http://promo.example/ontologies/thermodynamics/v1>``.
+Everything lives in a named graph per artefact — the working ontology
+``https://w3id.org/promo/ontology``, frozen versions at ``{graphIRI}/{v}``,
+and per-artefact graphs for variables/equations/models.  Predicate
+spellings below are the implemented ones (`backend/core/graph_store.py`).
 
 ### 3.1 Classes
 
 - `promo:Variable` — a declared physical quantity.
 - `promo:Index` — a running/block index.
-- `promo:ExpressionList` — an RDF sequence of tokens.
-- `promo:Token` — an operator/delimiter/function.
-- `promo:Equation` — one equation (LHS variable + RHS expression list +
-  metadata).
-- `promo:OntologyVersion` — version metadata, domain tree, and rules.
+- `promo:Token` — an operator/delimiter/function (`promo:tokenKind`).
+- `promo:Equation` — one equation (LHS variable + RHS text + metadata).
+- `promo:EquationClass` — equation classification term.
+- `promo:Domain` — a node in the domain/network tree.
+- `promo:EntityType`, `promo:ClassificationAxis`, `promo:AxisTerm`,
+  `promo:ScaleDimension`, `promo:ScaleValue`, `promo:ConnectionRule` —
+  ontology-side vocabulary (see §5).
+- `promo:Ontology` / `promo:Library` / `promo:Model` / … — artefact-type
+  markers stamped on graphs; `promo:Version` marks frozen version graphs
+  (`promo:versionOf` → line, `promo:versionInfo`, `promo:publishedOn`).
 
 ### 3.2 Variable predicates
 
@@ -423,18 +429,20 @@ Grouped by purpose, mirroring the ``Variable`` dataclass.
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:iri` | IRI | `Variable.iri` |
-| `promo:label` | xsd:string | `Variable.label` |
-| `promo:internal_id` | xsd:string | `Variable.internal_id` |
-| `promo:has_alias` | `rdf:List` or blank nodes with `promo:language` / `promo:value` | `Variable.aliases` |
+| IRI itself (subject) | IRI | `Variable.iri` |
+| `rdfs:label` | xsd:string | `Variable.label` |
+| `promo:internalID` | xsd:string | `Variable.internal_id` |
+| `promo:internal_code` / `promo:latex` / `promo:matlab` | xsd:string | `Variable.aliases` — direct predicates for the known alias kinds |
+| `promo:aliases` | xsd:string (JSON) | `Variable.aliases` — arbitrary aliases as one JSON literal |
 
 #### Domain / location
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
 | `promo:network` | xsd:string | `Variable.network` |
-| `promo:variable_class` | xsd:string | `Variable.type` (Python field name; values: `state`, `effort`, ...) |
-| `promo:port_variable` | xsd:boolean | `Variable.port_variable` |
+| `promo:variableClass` | xsd:string | `Variable.type` (Python field name; values: `state`, `effort`, ...) |
+| `promo:axisValue` | `promo:AxisTerm` (IRI, multiple) | multi-axis classification terms |
+| `promo:portVariable` | xsd:boolean | `Variable.port_variable` |
 | `promo:imported` | xsd:boolean | ontology-only metadata — not in `EquationContext` |
 
 #### Semantics
@@ -442,14 +450,14 @@ Grouped by purpose, mirroring the ``Variable`` dataclass.
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
 | `promo:doc` | xsd:string | `Variable.doc` |
-| `promo:units` | xsd:string or `rdf:List` of 8 ints | `Variable.units` |
-| `promo:has_token` | `promo:Token` (multiple) | `Variable.tokens` |
+| `promo:unitVector` | xsd:string (JSON, 8 ints) | `Variable.units` |
+| `promo:carriesToken` | `promo:Token` (IRI, multiple) | `Variable.tokens` |
 | `promo:value` | xsd:string | `Variable.value` — pre-bound value slot; universal constants carry it permanently, parameters get it at the instantiation stage (ADR-008) |
 | `promo:instanceOf` | `promo:Variable` (IRI) | provenance — this variable was declared an instance of the linked prototype by an `Instantiate` equation (ADR-008) |
 
-`promo:units` is an 8-integer SI exponent vector.  Keep it simple: an
-`rdf:List` ``[0, 0, 0, 1, -3, 0, 0, 0]`` (order: time, length, amount,
-mass, temperature, current, light, nil) and the loader converts it to
+`promo:unitVector` is an 8-integer SI exponent vector stored as a JSON
+literal ``[0, 0, 0, 1, -3, 0, 0, 0]`` (order: time, length, amount,
+mass, temperature, current, light, nil); the loader converts it to
 `Units`.
 
 The universal constants `zero`, `one`, `half` are seeded into every
@@ -461,15 +469,16 @@ pre-bound — see ADR-008.
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:has_index_structure` | `promo:Index` (multiple) | `Variable.index_structures` (IRIs) |
+| `promo:indexStructure` | `promo:Index` (IRI, multiple) | `Variable.index_structures` (IRIs) |
 
 #### Equations
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:has_equation` | `promo:Equation` (multiple) | link to equations |
-| `promo:compiled_lhs` | xsd:string / JSON | `Variable.compiled_lhs` |
-| `promo:memory` | xsd:string / JSON | `Variable.memory` |
+| `promo:hasEquation` | `promo:Equation` (IRI, multiple) | link to equations |
+
+`compiled_lhs` and `memory` are compile-time artefacts — computed, not
+persisted.
 
 ### 3.3 Index predicates
 
@@ -477,23 +486,36 @@ pre-bound — see ADR-008.
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:iri` / IRI itself | IRI | `Index.iri` |
-| `promo:label` | xsd:string | `Index.label` |
-| `promo:short_name` | xsd:string | `Index.short_name` |
-| `promo:has_alias` | `rdf:List` | `Index.aliases` |
+| IRI itself (subject) | IRI | `Index.iri` |
+| `rdfs:label` | xsd:string | `Index.label` |
+| `promo:internalID` | xsd:string | `Index.internal_id` |
+| `promo:shortName` | xsd:string | `Index.short_name` |
+| `promo:internal_code` / `promo:aliases` | xsd:string / JSON | `Index.aliases` |
 
 #### Domain
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:network` | xsd:string or `rdf:List` | `Index.network` |
-| `promo:index_class` | xsd:string | `Index.index_class` (`index` / `block_index`) |
+| `promo:network` | xsd:string | `Index.network` |
+| `promo:indexClass` | xsd:string | `Index.index_class` (`index` / `block_index`) |
+| `promo:doc` | xsd:string | `Index.doc` |
 
 #### Token
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:has_token` | `promo:Token` | `Index.token` |
+| `promo:token` | `promo:Token` (IRI) | `Index.token` |
+
+#### Sub-index partitioning (implemented 2026-09-20, BL doc §16)
+
+| Predicate | Type | Maps to `EquationContext` |
+|---|---|---|
+| `promo:subIndexOf` | `promo:Index` (IRI) | `Index.sub_index_of` — base index this is a subset of |
+| `promo:selector` | `promo:EntityType` (IRI) | `Index.selector` — classification term defining membership |
+
+A sub-index is a subset of its base index resolved at instantiation
+(e.g. `A_diff` ⊂ `arc`: arcs incident to a `diffusion_transport`
+node).  The checker treats it as a plain distinct index.
 
 Indices are typed as `promo:Index` (not bare IRIs).
 
@@ -503,29 +525,29 @@ Indices are typed as `promo:Index` (not bare IRIs).
 
 | Predicate | Type | Purpose |
 |---|---|---|
-| `promo:iri` | IRI | stable equation IRI (``E_N``) |
-| `promo:internal_id` | xsd:string | legacy `E_N` token / code name |
+| IRI itself (subject) | IRI | stable equation IRI (``E_N``) |
+| `promo:internalID` | xsd:string | legacy `E_N` token / code name |
 
 #### Relationship
 
 | Predicate | Type | Purpose |
 |---|---|---|
 | `promo:lhs` | `promo:Variable` (IRI) | the variable being defined; avoid duplicating `internal_id` / `latex` |
-| `promo:rhs` | `promo:ExpressionList` | token sequence (the `global_ID` form) |
-| `promo:rhs_latex` | xsd:string | **generated** LaTeX of the RHS, cached after first render |
+| `promo:rhs` | xsd:string | the RHS in label-form text (as entered) |
+| `promo:rhsLatex` | xsd:string | **generated** LaTeX of the RHS, cached after first render |
 
 #### Context
 
 | Predicate | Type | Purpose |
 |---|---|---|
 | `promo:network` | xsd:string | **expression definition network** |
-| `promo:equation_class` | xsd:string | `generic` / `instantiate` / `balance` / ... |
+| `promo:equationClass` | xsd:string | `generic` / `instantiate` / `balance` / ... |
 
 #### Content
 
 | Predicate | Type | Purpose |
 |---|---|---|
-| `promo:incidence_list` | `rdf:List` | **derived** list of variable IRIs in the RHS; cached for `Root` incidence checks |
+| `promo:incidenceList` | xsd:string (JSON) | **derived** list of variable IRIs in the RHS; cached for `Root` incidence checks |
 | `promo:doc` | xsd:string | equation documentation |
 
 #### Audit
@@ -536,21 +558,22 @@ Indices are typed as `promo:Index` (not bare IRIs).
 | `promo:modified` | xsd:dateTime | last modification |
 
 This replaces the old `expression_list_V_N` / `expression_list_E_N`
-indirection.  The RHS token list stays an `rdf:List` or `rdf:Seq`.
+indirection.  The RHS is stored as the label-form text literal — the
+token-stream form is a parse product, not persisted.
 
 ### 3.5 Domain tree
 
-Store the tree as a single per-ontology `rdf:List` of nodes, or as
-`skos:broader` / `promo:parent` edges between `promo:Network` resources:
+The tree is stored as `promo:parent` edges between `promo:Domain`
+resources:
 
 ```turtle
-promo:physical a promo:Network ;
+promo:physical a promo:Domain ;
     promo:parent promo:root .
 
-promo:macroscopic a promo:Network ;
+promo:macroscopic a promo:Domain ;
     promo:parent promo:physical .
 
-promo:reactions a promo:Network ;
+promo:reactions a promo:Domain ;
     promo:parent promo:physical .
 ```
 
@@ -561,13 +584,14 @@ The loader walks from an expression network up to root to compute
 
 ```turtle
 promo:Hadamard a promo:Token ;
-    promo:label "Hadamard" ;
+    rdfs:label "Hadamard" ;
     promo:internal_code "." ;
-    promo:global_id "O_42" ;
-    promo:token_type "operator" .
+    promo:tokenKind "operator" .
 ```
 
-`promo:token_type` is one of `operator`, `delimiter`, `function`.
+`promo:tokenKind` is one of `operator`, `delimiter`, `function`;
+`promo:parent` links subtokens; `promo:internal_code`/`promo:aliases`
+carry the surface-syntax aliases.
 
 ## 4. Loader contract
 
@@ -604,16 +628,17 @@ The provider must load:
    compute `accessible_networks`.
 2. **Variables** — materialise all `promo:Variable` resources with their
    predicates, grouped as in section 3.2.
-3. **Indices** — materialise `promo:Index` resources, their `short_name`,
-   and their `internal_code` aliases.
+3. **Indices** — materialise `promo:Index` resources, their `shortName`,
+   and their `internal_code`/`promo:aliases` aliases.
 4. **Equations** — for each variable, materialise its `promo:Equation`
-   resources, including the RHS token stream and `equation_class`.
-5. **Tokens** (for import/export) — map `global_id` and `internal_code`
+   resources, including the RHS text and `equationClass`.
+5. **Tokens** (for import/export) — map `internal_code` and other alias
    values to surface strings and IRIs.
 
-A concrete `DictContext` is already implemented for in-memory provision and
-testing.  The future `RdfContext` will sit on top of an RDF triple store
-(e.g. `rdflib` or a persistent graph database).
+`DictContext` provides in-memory provision for testing; `RdfContext`
+(`backend/ontology/rdf_context.py`) is the production provider on
+`rdflib`, reading the artefact graph plus its transitive
+`usesOntology` closure (`RdfStore.resolution_scope`).
 
 ## 5. Ontology graph semantics (implemented 2026-09-14)
 
@@ -666,22 +691,48 @@ applicable to a domain pair:
 - Results are ordered most-specific first (closest ancestor wins over
   wildcard rules).
 
+### Seeded structure (2026-09-20)
+
+- **Entity types** — `transport_system` is specialised by token:
+  `mass_transport` {`diffusion_transport`, `convection_transport`} and
+  `energy_transport` {`heat_transport`, `radiation_transport`,
+  `work_transport`} (`promo:parent` links).  Arc sub-indices select on
+  these types — see §3.3 and BL design doc §16.
+- **Scale regimes** — both structural scale trees are grouped under
+  `particulate` | `continuum` top-level values; `length` gained a
+  `molecular` level under `particulate`.  Entity types bind leaf
+  values; regime is derived by `promo:parent` ancestry.  All seeded
+  entity types are continuum.  See BL design doc §17.
+- **Seed contract** — `seed_default_ontology` writes the initial
+  state once (empty graph only); four idempotent migrations in
+  `load()` (`_seed_constants`, `_seed_scale_regimes`,
+  `_seed_transport_mechanisms`, `_seed_arc_sub_indices`) guarantee a
+  floor on the core graph — deletions of floor items resurrect on
+  restart, modifications persist.  Other artefact graphs are never
+  seeded or migrated.  See BL design doc §17.
+
 ## 6. Open questions
 
-1. **Units representation** — do we store raw SI exponents, QUDT quantity
-   kinds, or both?  If QUDT, the loader needs a `quantity_kind → Units` map.
+1. **Units representation** — raw SI exponents are stored (`promo:unitVector`
+   JSON literal).  Still open: whether to also record a QUDT quantity kind
+   per variable, which would need a `quantity_kind → Units` map.
 2. **Index `network` multiplicity** — an index can be valid in several
    networks (e.g. `t` is valid everywhere).  Should we store a list literal
    or a `promo:valid_in` edge per network?
-3. **Expression persistence** — when the user writes a new equation, do we
-   create a new `promo:Equation` resource or mutate an existing one?  ADR-006
-   says ontologies are versioned, so writes should append a new version.
-4. **Entities / incidence graph** — should the modeller own the bipartite
-   graph, or is it part of the ontology graph?
+3. ~~**Expression persistence**~~ **Resolved (2026-09-18):** each equation
+   is a `promo:Equation` resource linked from its LHS variable via
+   `promo:hasEquation`; writes land in the selected artefact graph
+   (`?graph=`), versioning is by freeze, not append-per-write.
+4. ~~**Entities / incidence graph**~~ **Resolved (2026-09-18, ADR-007):**
+   the modeller owns topology — `promo:ModelNode`/`promo:ModelArc`/
+   `promo:Composite` resources in the model artefact graph.
 
 ## 7. Files / references
 
 - `backend/equation/context.py` — the contract.
+- `backend/core/graph_store.py` — the implementation (writers/readers,
+  seeds, migrations).
+- `backend/ontology/rdf_context.py` — the production `EquationContext`.
 - `docs/equation-context-contract.md` — the contract description.
 - `docs/ADR-005-equation-editor.md` — serialisation defect.
 - `docs/ADR-006-*.md` — ontology versioning.

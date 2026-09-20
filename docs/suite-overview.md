@@ -341,5 +341,7 @@ is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
 - `docs/equation-context-contract.md` — EquationContext protocol and CompileSpace resolution rules
 - `docs/ontology-data-model.md` — variable/index/equation/token RDF schema, loader contract
 - `docs/ontology-editor-design.md` — ontology editor UI layout and workflow
+- `docs/behaviour-linker-design-discussion.md` — living BL design doc: state emergence, tokens, reference coordinates (§15), arc sub-indices (§16), scale regimes + seed contract (§17)
+- `docs/versioning-and-session-design.md` — artefact lines, `usesOntology` pins, resolution-scope rulings R1–R5
 - `docs/distributed-systems-design.md` — meshing concept for distributed PDE systems (future)
 

@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-18 (end of session)
+**Last updated:** 2026-09-20
 
 ## Summary
 
@@ -10,7 +10,7 @@
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
 | Equation Editor | Parser + checker + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes | React + TypeScript + Vite app | 6 test files, 119 tests | Backend and frontend functional; `?graph=` wired |
 | Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
-| Modeller | Scaffold | Phases 1–4 partial | 35 unit tests | Core editing complete, persistence pending; no backend calls yet |
+| Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
 | Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope), catalogue, full ontology CRUD | — | — | Legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
@@ -58,10 +58,17 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   - `backend/core/graph_store.py` — PROMO vocabulary for Domain,
     ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
     EquationClass. CRUD methods for all. `seed_default_ontology()`
-    bootstraps two-branch tree, 7 tokens, role axes, 8 entity types, 5
-    connection rules, 5 equation classes, 3 indices (species/node/arc).
-    `add_domain`/`add_connection_rule` use replace semantics for
-    `hasToken`/`sharedTokens`.
+    bootstraps two-branch tree, 7 tokens, role axes, entity types, 5
+    connection rules, 5 equation classes, indices (species/node/arc +
+    7 arc sub-indices).  `add_domain`/`add_connection_rule` use replace
+    semantics for `hasToken`/`sharedTokens`.
+  - Seeded structure (2026-09-20): transport entity tree grouped by
+    token (`mass_transport` {diffusion, convection}, `energy_transport`
+    {heat, radiation, work}); arc sub-indices via
+    `promo:subIndexOf`/`promo:selector`; `particulate`|`continuum`
+    regime grouping atop both scale trees; two-tier seed contract
+    (initial-state vs floor migrations, core graph only).  Design:
+    BL doc §16–17.
   - `backend/ontology/models.py` — VariableRecord, EquationRecord,
     DomainRecord (with `inherited_tokens`), ClassificationAxisRecord,
     AxisTermRecord, EntityTypeRecord, ConnectionRuleRecord.
@@ -161,7 +168,10 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   partially done (interactive knots, but no persistence yet).
 - **Tests:** 35 unit tests passing (TreeOps, ModelState, buildScene,
   connectionService).
-- **Backend:** `backend/modeller/` — empty scaffold.
+- **Backend:** `backend/modeller/service.py` — `GET`/`PUT
+  `/api/modeller/model` (ADR-007, 2026-09-18).  Known gap: `main.py`
+  has no `/modeller` SPA route — hub→model links hit the hub
+  catch-all (2026-09-20).
 - **Features:** Node/arc creation, drag, selection, deletion,
   three-panel hierarchy navigation, composite grouping, open-arc
   reconnection, pan/zoom, catalogue-resolved graphics,
@@ -200,6 +210,18 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   starts and `/api/health` returns `{"status":"ok"}`.
 
 ## How to run
+
+### Dev orchestrator (preferred)
+```bash
+cd /home/heinz/1_Gits/CAM14/ProMo14
+./dev.sh start all        # backend :8000 + all app dev servers
+./dev.sh start ontology   # one app — ensures backend, fresh-starts the app
+./dev.sh status           # ports, PIDs, hub URL
+./dev.sh stop backend     # warns if the ontology store is dirty
+```
+`start` always kills whatever holds the port first (fresh code);
+app starts *ensure* the backend but never bounce it (unsaved-store
+safety).  Hub: `http://localhost:8000/`.
 
 ### Modeller (frontend)
 ```bash

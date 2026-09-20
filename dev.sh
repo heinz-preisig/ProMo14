@@ -58,15 +58,27 @@ _status_line() {
 }
 
 _kill_port() {
-    local port="$1" name="$2"
+    local port="$1" name="$2" quiet="${3:-}"
     local pid
     pid=$(_pid_on_port "$port")
     if [ -n "$pid" ]; then
         echo "  Stopping $name (pid $pid)..."
-        kill "$pid" 2>/dev/null || true
+        # unquoted: lsof may return several PIDs (wrapper + child)
+        kill $pid 2>/dev/null || true
         sleep 0.5
-    else
+    elif [ -z "$quiet" ]; then
         echo "  $name not running."
+    fi
+}
+
+_warn_unsaved() {
+    # Stopping/restarting the backend discards unsaved in-memory
+    # triples — warn when the store is dirty.
+    local status
+    status=$(curl -s -m 2 "http://localhost:$BACKEND_PORT/api/ontology/status" 2>/dev/null || true)
+    if echo "$status" | grep -q '"dirty"[[:space:]]*:[[:space:]]*true'; then
+        echo "  WARNING: backend has UNSAVED ontology changes — they will be lost."
+        echo "           Save first (editor Save button or POST /api/ontology/save)."
     fi
 }
 
@@ -75,10 +87,10 @@ _kill_port() {
 # ---------------------------------------------------------------------------
 
 _start_backend() {
-    if _is_running $BACKEND_PORT; then
-        echo "  Backend already running on :$BACKEND_PORT"
-        return
-    fi
+    # Fresh start: kill any older instance first — guarded, since a
+    # running backend may hold unsaved in-memory triples.
+    _warn_unsaved
+    _kill_port $BACKEND_PORT "backend" quiet
     echo "  Starting backend on :$BACKEND_PORT  (log: $BACKEND_LOG)"
     cd "$REPO"
     nohup uv run uvicorn backend.main:app --port $BACKEND_PORT --reload \
@@ -91,11 +103,16 @@ _start_backend() {
     fi
 }
 
-_start_ontology() {
-    if _is_running $ONTOLOGY_PORT; then
-        echo "  Ontology editor already running on :$ONTOLOGY_PORT"
-        return
+_ensure_backend() {
+    # Dependency for app starts: bring the backend up if down, but
+    # never bounce a running one (unsaved store would be lost).
+    if ! _is_running $BACKEND_PORT; then
+        _start_backend
     fi
+}
+
+_start_ontology() {
+    _kill_port $ONTOLOGY_PORT "ontology-editor" quiet
     echo "  Starting ontology editor on :$ONTOLOGY_PORT  (log: $ONTOLOGY_LOG)"
     cd "$REPO"
     nohup npm run dev -w @promo/ontology-editor \
@@ -109,10 +126,7 @@ _start_ontology() {
 }
 
 _start_equation() {
-    if _is_running $EQUATION_PORT; then
-        echo "  Equation editor already running on :$EQUATION_PORT"
-        return
-    fi
+    _kill_port $EQUATION_PORT "equation-editor" quiet
     echo "  Starting equation editor on :$EQUATION_PORT  (log: $EQUATION_LOG)"
     cd "$REPO"
     nohup npm run dev:equation \
@@ -126,10 +140,7 @@ _start_equation() {
 }
 
 _start_modeller() {
-    if _is_running $MODELLER_PORT; then
-        echo "  Modeller already running on :$MODELLER_PORT"
-        return
-    fi
+    _kill_port $MODELLER_PORT "modeller" quiet
     echo "  Starting modeller on :$MODELLER_PORT  (log: $MODELLER_LOG)"
     cd "$REPO"
     nohup npm run dev \
@@ -150,6 +161,7 @@ cmd_status() {
     echo ""
     echo "ProMo suite status:"
     _status_line "backend"          $BACKEND_PORT   "http://localhost:$BACKEND_PORT/api/health"
+    _status_line "hub (entry point)" $BACKEND_PORT  "http://localhost:$BACKEND_PORT/"
     _status_line "ontology-editor"  $ONTOLOGY_PORT  "http://localhost:$ONTOLOGY_PORT/ontology/"
     _status_line "equation-editor"  $EQUATION_PORT  "http://localhost:$EQUATION_PORT"
     _status_line "behaviour-linker" $BEHAVIOUR_PORT "http://localhost:$BEHAVIOUR_PORT"
@@ -167,9 +179,9 @@ cmd_start() {
     echo "Starting: $service"
     case "$service" in
         backend)  _start_backend ;;
-        ontology) _start_ontology ;;
-        equation) _start_equation ;;
-        modeller) _start_modeller ;;
+        ontology) _ensure_backend; _start_ontology ;;
+        equation) _ensure_backend; _start_equation ;;
+        modeller) _ensure_backend; _start_modeller ;;
         all)
             _start_backend
             _start_ontology
@@ -182,6 +194,9 @@ cmd_start() {
 
 cmd_stop() {
     local service="${1:-all}"
+    case "$service" in
+        backend|all) _warn_unsaved ;;
+    esac
     echo "Stopping: $service"
     case "$service" in
         backend)   _kill_port $BACKEND_PORT   "backend" ;;
@@ -258,6 +273,7 @@ cmd_help() {
     echo "Services: backend | ontology | equation | behaviour | modeller | all (default)"
     echo ""
     echo "URLs:"
+    echo "  Hub (entry point)  http://localhost:$BACKEND_PORT/"
     echo "  Backend API        http://localhost:$BACKEND_PORT/api/health"
     echo "  Ontology Editor    http://localhost:$ONTOLOGY_PORT/ontology/"
     echo "  Equation Editor    http://localhost:$EQUATION_PORT"
