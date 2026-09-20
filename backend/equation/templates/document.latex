@@ -76,7 +76,7 @@
 {% endraw %}
 
 {% for net in var_groups %}
-\subsection{ {{ net }} }
+\subsection{ {{ net|tex }} }
 {% raw %}
 \renewcommand{\arraystretch}{1.5}
 
@@ -110,7 +110,7 @@
 {% endraw %}
 
 {% for net in eq_groups %}
-\subsection{ {{ net }} }
+\subsection{ {{ net|tex }} }
 {% raw %}
 \renewcommand{\arraystretch}{2}
 

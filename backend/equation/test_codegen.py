@@ -190,6 +190,35 @@ def test_latex_var_label_with_index_subscripts():
     assert gen("M", "latex") == r"\mathit{M}"
 
 
+def _underscore_space():
+    """A space whose index internal_code carries an underscore (A_heat)."""
+    ah = Index(iri="http://promo.example/index/A_heat", label="heat arcs",
+               network="root", aliases={"internal_code": "A_heat"})
+    j = Variable(iri="http://promo.example/var/J", internal_id="V_20",
+                 label="J", network="thermo", type="state",
+                 units=Units(), index_structures=[ah.iri])
+    return CompileSpace(
+        {j.iri: j}, {ah.iri: ah},
+        variable_definition_network="thermo",
+        expression_definition_network="thermo",
+    )
+
+
+def test_latex_underscore_index_alias_escaped():
+    # A raw ``_`` inside ``_{...}`` is a LaTeX double-subscript error.
+    space = _underscore_space()
+    assert gen("J", "latex", space) == r"\mathit{J}_{A\_heat}"
+    assert gen("reduceSum(J, A_heat)", "latex", space) == \
+        r"\sum_{A\_heat} \mathit{J}_{A\_heat}"
+
+
+def test_matlab_underscore_index_alias_stays_raw():
+    # Escaping is latex-only — matlab labels keep the real surface token.
+    space = _underscore_space()
+    assert gen("reduceSum(J, A_heat)", "matlab", space) == \
+        "reducesum(V_20, {'A_heat'})"
+
+
 def test_latex_group():
     assert gen("( rho + rho )", "latex") == \
         r"\left( \mathit{rho}_{N} + \mathit{rho}_{N} \right)"

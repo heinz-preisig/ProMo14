@@ -155,6 +155,15 @@ Implemented as a React + TypeScript + Vite app in
     `document.py` so the served `.tex` compiles standalone.
     `templates/legacy/` keeps the unported sources (equation-list
     variants, `template_main.python`, compile scripts) for reference.
+- ~~Underscore in surface names breaks LaTeX.~~ **Fixed (2026-09-20):**
+  sub-index `internal_code`s like `A_heat` landed raw inside `_{...}`
+  → double-subscript error (KaTeX preview + `.tex` compile).  Surface
+  names are atomic, not math, so `_` is escaped to `\_` at emission:
+  `codegen.tex_escape` (var subscripts, `\sum`/`\prod`/reduce indices),
+  `document.py` `_var_symbol` + `{{ net|tex }}` on `\subsection` titles
+  (network names hit text mode there), frontend `latex.ts` `texEscape`
+  (subscripts + unresolved Var fallback).  Matlab/python keep raw
+  aliases.  Regression tests in `test_codegen.py`/`test_document.py`.
 - ~~Equations persistence into `VariableRecord.equations`.~~ **Done
   (2026-09-18):** the chain already existed — `saveVariable` sends the
   equation dict, `add_variable_dict`→`add_equation` writes

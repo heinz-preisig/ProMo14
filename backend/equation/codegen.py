@@ -62,6 +62,15 @@ def _san(name: str) -> str:
     return re.sub(r"\W", "_", name)
 
 
+def tex_escape(name: str) -> str:
+    """Escape a surface name for math-mode LaTeX — ``A_heat`` → ``A\\_heat``.
+
+    Index ``internal_code`` aliases and variable labels are atomic names,
+    not math: a raw ``_`` inside ``_{...}`` is a double-subscript error.
+    """
+    return name.replace("_", r"\_")
+
+
 class Renderer:
     """Render one ``Checked`` tree for one target."""
 
@@ -80,7 +89,7 @@ class Renderer:
         var = resolved.variable
         if self.target == "latex":
             subs = [
-                self.space.index_alias(iri)
+                tex_escape(self.space.index_alias(iri))
                 for iri in sorted(var.index_structures)
             ]
             # A latex alias is raw LaTeX (e.g. "\rho", "\dot{m}") — render
@@ -90,7 +99,7 @@ class Renderer:
                 base = alias
             else:
                 label = var.label or node.name
-                base = r"\mathit{%s}" % label.replace("_", r"\_")
+                base = r"\mathit{%s}" % tex_escape(label)
             return "%s_{%s}" % (base, ",".join(subs)) if subs else base
         name = _san(var.internal_id or var.label or node.name)
         if resolved.imported and var.network:
@@ -109,6 +118,10 @@ class Renderer:
 
     def _index_name(self, iri: str) -> str:
         return self.space.index_alias(iri)
+
+    def _tex_index(self, iri: str) -> str:
+        """Index alias escaped for math-mode LaTeX."""
+        return tex_escape(self._index_name(iri))
 
     def _ml_labels(self, iris: List[str]) -> str:
         """Matlab cell array of index labels, e.g. ``{'N','t'}``."""
@@ -205,7 +218,7 @@ class Renderer:
             if self.target == "matlab":
                 return "reducemult(%s, %s)" % (
                     body, self._ml_labels([index_iri]))
-            return r"\prod_{%s} %s" % (self._index_name(index_iri), body)
+            return r"\prod_{%s} %s" % (self._tex_index(index_iri), body)
 
         if isinstance(node, Root):
             body = self.render(ch[0])
@@ -250,7 +263,7 @@ class Renderer:
             if self.target == "matlab":
                 return "reducesum(%s, %s)" % (
                     body, self._ml_labels([index_iri]))
-            return r"\sum_{%s} %s" % (self._index_name(index_iri), body)
+            return r"\sum_{%s} %s" % (self._tex_index(index_iri), body)
 
         if isinstance(node, UFunc):
             arg = self.render(ch[0])
@@ -291,7 +304,7 @@ class Renderer:
         if self.target == "latex":
             if reduced_iri:
                 return r"\sum_{%s} %s \, %s" % (
-                    self._index_name(reduced_iri), l_src, r_src)
+                    self._tex_index(reduced_iri), l_src, r_src)
             return r"%s \, %s" % (l_src, r_src)
 
         # Contraction over the shared index: axis = its position inside each

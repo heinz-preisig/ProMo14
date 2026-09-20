@@ -23,7 +23,7 @@ from typing import Any, Dict, List
 import jinja2
 
 from .checker import check
-from .codegen import Renderer
+from .codegen import Renderer, tex_escape
 from .compile_space import CompileSpace
 from .parser import parse
 from .syntax import Instantiate, Var
@@ -36,6 +36,9 @@ _env = jinja2.Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
+# ``{{ name|tex }}`` — escape surface names (networks, labels) that land in
+# LaTeX mode without a catcode safety net (e.g. \subsection titles).
+_env.filters["tex"] = tex_escape
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:
@@ -54,12 +57,15 @@ def _var_symbol(var: Any, space: CompileSpace) -> str:
     """``\\mathit{label}_{N,t}`` — same shape as codegen's latex var name,
     but straight from the record (no name resolution needed).  A ``latex``
     alias is raw LaTeX and wins over the italicised label."""
-    subs = [space.index_alias(i) for i in sorted(var.index_structures)]
+    subs = [
+        tex_escape(space.index_alias(i))
+        for i in sorted(var.index_structures)
+    ]
     alias = (_get(var, "aliases", {}) or {}).get("latex")
     if alias:
         base = alias
     else:
-        label = (var.label or var.iri).replace("_", r"\_")
+        label = tex_escape(var.label or var.iri)
         base = r"\mathit{%s}" % label
     return "%s_{%s}" % (base, ",".join(subs)) if subs else base
 

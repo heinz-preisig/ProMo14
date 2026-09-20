@@ -45,6 +45,10 @@ export function indexShortLabel(idx: Index | undefined): string {
   return idx.short_name?.trim() || singleLetterLabel(idx.label)
 }
 
+// Surface names (index codes, labels) are atomic names, not math — a raw
+// '_' inside _{...} is a KaTeX/LaTeX double-subscript error.
+const texEscape = (name: string): string => name.replace(/_/g, '\\_')
+
 function indexSubscripts(indexIris: string[], ctx?: LatexContext): string {
   const idxs = ctx?.indices ?? []
   const parts = indexIris.map((iri) => {
@@ -53,7 +57,7 @@ function indexSubscripts(indexIris: string[], ctx?: LatexContext): string {
       ? (indexShortLabel(idx) || idx.aliases?.internal_code || iri)
       : iri
   })
-  return `_{${parts.map((p) => `\\mathrm{${p}}`).join(',')}}`
+  return `_{${parts.map((p) => `\\mathrm{${texEscape(p)}}`).join(',')}}`
 }
 
 export function astToLatex(node: AstNode, ctx?: LatexContext): string {
@@ -64,7 +68,7 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
       const v = resolveVariable(name, ctx)
       // A latex alias is raw LaTeX (e.g. "\\rho", "0") — render verbatim;
       // otherwise fall back to the surface token the user typed.
-      const base = v?.aliases?.latex ?? name.replace(/!/g, '\\!')
+      const base = v?.aliases?.latex ?? texEscape(name.replace(/!/g, '\\!'))
       if (v?.index_structures && v.index_structures.length > 0) {
         return `${base}${indexSubscripts(v.index_structures, ctx)}`
       }

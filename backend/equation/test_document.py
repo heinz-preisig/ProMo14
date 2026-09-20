@@ -52,9 +52,17 @@ def _ctx():
         network="thermo", type="state", units=Units(mass=1),
         index_structures=[], doc="total mass",
     )
+    ah_idx = Index(iri="http://promo.example/index/A_heat",
+                   label="heat arcs", network="root",
+                   aliases={"internal_code": "A_heat"})
+    J = Variable(
+        iri="http://promo.example/var/J", internal_id="V_20", label="J",
+        network="mass_balance", type="state", units=Units(),
+        index_structures=[ah_idx.iri], doc="heat flow",
+    )
     return _Ctx(
-        {v.iri: v for v in [rho, M]},
-        {n_idx.iri: n_idx},
+        {v.iri: v for v in [rho, M, J]},
+        {i.iri: i for i in [n_idx, ah_idx]},
     )
 
 
@@ -94,6 +102,15 @@ def test_equation_rhs_falls_back_to_cached_latex():
     tex = build_document(_ctx())
     # e2's rhs does not parse -> cached rhs_latex is used
     assert r"\mathit{fallback}" in tex
+
+
+def test_underscores_escaped_in_math_and_titles():
+    tex = build_document(_ctx())
+    # A_heat index alias: raw ``_`` inside ``_{...}`` would be a LaTeX
+    # double-subscript error; the mass_balance network would break the
+    # text-mode \subsection title.
+    assert r"\mathit{J}_{A\_heat}" in tex
+    assert r"\subsection{ mass\_balance }" in tex
 
 
 def test_variable_row_lists_equation_links():
