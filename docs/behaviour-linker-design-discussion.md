@@ -1225,3 +1225,106 @@ intrinsic, this check is definitional rather than annotation-
 dependent.  Remaining work for ADR-008: the Modeller-side check on
 connect, and whether `carriesToken` becomes required for
 `port_variable` variables.
+
+## 15. Reference coordinates for flow systems (2026-09-20)
+
+### The problem
+
+Transfer laws give flow direction *relative to a reference
+coordinate*.  The reference coordinate comes from the connection —
+in old ProMo the directed arc drawing provided it, and the node–arc
+incidence matrix of the directed graph was the reference coordinate
+for the whole model.
+
+In the new modeller this no longer works directly:
+
+- Physical arcs are **bidirectional** connections (continuity
+  condition: effort equality + flow conservation).  `ModelArc.source`/
+  `target` records drawing order — pure layout, no semantics.
+- Transport systems are **nodes**, not arcs: a flow path is
+  `capacity —arc— transport —arc— capacity`.  There is no single arc
+  whose drawing direction could serve as the reference.
+
+### Decision: per-contact reference direction
+
+Every **contact** between a flow-system entity and a capacity carries
+a reference direction — essentially the old system, relocated:
+
+- Each physical (token-flow) arc gets a **semantic orientation**
+  (`referenceFrom`/`referenceTo` endpoints) independent of the drawn
+  `source`/`target`.  The old directed-arc gesture assigned both
+  contacts' directions at once; the new model assigns per contact.
+- Per-contact assignment is what generalises to **multi-port flow
+  systems** — a thermal system connected to several capacities, a
+  mass-diffusion system: n contacts, n reference directions.
+- One sign per contact suffices: direction "T → C" means positive
+  flow leaves the transport and enters the capacity; the capacity
+  end reads the complement automatically.
+- The flow-system entity **owns** the orientation: assigning the
+  reference coordinate is part of inserting the entity into the
+  model — the modern equivalent of drawing the directed arc.
+
+### Properties
+
+- **Any assignment is valid.**  Reference directions are pure
+  convention; a negative computed flow means physical flow runs
+  opposite to the reference.  The only hard requirement is
+  *existence*: every contact of a flow system must have one.
+- **Transport balance**: a non-accumulating transport's own
+  conservation is `Σ_i s_i·f_i = 0` over its contacts, signs from
+  the stored orientations.
+- **Global incidence is derived**: per-contact signs + topology →
+  the old-ProMo `F[N,A]` at instantiation.  Equations reference `F`
+  symbolically, so flipping an entity's orientation flips signs at
+  codegen — no equation edits.  (Notation: `F` = incidence matrix,
+  `I` is reserved for identity.)
+- **Scope**: only token-flow/continuity arcs need a reference
+  coordinate.  Signal/access/sensor/actuation arcs have inherent
+  direction (output → input); discrete/event systems have no
+  continuous conservation.  The problem is confined to the physical
+  domain's continuity condition.
+
+### Terminology caution
+
+"Incidence" currently names two different things:
+
+- `checker.py` / `promo:incidenceList` — the set of **variable IRIs
+  in an RHS** (bipartite variable↔equation dependency).
+- The topological **node–arc incidence matrix** `F[N,A]` discussed
+  here — derived from model topology at instantiation.
+
+Keep them distinct in discussion; a rename of the former may be
+worthwhile when the latter is implemented.
+
+### Edge cases
+
+- **Capacity↔capacity arcs** — if connection rules ever allow a
+  direct physical arc with no transport between, that arc needs its
+  own reference direction (no entity owns the contact).
+- **Transport↔transport arcs** — both ends are flow systems; each
+  end's sign is independent, and a consistency check should verify
+  the two ends' reference directions compose sensibly.
+- **Composites / open arcs** — the sign convention across a
+  composite boundary must be written down; `OpenArcDoc.isSource`
+  already encodes the boundary side.
+
+### Modeller UX implications
+
+- Orientation is part of the **insertion gesture** for flow-system
+  entities.
+- Default for the common 2-port case: auto-assign the through-path
+  orientation when the second connection is made; explicit choice
+  only for n-port or non-standard orientations.
+- A **"reverse reference direction"** command flips the semantic
+  orientation without touching layout.
+- A visible **arrow convention** on the entity/contacts shows the
+  reference direction — distinct from arc rendering.
+
+### Where it lands
+
+- **Model artefact**: per-arc semantic orientation stored alongside
+  `ModelArc` (e.g. `promo:referenceFrom`/`promo:referenceTo`).
+- **BL / instantiation**: derives the signed incidence matrix `F`
+  from topology + orientations; binds it to the symbolic `F` in
+  conservation equations.
+- **Equation editor**: unchanged — equations stay orientation-free.
