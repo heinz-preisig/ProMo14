@@ -153,35 +153,55 @@ export default function App() {
     >
       <div
         style={{
-          height: 44,
-          padding: '0 16px',
+          minHeight: 44,
+          padding: '4px 16px',
           background: '#e0e0e0',
           display: 'flex',
           alignItems: 'center',
-          gap: 16,
+          columnGap: 16,
+          rowGap: 4,
+          flexWrap: 'wrap',
           borderBottom: '1px solid #ccc',
         }}
       >
-        <strong>ProMo14 — Equation Editor</strong>
-        <div style={{ flex: 1 }} />
-        {storeDirty && (
-          <span style={{ fontSize: 12, color: '#b8860b' }} title="Unsaved changes in the store">
-            ● unsaved
-          </span>
-        )}
-        {saveMsg && <span style={{ fontSize: 12, color: '#2e8b57' }}>{saveMsg}</span>}
-        <a
-          href={documentUrl()}
-          target="_blank"
-          rel="noreferrer"
-          style={{ fontSize: 12 }}
-          title="Open the printable LaTeX document (variables & equations)"
+        <strong
+          style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            minWidth: 0,
+          }}
         >
-          LaTeX doc
-        </a>
-        <button type="button" onClick={onSave} style={{ fontSize: 12 }}>
-          Save
-        </button>
+          ProMo14 — Equation Editor
+        </strong>
+        <div
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            flexShrink: 0,
+          }}
+        >
+          {storeDirty && (
+            <span style={{ fontSize: 12, color: '#b8860b', whiteSpace: 'nowrap' }} title="Unsaved changes in the store">
+              ● unsaved
+            </span>
+          )}
+          {saveMsg && <span style={{ fontSize: 12, color: '#2e8b57', whiteSpace: 'nowrap' }}>{saveMsg}</span>}
+          <a
+            href={documentUrl()}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+            title="Open the printable LaTeX document (variables & equations)"
+          >
+            LaTeX doc
+          </a>
+          <button type="button" onClick={onSave} style={{ fontSize: 12 }}>
+            Save
+          </button>
+        </div>
       </div>
 
       <div
