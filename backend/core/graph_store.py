@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -44,6 +45,11 @@ SEED_CONSTANTS = (
 
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
+
+# Conforming equation ids: ``E_1`` … ``E_999999``.  Anything else
+# (notably legacy ``E_<epoch-ms>`` ids minted by the equation editor)
+# is renumbered by ``_migrate_equation_ids``.
+_EQUATION_ID_RE = re.compile(r"^E_(\d{1,6})$")
 
 # ProMo14 ontology vocabulary extensions (see docs/ontology-editor-v1-ticket.md)
 #
@@ -218,6 +224,36 @@ class RdfStore:
                 self.dataset.parse(str(path), format="trig")
             except Exception:
                 continue
+
+        # Idempotent data migration: legacy ``E_<epoch-ms>`` equation
+        # ids → sequential ``E_n`` (readable in the printed document).
+        self._migrate_equation_ids()
+
+    def _migrate_equation_ids(self) -> None:
+        """Renumber non-conforming equation ``internalID`` literals.
+
+        Only the literal changes — equation IRIs stay stable.  Ids are
+        unique dataset-wide (the printed document hyperlinks by number),
+        so the scan covers every named graph.
+        """
+        used: set = set()
+        legacy: List[Any] = []
+        for g in self.dataset.contexts():
+            for s in g.subjects(RDF.type, PROMO["Equation"]):
+                raw = g.value(s, PROMO["internalID"])
+                m = _EQUATION_ID_RE.match(str(raw) if raw is not None else "")
+                if m:
+                    used.add(int(m.group(1)))
+                else:
+                    legacy.append((g, s))
+        next_free = 1
+        for g, s in sorted(legacy, key=lambda t: str(t[1])):
+            while next_free in used:
+                next_free += 1
+            g.set((s, PROMO["internalID"], Literal(f"E_{next_free}")))
+            used.add(next_free)
+        if legacy:
+            self.mark_dirty()
 
     def save(self, filename: str = "ontology.trig") -> Path:
         """Serialise the dataset to ``PROMO_DATA_DIR/filename``.

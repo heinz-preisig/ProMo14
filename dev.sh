@@ -7,12 +7,14 @@
 #   ./dev.sh restart [service]    — stop then start
 #   ./dev.sh status               — show what is running
 #   ./dev.sh wipe                 — delete all data files (ontology.trig etc.)
-#   ./dev.sh wipe-restart         — wipe data then restart backend
+#   ./dev.sh wipe-restart         — wipe data, reseed (seed + HAP ext), restart backend
+#   ./dev.sh save                 — persist the in-memory store to data/ontology.trig
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
 # Services: backend | ontology | equation | modeller | all (default)
+#           (behaviour is stop/logs/status only — scaffold, not startable)
 #
-# Log files are written to /tmp/promo-*.log
+# Log files are written to logs/ in the repo root
 
 set -euo pipefail
 
@@ -171,6 +173,31 @@ cmd_status() {
     local trig_count
     trig_count=$(find "$DATA_DIR" -name "*.trig" 2>/dev/null | wc -l | tr -d ' ')
     echo "  Data files: $trig_count .trig file(s)"
+
+    if _is_running $BACKEND_PORT; then
+        local status
+        status=$(curl -s -m 2 "http://localhost:$BACKEND_PORT/api/ontology/status" 2>/dev/null || true)
+        if echo "$status" | grep -q '"dirty"[[:space:]]*:[[:space:]]*true'; then
+            echo "  Store: DIRTY — unsaved changes (run: ./dev.sh save)"
+        else
+            echo "  Store: clean"
+        fi
+        echo ""
+        echo "  Artefact lines (hub: http://localhost:$BACKEND_PORT/):"
+        curl -s -m 2 "http://localhost:$BACKEND_PORT/api/catalogue" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for l in d.get("lines", []):
+    vs = len(l.get("versions", []))
+    pins = len(l.get("usesOntology", []))
+    print("    %-20s %-10s %-7s %d version(s), %d pin(s)  %s" % (
+        l.get("label") or "", l.get("type") or "",
+        l.get("status") or "", vs, pins, l.get("iri") or ""))
+' 2>/dev/null || true
+    fi
     echo ""
 }
 
@@ -242,7 +269,25 @@ cmd_wipe_restart() {
     cmd_stop backend
     cmd_wipe
     sleep 1
+    # Reseed = seed + HAP extensions.  The script runs offline: with no
+    # .trig present its load() seeds fresh, extends, and writes
+    # data/ontology.trig before the backend comes up.
+    # Bare seed (no extensions): ./dev.sh wipe && ./dev.sh start backend
+    if [ -f "$REPO/scripts/extend_ontology_hap.py" ]; then
+        echo "  Reseeding: seed + HAP extensions (extend_ontology_hap.py)"
+        (cd "$REPO" && uv run python scripts/extend_ontology_hap.py)
+    fi
     cmd_start backend
+}
+
+cmd_save() {
+    if ! _is_running $BACKEND_PORT; then
+        echo "  Backend not running — nothing to save."
+        return 1
+    fi
+    curl -s -m 5 -X POST "http://localhost:$BACKEND_PORT/api/ontology/save" \
+        -H 'Content-Type: application/json' -d '{}'
+    echo ""
 }
 
 cmd_logs() {
@@ -267,10 +312,13 @@ cmd_help() {
     echo "  stop    [service]   — stop service(s)"
     echo "  restart [service]   — restart service(s)"
     echo "  wipe                — delete all data files (backend reseeds on start)"
-    echo "  wipe-restart        — wipe data + restart backend"
+    echo "  wipe-restart        — wipe data + reseed (seed + HAP ext) + restart backend"
+    echo "                        (bare seed: ./dev.sh wipe && ./dev.sh start backend)"
+    echo "  save                — persist in-memory store to data/ontology.trig"
     echo "  logs    [service]   — tail log for a service"
     echo ""
-    echo "Services: backend | ontology | equation | behaviour | modeller | all (default)"
+    echo "Services: backend | ontology | equation | modeller | all (default)"
+    echo "          (behaviour: stop/logs/status only — scaffold, not startable)"
     echo ""
     echo "URLs:"
     echo "  Hub (entry point)  http://localhost:$BACKEND_PORT/"
@@ -296,6 +344,7 @@ case "$COMMAND" in
     restart)       cmd_restart "$SERVICE" ;;
     wipe)          cmd_wipe ;;
     wipe-restart)  cmd_wipe_restart ;;
+    save)          cmd_save ;;
     logs)          cmd_logs "$SERVICE" ;;
     help|--help|-h) cmd_help ;;
     *) echo "Unknown command: $COMMAND"; cmd_help; exit 1 ;;

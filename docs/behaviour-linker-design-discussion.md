@@ -1397,6 +1397,15 @@ leaves bind the continuum pair (`macro_event_dynamic` +
   (`A_mass` over the leaves of `mass_transport`).
 - The F-builder that turns membership + orientations (§15) into the
   numeric matrices.
+- Signal arcs: no mechanism partition — they touch no transport node,
+  so the selector has nothing to resolve against, and direction is
+  already discriminated by rule + subtoken.  If information-domain
+  balances ever sum transmissions into information state, add
+  `A_signal` as a *token* partition selecting by rule/subtoken, not
+  mechanism (2026-09-21 discussion).
+- `idx_arc` is seeded `network="physical"` — whether signal arcs
+  (information topology) fall in its element set is unsettled; settle
+  before any signal sub-index question (2026-09-21).
 
 ## 17. Scale regimes and the seed contract (2026-09-20)
 
@@ -1463,3 +1472,71 @@ seed contains.
   resurrection by surprise.
 - **`seedFrom`** on `New` — copy a chosen graph as starting point
   (fork without lineage) if non-empty non-fork starts are wanted.
+
+## 18. Variable mutability policy (2026-09-21)
+
+### Question
+
+Which parts of a variable definition stay editable once the variable
+is in use?  Answer: usage-conditioned — cosmetic fields always free,
+structural fields locked while referenced.
+
+### Field classes
+
+- **Free always** — `doc`, `label`, `latex` and other codegen aliases,
+  audit fields.  Stored expressions reference variables by
+  `global_ID`/`internal_id` (rhs is a token stream in global_ID form;
+  `lhs` is the variable IRI), so surface names are display/input only.
+  Caveat: `rhs_latex` is a cached rendering — a rename needs cache
+  regeneration, not a lock.
+- **Identity (effectively immutable)** — `iri`, `internal_id` /
+  `global_ID`; for indices, `internal_code`.  These are the reference
+  keys inside stored expressions.
+- **Locked while used** — `units`, `index_structures`, `tokens`,
+  `classifications` / `variable_class`, `port_variable`, `network`.
+  Class is locked too: §14 makes class+token the variable's identity
+  (roles are the token's manifestation modes), so reclassifying a used
+  `state` → `parameter` would silently change what `d(x)/dt` means.
+- **Data, editable** — `value` (changes results, not structure;
+  seeded constants stay permanent by convention).
+
+### Usage
+
+An equation *uses* a variable iff the variable's IRI is the equation's
+`promo:lhs`, appears in its cached `promo:incidenceList`, or one of its
+reference tokens (IRI, `internal_id`, `global_ID`, `internal_code`)
+occurs as a whole token in `promo:rhs`.  The variable's own defining
+equation counts — changing `x`'s units breaks `x := f(y)` too.  The
+scan is dataset-wide: `usesOntology` pins make references
+cross-artefact.
+
+### Enforcement (`backend/equation/service.py`)
+
+- `POST`/`PUT /variables/{iri}` — field-level diff; structural change
+  + non-empty usage → **409** with `locked_fields` + `references`.
+  (POST guards too: the editor updates via POST, and re-POST now
+  replaces rather than merging multi-valued triples.)
+- `DELETE /variables/{iri}` — 409 while *foreign* equations reference
+  it; own equations are deleted with the variable.  Delete also
+  removes the variable's equation nodes — previously they were
+  orphaned, leaving phantom rhs references.
+- `GET /variables/{iri}/references` — `{used, references[]}` for
+  proactive UI locking; `api.ts` surfaces the 409 `detail` message.
+- Editor side: `VariableDetailDialog` (the variable detail modal) edits
+  name/LaTeX/doc always, greys out network, class, units and index
+  structures while `used`, and its "Add equation…" button opens
+  `DependentVariableEditor` in editing mode — the same check/parse/
+  generate/preview UI as for new variables, prefilled, structural
+  fields locked while `used`, attaching the equation to the existing
+  record (adding one makes the variable `used`, so its own structural
+  fields lock).  The repository table edits name and doc inline
+  (click cell → Enter/blur commits, Esc cancels).  `saveVariable`
+  carries `equations`,
+  `classifications`, `imported` and audit fields through the
+  replace-semantics POST — previously a re-save silently dropped them.
+
+### Deferred
+
+- **Arc/port usage** — BL port bindings (`hasPortVariable`) and model
+  arcs should count as usage once those writers exist.
+- **`rhs_latex` cache invalidation** on rename.

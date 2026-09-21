@@ -70,7 +70,9 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
       // otherwise fall back to the surface token the user typed.
       const base = v?.aliases?.latex ?? texEscape(name.replace(/!/g, '\\!'))
       if (v?.index_structures && v.index_structures.length > 0) {
-        return `${base}${indexSubscripts(v.index_structures, ctx)}`
+        // Brace the base: a verbatim alias may itself carry a subscript
+        // ("r_z") — "{r_z}_{N}" compiles, "r_z_{N}" is a double subscript.
+        return `{${base}}${indexSubscripts(v.index_structures, ctx)}`
       }
       return base
     }

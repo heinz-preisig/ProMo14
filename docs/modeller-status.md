@@ -114,12 +114,12 @@ compiles clean.
 ```bash
 cd /home/heinz/1_Gits/CAM14/ProMo14
 npm install
-npm run dev      # development server on :3000
+npm run dev      # development server on :3004
 npm run build    # production build
 npm test         # all workspace tests
 ```
 
-Or: `./run-dev.sh`
+Or via the orchestrator: `./dev.sh start modeller` (ensures backend too)
 
 ## Mouse / pointer mapping
 

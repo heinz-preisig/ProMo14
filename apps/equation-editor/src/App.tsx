@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
-import { indexShortLabel } from './latex'
 import { deleteVariable, documentUrl, loadContext, saveOntology, saveVariable } from './api'
 import { useStoreDirty } from './useStoreDirty'
-import type { Index, NetworkTree, Variable } from './types'
+import type { Index, NetworkTree, SavedEquation, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
-import EquationList, { type SavedEquation } from './components/EquationList'
+import EquationList from './components/EquationList'
 import PortVariableEditor from './components/PortVariableEditor'
+import VariableDetailDialog from './components/VariableDetailDialog'
 import VariablePalette from './components/VariablePalette'
 import VariableTable from './components/VariableTable'
 
@@ -22,6 +22,9 @@ export default function App() {
 
   const [portOpen, setPortOpen] = useState(false)
   const [dependentOpen, setDependentOpen] = useState(false)
+  // Set when the equation editor attaches to an existing variable
+  // ("Add equation…" in the detail dialog) instead of minting a new one.
+  const [dependentEditing, setDependentEditing] = useState<Variable | null>(null)
   // Last domain/class picked in either variable editor — offered as
   // defaults the next time one is opened.
   const [lastDomain, setLastDomain] = useState('')
@@ -29,8 +32,6 @@ export default function App() {
 
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
-  const [latexDraft, setLatexDraft] = useState('')
-  const [latexMsg, setLatexMsg] = useState('')
   const [debugOpen, setDebugOpen] = useState(false)
   const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
   const [saveMsg, setSaveMsg] = useState('')
@@ -74,30 +75,43 @@ export default function App() {
       .catch((err) => console.error('Failed to load context:', err))
   }, [])
 
-  const addPortVariable = useCallback(async (v: Variable) => {
-    try {
-      await saveVariable(v)
-      const ctx = await loadContext()
-      setVariables(ctx.variables)
-      setIndices(ctx.indices)
-      setNetworkTree(ctx.network_tree)
-    } catch (err) {
-      console.error('Failed to save variable:', err)
-    }
-  }, [])
+  // Persist an edited variable (detail dialog + inline table edits);
+  // an optional equation is appended to the variable's equations.
+  // Errors propagate so the caller can show the 409 lock message.
+  const saveEditedVariable = useCallback(async (v: Variable, eq?: SavedEquation) => {
+    await saveVariable(v, eq, variables)
+    const ctx = await loadContext()
+    setVariables(ctx.variables)
+    setIndices(ctx.indices)
+    setNetworkTree(ctx.network_tree)
+    // A rename changes the displayed lhs of the variable's equations —
+    // refresh them from the reloaded records (keeps session ast/check).
+    const eqIds = new Set(Object.keys(v.equations ?? {}))
+    setEquations((prev) => [
+      ...prev.map((e) => (eqIds.has(e.id) ? { ...e, lhs: v.label } : e)),
+      ...(eq ? [eq] : []),
+    ])
+    setSelectedVariable((prev) =>
+      prev?.iri === v.iri
+        ? (ctx.variables.find((x) => x.iri === v.iri) ?? prev)
+        : prev,
+    )
+    refreshDirty()
+  }, [refreshDirty, variables])
 
-  const acceptDependent = useCallback(async (v: Variable, eq: SavedEquation) => {
-    try {
-      await saveVariable(v, eq)
-      const ctx = await loadContext()
-      setVariables(ctx.variables)
-      setIndices(ctx.indices)
-      setNetworkTree(ctx.network_tree)
-    } catch (err) {
-      console.error('Failed to save variable:', err)
-    }
-    setEquations((prev) => [...prev, eq])
-  }, [])
+  // Equation editor accept — covers both "new dependent variable" and
+  // "add equation to existing variable" (editing mode).
+  const acceptDependent = useCallback((v: Variable, eq: SavedEquation) => {
+    saveEditedVariable(v, eq).catch((err) =>
+      console.error('Failed to save variable:', err),
+    )
+  }, [saveEditedVariable])
+
+  const addPortVariable = useCallback((v: Variable) => {
+    saveEditedVariable(v).catch((err) =>
+      console.error('Failed to save variable:', err),
+    )
+  }, [saveEditedVariable])
 
   const removeEquation = useCallback((id: string) => {
     setEquations((prev) => prev.filter((eq) => eq.id !== id))
@@ -115,31 +129,6 @@ export default function App() {
     setEquations((prev) => prev.filter((eq) => !impact.equationIds.includes(eq.id)))
     setDeleteTarget(null)
   }, [])
-
-  // Sync the LaTeX draft field whenever a different variable is opened.
-  useEffect(() => {
-    setLatexDraft(selectedVariable?.aliases?.latex ?? '')
-    setLatexMsg('')
-  }, [selectedVariable])
-
-  const saveLatexAlias = useCallback(async () => {
-    if (!selectedVariable) return
-    const aliases = { ...(selectedVariable.aliases ?? {}) }
-    if (latexDraft.trim()) aliases.latex = latexDraft.trim()
-    else delete aliases.latex
-    try {
-      await saveVariable({ ...selectedVariable, aliases })
-      const ctx = await loadContext()
-      setVariables(ctx.variables)
-      setIndices(ctx.indices)
-      setNetworkTree(ctx.network_tree)
-      setSelectedVariable((prev) => (prev ? { ...prev, aliases } : prev))
-      setLatexMsg('Saved')
-      setTimeout(() => setLatexMsg(''), 3000)
-    } catch (err) {
-      setLatexMsg(`Save failed: ${err}`)
-    }
-  }, [selectedVariable, latexDraft])
 
   const updateContext = useCallback((ctx: {
     variables: Variable[]
@@ -218,7 +207,13 @@ export default function App() {
             <button type="button" onClick={() => setPortOpen(true)}>
               New port variable…
             </button>
-            <button type="button" onClick={() => setDependentOpen(true)}>
+            <button
+              type="button"
+              onClick={() => {
+                setDependentEditing(null)
+                setDependentOpen(true)
+              }}
+            >
               New dependent variable…
             </button>
           </div>
@@ -264,9 +259,24 @@ export default function App() {
             variables={variables}
             indices={indices}
             onSelect={setSelectedVariable}
+            onSave={saveEditedVariable}
           />
         </div>
       </div>
+
+      {selectedVariable && (
+        <VariableDetailDialog
+          variable={selectedVariable}
+          indices={indices}
+          networkTree={networkTree}
+          onSave={saveEditedVariable}
+          onAddEquation={(v) => {
+            setDependentEditing(v)
+            setDependentOpen(true)
+          }}
+          onClose={() => setSelectedVariable(null)}
+        />
+      )}
 
       <PortVariableEditor
         open={portOpen}
@@ -294,12 +304,16 @@ export default function App() {
 
       <DependentVariableEditor
         open={dependentOpen}
-        onClose={() => setDependentOpen(false)}
+        onClose={() => {
+          setDependentOpen(false)
+          setDependentEditing(null)
+        }}
         variables={variables}
         indices={indices}
         networkTree={networkTree}
         initialDomain={lastDomain}
         initialClass={lastClass}
+        editing={dependentEditing}
         onDefaultsChange={(d, c) => {
           setLastDomain(d)
           setLastClass(c)
@@ -355,95 +369,6 @@ export default function App() {
         </div>
       )}
 
-      {selectedVariable && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedVariable(null)
-          }}
-        >
-          <div
-            style={{
-              width: 480,
-              maxHeight: '80vh',
-              background: '#fff',
-              borderRadius: 6,
-              padding: 20,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              overflowY: 'auto',
-            }}
-          >
-            <h3 style={{ margin: 0 }}>{selectedVariable.label}</h3>
-            <div style={{ fontSize: 13, color: '#555' }}>
-              <strong>IRI:</strong> {selectedVariable.iri} <br />
-              <strong>Network:</strong> {selectedVariable.network} <br />
-              <strong>Class:</strong> {selectedVariable.type ?? '—'} <br />
-              <strong>Port variable:</strong> {selectedVariable.port_variable ? 'yes' : 'no'} <br />
-              <strong>Index structures:</strong>{' '}
-              {selectedVariable.index_structures
-                ?.map((iri) => {
-                  const idx = indices.find((i) => i.iri === iri)
-                  return idx
-                    ? `${indexShortLabel(idx)} (${idx.label})`
-                    : iri
-                })
-                .join(', ') ?? '—'} <br />
-              <strong>Units:</strong> {JSON.stringify(selectedVariable.units)} <br />
-              <strong>LaTeX symbol:</strong>{' '}
-              <input
-                type="text"
-                value={latexDraft}
-                onChange={(e) => setLatexDraft(e.target.value)}
-                placeholder="e.g. \\rho — defaults to label"
-                style={{ width: 160, fontSize: 12 }}
-              />{' '}
-              <button type="button" onClick={saveLatexAlias} style={{ fontSize: 12 }}>
-                Save
-              </button>{' '}
-              {latexMsg && <span style={{ fontSize: 12, color: '#2e8b57' }}>{latexMsg}</span>}
-              <br />
-              {selectedVariable.doc && (
-                <>
-                  <strong>Doc:</strong> {selectedVariable.doc}
-                </>
-              )}
-            </div>
-
-            {(() => {
-              const eq = equations.find((e) => e.lhs === selectedVariable.label)
-              if (!eq) return null
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <strong style={{ fontSize: 13 }}>Defining equation</strong>
-                  <code style={{ fontSize: 12, background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
-                    {eq.text}
-                  </code>
-                  <div style={{ fontSize: 12, color: '#666' }}>
-                    Units: {eq.check?.units_pretty ?? '—'} | Indices: {eq.check?.indices?.join(', ') ?? '—'}
-                  </div>
-                </div>
-              )
-            })()}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button type="button" onClick={() => setSelectedVariable(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -20,15 +20,76 @@ export interface VariableTableProps {
   variables: Variable[]
   indices: Index[]
   onSelect?: (v: Variable) => void
+  /** Persist an edited variable — enables inline editing of the free
+   *  fields (name, doc).  Structural fields stay in the detail dialog
+   *  (§18 mutability policy). */
+  onSave?: (v: Variable) => Promise<void>
 }
 
+type EditCell = { iri: string; field: 'label' | 'doc' }
+
 /** Repository browser: sortable/filterable table of all variables with
- *  per-variable expandable equation rows. */
-export default function VariableTable({ variables, indices, onSelect }: VariableTableProps) {
+ *  per-variable expandable equation rows.  Name and doc cells are
+ *  click-to-edit when ``onSave`` is given. */
+export default function VariableTable({ variables, indices, onSelect, onSave }: VariableTableProps) {
   const [filter, setFilter] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('label')
   const [sortAsc, setSortAsc] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [editCell, setEditCell] = useState<EditCell | null>(null)
+  const [draft, setDraft] = useState('')
+  const [editErr, setEditErr] = useState('')
+
+  const startEdit = (e: React.MouseEvent, v: Variable, field: EditCell['field']) => {
+    if (!onSave || editCell) return
+    e.stopPropagation()
+    setEditCell({ iri: v.iri, field })
+    setDraft(field === 'label' ? v.label : (v.doc ?? ''))
+    setEditErr('')
+  }
+
+  const commitEdit = async () => {
+    const cell = editCell
+    if (!cell || !onSave) return
+    const v = variables.find((x) => x.iri === cell.iri)
+    const value = draft.trim()
+    const current = cell.field === 'label' ? v?.label : (v?.doc ?? '')
+    if (!v || value === current) {
+      setEditCell(null)
+      return
+    }
+    if (cell.field === 'label' && !value) {
+      setEditErr('Name is required')
+      return
+    }
+    setEditCell(null) // close before await — prevents a blur double-commit
+    try {
+      await onSave({ ...v, [cell.field]: value })
+    } catch (err) {
+      setEditCell(cell)
+      setDraft(value)
+      setEditErr(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const editInput = (autoFocusKey: string) => (
+    <>
+      <input
+        key={autoFocusKey}
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void commitEdit()
+          if (e.key === 'Escape') setEditCell(null)
+        }}
+        onBlur={() => void commitEdit()}
+        style={{ width: '90%', fontSize: 12 }}
+      />
+      {editErr && <div style={{ color: '#c62828', fontSize: 11 }}>{editErr}</div>}
+    </>
+  )
 
   const eqCount = (v: Variable) => Object.keys(v.equations ?? {}).length
 
@@ -189,11 +250,21 @@ export default function VariableTable({ variables, indices, onSelect }: Variable
                           </button>
                         )}
                       </td>
-                      <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', fontWeight: 500 }}>
-                        {v.label}
-                        {v.value != null && v.value !== '' && (
-                          <span style={{ color: '#888', fontWeight: 400 }}> = {v.value}</span>
-                        )}
+                      <td
+                        onClick={(e) => startEdit(e, v, 'label')}
+                        title={onSave ? 'Click to rename' : v.iri}
+                        style={{ padding: '4px 8px', borderBottom: '1px solid #eee', fontWeight: 500 }}
+                      >
+                        {editCell?.iri === v.iri && editCell.field === 'label'
+                          ? editInput(`label-${v.iri}`)
+                          : (
+                            <>
+                              {v.label}
+                              {v.value != null && v.value !== '' && (
+                                <span style={{ color: '#888', fontWeight: 400 }}> = {v.value}</span>
+                              )}
+                            </>
+                          )}
                       </td>
                       <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', color: '#555' }}>
                         {v.type ?? '—'}
@@ -213,6 +284,8 @@ export default function VariableTable({ variables, indices, onSelect }: Variable
                         {eqs.length || ''}
                       </td>
                       <td
+                        onClick={(e) => startEdit(e, v, 'doc')}
+                        title={onSave ? 'Click to edit doc' : undefined}
                         style={{
                           padding: '4px 8px',
                           borderBottom: '1px solid #eee',
@@ -223,7 +296,9 @@ export default function VariableTable({ variables, indices, onSelect }: Variable
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {v.doc ?? ''}
+                        {editCell?.iri === v.iri && editCell.field === 'doc'
+                          ? editInput(`doc-${v.iri}`)
+                          : (v.doc ?? '')}
                       </td>
                     </tr>
                     {open &&

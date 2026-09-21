@@ -1,13 +1,5 @@
 import { nodeToString } from '../api'
-import type { AstNode, CheckResponse } from '../types'
-
-export interface SavedEquation {
-  id: string
-  lhs: string
-  text: string
-  ast: AstNode | null
-  check: CheckResponse | null
-}
+import type { SavedEquation } from '../types'
 
 export interface EquationListProps {
   equations: SavedEquation[]

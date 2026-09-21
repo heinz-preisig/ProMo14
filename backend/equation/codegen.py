@@ -100,7 +100,9 @@ class Renderer:
             else:
                 label = var.label or node.name
                 base = r"\mathit{%s}" % tex_escape(label)
-            return "%s_{%s}" % (base, ",".join(subs)) if subs else base
+            # Brace the base: a verbatim alias may itself carry a subscript
+            # (``r_z``) — ``{r_z}_{N}`` compiles, ``r_z_{N}`` does not.
+            return "{%s}_{%s}" % (base, ",".join(subs)) if subs else base
         name = _san(var.internal_id or var.label or node.name)
         if resolved.imported and var.network:
             return "%s_%s" % (_san(var.network), name)

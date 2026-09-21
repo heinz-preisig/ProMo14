@@ -27,6 +27,10 @@ export interface Variable {
   /** Pre-bound promo:value — universal constants carry it permanently. */
   value?: string | null
   equations?: Record<string, EquationRecord>
+  classifications?: Record<string, string>
+  imported?: boolean
+  created?: string | null
+  modified?: string | null
 }
 
 export interface Index {
@@ -118,3 +122,13 @@ export type AstNode =
   | { type: 'UFunc'; name: string; arg: AstNode }
   | { type: 'Call'; name: AstNode; args: AstNode[] }
   | { type: string; [key: string]: unknown }
+
+/** A checked equation kept in the session list and attached to a
+ *  variable record on save. */
+export interface SavedEquation {
+  id: string
+  lhs: string
+  text: string
+  ast: AstNode | null
+  check: CheckResponse | null
+}

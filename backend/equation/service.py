@@ -14,6 +14,7 @@ instead.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, List, Optional
@@ -372,7 +373,13 @@ def document_endpoint(
     """
     ctx = scoped_context(get_store(), graph_iri)
     return PlainTextResponse(
-        build_document(ctx), media_type="application/x-latex"
+        build_document(ctx),
+        media_type="application/x-latex",
+        # inline keeps the open-in-tab preview; the filename gives the
+        # browser's Save-As a compilable .tex name (not .latex).
+        headers={
+            "Content-Disposition": 'inline; filename="document.tex"'
+        },
     )
 
 
@@ -436,6 +443,12 @@ def create_variable(
     if not record.internal_id:
         record.internal_id = store.next_internal_id("V")
 
+    # POST doubles as the editor's update path (the frontend never PUTs):
+    # enforce the mutability guard and replace — not merge — when the
+    # variable already exists.
+    _guard_structural_edit(store, graph, record.iri, record)
+    _remove_variable(graph, URIRef(record.iri))
+
     protos = _instantiate_protos(record)
     var = record.model_dump()
     if var.get("variable_class"):
@@ -445,13 +458,161 @@ def create_variable(
     return record
 
 
+# ---------------------------------------------------------------------------
+# Variable mutability — usage guard
+# ---------------------------------------------------------------------------
+# Policy (design doc §18): while a variable is referenced by an equation its
+# structural fields are locked — units, index structures, tokens,
+# classifications, port_variable, network and the reference-key names
+# (internal_id, global_ID, internal_code).  Surface names (label, latex,
+# doc, codegen aliases) and the value slot stay free.  Usage is scanned
+# dataset-wide: ``usesOntology`` pins make references cross-artefact.
+
+_STRUCTURAL_ALIASES = ("global_ID", "internal_code")
+
+
+def _reference_tokens(var) -> List[str]:
+    """Surface forms by which an rhs token stream can denote ``var``."""
+    toks = {var.iri, var.internal_id}
+    toks.update(var.aliases.get(k) for k in _STRUCTURAL_ALIASES)
+    return sorted(t for t in toks if t)
+
+
+def _token_in_rhs(rhs: str, token: str) -> bool:
+    """Whole-token match — ``V_1`` must not match inside ``V_12``."""
+    return re.search(
+        r"(?<![A-Za-z0-9_])" + re.escape(token) + r"(?![A-Za-z0-9_])",
+        rhs,
+    ) is not None
+
+
+def _variable_references(store, iri: str) -> List[Dict[str, str]]:
+    """Equations referencing variable ``iri``, scanned over all graphs.
+
+    ``via`` is ``lhs`` for the variable's own defining equation(s) and
+    ``incidence``/``rhs`` for foreign references.
+    """
+    subject = URIRef(iri)
+    var = RdfContext(store).variables().get(iri)
+    tokens = _reference_tokens(var) if var is not None else [iri]
+    refs: List[Dict[str, str]] = []
+    for g in store.dataset.graphs():
+        for eq in g.subjects(RDF.type, PROMO["Equation"]):
+            via = None
+            if g.value(eq, PROMO["lhs"]) == subject:
+                via = "lhs"
+            else:
+                inc = g.value(eq, PROMO["incidenceList"])
+                if inc is not None:
+                    try:
+                        if iri in json.loads(str(inc)):
+                            via = "incidence"
+                    except (TypeError, ValueError):
+                        pass
+                if via is None:
+                    rhs = g.value(eq, PROMO["rhs"])
+                    if rhs is not None and any(
+                        _token_in_rhs(str(rhs), t) for t in tokens
+                    ):
+                        via = "rhs"
+            if via is not None:
+                refs.append({
+                    "equation": str(eq),
+                    "graph": str(g.identifier),
+                    "via": via,
+                })
+    return refs
+
+
+def _structural_changes(old, record: VariableRecord) -> List[str]:
+    """Structural fields differing between the stored variable and the
+    incoming record.  ``global_ID`` falls back to the IRI fragment (the
+    reader's convention), so an absent alias is not a change."""
+    fragment = record.iri.split("#")[-1].split("/")[-1]
+    pairs = [
+        ("units",
+         old.units.as_list() if getattr(old, "units", None) else [0] * 8,
+         list(record.units)),
+        ("index_structures",
+         sorted(getattr(old, "index_structures", [])),
+         sorted(record.index_structures)),
+        ("tokens",
+         sorted(getattr(old, "tokens", [])),
+         sorted(record.tokens)),
+        ("classifications",
+         dict(getattr(old, "classifications", {})),
+         dict(record.classifications)),
+        ("variable_class", getattr(old, "type", None),
+         record.variable_class or None),
+        ("port_variable", bool(getattr(old, "port_variable", False)),
+         bool(record.port_variable)),
+        ("network", getattr(old, "network", None), record.network),
+        ("internal_id", getattr(old, "internal_id", None),
+         record.internal_id),
+        ("alias:global_ID",
+         getattr(old, "aliases", {}).get("global_ID") or fragment,
+         record.aliases.get("global_ID") or fragment),
+        ("alias:internal_code",
+         getattr(old, "aliases", {}).get("internal_code"),
+         record.aliases.get("internal_code")),
+    ]
+    return [name for name, before, after in pairs if before != after]
+
+
+def _remove_variable(graph, subject: URIRef) -> None:
+    """Remove a variable *and* its equation nodes — equations are nested
+    records; dropping only the variable's triples would orphan rhs
+    references that still mention other variables."""
+    for eq in list(graph.objects(subject, PROMO["hasEquation"])):
+        graph.remove((eq, None, None))
+    graph.remove((subject, None, None))
+
+
+def _guard_structural_edit(store, graph, iri: str,
+                           record: VariableRecord) -> None:
+    """409 when ``record`` changes structural fields of a variable that
+    equations reference.  No-op when the variable does not exist in
+    ``graph`` (plain create)."""
+    subject = URIRef(iri)
+    if (subject, None, None) not in graph:
+        return
+    old = RdfContext(store).variables().get(iri)
+    changed = _structural_changes(old, record) if old is not None else []
+    if not changed:
+        return
+    refs = _variable_references(store, iri)
+    if refs:
+        raise HTTPException(status_code=409, detail={
+            "message": (
+                "Variable is referenced by %d equation(s); "
+                "structural field(s) locked: %s"
+                % (len(refs), ", ".join(changed))
+            ),
+            "locked_fields": changed,
+            "references": refs,
+        })
+
+
+@router.get("/variables/{iri:path}/references")
+def variable_references(iri: str) -> Dict[str, Any]:
+    """Equations referencing the variable — lets the editor lock
+    structural fields proactively (``used``) and explain 409s."""
+    store = get_store()
+    refs = _variable_references(store, iri)
+    return {"iri": iri, "used": bool(refs), "references": refs}
+
+
 @router.put("/variables/{iri:path}", response_model=VariableRecord)
 def update_variable(
     iri: str,
     record: VariableRecord,
     graph_iri: Optional[str] = Depends(editable_param),
 ) -> VariableRecord:
-    """Replace a variable in the selected artefact graph."""
+    """Replace a variable in the selected artefact graph.
+
+    Structural fields are locked while the variable is referenced by an
+    equation — changing them then returns 409 with the referencers.
+    """
     store = get_store()
     graph = resolve_graph(store, graph_iri)
 
@@ -459,7 +620,8 @@ def update_variable(
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Variable not found")
 
-    graph.remove((subject, None, None))
+    _guard_structural_edit(store, graph, iri, record)
+    _remove_variable(graph, subject)
     record.iri = iri
     protos = _instantiate_protos(record)
     var_iri = store.add_variable_dict(graph, record.model_dump())
@@ -472,11 +634,24 @@ def delete_variable(
     iri: str,
     graph_iri: Optional[str] = Depends(editable_param),
 ) -> Dict[str, str]:
-    """Delete a variable from the selected artefact graph."""
+    """Delete a variable from the selected artefact graph.
+
+    Blocked (409) while *other* variables' equations reference it; its
+    own equations are deleted with it.
+    """
     store = get_store()
     graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Variable not found")
-    graph.remove((subject, None, None))
+    refs = [r for r in _variable_references(store, iri) if r["via"] != "lhs"]
+    if refs:
+        raise HTTPException(status_code=409, detail={
+            "message": (
+                "Variable is referenced by %d equation(s) — remove the "
+                "referencing equations first" % len(refs)
+            ),
+            "references": refs,
+        })
+    _remove_variable(graph, subject)
     return {"deleted": iri}

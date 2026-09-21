@@ -186,7 +186,7 @@ def test_matlab_root():
 # -- latex ------------------------------------------------------------------
 
 def test_latex_var_label_with_index_subscripts():
-    assert gen("rho", "latex") == r"\mathit{rho}_{N}"
+    assert gen("rho", "latex") == r"{\mathit{rho}}_{N}"
     assert gen("M", "latex") == r"\mathit{M}"
 
 
@@ -207,9 +207,9 @@ def _underscore_space():
 def test_latex_underscore_index_alias_escaped():
     # A raw ``_`` inside ``_{...}`` is a LaTeX double-subscript error.
     space = _underscore_space()
-    assert gen("J", "latex", space) == r"\mathit{J}_{A\_heat}"
+    assert gen("J", "latex", space) == r"{\mathit{J}}_{A\_heat}"
     assert gen("reduceSum(J, A_heat)", "latex", space) == \
-        r"\sum_{A\_heat} \mathit{J}_{A\_heat}"
+        r"\sum_{A\_heat} {\mathit{J}}_{A\_heat}"
 
 
 def test_matlab_underscore_index_alias_stays_raw():
@@ -221,21 +221,21 @@ def test_matlab_underscore_index_alias_stays_raw():
 
 def test_latex_group():
     assert gen("( rho + rho )", "latex") == \
-        r"\left( \mathit{rho}_{N} + \mathit{rho}_{N} \right)"
+        r"\left( {\mathit{rho}}_{N} + {\mathit{rho}}_{N} \right)"
 
 
 def test_latex_hadamard():
-    assert gen("rho . v", "latex") == r"\mathit{rho}_{N} \circ \mathit{v}_{N}"
+    assert gen("rho . v", "latex") == r"{\mathit{rho}}_{N} \circ {\mathit{v}}_{N}"
 
 
 def test_latex_expand():
     assert gen("rho : rhoT", "latex") == \
-        r"\mathit{rho}_{N} \otimes \mathit{rhoT}_{t}"
+        r"{\mathit{rho}}_{N} \otimes {\mathit{rhoT}}_{t}"
 
 
 def test_latex_reduce_sums_shared_index():
     assert gen("rho * v", "latex") == \
-        r"\sum_{N} \mathit{rho}_{N} \, \mathit{v}_{N}"
+        r"\sum_{N} {\mathit{rho}}_{N} \, {\mathit{v}}_{N}"
 
 
 def test_latex_power():
@@ -260,7 +260,24 @@ def test_latex_root():
 
 def test_latex_pardiff():
     assert gen("ParDiff(x, x)", "latex") == \
-        r"\frac{\partial \mathit{x}_{t}}{\partial \mathit{x}_{t}}"
+        r"\frac{\partial {\mathit{x}}_{t}}{\partial {\mathit{x}}_{t}}"
+
+
+def test_latex_alias_with_own_subscript_braced():
+    # A verbatim latex alias may itself carry a subscript (``r_z``);
+    # ``{r_z}_{N}`` compiles, ``r_z_{N}`` is a double-subscript error.
+    n_idx = Index(iri=N, label="species", network="thermo",
+                  aliases={"internal_code": "N"})
+    rz = Variable(iri="http://promo.example/var/rz", internal_id="V_30",
+                  label="rz", network="thermo", type="state",
+                  units=Units(), index_structures=[N],
+                  aliases={"latex": "r_z"})
+    space = CompileSpace(
+        {rz.iri: rz}, {n_idx.iri: n_idx},
+        variable_definition_network="thermo",
+        expression_definition_network="thermo",
+    )
+    assert gen("rz", "latex", space) == r"{r_z}_{N}"
 
 
 def test_latex_instantiate():

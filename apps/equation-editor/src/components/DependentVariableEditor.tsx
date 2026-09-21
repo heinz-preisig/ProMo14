@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, CodegenTarget, Index, NetworkTree, Variable } from '../types'
+import type { AstNode, CheckRequest, CheckResponse, CodegenTarget, Index, NetworkTree, SavedEquation, Variable } from '../types'
+import { nextInternalId } from '../variableUtils'
+import { useVariableLock } from '../useVariableLock'
 import ExpressionInput from './ExpressionInput'
 import LaTeXPreview from './LaTeXPreview'
 import NetworkTreeSelect from './NetworkTreeSelect'
 import ResultPanel from './ResultPanel'
 import VariablePalette from './VariablePalette'
-import type { SavedEquation } from './EquationList'
 import {
   findNameCollision,
   isValidVariableName,
@@ -26,16 +27,12 @@ export interface DependentVariableEditorProps {
   networkTree: NetworkTree
   initialDomain: string
   initialClass: string
+  /** When set, the editor attaches the equation to this existing
+   *  variable instead of minting a new one — fields are prefilled and
+   *  structural ones lock while the variable is used (§18). */
+  editing?: Variable | null
   onDefaultsChange?: (domain: string, variableClass: string) => void
   onAccept: (v: Variable, eq: SavedEquation) => void
-}
-
-function nextInternalId(variables: Variable[]): string {
-  const max = variables
-    .map((v) => parseInt(v.internal_id?.replace(/^V_/, '') ?? '0', 10))
-    .filter((n) => !Number.isNaN(n))
-  const next = (max.length ? Math.max(...max) : 0) + 1
-  return `V_${next}`
 }
 
 export default function DependentVariableEditor({
@@ -46,6 +43,7 @@ export default function DependentVariableEditor({
   networkTree,
   initialDomain,
   initialClass,
+  editing,
   onDefaultsChange,
   onAccept,
 }: DependentVariableEditorProps) {
@@ -64,24 +62,26 @@ export default function DependentVariableEditor({
   const [genTarget, setGenTarget] = useState<CodegenTarget>('python')
   const [genCode, setGenCode] = useState<string | null>(null)
   const [genLoading, setGenLoading] = useState(false)
+  // §18 usage lock — structural fields grey out while referenced.
+  const { used } = useVariableLock(editing?.iri)
 
   useEffect(() => {
     if (open) {
-      setDomain(initialDomain)
-      setVariableClass(initialClass)
-      setName('')
-      setLatexSym('')
+      setDomain(editing?.network ?? initialDomain)
+      setVariableClass(editing?.type ?? initialClass)
+      setName(editing?.label ?? '')
+      setLatexSym(editing?.aliases?.latex ?? '')
       setText('')
       setAst(null)
       setParseError(null)
       setCheckResult(null)
       setError(null)
-      setDoc('')
+      setDoc(editing?.doc ?? '')
       setLoading(false)
       setGenCode(null)
       setGenLoading(false)
     }
-  }, [open])
+  }, [open, editing])
 
   useEffect(() => {
     setAst(null)
@@ -92,24 +92,31 @@ export default function DependentVariableEditor({
   }, [name, domain, variableClass, text, latexSym])
 
   // Report the current domain/class so the app can offer them as
-  // defaults next time either variable editor is opened.
+  // defaults next time either variable editor is opened.  Skipped in
+  // editing mode — the existing variable's values aren't user defaults.
   useEffect(() => {
-    onDefaultsChange?.(domain, variableClass)
-  }, [domain, variableClass])
+    if (!editing) onDefaultsChange?.(domain, variableClass)
+  }, [domain, variableClass, editing])
 
   // Instantiate RHS → LHS class restricted to constant|parameter.  The
   // text heuristic covers the pre-check state (ast only exists after a
   // successful parse); the backend checker stays authoritative (ADR-008).
   const isInstantiate =
     ast?.type === 'Instantiate' || /^\s*Instantiate\s*\(/.test(text)
+  // Structural fields lock while the edited variable is used — the
+  // Instantiate class-forcing must not bypass the lock either.
+  const structuralLocked = !!editing && used
   const effectiveClass =
-    isInstantiate && !INSTANTIATE_CLASSES.includes(variableClass)
+    !structuralLocked && isInstantiate && !INSTANTIATE_CLASSES.includes(variableClass)
       ? 'parameter'
       : variableClass
 
   // Names must be valid expression-language identifiers (lexer rule).
   const nameValid = isValidVariableName(name)
-  const collision = findNameCollision(variables, name)
+  const collision = findNameCollision(
+    editing ? variables.filter((x) => x.iri !== editing.iri) : variables,
+    name,
+  )
 
   const handleCheck = useCallback(async () => {
     setLoading(true)
@@ -123,7 +130,11 @@ export default function DependentVariableEditor({
         setAst(parseRes.ast)
         // Instantiate LHS must be constant|parameter — sync the select so
         // the request below already carries an allowed class (ADR-008).
-        if (parseRes.ast.type === 'Instantiate' && !INSTANTIATE_CLASSES.includes(variableClass)) {
+        if (
+          !structuralLocked &&
+          parseRes.ast.type === 'Instantiate' &&
+          !INSTANTIATE_CLASSES.includes(variableClass)
+        ) {
           setVariableClass('parameter')
         }
       } else {
@@ -142,24 +153,41 @@ export default function DependentVariableEditor({
   }, [text, variables, indices, domain, name, variableClass, networkTree])
 
   /** The draft LHS variable — shared by /check, /generate, accept and the
-   *  LaTeX preview so all see the same record (incl. the latex alias). */
+   *  LaTeX preview so all see the same record (incl. the latex alias).
+   *  In editing mode it carries the existing record (iri, internal_id,
+   *  equations, classifications, audit fields) so saveVariable's
+   *  replace-semantics POST loses nothing. */
   const draftVariable = useCallback((): Variable => {
     const lhs = name.trim()
+    const aliases = { ...(editing?.aliases ?? {}) }
+    if (latexSym.trim()) aliases.latex = latexSym.trim()
+    else delete aliases.latex
     return {
+      ...(editing ?? {}),
       // Case-sensitive IRI: the language treats `rho` and `Rho` as
       // distinct identifiers, so the IRI must preserve case too.
-      iri: `promo:${lhs}`,
+      iri: editing?.iri ?? `promo:${lhs}`,
       label: lhs,
       network: domain,
       type: effectiveClass,
-      units: checkResult?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
-      index_structures: checkResult?.indices ?? [],
-      internal_id: nextInternalId(variables),
-      port_variable: false,
-      aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
+      units: checkResult?.units ?? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
+      index_structures: checkResult?.indices ?? editing?.index_structures ?? [],
+      internal_id: editing?.internal_id ?? nextInternalId(variables),
+      port_variable: editing?.port_variable ?? false,
+      aliases,
       doc,
     }
-  }, [name, domain, effectiveClass, variables, checkResult, latexSym, doc])
+  }, [name, domain, effectiveClass, variables, checkResult, latexSym, doc, editing])
+
+  /** The variable context for /check, /generate and the LaTeX preview —
+   *  the draft replaces the stored record when editing, appends when
+   *  creating. */
+  const contextVariables = useCallback((): Variable[] => {
+    const draft = draftVariable()
+    return editing
+      ? variables.map((x) => (x.iri === editing.iri ? draft : x))
+      : [...variables, draft]
+  }, [variables, editing, draftVariable])
 
   /** The check request for the current inputs — shared by /check and
    *  /generate so both see the same draft LHS variable. */
@@ -167,14 +195,14 @@ export default function DependentVariableEditor({
     const lhs = name.trim()
     return {
       text,
-      variables: [...variables, draftVariable()],
+      variables: contextVariables(),
       indices,
       variable_definition_network: domain,
       expression_definition_network: domain,
       lhs: lhs || null,
       network_tree: networkTree,
     }
-  }, [text, variables, indices, domain, name, variableClass, networkTree, draftVariable])
+  }, [text, variables, indices, domain, name, variableClass, networkTree, contextVariables])
 
   const handleGenerate = useCallback(async () => {
     setGenLoading(true)
@@ -257,16 +285,36 @@ export default function DependentVariableEditor({
             borderBottom: '1px solid #ccc',
           }}
         >
-          <h3 style={{ margin: 0 }}>New dependent variable</h3>
+          <h3 style={{ margin: 0 }}>
+            {editing ? `Add equation — ${editing.label}` : 'New dependent variable'}
+          </h3>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
+          >
             Domain:
-            <NetworkTreeSelect tree={networkTree} selected={domain} onSelect={setDomain} />
+            <span
+              style={
+                structuralLocked
+                  ? { pointerEvents: 'none', opacity: 0.55, display: 'inline-flex' }
+                  : { display: 'inline-flex' }
+              }
+            >
+              <NetworkTreeSelect tree={networkTree} selected={domain} onSelect={setDomain} />
+            </span>
           </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
+          >
             Class:
-            <select value={effectiveClass} onChange={(e) => setVariableClass(e.target.value)}>
+            <select
+              value={effectiveClass}
+              onChange={(e) => setVariableClass(e.target.value)}
+              disabled={structuralLocked}
+            >
               <option value="">Select…</option>
               {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
                 <option key={c} value={c}>
@@ -333,7 +381,7 @@ export default function DependentVariableEditor({
                       : undefined
               }
             >
-              Accept
+              {editing ? 'Add equation' : 'Accept'}
             </button>
           </div>
         </div>
@@ -393,7 +441,7 @@ export default function DependentVariableEditor({
 
             <LaTeXPreview
               ast={ast}
-              variables={[...variables, draftVariable()]}
+              variables={contextVariables()}
               indices={indices}
               expressionNetwork={domain}
               lhs={name.trim() || undefined}

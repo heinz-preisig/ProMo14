@@ -7,6 +7,7 @@ import {
   VARIABLE_CLASSES,
   VARIABLE_NAME_HINT,
 } from '../validation'
+import { nextInternalId } from '../variableUtils'
 import NetworkTreeSelect from './NetworkTreeSelect'
 
 const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current', 'light', 'nil']
@@ -21,14 +22,6 @@ export interface PortVariableEditorProps {
   initialClass?: string
   onDefaultsChange?: (domain: string, variableClass: string) => void
   onAccept: (v: Variable) => void
-}
-
-function nextInternalId(variables: Variable[]): string {
-  const max = variables
-    .map((v) => parseInt(v.internal_id?.replace(/^V_/, '') ?? '0', 10))
-    .filter((n) => !Number.isNaN(n))
-  const next = (max.length ? Math.max(...max) : 0) + 1
-  return `V_${next}`
 }
 
 /** Single-dialog port variable definition — same header widgets as the

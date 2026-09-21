@@ -1,5 +1,5 @@
-import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, Variable } from './types'
-import type { SavedEquation } from './components/EquationList'
+import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, SavedEquation, Variable } from './types'
+import { nextEquationId } from './variableUtils'
 
 /** The artefact graph this session edits — from the hub's ?graph= link.
  *  Undefined means the default working ontology. */
@@ -40,10 +40,18 @@ export async function loadContext(): Promise<ContextResponse> {
   return res.json() as Promise<ContextResponse>
 }
 
-export async function saveVariable(v: Variable, equation?: SavedEquation): Promise<Variable> {
-  const equations: Record<string, unknown> = {}
+export async function saveVariable(
+  v: Variable,
+  equation?: SavedEquation,
+  allVariables: Variable[] = [],
+): Promise<Variable> {
+  // Re-save replaces the whole record — carry stored equations forward
+  // or an edit would silently drop them.
+  const equations: Record<string, unknown> = { ...(v.equations ?? {}) }
   if (equation) {
-    const eqId = `E_${Date.now()}`
+    // Sequential E_n (smallest free) — epoch-ms ids are unreadable in
+    // the printed document.  Pool is the full variable set when given.
+    const eqId = nextEquationId(allVariables.length ? allVariables : [v])
     equations[eqId] = {
       iri: '',
       internal_id: eqId,
@@ -64,10 +72,10 @@ export async function saveVariable(v: Variable, equation?: SavedEquation): Promi
     internal_id: v.internal_id ?? null,
     aliases: v.aliases ?? {},
     network: v.network,
-    classifications: {},
+    classifications: v.classifications ?? {},
     variable_class: v.type ?? null,
     port_variable: v.port_variable ?? false,
-    imported: false,
+    imported: v.imported ?? false,
     doc: v.doc ?? '',
     units: v.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
     tokens: v.tokens ?? [],
@@ -76,16 +84,33 @@ export async function saveVariable(v: Variable, equation?: SavedEquation): Promi
     equations,
     compiled_lhs: null,
     memory: null,
-    created: null,
-    modified: null,
+    created: v.created ?? null,
+    modified: v.modified ?? null,
   }
   const res = await apiFetch('/api/equation/variables', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`Failed to save variable: ${res.status}`)
+  if (!res.ok) throw await apiError(res, `Failed to save variable: ${res.status}`)
   return res.json()
+}
+
+/** Build an Error from a failed response, surfacing FastAPI's ``detail``
+ *  (string or the structured 409 payload from the mutability guard). */
+async function apiError(res: Response, fallback: string): Promise<Error> {
+  try {
+    const body = await res.json()
+    const d = body?.detail
+    if (typeof d === 'string') return new Error(d)
+    if (d && typeof d.message === 'string') {
+      const refs = (d.references ?? [])
+        .map((r: { via?: string; equation?: string }) => `  ${r.via}: ${r.equation}`)
+        .join('\n')
+      return new Error(refs ? `${d.message}\n${refs}` : d.message)
+    }
+  } catch { /* body not JSON — fall through */ }
+  return new Error(fallback)
 }
 
 export async function generateExpression(req: GenerateRequest): Promise<GenerateResponse> {
@@ -108,7 +133,21 @@ export async function deleteVariable(iri: string): Promise<void> {
   const res = await apiFetch(`/api/equation/variables/${encodeURIComponent(iri)}`, {
     method: 'DELETE',
   })
-  if (!res.ok) throw new Error(`Failed to delete variable: ${res.status}`)
+  if (!res.ok) throw await apiError(res, `Failed to delete variable: ${res.status}`)
+}
+
+export interface VariableReferences {
+  iri: string
+  used: boolean
+  references: { equation: string; graph: string; via: string }[]
+}
+
+/** Equations referencing a variable — drives the mutability lock (§18):
+ *  structural fields are editable only while ``used`` is false. */
+export async function getVariableReferences(iri: string): Promise<VariableReferences> {
+  const res = await apiFetch(`/api/equation/variables/${encodeURIComponent(iri)}/references`)
+  if (!res.ok) throw await apiError(res, `Failed to load references: ${res.status}`)
+  return res.json()
 }
 
 export interface StoreStatus {

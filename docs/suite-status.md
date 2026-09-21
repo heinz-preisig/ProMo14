@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-20
+**Last updated:** 2026-09-21
 
 ## Summary
 
@@ -8,7 +8,7 @@
 |--------|---------|----------|-------|--------|
 | Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork` | `backend/static/hub.html` at `/` | covered by service tests | **Working** — artefact lines, pins, fork, open-in-app |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
-| Equation Editor | Parser + checker + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes | React + TypeScript + Vite app | 6 test files, 119 tests | Backend and frontend functional; `?graph=` wired |
+| Equation Editor | Parser + checker + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 8 test files; 206 backend tests total | Backend and frontend functional; `?graph=` wired |
 | Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
 | Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
@@ -143,7 +143,26 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `zero`/`one`/`half` seeded with pre-bound `promo:value`;
   `promo:instanceOf` provenance + `equation_class="instantiate"`
   written at save.
+- **Mutability guard (2026-09-21, §18):** `POST /variables` rejects
+  structural edits on equation-referenced variables with 409
+  (`_guard_structural_edit`); `GET /variables/{iri}/references` scans
+  the dataset (lhs / incidence / rhs whole-token match); frontend
+  `useVariableLock` disables locked fields.  `test_mutability.py`.
+- **Editor UI rework (2026-09-21):** `VariableDetailDialog` (view/edit
+  + equation list) replaces `VariableEditor`, `VariableChoiceDialog`,
+  `DependentVariableDialog`; `?` operator-help modal
+  (`OperatorHelp.tsx`/`operatorHelp.ts`) and `syntax` railway-diagram
+  modal (`SyntaxDiagram.tsx`, railroad-diagrams lib) with a printable
+  cheat-sheet view.
+- **LaTeX document fixes (2026-09-21):** downloads as `document.tex`
+  (`Content-Disposition: inline; filename=`); symbol base braced
+  before index subscripts — `{r_z}_{N}` compiles where `r_z_{N}` was a
+  LaTeX double-subscript error (document.py, codegen.py, latex.ts).
+  Equation ids now sequential `E_n` (smallest-free mint in
+  `variableUtils.ts::nextEquationId`); `RdfStore._migrate_equation_ids`
+  renumbers legacy `E_<epoch-ms>` literals at load, dataset-wide.
 - **Next:** RDF vocabulary finalization for equations/operators;
+  equation IRIs still mint under `promo#` (should be `{graphIRI}#`);
   LaTeX→image cache deferred.  (Persistence UX done 2026-09-18:
   store-global dirty tracking + Save button + unsaved badge.)
 
@@ -227,7 +246,7 @@ safety).  Hub: `http://localhost:8000/`.
 ```bash
 cd /home/heinz/1_Gits/CAM14/ProMo14
 npm install
-npm run dev      # modeller on :3000
+npm run dev      # modeller on :3004
 npm test         # all workspace tests
 ```
 
@@ -247,5 +266,5 @@ uv run uvicorn backend.main:app --port 8000
 ```bash
 cd /home/heinz/1_Gits/CAM14/ProMo14
 npm install
-npm run dev:equation  # Vite dev server on http://localhost:3001
+npm run dev:equation  # Vite dev server on http://localhost:3002
 ```

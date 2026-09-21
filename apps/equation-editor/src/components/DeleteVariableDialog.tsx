@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
-import type { Variable } from '../types'
-import type { SavedEquation } from './EquationList'
+import type { SavedEquation, Variable } from '../types'
 
 export interface DeleteImpact {
   target: Variable

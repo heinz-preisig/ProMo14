@@ -1,4 +1,7 @@
-import { type ChangeEvent, type KeyboardEvent, useRef } from 'react'
+import { type ChangeEvent, type KeyboardEvent, useRef, useState } from 'react'
+import { OPERATOR_HELP } from '../operatorHelp'
+import OperatorHelp from './OperatorHelp'
+import SyntaxDiagram from './SyntaxDiagram'
 
 export interface ExpressionInputProps {
   value: string
@@ -7,16 +10,23 @@ export interface ExpressionInputProps {
   disabled?: boolean
 }
 
-const OP_BUTTONS = [
+const OP_BUTTONS: { label: string; value: string; tip?: string }[] = [
   { label: '+', value: ' + ' },
   { label: '-', value: ' - ' },
   { label: '*', value: ' * ' },
   { label: ':', value: ' : ' },
   { label: '.', value: ' . ' },
   { label: '^', value: ' ^ ' },
-  { label: '(', value: ' (' },
-  { label: ')', value: ') ' },
+  { label: '(', value: ' (', tip: 'open group' },
+  { label: ')', value: ') ', tip: 'close group' },
 ]
+
+/** Tooltip text for an operator button — syntax + meaning from the
+ *  shared reference table. */
+const tipFor = (label: string) => {
+  const h = OPERATOR_HELP.find((e) => e.label === label)
+  return h ? `${h.syntax} — ${h.description}` : undefined
+}
 
 const FUNC_BUTTONS = [
   'Integral',
@@ -43,6 +53,8 @@ export default function ExpressionInput({
   disabled,
 }: ExpressionInputProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [syntaxOpen, setSyntaxOpen] = useState(false)
 
   const insert = (token: string) => {
     const el = ref.current
@@ -76,6 +88,7 @@ export default function ExpressionInput({
             type="button"
             onClick={() => insert(b.value)}
             disabled={disabled}
+            title={b.tip ?? tipFor(b.label)}
             style={{ minWidth: 32, padding: '4px 8px', fontSize: 14 }}
           >
             {b.label}
@@ -89,12 +102,48 @@ export default function ExpressionInput({
             type="button"
             onClick={() => insert(`${f}(`)}
             disabled={disabled}
+            title={tipFor(f)}
             style={{ padding: '4px 8px', fontSize: 12 }}
           >
             {f}(
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setHelpOpen((o) => !o)}
+          title="Operator reference"
+          style={{
+            marginLeft: 'auto',
+            padding: '4px 10px',
+            fontSize: 12,
+            fontWeight: 'bold',
+            background: '#1565c0',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 4,
+          }}
+        >
+          ?
+        </button>
+        <button
+          type="button"
+          onClick={() => setSyntaxOpen(true)}
+          title="Railway diagram of the expression grammar"
+          style={{
+            padding: '4px 10px',
+            fontSize: 12,
+            fontWeight: 'bold',
+            background: '#1565c0',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 4,
+          }}
+        >
+          syntax
+        </button>
       </div>
+      {helpOpen && <OperatorHelp />}
+      {syntaxOpen && <SyntaxDiagram onClose={() => setSyntaxOpen(false)} />}
       <textarea
         ref={ref}
         value={value}

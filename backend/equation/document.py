@@ -67,7 +67,9 @@ def _var_symbol(var: Any, space: CompileSpace) -> str:
     else:
         label = tex_escape(var.label or var.iri)
         base = r"\mathit{%s}" % label
-    return "%s_{%s}" % (base, ",".join(subs)) if subs else base
+    # Brace the base: a verbatim alias may itself carry a subscript
+    # (``r_z``) — ``{r_z}_{N}`` compiles, ``r_z_{N}`` is a double subscript.
+    return "{%s}_{%s}" % (base, ",".join(subs)) if subs else base
 
 
 def _rhs_latex(eq: Any, var: Any, ctx: Any) -> str:

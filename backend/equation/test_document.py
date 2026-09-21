@@ -60,8 +60,13 @@ def _ctx():
         network="mass_balance", type="state", units=Units(),
         index_structures=[ah_idx.iri], doc="heat flow",
     )
+    rz = Variable(
+        iri="http://promo.example/var/rz", internal_id="V_30", label="rz",
+        network="thermo", type="state", units=Units(),
+        index_structures=[N], aliases={"latex": "r_z"},
+    )
     return _Ctx(
-        {v.iri: v for v in [rho, M, J]},
+        {v.iri: v for v in [rho, M, J, rz]},
         {i.iri: i for i in [n_idx, ah_idx]},
     )
 
@@ -78,7 +83,7 @@ def test_document_structure():
 def test_variable_rows():
     tex = build_document(_ctx())
     # symbol with index subscript, label verbatim, doc un-underscored
-    assert r"\mathit{rho}_{N}" in tex
+    assert r"{\mathit{rho}}_{N}" in tex
     assert r"\verb|rho|" in tex
     assert "mass density" in tex
     # hyperlink target keyed on the stripped number
@@ -91,7 +96,7 @@ def test_variable_rows():
 def test_equation_rows_render_rhs():
     tex = build_document(_ctx())
     # e1: fresh parse+check+render of "rho + rho"
-    assert r"\mathit{rho}_{N} + \mathit{rho}_{N}" in tex
+    assert r"{\mathit{rho}}_{N} + {\mathit{rho}}_{N}" in tex
     assert ":=" in tex
     # cross-link back to the defining variable
     assert r'\hyperlink{"v:1"}' in tex
@@ -109,8 +114,15 @@ def test_underscores_escaped_in_math_and_titles():
     # A_heat index alias: raw ``_`` inside ``_{...}`` would be a LaTeX
     # double-subscript error; the mass_balance network would break the
     # text-mode \subsection title.
-    assert r"\mathit{J}_{A\_heat}" in tex
+    assert r"{\mathit{J}}_{A\_heat}" in tex
     assert r"\subsection{ mass\_balance }" in tex
+
+
+def test_latex_alias_with_own_subscript_braced():
+    tex = build_document(_ctx())
+    # Verbatim alias ``r_z`` + index subscript: ``{r_z}_{N}`` compiles,
+    # ``r_z_{N}`` is a LaTeX double-subscript error.
+    assert r"{r_z}_{N}" in tex
 
 
 def test_variable_row_lists_equation_links():
