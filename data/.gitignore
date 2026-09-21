@@ -1,5 +1,10 @@
-# Ignore all user data files in this directory by default.
-# Only this file and the README are tracked by git.
+# User data files in this directory.
+# Ontology / var-expr graph files ARE tracked — the user syncs work
+# between two machines via git.  Everything else stays ignored.
 *
 !.gitignore
 !README.md
+!*/
+!*.trig
+!*.ttl
+!*.jsonld
