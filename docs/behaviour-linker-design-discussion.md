@@ -1698,6 +1698,11 @@ instantiated — incidence/constant bindings exempt), plus
 - **Port direction check** — binding is token+export based; whether
   the arc's rule direction licenses the flow (sensor reads vs
   actuation writes) is the modeller-side check (pending item 4).
+- **R3 validation** — the flag-as-override rule is a hypothesis about
+  modelling ergonomics; unit tests verify mechanics only.  Validate
+  against real cases in the modeller (same-token exports, sensor
+  reading state, unflagged efforts) before settling — R1 (strict
+  gate) remains the fallback.
 - **`[N,A]`-indexed data variables** — resolved by the constant-class
   guard above: only `constant`-class vars of that shape bind to `F`;
   a data variable binds `local` with per-index element sets.
