@@ -47,7 +47,14 @@ The var/expr graph is a **bipartite graph**:
   - `promo:axisValue` → axis term IRIs (classification tags)
   - `promo:carriesToken` → token IRIs
   - `promo:unitVector` (8-element SI exponent vector)
-  - `promo:indexStructure` → index IRIs
+  - `promo:indexStructure` → index IRIs — a **fixed sequence of
+    unique indices**: declaration order is the canonical axis order
+    (`F[node, arc]` means rows=nodes, cols=arcs).  The checker
+    enforces uniqueness and preserves order through the expression
+    tree (ordered union for products, operand order minus the
+    reduced index for reductions); element-wise ops require the same
+    sequence, not just the same set.  Codegen emits axes in this
+    order — no label lookup needed at runtime.
   - `promo:variableClass` (legacy string, being replaced by classifications)
   - `promo:hasEquation` → equation IRIs (the bipartite edges)
 

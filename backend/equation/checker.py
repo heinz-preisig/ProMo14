@@ -5,8 +5,12 @@ The checker is a second pass after parsing. It takes a plain AST and a
 a checked tree in which every subexpression carries:
 
 - ``units`` — the inferred SI unit vector;
-- ``indices`` — the sorted list of index IRIs the subexpression has after
-  the operation;
+- ``indices`` — the *ordered sequence* of index IRIs the subexpression
+  has after the operation.  An index structure is a fixed sequence of
+  unique indices: declaration order is preserved through the tree
+  (ordered union for products, operand order minus the reduced index
+  for reductions), so ``indices`` is the canonical axis order codegen
+  emits — ``F[node, arc]`` means rows=nodes, cols=arcs.
 - ``incidence`` — the set of variable IRIs referenced;
 - ``label`` — a temporary variable label for codegen.
 
@@ -48,6 +52,23 @@ from .units import Units
 INSTANTIATE_CLASSES = ("constant", "parameter")
 
 
+def _union(*seqs: List[str]) -> List[str]:
+    """Ordered union of index sequences — first-seen order wins."""
+    seen: Set[str] = set()
+    out: List[str] = []
+    for s in seqs:
+        for i in s:
+            if i not in seen:
+                seen.add(i)
+                out.append(i)
+    return out
+
+
+def _without(indices: List[str], iri: str) -> List[str]:
+    """``indices`` minus ``iri``, order preserved."""
+    return [i for i in indices if i != iri]
+
+
 @dataclass
 class Checked:
     """A type-checked / unit-checked subexpression."""
@@ -70,10 +91,17 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
     if isinstance(node, Var):
         resolved = space.resolve(node.name)
         var = resolved.variable
+        if len(set(var.index_structures)) != len(var.index_structures):
+            raise IndexStructureError(
+                "variable %s repeats an index %s — an index structure "
+                "is a fixed sequence of unique indices"
+                % (node.name,
+                   space.pretty_index_list(var.index_structures))
+            )
         return Checked(
             node=node,
             units=var.units,
-            indices=sorted(var.index_structures),
+            indices=list(var.index_structures),
             label=node.name,
             incidence=frozenset([var.iri]) if var.iri else frozenset(),
         )
@@ -128,7 +156,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=left.units * right.units,
-            indices=sorted(left.index_set() | right.index_set()),
+            indices=_union(left.indices, right.indices),
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],
@@ -140,7 +168,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=left.units * right.units,
-            indices=sorted(left.index_set() | right.index_set()),
+            indices=_union(left.indices, right.indices),
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],
@@ -175,7 +203,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         if n_common == 1:
             # Exactly one common index; reduce over it.
             reduced_iri = list(common)[0]
-            result_indices = sorted(left.index_set() ^ right.index_set())
         else:
             # More than one common index — an explicit reduce index is required
             # so the rule is unambiguous.
@@ -191,9 +218,8 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                     )
                 )
             reduced_iri = reduce_iri
-            result_indices = sorted(
-                (left.index_set() | right.index_set()) - {reduced_iri}
-            )
+        result_indices = _without(
+            _union(left.indices, right.indices), reduced_iri)
 
         return Checked(
             node=node,
@@ -280,7 +306,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                     "differential index %s not declared in ontology "
                     "(diffSpace requires a pre-declared index)" % diff_label
                 )
-            indices = sorted(set(indices) | {diff_iri})
+            indices = _union(indices, [diff_iri])
 
         return Checked(
             node=node,
@@ -362,7 +388,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=arg.units,
-            indices=sorted(arg.index_set() - {index_iri}),
+            indices=_without(arg.indices, index_iri),
             label=space.new_temp(),
             incidence=arg.incidence,
             children=[arg],
@@ -382,7 +408,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=lhs_resolved.variable.units,
-            indices=lhs_resolved.variable.index_structures,
+            indices=list(lhs_resolved.variable.index_structures),
             label=space.new_temp(),
             incidence=body.incidence,
             children=[body],
@@ -394,7 +420,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=x.units - y.units,
-            indices=sorted(x.index_set() | y.index_set()),
+            indices=_union(x.indices, y.indices),
             label=space.new_temp(),
             incidence=x.incidence | y.incidence,
             children=[x, y],
@@ -406,7 +432,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=x.units - y.units,
-            indices=sorted(x.index_set() | y.index_set()),
+            indices=_union(x.indices, y.indices),
             label=space.new_temp(),
             incidence=x.incidence | y.incidence,
             children=[x, y],
@@ -422,7 +448,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=arg.units,
-            indices=sorted(arg.index_set() - {index_iri}),
+            indices=_without(arg.indices, index_iri),
             label=space.new_temp(),
             incidence=arg.incidence,
             children=[arg],
@@ -432,15 +458,13 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         args = [check(a, space, lhs) for a in node.args]
         # Generic function calls have no unit rule yet. Treat as dimensionless
         # with the union of argument indices; this is provisional.
-        indices: Set[str] = set()
         incidence: Set[str] = set()
         for a in args:
-            indices |= a.index_set()
             incidence |= a.incidence
         return Checked(
             node=node,
             units=Units(),
-            indices=sorted(indices),
+            indices=_union(*[a.indices for a in args]),
             label=space.new_temp(),
             incidence=frozenset(incidence),
             children=args,

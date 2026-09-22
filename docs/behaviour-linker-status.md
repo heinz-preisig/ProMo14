@@ -104,6 +104,13 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   signal-token comparability, scheduling (linear chain, algebraic
   loop, unbound-port edge-freedom), problem kinds, endpoint
   roundtrip.
+- **Index discipline (2026-09-22):** a variable's index structure is
+  a fixed sequence of *unique* indices — the checker now rejects
+  duplicates and preserves declaration order through the checked
+  tree (`Checked.indices` was previously sorted, losing the declared
+  axis order).  Element-wise ops require the same sequence, not just
+  the same set.  This is the codegen axis convention: `F[N,A]` emits
+  rows=N, cols=A, matching the fbuilder matrices.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search

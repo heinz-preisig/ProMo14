@@ -333,6 +333,61 @@ def test_root_requires_lhs():
     raise AssertionError("expected VarError")
 
 
+# ---------------------------------------------------------------------------
+# Index discipline: a fixed sequence of *unique* indices, declaration order
+# ---------------------------------------------------------------------------
+
+T = "http://promo.example/index/T"
+N = "http://promo.example/index/N"
+
+
+def _add_var(space, label, units, index_structures):
+    iri = "http://promo.example/var/%s" % label
+    space.variables[iri] = Variable(
+        iri=iri, internal_id="V_x", label=label, network="thermo",
+        type="state", units=units, index_structures=index_structures)
+    return iri
+
+
+def test_duplicate_index_rejected():
+    space = _space()
+    _add_var(space, "bad", Units(), [N, N])
+    try:
+        check(parse("bad"), space)
+    except IndexStructureError:
+        return
+    raise AssertionError("expected IndexStructureError")
+
+
+def test_declaration_order_preserved():
+    """[T, N] declared stays [T, N] — no silent sorting (sorted would
+    give [N, T])."""
+    space = _space()
+    _add_var(space, "w", Units(), [T, N])
+    c = check(parse("w"), space)
+    assert c.indices == [T, N]
+
+
+def test_expand_order_is_left_then_right():
+    """x[T] : N[N] → [T, N]: the expand product's axis order follows
+    the operands' declaration order."""
+    space = _space()
+    c = check(parse("x : N"), space)
+    assert c.indices == [T, N]
+
+
+def test_add_requires_same_index_order():
+    """[T,N] + [N,T] is rejected — the sequence IS the structure."""
+    space = _space()
+    _add_var(space, "w1", Units(), [T, N])
+    _add_var(space, "w2", Units(), [N, T])
+    try:
+        check(parse("w1 + w2"), space)
+    except IndexStructureError:
+        return
+    raise AssertionError("expected IndexStructureError")
+
+
 if __name__ == "__main__":
     import sys
 
