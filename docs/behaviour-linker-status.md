@@ -79,7 +79,8 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   model artefact to §13 assignments and emits the assembled equation
   set.  Index element sets (`N` = nodes, `A` = token-flow arcs,
   `A_k` = members, `N_T` per entity type); variable bindings
-  (`incidence` for `[N,A]`-indexed vars → the numeric `F` matrices,
+  (`incidence` for `constant`-class `[N,A]`-indexed vars → the
+  numeric `F` matrices,
   `constant`, `parameter`, `port`, `local` with per-index element
   sets); per-contact port resolution across arcs (peer's exported
   `port_variable` defined vars, token-comparable via `promo:parent`

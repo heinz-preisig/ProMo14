@@ -216,6 +216,24 @@ def test_incidence_var_binds_matrix():
     assert f.indices == {}          # the matrix IS the binding
 
 
+def test_incidence_requires_constant_class():
+    """A non-constant [N,A]-indexed variable is data, not F — it never
+    takes the incidence matrix (here: an unmarked external input)."""
+    variables = dict(VARIABLES)
+    variables[_var("F")] = VarInfo(
+        _var("F"), "F_diff", "V_4",
+        index_structures=[_idx("idx_node"), _idx("idx_arc_diffusion")],
+        var_class="state")
+    rep = _build(variables=variables)
+    cap = _entity(rep, _et("lumped_capacity"))
+    f = _binding(cap, _var("F"))
+    assert f.binding == "input"      # data, not incidence
+    assert f.matrix is None
+    assert f.indices[_idx("idx_node")] == ["c1", "c2"]
+    assert f.indices[_idx("idx_arc_diffusion")] == ["a1", "a2"]
+    assert any(p.kind == "unmarked-input" for p in rep.problems)
+
+
 def test_parameter_and_constant_bindings():
     rep = _build()
     tr = _entity(rep, _et("diffusion_transport"))

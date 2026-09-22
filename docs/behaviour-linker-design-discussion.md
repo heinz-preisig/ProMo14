@@ -1615,12 +1615,13 @@ own element source exists (composition, reaction list).
 Every variable an assignment references gets a **role** (state /
 defined / port / parameter / input) and a **binding**:
 
-- `incidence` — a `[node, arc]`-indexed variable binds to the numeric
-  `F` matrix for its arc index (`[N,A]` → base, `[N,A_k]` → `F_k`).
-  This is the symbolic-F convention from §15: equations reference `F`
-  by index structure, instantiation supplies the numbers.  (A genuine
-  `[N,A]`-indexed data variable would need a distinguishing marker —
-  none exists yet.)
+- `incidence` — a `constant`-class variable indexed `[node, arc]`
+  binds to the numeric `F` matrix for its arc index (`[N,A]` → base,
+  `[N,A_k]` → `F_k`).  This is the symbolic-F convention from §15:
+  equations reference `F` by index structure, instantiation supplies
+  the numbers.  The `constant` class is the guard: graphs map into
+  incidence matrices, so the `[N,arc]` shape is reserved for them —
+  a data variable with that shape binds `local`, never silently `F`.
 - `constant` — pre-bound `promo:value` (universal constants); one
   global instance.
 - `parameter` — marked `hasInstantiatedVariable` or a bound-value
@@ -1682,5 +1683,6 @@ instantiated — incidence/constant bindings exempt), plus
 - **Port direction check** — binding is token+export based; whether
   the arc's rule direction licenses the flow (sensor reads vs
   actuation writes) is the modeller-side check (pending item 4).
-- **`[N,A]`-indexed data variables** — currently all bind as
-  incidence; a marker will be needed if a real one appears.
+- **`[N,A]`-indexed data variables** — resolved by the constant-class
+  guard above: only `constant`-class vars of that shape bind to `F`;
+  a data variable binds `local` with per-index element sets.

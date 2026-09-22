@@ -13,8 +13,12 @@ report:
 - **Variable bindings** — every variable referenced by an entity
   type's assignment gets a binding kind:
 
-  - ``incidence`` — a ``[node, arc]``-indexed variable binds to the
-    numeric ``F`` matrix for its arc index (base ``A`` or sub-index);
+  - ``incidence`` — a ``constant``-class variable indexed ``[node,
+    arc]`` binds to the numeric ``F`` matrix for its arc index (base
+    ``A`` or sub-index).  The class guard keeps the structural rule
+    honest: graphs map into incidence matrices, and a ``[N,A]``-shaped
+    *data* variable (should one ever appear) binds as ``local``
+    instead of silently taking the ``F`` matrix;
   - ``constant``  — pre-bound ``promo:value`` (universal constants),
     one global instance;
   - ``parameter`` — marked to-be-instantiated or a bound-value class;
@@ -405,7 +409,7 @@ def build(nodes: Dict[str, NodeInfo],
                             if _arc_like(indices.get(i), indices)), None)
             node_idx = next((i for i in idx_iris
                              if _node_like(indices.get(i), indices)), None)
-            if arc_idx and node_idx:
+            if arc_idx and node_idx and var.var_class == "constant":
                 binding = "incidence"
             elif var.value is not None:
                 binding = "constant"
