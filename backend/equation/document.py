@@ -17,6 +17,9 @@ fallback covers expressions that no longer parse/check.
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -118,6 +121,63 @@ def _inline_resources(tex: str) -> str:
                     name, path.read_text()),
             )
     return tex
+
+
+class PdfCompileError(Exception):
+    """LaTeX → PDF compilation failed; the message carries the log tail."""
+
+
+def pdf_available() -> bool:
+    """Whether this host can compile PDFs — gates the UI's PDF link and
+    is reported via ``/context`` capabilities.  Requires a TeX Live
+    toolchain (pdflatex); absent in the default Docker image unless
+    built with ``WITH_TEX=true``."""
+    return shutil.which("pdflatex") is not None
+
+
+def _log_tail(work: Path, stdout: str) -> str:
+    """Extract the useful part of a failed pdflatex run: the first ``!``
+    error block if present, else the last lines of the log."""
+    log = work / "document.log"
+    text = log.read_text(errors="replace") if log.exists() else stdout
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("!"):
+            return "\n".join(lines[i:i + 15])
+    return "\n".join(lines[-30:])
+
+
+def compile_pdf(tex: str) -> bytes:
+    """Compile a standalone .tex source to PDF bytes via pdflatex.
+
+    Runs in a throwaway directory with shell escape off; two passes so
+    ``hyperref`` targets and ``\\tableofcontents`` settle.  Raises
+    ``PdfCompileError`` when no TeX toolchain is installed or the run
+    fails — the message holds the log tail for display.
+    """
+    pdflatex = shutil.which("pdflatex")
+    if pdflatex is None:
+        raise PdfCompileError(
+            "pdflatex not found — install a TeX Live toolchain "
+            "(or use ?format=tex for the source)")
+    with tempfile.TemporaryDirectory(prefix="promo_doc_") as tmp:
+        work = Path(tmp)
+        (work / "document.tex").write_text(tex)
+        for _ in range(2):
+            try:
+                proc = subprocess.run(
+                    [pdflatex, "-interaction=nonstopmode", "-halt-on-error",
+                     "-no-shell-escape", "document.tex"],
+                    cwd=work, capture_output=True, text=True, timeout=90,
+                )
+            except subprocess.TimeoutExpired:
+                raise PdfCompileError("pdflatex timed out after 90 s")
+            if proc.returncode != 0:
+                raise PdfCompileError(_log_tail(work, proc.stdout))
+        pdf = work / "document.pdf"
+        if not pdf.exists():
+            raise PdfCompileError("pdflatex produced no PDF")
+        return pdf.read_bytes()
 
 
 def build_document(ctx: Any) -> str:

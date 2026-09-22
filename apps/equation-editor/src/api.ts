@@ -124,9 +124,11 @@ export async function generateExpression(req: GenerateRequest): Promise<Generate
 }
 
 /** URL of the printable LaTeX document (variables + equations) for the
- *  current graph scope — opened in a new tab for print/compile. */
-export function documentUrl(): string {
-  return q('/api/equation/document')
+ *  current graph scope — opened in a new tab.  ``pdf`` compiles server-
+ *  side and opens in the browser's PDF viewer; ``tex`` is the raw
+ *  compilable source. */
+export function documentUrl(format: 'pdf' | 'tex' = 'pdf'): string {
+  return q(`/api/equation/document?format=${format}`)
 }
 
 export async function deleteVariable(iri: string): Promise<void> {

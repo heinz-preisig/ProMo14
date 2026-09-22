@@ -1,7 +1,21 @@
 """Tests for ``backend/equation/document.py``."""
 
+import shutil
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.core import graph_store
+from backend.main import app
+
 from .compile_space import Index, Variable
-from .document import build_document
+from .document import (
+    PdfCompileError,
+    build_document,
+    compile_pdf,
+    pdf_available,
+)
 from .units import Units
 
 N = "http://promo.example/index/N"
@@ -129,3 +143,33 @@ def test_variable_row_lists_equation_links():
     tex = build_document(_ctx())
     assert r'\hyperlink{"e:1"}' in tex
     assert r'\hyperlink{"e:2"}' in tex
+
+
+@pytest.mark.skipif(shutil.which("pdflatex") is None,
+                    reason="no TeX toolchain installed")
+def test_generated_document_compiles_to_pdf():
+    """End-to-end: the rendered .tex must survive a real pdflatex run."""
+    pdf = compile_pdf(build_document(_ctx()))
+    assert pdf.startswith(b"%PDF")
+
+
+def test_compile_pdf_reports_log_tail():
+    if shutil.which("pdflatex") is None:
+        pytest.skip("no TeX toolchain installed")
+    with pytest.raises(PdfCompileError) as exc:
+        compile_pdf("\\documentclass{article}\\begin{document}\\undefinedcmd\n"
+                    "\\end{document}")
+    assert "undefinedcmd" in str(exc.value)
+
+
+def test_context_reports_pdf_capability(tmp_path: Path, monkeypatch):
+    """``GET /context`` advertises host capabilities; ``pdf`` mirrors
+    ``pdf_available()`` so the UI can hide the link on TeX-less hosts
+    (default Docker image)."""
+    monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(graph_store, "_STORE", None)
+    with TestClient(app) as client:
+        r = client.get("/api/equation/context")
+    monkeypatch.setattr(graph_store, "_STORE", None)
+    assert r.status_code == 200
+    assert r.json()["capabilities"]["pdf"] == pdf_available()

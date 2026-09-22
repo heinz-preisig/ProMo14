@@ -35,6 +35,9 @@ export default function App() {
   const [debugOpen, setDebugOpen] = useState(false)
   const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
   const [saveMsg, setSaveMsg] = useState('')
+  // Host capability from /context — false when the backend has no TeX
+  // toolchain (e.g. default Docker image); gates the PDF doc link.
+  const [pdfCapable, setPdfCapable] = useState(false)
 
   const onSave = useCallback(async () => {
     try {
@@ -53,6 +56,7 @@ export default function App() {
         setVariables(ctx.variables)
         setIndices(ctx.indices)
         setNetworkTree(ctx.network_tree)
+        setPdfCapable(ctx.capabilities?.pdf ?? false)
         // Rebuild SavedEquation list from persisted equations
         const saved: SavedEquation[] = []
         for (const v of ctx.variables) {
@@ -189,14 +193,25 @@ export default function App() {
             </span>
           )}
           {saveMsg && <span style={{ fontSize: 12, color: '#2e8b57', whiteSpace: 'nowrap' }}>{saveMsg}</span>}
+          {pdfCapable && (
+            <a
+              href={documentUrl('pdf')}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+              title="Open the printable document as PDF (variables & equations)"
+            >
+              PDF doc
+            </a>
+          )}
           <a
-            href={documentUrl()}
+            href={documentUrl('tex')}
             target="_blank"
             rel="noreferrer"
             style={{ fontSize: 12, whiteSpace: 'nowrap' }}
-            title="Open the printable LaTeX document (variables & equations)"
+            title="Open the LaTeX source (variables & equations)"
           >
-            LaTeX doc
+            .tex
           </a>
           <button type="button" onClick={onSave} style={{ fontSize: 12 }}>
             Save

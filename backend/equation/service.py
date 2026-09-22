@@ -19,7 +19,7 @@ import re
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, field_validator
 from rdflib import URIRef
@@ -39,7 +39,12 @@ from .checker import check
 from .codegen import TARGETS, render
 from .compile_space import CompileSpace, Index, Variable
 from .context import DictContext
-from .document import build_document
+from .document import (
+    PdfCompileError,
+    build_document,
+    compile_pdf,
+    pdf_available,
+)
 
 from .errors import VarError
 from .parser import ParseError, parse
@@ -183,6 +188,9 @@ class ContextResponse(BaseModel):
     variables: List[VariableIn] = Field(default_factory=list)
     indices: List[IndexIn] = Field(default_factory=list)
     network_tree: Dict[str, List[str]] = Field(default_factory=dict)
+    # Host capabilities the UI adapts to — e.g. {"pdf": false} when no
+    # TeX toolchain is installed (default Docker image).
+    capabilities: Dict[str, bool] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +252,7 @@ def context_endpoint(
         variables=variables,
         indices=indices,
         network_tree=ctx.tree(),
+        capabilities={"pdf": pdf_available()},
     )
 
 
@@ -363,17 +372,35 @@ def generate_endpoint(req: GenerateRequest) -> GenerateResponse:
 
 @router.get("/document")
 def document_endpoint(
+    format: str = "tex",
     graph_iri: Optional[str] = Depends(graph_param),
-) -> PlainTextResponse:
+) -> Response:
     """Printable LaTeX document of the context's variables and equations.
 
     Ported from old-ProMo's EquationEditor_v01 Jinja templates: a
     landscape article with hyperlinked variable/equation tables sectioned
     by network.  ``?graph=`` scopes the context as in ``/context``.
+    ``?format=pdf`` compiles the source with pdflatex and returns the
+    PDF inline (browser tab = viewer); a compile failure returns the
+    log tail as plain text.
     """
     ctx = scoped_context(get_store(), graph_iri)
+    tex = build_document(ctx)
+    if format == "pdf":
+        try:
+            pdf = compile_pdf(tex)
+        except PdfCompileError as exc:
+            return PlainTextResponse(
+                "LaTeX compile failed:\n\n%s" % exc, status_code=500)
+        return Response(
+            pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'inline; filename="document.pdf"'
+            },
+        )
     return PlainTextResponse(
-        build_document(ctx),
+        tex,
         media_type="application/x-latex",
         # inline keeps the open-in-tab preview; the filename gives the
         # browser's Save-As a compilable .tex name (not .latex).

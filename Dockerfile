@@ -35,6 +35,18 @@ FROM python:3.12-slim AS backend
 
 WORKDIR /app
 
+# Optional TeX Live toolchain for the equation editor's PDF document
+# endpoint (GET /api/equation/document?format=pdf).  Off by default —
+# the UI hides the "PDF doc" link when the host reports no pdflatex.
+# Enable with:  docker build --build-arg WITH_TEX=true .
+ARG WITH_TEX=false
+RUN if [ "$WITH_TEX" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            texlive-latex-base texlive-latex-recommended \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # Install uv for fast, reproducible dependency management.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 

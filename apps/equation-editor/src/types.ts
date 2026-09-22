@@ -55,6 +55,9 @@ export interface ContextResponse {
   variables: Variable[]
   indices: Index[]
   network_tree: NetworkTree
+  /** Host capabilities the UI adapts to — e.g. `{ pdf: false }` when
+   *  the backend host has no TeX toolchain (default Docker image). */
+  capabilities?: Record<string, boolean>
 }
 
 export interface CheckRequest {

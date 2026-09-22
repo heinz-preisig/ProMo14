@@ -149,6 +149,20 @@ Implemented as a React + TypeScript + Vite app in
   parse→check→latex; cached `rhs_latex`/verbatim fallback.  UI:
   "LaTeX doc" header link.  5 tests in `test_document.py`.  `jinja2`
   added to backend deps.
+  - **PDF output (2026-09-22):** `?format=pdf` compiles the `.tex`
+    server-side via `document.py compile_pdf` — pdflatex ×2 in a temp
+    dir (hyperref/TOC settle on pass 2), `-no-shell-escape`, 90 s
+    timeout; `PdfCompileError` returns the `!`-error log tail as a 500
+    plain-text body.  Requires TeX Live on the host (dev machines have
+    it); `?format=tex` remains for source.  UI: "PDF doc" + ".tex"
+    header links — the PDF opens in the browser's built-in viewer.
+    2 compile tests (skipped without pdflatex).
+    **Capability gating:** `GET /context` reports
+    `capabilities: {pdf: bool}` (`document.py pdf_available` =
+    `shutil.which("pdflatex")`); the "PDF doc" link renders only when
+    true, so TeX-less hosts degrade silently.  Docker: the default
+    image has no TeX — build with `--build-arg WITH_TEX=true` to
+    install `texlive-latex-base` + `-recommended` (~400 MB).
   - **Vendored assets:** `templates/resources/` holds old-ProMo's
     `defs.tex`/`defvars.tex`/`header.tex`/`automata_tables.tex`
     (RepositoryInfrastructure) — `\input` lines are inlined by
