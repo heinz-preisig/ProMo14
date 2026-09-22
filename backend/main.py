@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.behaviour import router as behaviour_router
@@ -85,26 +85,72 @@ if ONTOLOGY_ASSETS_DIR.is_dir():
     )
 
 
+def _spa_index(static_dir: Path, name: str) -> Response:
+    """Serve a built SPA's index.html, or a plain 404 if not built yet."""
+    index = static_dir / "index.html"
+    if index.is_file():
+        return FileResponse(str(index))
+    return PlainTextResponse(
+        f"{name} frontend not built (missing {index})", status_code=404
+    )
+
+
 @app.get("/ontology", include_in_schema=False)
 @app.get("/ontology/", include_in_schema=False)
 @app.get("/ontology/{full_path:path}", include_in_schema=False)
-def serve_ontology_spa(full_path: str = "") -> FileResponse:
+def serve_ontology_spa(full_path: str = "") -> Response:
     """Serve the ontology editor SPA for every /ontology/* route."""
-    index = ONTOLOGY_STATIC_DIR / "index.html"
-    if index.is_file():
-        return FileResponse(str(index))
-    return FileResponse(str(ONTOLOGY_STATIC_DIR / "index.html"), status_code=404)
+    return _spa_index(ONTOLOGY_STATIC_DIR, "Ontology editor")
 
 
 @app.get("/equation", include_in_schema=False)
 @app.get("/equation/", include_in_schema=False)
 @app.get("/equation/{full_path:path}", include_in_schema=False)
-def serve_equation_spa(full_path: str = "") -> FileResponse:
+def serve_equation_spa(full_path: str = "") -> Response:
     """Serve the equation editor SPA for every /equation/* route."""
-    index = STATIC_DIR / "index.html"
-    if index.is_file():
-        return FileResponse(str(index))
-    return FileResponse(str(STATIC_DIR / "index.html"), status_code=404)
+    return _spa_index(STATIC_DIR, "Equation editor")
+
+
+MODELLER_STATIC_DIR = Path(
+    os.environ.get("MODELLER_STATIC_DIR", "apps/modeller/dist")
+).resolve()
+MODELLER_ASSETS_DIR = MODELLER_STATIC_DIR / "assets"
+
+if MODELLER_ASSETS_DIR.is_dir():
+    app.mount(
+        "/modeller/assets",
+        StaticFiles(directory=str(MODELLER_ASSETS_DIR)),
+        name="modeller-assets",
+    )
+
+
+@app.get("/modeller", include_in_schema=False)
+@app.get("/modeller/", include_in_schema=False)
+@app.get("/modeller/{full_path:path}", include_in_schema=False)
+def serve_modeller_spa(full_path: str = "") -> Response:
+    """Serve the modeller SPA for every /modeller/* route."""
+    return _spa_index(MODELLER_STATIC_DIR, "Modeller")
+
+
+BEHAVIOUR_STATIC_DIR = Path(
+    os.environ.get("BEHAVIOUR_STATIC_DIR", "apps/behaviour-linker/dist")
+).resolve()
+BEHAVIOUR_ASSETS_DIR = BEHAVIOUR_STATIC_DIR / "assets"
+
+if BEHAVIOUR_ASSETS_DIR.is_dir():
+    app.mount(
+        "/behaviour/assets",
+        StaticFiles(directory=str(BEHAVIOUR_ASSETS_DIR)),
+        name="behaviour-assets",
+    )
+
+
+@app.get("/behaviour", include_in_schema=False)
+@app.get("/behaviour/", include_in_schema=False)
+@app.get("/behaviour/{full_path:path}", include_in_schema=False)
+def serve_behaviour_spa(full_path: str = "") -> Response:
+    """Serve the behaviour linker SPA for every /behaviour/* route."""
+    return _spa_index(BEHAVIOUR_STATIC_DIR, "Behaviour linker")
 
 
 HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
