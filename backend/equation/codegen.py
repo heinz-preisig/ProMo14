@@ -74,19 +74,26 @@ def tex_escape(name: str) -> str:
 class Renderer:
     """Render one ``Checked`` tree for one target."""
 
-    def __init__(self, space: CompileSpace, target: str, lhs: Optional[str] = None):
+    def __init__(self, space: CompileSpace, target: str,
+                 lhs: Optional[str] = None,
+                 names: Optional[Dict[str, str]] = None):
         if target not in TARGETS:
             raise VarError("unknown codegen target %r (expected one of %s)"
                            % (target, TARGETS))
         self.space = space
         self.target = target
         self.lhs = lhs
+        #: Optional var-IRI → emitted-name override (model codegen:
+        #: per-entity-type instance names, not bare internal_ids).
+        self.names = names or {}
 
     # -- variable naming ----------------------------------------------------
 
     def _var_name(self, node: Var) -> str:
         resolved = self.space.resolve(node.name)
         var = resolved.variable
+        if self.target != "latex" and var.iri in self.names:
+            return self.names[var.iri]
         if self.target == "latex":
             subs = [
                 tex_escape(self.space.index_alias(iri))
@@ -328,6 +335,7 @@ def render(
     space: CompileSpace,
     target: str,
     lhs: Optional[str] = None,
+    names: Optional[Dict[str, str]] = None,
 ) -> str:
     """Render a checked expression tree to ``target`` source code."""
-    return Renderer(space, target, lhs=lhs).render(checked)
+    return Renderer(space, target, lhs=lhs, names=names).render(checked)

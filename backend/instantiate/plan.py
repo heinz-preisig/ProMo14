@@ -26,6 +26,8 @@ in schedule order.  The plan itself is inspectable and serialisable
 
 from __future__ import annotations
 
+import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -48,6 +50,7 @@ class StateSlot:
     var: str
     instance: str
     entity_type: str
+    name: str = ""                        # emitted identifier
     indices: Dict[str, List[str]] = field(default_factory=dict)
     offset: int = 0
     size: int = 0
@@ -60,8 +63,11 @@ class Gather:
     var: str                            # port var IRI
     instance: str                       # port var's instance name
     peer_instance: str                  # peer var's instance name
+    name: str = ""                      # emitted identifier
+    peer_name: str = ""
     elements: List[str] = field(default_factory=list)   # port elems
     map: List[int] = field(default_factory=list)        # peer pos.
+    scalar: bool = False                # no bound indices → select
 
 
 @dataclass
@@ -70,6 +76,7 @@ class MatrixLit:
     the entity type's bound rows/cols."""
 
     instance: str
+    name: str = ""                      # emitted identifier
     rows: List[str] = field(default_factory=list)
     cols: List[str] = field(default_factory=list)
     entries: List[Tuple[int, int, int]] = field(default_factory=list)
@@ -82,6 +89,7 @@ class ParamSlot:
     var: str
     instance: str
     kind: str                           # constant|parameter|input
+    name: str = ""                      # emitted identifier
     value: Optional[str] = None
 
 
@@ -93,7 +101,9 @@ class PlanBlock:
     equation: str
     lhs: str                            # var IRI
     lhs_instance: str
+    lhs_name: str = ""                  # emitted identifier
     lhs_indices: Dict[str, List[str]] = field(default_factory=dict)
+    inputs: List[str] = field(default_factory=list)     # var IRIs
     rhs: str = ""
     loop: int = -1
 
@@ -109,6 +119,9 @@ class CodePlan:
     inputs: List[ParamSlot] = field(default_factory=list)
     levels: List[List[PlanBlock]] = field(default_factory=list)
     loops: List[List[Tuple[str, str]]] = field(default_factory=list)
+    #: entity_type → var IRI → emitted identifier (the renderer's
+    #: name override — per-type instance names, not bare ids).
+    names: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
 
 def plan(report: Instantiation, sched: Schedule,
@@ -126,6 +139,24 @@ def plan(report: Instantiation, sched: Schedule,
     node_type = {n: e.entity_type for e in report.entity_types
                  for n in e.nodes}
 
+    # Emitted identifiers: the internal_id, suffixed with the entity
+    # type's fragment when several types share the variable (a port
+    # var and its peer are the same IRI — without the suffix their
+    # instances collide).
+    counts = Counter(v.instance.split("@")[0] for v in bindings.values())
+
+    def emit_name(vb: VarBinding) -> str:
+        base, _, frag = vb.instance.partition("@")
+        n = re.sub(r"\W", "_", base)
+        if counts[base] > 1:
+            n += "_" + re.sub(r"\W", "_", frag).removeprefix("etype_")
+        return n
+
+    names: Dict[str, Dict[str, str]] = {}
+    for (et, var), vb in bindings.items():
+        names.setdefault(et, {})[var] = emit_name(vb)
+    out.names = names
+
     # -- states -------------------------------------------------------------
     offset = 0
     for e in report.entity_types:
@@ -140,6 +171,7 @@ def plan(report: Instantiation, sched: Schedule,
         out.states.append(StateSlot(
             var=vb.var, instance=vb.instance,
             entity_type=e.entity_type, indices=vb.indices,
+            name=names[e.entity_type][vb.var],
             offset=offset, size=size))
         offset += size
 
@@ -164,8 +196,8 @@ def plan(report: Instantiation, sched: Schedule,
                         for r, c, s in inc.entries)
                        if n in rmap and a in cmap]
             out.matrices.append(MatrixLit(
-                instance=v.instance, rows=rows, cols=cols,
-                entries=entries))
+                instance=v.instance, name=names[e.entity_type][v.var],
+                rows=rows, cols=cols, entries=entries))
 
     # -- params / inputs ------------------------------------------------------
     for e in report.entity_types:
@@ -173,10 +205,12 @@ def plan(report: Instantiation, sched: Schedule,
             if v.binding in ("constant", "parameter"):
                 out.params.append(ParamSlot(
                     var=v.var, instance=v.instance,
-                    kind=v.binding, value=v.value))
+                    kind=v.binding, value=v.value,
+                    name=names[e.entity_type][v.var]))
             elif v.binding == "input":
                 out.inputs.append(ParamSlot(
-                    var=v.var, instance=v.instance, kind="input"))
+                    var=v.var, instance=v.instance, kind="input",
+                    name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
     # Port vars are type-level: group a var's contacts across all of
@@ -210,7 +244,11 @@ def plan(report: Instantiation, sched: Schedule,
         out.gathers.append(Gather(
             var=var, instance=vb.instance,
             peer_instance=peer_vb.instance,
-            elements=elements, map=gmap))
+            name=names[et][var],
+            peer_name=names.get(peer_type or "", {}).get(
+                pbs[0].peer_var or "", peer_vb.instance),
+            elements=elements, map=gmap,
+            scalar=not vb.indices))
 
     # -- blocks in schedule order ---------------------------------------------
     for lvl in sched.levels:
@@ -223,7 +261,10 @@ def plan(report: Instantiation, sched: Schedule,
                 equation=b.equation,
                 lhs=b.lhs,
                 lhs_instance=vb.instance if vb else b.lhs,
+                lhs_name=(names.get(b.entity_type, {}).get(b.lhs)
+                          or (vb.instance if vb else b.lhs)),
                 lhs_indices=vb.indices if vb else {},
+                inputs=list(eq.inputs) if eq else [],
                 rhs=eq.rhs if eq else "",
                 loop=b.loop))
         out.levels.append(out_lvl)

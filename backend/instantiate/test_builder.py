@@ -28,6 +28,9 @@ from backend.instantiate.resolver import (
     SubIndexInfo,
     resolve,
 )
+from backend.equation.compile_space import CompileSpace, Index, Variable
+from backend.equation.units import Units
+from backend.instantiate.emit_python import emit_python
 from backend.instantiate.fbuilder import build as fbuild
 from backend.instantiate.plan import plan
 from backend.instantiate.scheduler import schedule
@@ -124,10 +127,12 @@ VARIABLES = {
 
 EQUATIONS = {
     _eq("bal"): EqInfo(_eq("bal"), _var("m"), [_var("F"), _var("J")],
-                       "E_1"),
-    _eq("prop"): EqInfo(_eq("prop"), _var("p"), [_var("m")], "E_2"),
+                       "E_1", rhs="V_4 * V_3"),
+    _eq("prop"): EqInfo(_eq("prop"), _var("p"), [_var("m")], "E_2",
+                        rhs="V_1"),
     _eq("flow"): EqInfo(_eq("flow"), _var("J"),
-                        [_var("k"), _var("p_in")], "E_3"),
+                        [_var("k"), _var("p_in")], "E_3",
+                        rhs="V_5 . V_6"),
 }
 
 ASSIGNMENTS = {
@@ -564,6 +569,52 @@ def test_plan_blocks_carry_rhs_and_indices():
     assert prop.lhs_instance == "V_2@etype_lumped_capacity"
     assert prop.lhs_indices[_idx("idx_node")] == ["c1", "c2"]
     assert all(b.loop == -1 for lvl in cp.levels for b in lvl)
+
+
+def _emit_space():
+    """A CompileSpace over the fixture variables/indices — names are
+    the internal_ids (V_N), which resolve via the space's
+    internal-id map."""
+    variables = {
+        iri: Variable(
+            iri=iri, internal_id=v.internal_id, label=v.label,
+            network="", type=v.var_class, units=Units(),
+            index_structures=v.index_structures, value=v.value)
+        for iri, v in VARIABLES.items()
+    }
+    indices = {
+        iri: Index(iri=iri, label=idx.short_name, network="",
+                   index_class="index",
+                   aliases={"internal_code": idx.short_name},
+                   sub_index_of=idx.sub_index_of)
+        for iri, idx in INDICES.items()
+    }
+    return CompileSpace(variables, indices,
+                        variable_definition_network="",
+                        expression_definition_network="")
+
+
+def test_emit_python():
+    """The NumPy emitter: state unpack, param lookup, gathers, the
+    rendered blocks in schedule order, and the balance into dy.
+    J is shared (capacity port + transport defined) → its instances
+    get type-suffixed names."""
+    src = emit_python(_plan(_build()), _emit_space())
+    assert "V_4 = np.array([[-1, 0], [0, 1]])" in src
+    assert "def derivative(t, y, par):" in src
+    assert "V_1 = y[0:2]" in src
+    assert 'V_5 = par["V_5"]' in src
+    # level 0: p = m
+    assert "V_2 = V_1" in src
+    # level 1: p_in gathers p at peer nodes; J = k ⊙ p_in
+    assert "V_6 = V_2[[0, 1]]" in src
+    assert "V_3_diffusion_transport = V_5 * V_6" in src
+    # level 2: J gather (identity over A_diff); dm = F·J
+    assert ("V_3_lumped_capacity = V_3_diffusion_transport[[0, 1]]"
+            in src)
+    assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
+            "axes=([1], [0]))" in src)
+    assert "return dy" in src
 
 
 # ---------------------------------------------------------------------------
