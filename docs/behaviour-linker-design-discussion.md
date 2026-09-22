@@ -1723,6 +1723,24 @@ SCCs of size > 1, the algebraic loops needing `fsolve`/tearing,
 reported as `algebraic-loop` problems.  The canonical chain:
 secondary states → flows → balances (`prop → flow → bal`).
 
+### Codegen targets (2026-09-22)
+
+Three emitters over one target-agnostic `CodePlan`
+(report + schedule → structured plan: state layout, gather maps,
+matrix literals, ordered blocks, loop groups):
+
+- **Julia** — *primary numerical target*: `Tullio` for named-index
+  Einstein ops (matches `Checked.indices` directly), `SparseArrays`
+  for `F`, `OrdinaryDiffEq`/`NonlinearSolve` for integration and
+  algebraic loops; ModelingToolkit later for index
+  reduction/tearing.  `Unitful` could carry the checker's SI units
+  into compile-time checking.
+- **NumPy** — *readable baseline*: `np.einsum` subscripts lowered
+  from the ordered index list, fancy-indexing gathers, dense/sparse
+  `F @ J`.  No tensor runtime needed (no MultiDimVar port).
+- **Matlab** — *legacy audience*: the vendored `MultiDimVar`
+  Einstein-notation library (`runtime/matlab/@MultiDimVar`).
+
 ### Deferred
 
 - **Persistence** — the report is computed per request; an

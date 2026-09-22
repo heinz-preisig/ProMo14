@@ -30,6 +30,7 @@ from backend.instantiate.resolver import (
 )
 from backend.equation.compile_space import CompileSpace, Index, Variable
 from backend.equation.units import Units
+from backend.instantiate.emit_julia import emit_julia
 from backend.instantiate.emit_python import emit_python
 from backend.instantiate.fbuilder import build as fbuild
 from backend.instantiate.plan import plan
@@ -615,6 +616,24 @@ def test_emit_python():
     assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
             "axes=([1], [0]))" in src)
     assert "return dy" in src
+
+
+def test_emit_julia():
+    """The Julia emitter: in-place OrdinaryDiffEq signature, 1-based
+    slices/maps, sparse F literal, broadcast Hadamard, plain ``*``
+    for the matrix·vector balance."""
+    src = emit_julia(_plan(_build()), _emit_space())
+    assert "V_4 = sparse([1, 2], [1, 2], [-1, 1], 2, 2)" in src
+    assert "function derivative!(dy, y, par, t)" in src
+    assert "V_1 = @view y[1:2]" in src
+    assert "V_5 = par.V_5" in src
+    assert "V_2 = V_1" in src
+    assert "V_6 = V_2[[1, 2]]" in src
+    assert "V_3_diffusion_transport = V_5 .* V_6" in src
+    assert ("V_3_lumped_capacity = V_3_diffusion_transport[[1, 2]]"
+            in src)
+    assert "dy[1:2] = V_4 * V_3_lumped_capacity" in src
+    assert "return nothing" in src
 
 
 # ---------------------------------------------------------------------------

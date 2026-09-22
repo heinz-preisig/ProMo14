@@ -14,6 +14,11 @@ Targets:
   Hadamard/expand/contraction, ``reducesum``/``reducemult`` for index
   reductions — all keyed by index *labels* (the ``internal_code``
   aliases), not axis positions.
+- ``julia`` — Julia code: broadcast dots for element-wise ops, ``*``
+  for the matrix·vector contraction pattern, ``dropdims(sum/prod(
+  …, dims=))`` for reductions (1-based axes), named helpers
+  (``contract``, ``quadgk``, ``nlsolve``, ``gradient``) where the
+  runtime supplies the implementation.
 - ``latex`` — publication rendering; variables render as their human label
   with index subscripts from the index ``internal_code`` aliases.
 
@@ -35,7 +40,7 @@ from .syntax import (
     ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
 )
 
-TARGETS = ("python", "matlab", "latex")
+TARGETS = ("python", "matlab", "julia", "latex")
 
 # Unitary function name → target surface form.  Names not listed fall back
 # to the raw function name (user functions render as plain calls).
@@ -54,6 +59,12 @@ _UFUNC_ML: Dict[str, str] = {
 _UFUNC_TEX: Dict[str, str] = {
     "sin": r"\sin", "cos": r"\cos", "tan": r"\tan",
     "exp": r"\exp", "ln": r"\ln", "log": r"\log",
+}
+# Julia: same surface names as Matlab mostly; emitted broadcast (``f.(x)``).
+_UFUNC_JL: Dict[str, str] = {
+    "ln": "log", "log": "log10",
+    "inv": "inv", "trans": "transpose",
+    "diffSpace": "gradient",
 }
 
 
@@ -148,7 +159,7 @@ class Renderer:
             # A variable with a pre-bound ``promo:value`` (universal
             # constants) renders as the literal in code targets — never
             # as its own LHS symbol though (ADR-008).
-            if (self.target in ("python", "matlab")
+            if (self.target in ("python", "matlab", "julia")
                     and getattr(var, "value", None)
                     and node.name != self.lhs):
                 return var.value
@@ -171,6 +182,8 @@ class Renderer:
                 # einsum with no reduce labels: disjoint index sets give a
                 # pure outer product.
                 return "einsum(%s, %s)" % (left, right)
+            if self.target == "julia":
+                return "%s * transpose(%s)" % (left, right)
             return r"%s \otimes %s" % (left, right)
 
         if isinstance(node, Hadamard):
@@ -181,6 +194,8 @@ class Renderer:
                 # einsum with no reduce labels: shared indices become
                 # element-wise "pages", disjoint ones outer-product.
                 return "einsum(%s, %s)" % (left, right)
+            if self.target == "julia":
+                return "%s .* %s" % (left, right)
             return r"%s \circ %s" % (left, right)
 
         if isinstance(node, Reduce):
@@ -192,6 +207,8 @@ class Renderer:
                 return "%s ** %s" % (base, exp)
             if self.target == "matlab":
                 return "power(%s, %s)" % (base, exp)
+            if self.target == "julia":
+                return "%s .^ %s" % (base, exp)
             return "{%s}^{%s}" % (base, exp)
 
         if isinstance(node, Instantiate):
@@ -206,6 +223,9 @@ class Renderer:
             if self.target == "matlab":
                 return ("%s = []; %% parameter: instance of %s"
                         % (lhs_name, proto))
+            if self.target == "julia":
+                return ("%s = nothing  # parameter: instance of %s"
+                        % (lhs_name, proto))
             return ("%s = None  # parameter: instance of %s"
                     % (lhs_name, proto))
 
@@ -216,6 +236,9 @@ class Renderer:
                         % (var, body, lo, hi))
             if self.target == "matlab":
                 return "integral(@(%s) %s, %s, %s)" % (var, body, lo, hi)
+            if self.target == "julia":
+                return ("quadgk(%s -> %s, %s, %s)[1]"
+                        % (var, body, lo, hi))
             return r"\int_{%s}^{%s} %s \, d%s" % (lo, hi, body, var)
 
         if isinstance(node, Product):
@@ -227,6 +250,9 @@ class Renderer:
             if self.target == "matlab":
                 return "reducemult(%s, %s)" % (
                     body, self._ml_labels([index_iri]))
+            if self.target == "julia":
+                return ("dropdims(prod(%s, dims=%d), dims=%d)"
+                        % (body, axis + 1, axis + 1))
             return r"\prod_{%s} %s" % (self._tex_index(index_iri), body)
 
         if isinstance(node, Root):
@@ -236,6 +262,8 @@ class Renderer:
                 return "scipy.optimize.fsolve(lambda %s: %s, x0)" % (lhs, body)
             if self.target == "matlab":
                 return "fzero(@(%s) %s, x0)" % (lhs, body)
+            if self.target == "julia":
+                return "nlsolve(%s -> %s, x0)" % (lhs, body)
             return r"%s = 0" % body
 
         if isinstance(node, MaxMin):
@@ -245,6 +273,8 @@ class Renderer:
                 return "%s(%s, %s)" % (fn, a, b)
             if self.target == "matlab":
                 return "%s(%s, %s)" % (node.which, a, b)
+            if self.target == "julia":
+                return "%s.(%s, %s)" % (node.which, a, b)
             return r"\%s\left( %s, %s \right)" % (node.which, a, b)
 
         if isinstance(node, TotalDiff):
@@ -253,6 +283,8 @@ class Renderer:
                 return "total_diff(%s, %s)" % (x, y)
             if self.target == "matlab":
                 return "totalDiff(%s, %s)" % (x, y)
+            if self.target == "julia":
+                return "total_diff(%s, %s)" % (x, y)
             return r"\frac{\mathrm{d} %s}{\mathrm{d} %s}" % (x, y)
 
         if isinstance(node, ParDiff):
@@ -261,6 +293,8 @@ class Renderer:
                 return "par_diff(%s, %s)" % (x, y)
             if self.target == "matlab":
                 return "parDiff(%s, %s)" % (x, y)
+            if self.target == "julia":
+                return "par_diff(%s, %s)" % (x, y)
             return r"\frac{\partial %s}{\partial %s}" % (x, y)
 
         if isinstance(node, ReduceSum):
@@ -272,6 +306,9 @@ class Renderer:
             if self.target == "matlab":
                 return "reducesum(%s, %s)" % (
                     body, self._ml_labels([index_iri]))
+            if self.target == "julia":
+                return ("dropdims(sum(%s, dims=%d), dims=%d)"
+                        % (body, axis + 1, axis + 1))
             return r"\sum_{%s} %s" % (self._tex_index(index_iri), body)
 
         if isinstance(node, UFunc):
@@ -280,6 +317,8 @@ class Renderer:
                 return "%s(%s)" % (_UFUNC_PY.get(node.name, "np." + node.name), arg)
             if self.target == "matlab":
                 return "%s(%s)" % (_UFUNC_ML.get(node.name, node.name), arg)
+            if self.target == "julia":
+                return "%s.(%s)" % (_UFUNC_JL.get(node.name, node.name), arg)
             tex = _UFUNC_TEX.get(node.name)
             if tex:
                 return r"%s\left( %s \right)" % (tex, arg)
@@ -326,6 +365,15 @@ class Renderer:
                 l_src, r_src, self._ml_labels([reduced_iri]))
         li = self._index_axis(left, reduced_iri)
         ri = self._index_axis(right, reduced_iri)
+        if self.target == "julia":
+            # The matrix·vector pattern (2-D · 1-D over the shared
+            # trailing/leading axis) is plain ``*``; anything else
+            # defers to a ``contract`` runtime helper (1-based axes).
+            if (len(left.indices) == 2 and len(right.indices) == 1
+                    and li == 1 and ri == 0):
+                return "%s * %s" % (l_src, r_src)
+            return ("contract(%s, %s, (%d,), (%d,))"
+                    % (l_src, r_src, li + 1, ri + 1))
         return ("np.tensordot(%s, %s, axes=([%d], [%d]))"
                 % (l_src, r_src, li, ri))
 

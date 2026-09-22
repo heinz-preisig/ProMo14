@@ -111,6 +111,16 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   axis order).  Element-wise ops require the same sequence, not just
   the same set.  This is the codegen axis convention: `F[N,A]` emits
   rows=N, cols=A, matching the fbuilder matrices.
+- **Codegen (2026-09-22):** `plan.py` lowers report+schedule into a
+  target-agnostic `CodePlan` (state layout, port gathers as index
+  maps, incidence matrices restricted to bound elements, param/input
+  slots, ordered blocks with rhs text, per-type emitted-name maps —
+  shared var IRIs get type-suffixed names).  `emit_python.py` is the
+  first emitter: NumPy derivative function (state unpack, gathers,
+  `np.tensordot` balances, `dy` slices).  Targets agreed: Julia
+  primary (Tullio/DifferentialEquations), NumPy baseline, Matlab
+  legacy.  `EqInfo.rhs` carries the expression text; the `Renderer`
+  takes a `names` override for per-instance identifiers.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search
