@@ -40,6 +40,7 @@ export interface EntityTypeRecord {
   branch?: string
   scale_values?: string[]
   description?: string
+  parent?: string | null
 }
 
 export interface DomainRecord {
@@ -147,6 +148,7 @@ export class RemoteCatalogue implements SemanticCatalogue {
         label: e.label,
         typeIris: [e.iri],
         domainTypeIris: domainIri ? [domainIri] : [],
+        parentIri: e.parent ?? undefined,
         graphicalDefinitionIri: nodeGraphicals.length
           ? nodeGraphicals[i % nodeGraphicals.length]
           : undefined,

@@ -773,6 +773,7 @@ def create_entity_type(
         spatial_size=record.spatial_size,
         description=record.description,
         scale_values=record.scale_values,
+        parent=URIRef(record.parent) if record.parent else None,
     )
     return record
 
@@ -1217,6 +1218,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
         spatial_size = graph.value(s, PROMO["spatialSize"])
         branch = graph.value(s, PROMO["branch"])
         doc = graph.value(s, PROMO["doc"])
+        parent = graph.value(s, PROMO["parent"])
         scale_values = [str(sv) for sv in graph.objects(s, PROMO["hasScaleValue"])]
         records.append(
             EntityTypeRecord(
@@ -1228,6 +1230,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
                 branch=str(branch) if branch else "",
                 scale_values=scale_values,
                 description=str(doc) if doc else "",
+                parent=str(parent) if parent else None,
             )
         )
     return records

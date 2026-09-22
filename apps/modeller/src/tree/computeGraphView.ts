@@ -137,6 +137,9 @@ export function computeGraphView(
 
     if (sourceVisibleId && targetVisibleId && sourceVisibleId !== targetVisibleId && nodeMap.has(sourceVisibleId) && nodeMap.has(targetVisibleId)) {
       const arcType: VisibleArcType = 'connection'
+      // §15: arrowhead follows the reference direction, not draw order.
+      const referenceReversed =
+        (arc.referenceFrom ?? arc.sourceIri) === arc.targetIri
       arcs.push({
         modelArcIri: arc.iri,
         sourceId: sourceVisibleId,
@@ -144,6 +147,7 @@ export function computeGraphView(
         arcType,
         modelArcType: arc.arcType,
         knots: knotStore.get(viewNodeId)?.get(arc.iri) ?? [],
+        referenceReversed,
       })
     }
   }
@@ -157,6 +161,10 @@ export function computeGraphView(
       if (externalLeafId === null) continue
       const externalVisibleId = findVisibleId(externalLeafId, viewNodeId, tree)
       if (externalVisibleId && nodeMap.has(externalVisibleId)) {
+        // §15: the external node is the visible target iff isSource;
+        // the reference direction points at it iff refToExternal.
+        // Arrow lands at the source end when the two disagree.
+        const refToExternal = openArc.refToExternal ?? openArc.isSource
         openArcsOut.push({
           modelArcIri: openArc.iri,
           sourceId: openArc.isSource ? compositeVisibleId : externalVisibleId,
@@ -166,6 +174,7 @@ export function computeGraphView(
           knots: knotStore.get(viewNodeId)?.get(openArc.iri) ?? [],
           openEndId: compositeVisibleId,
           openEndTreeNodeId: compositeId,
+          referenceReversed: refToExternal !== openArc.isSource,
         })
       }
     }

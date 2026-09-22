@@ -49,6 +49,9 @@ export interface BaseEntityDefinition {
    *  connection-rule resolution (``resolve-connection`` matches rules
    *  on domain pairs).  Empty for catalogue-only placeholder types. */
   domainTypeIris?: Iri[]
+  /** Entity-type taxonomy link (promo:parent) — walk it for is-a
+   *  checks (e.g. "is this entity type a transport system?"). */
+  parentIri?: Iri
   interfaceIri?: Iri
   graphicalDefinitionIri?: Iri
   classifications: Classification[]

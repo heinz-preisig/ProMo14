@@ -5,6 +5,24 @@ import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
 import { resolveConnectionAsync, pickArcType } from '@promo/semantic'
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
+import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
+
+/** Root of the transport-system subtree — seeded entity type
+ *  (deterministic IRI, minted under the ontology namespace). */
+const TRANSPORT_SYSTEM_IRI = 'https://w3id.org/promo/ontology#etype_transport_system'
+
+/** §15: is this entity type a transport system (or a subtype)?
+ *  Walks the promo:parent chain exposed via the catalogue. */
+function isTransportEntity(entityType: string | undefined, catalogue: SemanticCatalogue): boolean {
+  let cur = entityType
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur)) {
+    if (cur === TRANSPORT_SYSTEM_IRI) return true
+    seen.add(cur)
+    cur = catalogue.getBaseEntity(cur)?.parentIri
+  }
+  return false
+}
 
 export interface CanvasEventHandlers {
   handleStageClick: (e: KonvaEventObject<MouseEvent>) => void
@@ -145,6 +163,16 @@ export function useCanvasEvents(
       return
     }
 
+    // §15: right-click on a token-flow arc reverses its reference
+    // direction (layout untouched).
+    if (obj.kind === 'arc' && obj.arcIri) {
+      const modelArc = state.modelArcs.get(obj.arcIri)
+      if (modelArc && arcCarrier(modelArc.arcType) === 'token-flow') {
+        dispatch({ type: 'reverseArcOrientation', iri: obj.arcIri })
+      }
+      return
+    }
+
     if (obj.kind !== 'node') return
 
     const nodeId = obj.selectionId!
@@ -166,12 +194,22 @@ export function useCanvasEvents(
       const arcType = pickArcType(result, activeArcType)
       if (arcType) {
         const arcIri = `promo:Arc/Arc_${state.arcCounter}`
+        const orientation = defaultOrientation(
+          arcType,
+          pendingConnection.sourceModelIri,
+          obj.modelNodeIri,
+          isTransportEntity(pendingConnection.sourceEntityType, catalogue),
+          isTransportEntity(obj.entityType, catalogue),
+          transportArcs(pendingConnection.sourceModelIri, obj.modelNodeIri),
+        )
         dispatch({
           type: 'insertArc',
           iri: arcIri,
           sourceIri: pendingConnection.sourceModelIri,
           targetIri: obj.modelNodeIri,
           arcType,
+          referenceFrom: orientation?.referenceFrom,
+          referenceTo: orientation?.referenceTo,
         })
       }
       setPendingConnection(null)
@@ -199,12 +237,22 @@ export function useCanvasEvents(
         const arcType = pickArcType(result, activeArcType)
         if (arcType) {
           const arcIri = `promo:Arc/Arc_${state.arcCounter}`
+          const orientation = defaultOrientation(
+            arcType,
+            sourceNode.modelNodeIri,
+            targetNode.modelNodeIri,
+            isTransportEntity(sourceNode.entityType, catalogue),
+            isTransportEntity(targetNode.entityType, catalogue),
+            transportArcs(sourceNode.modelNodeIri, targetNode.modelNodeIri),
+          )
           dispatch({
             type: 'insertArc',
             iri: arcIri,
             sourceIri: sourceNode.modelNodeIri,
             targetIri: targetNode.modelNodeIri,
             arcType,
+            referenceFrom: orientation?.referenceFrom,
+            referenceTo: orientation?.referenceTo,
           })
         }
       }
@@ -373,6 +421,17 @@ export function useCanvasEvents(
     })
   }
 
+  /** Existing arcs incident on whichever endpoint is a transport node
+   *  (feeds the §15 through-path default). */
+  const transportArcs = (sourceIri: string, targetIri: string) => {
+    const sourceT = isTransportEntity(state.modelNodes.get(sourceIri)?.entityType, catalogue)
+    const targetT = isTransportEntity(state.modelNodes.get(targetIri)?.entityType, catalogue)
+    const transport = sourceT && !targetT ? sourceIri : targetT && !sourceT ? targetIri : undefined
+    if (!transport) return []
+    return [...state.modelArcs.values()].filter(
+      (a) => a.sourceIri === transport || a.targetIri === transport)
+  }
+
   const handleDelete = () => {
     if (state.selectedVisibleNodeId) {
       const node = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
@@ -393,11 +452,17 @@ export function useCanvasEvents(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDelete()
+      } else if (e.key === 'r' && state.selectedModelArcIri) {
+        // §15: 'r' reverses the selected token-flow arc's reference direction
+        const arc = state.modelArcs.get(state.selectedModelArcIri)
+        if (arc && arcCarrier(arc.arcType) === 'token-flow') {
+          dispatch({ type: 'reverseArcOrientation', iri: arc.iri })
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleDelete])
+  }, [handleDelete, state.selectedModelArcIri, state.modelArcs])
 
   const sceneHandlers: SceneInteractionHandlers = {
     onClick: onSceneClick,

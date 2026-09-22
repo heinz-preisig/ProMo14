@@ -539,7 +539,7 @@ export default function App() {
                 : hoveredObject?.kind === 'knot'
                   ? 'Drag to move — double-click to add knot — right-click to remove'
                   : hoveredObject?.kind === 'arc'
-                    ? 'Click to select — double-click to add knot — Delete to remove'
+                    ? 'Click to select — right-click to reverse flow direction — double-click to add knot — Delete to remove'
                     : hoveredObject?.kind === 'openArcHandle'
                       ? 'Drag to reconnect to a nearby node'
                       : hoveredObject?.kind === 'node' && !state.selectedVisibleNodeId
@@ -547,7 +547,7 @@ export default function App() {
                         : state.selectedVisibleNodeId
                           ? 'Right-click a leaf to connect — double-click composite to zoom — Delete to remove'
                           : state.selectedModelArcIri
-                            ? 'Delete to remove — drag knots to route'
+                            ? 'Delete to remove — drag knots to route — r or right-click to reverse flow direction'
                             : 'Click canvas to add node — double-click composite to zoom — Delete to remove'}
         </span>
         <span style={{ marginLeft: 'auto', color: '#555' }}>

@@ -183,6 +183,7 @@ class EntityTypeRecord(BaseModel):
     branch: str  # must match a top-level domain's branch label
     scale_values: List[str] = Field(default_factory=list)  # scale value IRIs
     description: str = ""
+    parent: Optional[str] = None  # promo:parent — entity-type taxonomy
 
 
 # ---------------------------------------------------------------------------

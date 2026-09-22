@@ -1335,6 +1335,25 @@ worthwhile when the latter is implemented.
   conservation equations.
 - **Equation editor**: unchanged — equations stay orientation-free.
 
+> **Implemented 2026-09-22** (modeller side; F-builder still open):
+>
+> - `ModelArc.referenceFrom`/`referenceTo` (absent = draw order),
+>   persisted as `promo:referenceFrom`/`referenceTo` — token-flow
+>   arcs only; signal/reference arcs keep their inherent direction.
+> - Insertion default in `defaultOrientation()` (ModelGraph.ts):
+>   through-path — a second arc on a transport complements the
+>   existing one's direction; otherwise draw order.  The is-transport
+>   check walks `promo:parent` via `BaseEntityDefinition.parentIri`
+>   (new; `EntityTypeRecord.parent` added to the ontology API).
+> - Reverse command: right-click on a token-flow arc, or `r` on the
+>   selected arc → `reverseArcOrientation` (layout untouched).
+> - Arrowhead follows the reference direction (`referenceReversed`
+>   on `VisibleArc` → `arrowReversed` on the scene object).
+> - Open arcs carry `refToExternal` (boundary-relative, survives
+>   leaf→composite→leaf); restored on `reconnectOpenArc`.
+> - `GET /api/instantiate/arc-indices` reports the effective
+>   `reference_from`/`reference_to` per arc — the F-builder input.
+
 ## 16. Arc sub-indices by token and mechanism (2026-09-20)
 
 ### The problem

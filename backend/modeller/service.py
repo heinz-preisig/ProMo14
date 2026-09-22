@@ -12,7 +12,9 @@ RDF shape (see docs/ADR-007-model-persistence.md):
 - ``promo:ModelNode`` — ``entityType`` → entity-type IRI, label,
   ``internalID``.
 - ``promo:ModelArc`` — ``source``/``target`` → ModelNode IRI,
-  ``arcType`` → arc-type IRI, ``internalID``.
+  ``arcType`` → arc-type IRI, ``internalID``, and for token-flow arcs
+  ``referenceFrom``/``referenceTo`` → ModelNode IRI: the §15 semantic
+  reference direction (positive flow), independent of draw order.
 - ``promo:Composite`` — ``internalID`` = tree id, label, ``parent`` →
   parent Composite (absent on root), ``children``/``layout``/
   ``knots``/``openArcs`` JSON literals.  Knots are per (view, arc):
@@ -52,6 +54,9 @@ class ModelArcDoc(BaseModel):
     sourceIri: str = ""
     targetIri: str = ""
     arcType: str = ""
+    # §15 reference direction (token-flow arcs only); absent = draw order
+    referenceFrom: Optional[str] = None
+    referenceTo: Optional[str] = None
 
 
 class ChildDoc(BaseModel):
@@ -64,6 +69,9 @@ class OpenArcDoc(BaseModel):
     externalIri: str = ""
     arcType: str = ""
     isSource: bool = False
+    # §15: does the reference direction point toward the external node?
+    # Boundary-relative so it survives the leaf→composite→leaf cycle.
+    refToExternal: Optional[bool] = None
 
 
 class CompositeDoc(BaseModel):
@@ -140,6 +148,8 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
             sourceIri=_one(graph, s, PROMO["source"]) or "",
             targetIri=_one(graph, s, PROMO["target"]) or "",
             arcType=_one(graph, s, PROMO["arcType"]) or "",
+            referenceFrom=_one(graph, s, PROMO["referenceFrom"]),
+            referenceTo=_one(graph, s, PROMO["referenceTo"]),
         ))
 
     # treeId <-> composite IRI both ways
@@ -213,6 +223,10 @@ def put_model(
             graph.set((s, PROMO["target"], URIRef(a.targetIri)))
         if a.arcType:
             graph.set((s, PROMO["arcType"], URIRef(a.arcType)))
+        if a.referenceFrom:
+            graph.set((s, PROMO["referenceFrom"], URIRef(a.referenceFrom)))
+        if a.referenceTo:
+            graph.set((s, PROMO["referenceTo"], URIRef(a.referenceTo)))
         graph.set((s, PROMO["internalID"],
                    Literal(a.iri.rsplit("/", 1)[-1])))
 

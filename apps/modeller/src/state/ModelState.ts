@@ -1,6 +1,6 @@
 import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc, Knot } from '../types'
 import { createTree, TreeOps } from '../tree/Tree'
-import { ModelGraphOps } from '../model/ModelGraph'
+import { arcCarrier, ModelGraphOps } from '../model/ModelGraph'
 
 // ─── Unified application state ───
 export interface AppState {
@@ -33,8 +33,9 @@ export const initialState: AppState = {
 export type Command =
   | { type: 'insertNode'; id: number; iri: string; label: string; entityType: NodeType; parentViewNodeId: number; x: number; y: number }
   | { type: 'deleteNode'; visibleNodeId: string; treeNodeId: number; modelNodeIri?: string }
-  | { type: 'insertArc'; iri: string; sourceIri: string; targetIri: string; arcType: ArcType }
+  | { type: 'insertArc'; iri: string; sourceIri: string; targetIri: string; arcType: ArcType; referenceFrom?: string; referenceTo?: string }
   | { type: 'deleteArc'; iri: string }
+  | { type: 'reverseArcOrientation'; iri: string }
   | { type: 'moveNode'; viewNodeId: number; nodeId: string; x: number; y: number }
   | { type: 'setView'; viewNodeId: number }
   | { type: 'selectNode'; id: string | null }
@@ -69,11 +70,19 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       if (oldParentIri) {
         for (const arc of modelGraph.getConnectedArcs(oldParentIri)) {
           const isSource = arc.sourceIri === oldParentIri
+          const externalIri = isSource ? arc.targetIri : arc.sourceIri
+          // §15: preserve the reference direction across the boundary —
+          // boundary-relative (toward the external node?) so it survives
+          // the leaf→composite→leaf cycle.  Token-flow arcs only.
+          const refToExternal = arcCarrier(arc.arcType) === 'token-flow'
+            ? (arc.referenceTo ?? arc.targetIri) === externalIri
+            : undefined
           openForView.push({
             iri: arc.iri,
-            externalIri: isSource ? arc.targetIri : arc.sourceIri,
+            externalIri,
             arcType: arc.arcType,
             isSource,
+            refToExternal,
           })
         }
         modelGraph.deleteNode(oldParentIri)
@@ -123,7 +132,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
 
     case 'insertArc': {
       const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
-      modelGraph.insertArc(cmd.iri, cmd.sourceIri, cmd.targetIri, cmd.arcType)
+      modelGraph.insertArc(cmd.iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceFrom, cmd.referenceTo)
 
       return {
         ...state,
@@ -133,6 +142,12 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         selectedVisibleNodeId: null,
         selectedModelArcIri: cmd.iri,
       }
+    }
+
+    case 'reverseArcOrientation': {
+      const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
+      modelGraph.reverseArc(cmd.iri)
+      return { ...state, modelArcs: modelGraph.getArcs() }
     }
 
     case 'deleteArc': {
@@ -188,7 +203,15 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
       const sourceIri = openArc.isSource ? cmd.newModelNodeIri : openArc.externalIri
       const targetIri = openArc.isSource ? openArc.externalIri : cmd.newModelNodeIri
-      modelGraph.insertArc(openArc.iri, sourceIri, targetIri, openArc.arcType as ArcType)
+      // §15: restore the preserved reference direction — refToExternal
+      // says whether positive flow points at the external node.
+      const referenceFrom = openArc.refToExternal === undefined
+        ? undefined
+        : openArc.refToExternal ? cmd.newModelNodeIri : openArc.externalIri
+      const referenceTo = openArc.refToExternal === undefined
+        ? undefined
+        : openArc.refToExternal ? openArc.externalIri : cmd.newModelNodeIri
+      modelGraph.insertArc(openArc.iri, sourceIri, targetIri, openArc.arcType as ArcType, referenceFrom, referenceTo)
 
       const nextOpenArcs = new Map(state.openArcs)
       const remaining = openForView.filter((a) => a.iri !== cmd.openArcIri)

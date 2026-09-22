@@ -27,6 +27,10 @@ compiles clean.
 | Knot structure in arcs | ✅ Done |
 | Interactive knots: drag, double-click add, right-click remove | ✅ Done |
 | Open-arc reconnection via red drag handle | ✅ Done |
+| §15 arc reference direction: through-path default on insert | ✅ Done |
+| §15 reverse reference direction (right-click arc / `r` key) | ✅ Done |
+| §15 arrowhead follows reference direction, not draw order | ✅ Done |
+| §15 orientation preserved across composite boundary (open arcs) | ✅ Done |
 | Declarative SceneObject[] rendering layer | ✅ Done |
 | Uniform scene interaction dispatch | ✅ Done |
 | Three-panel layout (ancestors / children / siblings) | ✅ Done |
@@ -141,6 +145,8 @@ Or via the orchestrator: `./dev.sh start modeller` (ensures backend too)
 | Drag knot | Move knot position |
 | Double-click on knot | Add a new knot at that position |
 | Right-click on knot | Remove knot |
+| Right-click on token-flow arc | Reverse reference direction (§15) |
+| `r` with arc selected | Reverse reference direction (§15) |
 | Delete / Backspace | Remove selected node, arc, or knot |
 
 ## Constants

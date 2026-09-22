@@ -150,6 +150,7 @@ function renderArc(
     <Group
       key={obj.id}
       onClick={(e: KonvaEventObject<MouseEvent>) => handlers.onClick(obj, e)}
+      onContextMenu={obj.interactions.rightClickable ? (e: KonvaEventObject<MouseEvent>) => handlers.onRightClick(obj, e) : undefined}
       onDblClick={obj.interactions.doubleClickable ? (e: KonvaEventObject<MouseEvent>) => handlers.onDoubleClick(obj, e) : undefined}
       onMouseEnter={(e: KonvaEventObject<MouseEvent>) => handlers.onMouseEnter(obj, e)}
       onMouseLeave={(e: KonvaEventObject<MouseEvent>) => handlers.onMouseLeave(obj, e)}

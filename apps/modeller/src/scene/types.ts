@@ -44,6 +44,9 @@ export interface SceneArc extends SceneObjectBase {
   arrowX: number
   arrowY: number
   arrowAngle: number
+  /** §15: draw the arrowhead at the start end (reference direction
+   *  runs opposite to draw order). */
+  arrowReversed?: boolean
   stroke: string
   strokeWidth: number
   dash?: number[]
@@ -56,6 +59,8 @@ export interface SceneOpenArc extends SceneObjectBase {
   arrowX: number
   arrowY: number
   arrowAngle: number
+  /** §15: draw the arrowhead at the start end. */
+  arrowReversed?: boolean
   stroke: string
   strokeWidth: number
   dash?: number[]

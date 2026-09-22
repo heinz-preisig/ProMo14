@@ -23,9 +23,13 @@ export interface ModelNode {
 /** A model arc connects two model nodes in the flat graph. */
 export interface ModelArc {
   iri: string
-  sourceIri: string    // References ModelNode.iri
+  sourceIri: string    // References ModelNode.iri — draw order, no semantics
   targetIri: string
   arcType: string      // From ontology
+  /** §15 semantic reference direction (positive flow) — token-flow arcs
+   *  only.  Absent means draw order (sourceIri → targetIri). */
+  referenceFrom?: string
+  referenceTo?: string
 }
 
 // ===========================================================================
@@ -95,6 +99,9 @@ export interface VisibleArc {
   openEndId?: string
   /** For arcType === 'open': the tree node id of the composite that owns the open end. */
   openEndTreeNodeId?: number
+  /** §15: true when the reference direction runs target→source in this
+   *  view's draw order — the arrowhead renders at the start end. */
+  referenceReversed?: boolean
 }
 
 /** A computed GraphView for a specific tree node. Regenerated on demand. */
@@ -116,6 +123,10 @@ export interface OpenArc {
   externalIri: string   // Model node IRI that still exists on the other side
   arcType: string       // Ontology arc type
   isSource: boolean     // True if the removed leaf was the source (connector now acts as source)
+  /** §15: does the reference direction point toward the external node?
+   *  Boundary-relative so it survives leaf→composite→leaf.  Undefined
+   *  on non-token-flow arcs (their direction is inherent). */
+  refToExternal?: boolean
 }
 
 // ===========================================================================

@@ -62,10 +62,11 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   `A_mass`).  Reference arcs report empty membership;
   transport↔transport unions both ends.
 - `service.py` — `GET /api/instantiate/arc-indices?graph=` returns
-  per-arc membership + inverted `by_sub_index` map; reads the model
+  per-arc membership + inverted `by_sub_index` map + the effective
+  §15 `reference_from`/`reference_to` per arc; reads the model
   graph's `ModelNode`/`ModelArc` and the ontology across the
   artefact's resolution scope.
-- `test_resolver.py` — 8 tests incl. a seeded-model endpoint test.
+- `test_resolver.py` — 10 tests incl. a seeded-model endpoint test.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search
@@ -119,7 +120,16 @@ contract, §18 variable mutability).
    Modeller-side arc check (ADR-008 deferred item).
 5. Fix marking (three-layer binding model, ADR-008) — per-occurrence
    override belongs to the model artefact.
-6. ~~UI polish~~ **Done (2026-09-22):** KaTeX rendering — `/context`
+6. ~~§15 orientation capture~~ **Done (2026-09-22, modeller side):**
+   `ModelArc.referenceFrom`/`referenceTo` persisted as
+   `promo:referenceFrom`/`referenceTo` (token-flow arcs only);
+   through-path default on insertion; right-click / `r` reverses;
+   arrowhead follows reference direction; open arcs carry
+   `refToExternal` across the composite boundary.  Entity-type
+   `parent` now exposed via `/api/ontology/entity-types` →
+   `BaseEntityDefinition.parentIri` for the is-transport check.
+   Remaining: the F-builder (membership + orientations → F[N,A]).
+7. ~~UI polish~~ **Done (2026-09-22):** KaTeX rendering — `/context`
    returns server-rendered `lhs_latex`/`rhs_latex` (reusing
    `document.py`'s `_var_symbol`/`_rhs_latex`); SPA renders `lhs := rhs`
    as math with text fallback.  Sidebar entity-type filter box;

@@ -131,6 +131,30 @@ def test_untyped_arc_resolves_permissively():
         _idx("idx_arc_heat"), _idx("idx_arc_energy")}
 
 
+def test_reference_direction_defaults_to_draw_order():
+    nodes = {
+        "n1": NodeInfo("n1", _et("lumped")),
+        "n2": NodeInfo("n2", _et("diffusion_transport")),
+    }
+    arcs = {"a1": ArcInfo("a1", "n1", "n2", "token-flow")}
+    out = resolve(nodes, arcs, SUB_INDICES, PARENTS)
+    assert out[0].reference_from == "n1"
+    assert out[0].reference_to == "n2"
+
+
+def test_reference_direction_uses_stored_orientation():
+    """§15: explicit referenceFrom/To override draw order."""
+    nodes = {
+        "n1": NodeInfo("n1", _et("lumped")),
+        "n2": NodeInfo("n2", _et("diffusion_transport")),
+    }
+    arcs = {"a1": ArcInfo("a1", "n1", "n2", "token-flow",
+                          reference_from="n2", reference_to="n1")}
+    out = resolve(nodes, arcs, SUB_INDICES, PARENTS)
+    assert out[0].reference_from == "n2"
+    assert out[0].reference_to == "n1"
+
+
 def test_by_sub_index_inverts():
     nodes = {
         "n1": NodeInfo("n1", _et("lumped")),

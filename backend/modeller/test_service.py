@@ -20,7 +20,9 @@ def _doc():
         ],
         "arcs": [
             {"iri": "promo:Arc/Arc_1", "sourceIri": "promo:Model/Node_1",
-             "targetIri": "promo:Model/Node_2", "arcType": "promo:ArcType/token-flow"},
+             "targetIri": "promo:Model/Node_2", "arcType": "promo:ArcType/token-flow",
+             "referenceFrom": "promo:Model/Node_2",
+             "referenceTo": "promo:Model/Node_1"},
         ],
         "composites": [
             {"treeId": 0, "label": "Root", "parentTreeId": None,
@@ -32,7 +34,8 @@ def _doc():
              "children": [{"id": 3, "iri": "promo:Model/Node_2"}],
              "layout": {"3": {"x": 5.0, "y": 5.0}}, "knots": {},
              "openArcs": [{"iri": "promo:Arc/Arc_9", "externalIri": "promo:Model/Node_1",
-                           "arcType": "promo:ArcType/token-flow", "isSource": True}]},
+                           "arcType": "promo:ArcType/token-flow", "isSource": True,
+                           "refToExternal": True}]},
         ],
         "rootTreeId": 0, "nextTreeId": 4, "arcCounter": 2,
     }
@@ -62,6 +65,13 @@ def test_put_get_roundtrip(client):
     assert by_id[0]["layout"]["2"] == {"x": 100.0, "y": 50.0}
     assert by_id[0]["knots"]["promo:Arc/Arc_1"] == [{"x": 10.0, "y": 20.0}]
     assert by_id[2]["openArcs"][0]["externalIri"] == "promo:Model/Node_1"
+
+    # §15: reference direction persists on the arc, refToExternal on the
+    # open arc (JSON literal inside the Composite).
+    arc = got["arcs"][0]
+    assert arc["referenceFrom"] == "promo:Model/Node_2"
+    assert arc["referenceTo"] == "promo:Model/Node_1"
+    assert by_id[2]["openArcs"][0]["refToExternal"] is True
 
 
 def test_put_replaces(client):

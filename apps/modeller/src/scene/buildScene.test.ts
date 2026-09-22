@@ -133,7 +133,7 @@ describe('buildScene', () => {
         clickable: true,
         draggable: false,
         doubleClickable: true,
-        rightClickable: false,
+        rightClickable: true,
       },
     })
     expect(arc!.points).toHaveLength(6)

@@ -37,6 +37,10 @@ class ArcInfo:
     source: Optional[str] = None        # ModelNode IRI (layout order)
     target: Optional[str] = None        # ModelNode IRI
     carrier: Optional[str] = None       # "token-flow" | "reference" | …
+    # §15 semantic reference direction (positive flow); absent = draw
+    # order.  Only meaningful on token-flow arcs.
+    reference_from: Optional[str] = None
+    reference_to: Optional[str] = None
 
 
 @dataclass
@@ -57,6 +61,10 @@ class ArcMembership:
     carrier: Optional[str]
     sub_indices: List[str] = field(default_factory=list)   # sub-index IRIs
     touches: List[str] = field(default_factory=list)       # entity types hit
+    # Effective §15 reference direction (stored orientation, else draw
+    # order) — the F-builder reads these for the ±1 signs.
+    reference_from: Optional[str] = None
+    reference_to: Optional[str] = None
 
 
 def ancestors(entity_type: Optional[str],
@@ -118,6 +126,8 @@ def resolve(nodes: Dict[str, NodeInfo],
             carrier=carrier,
             sub_indices=sorted(member),
             touches=sorted(touched),
+            reference_from=arc.reference_from or arc.source,
+            reference_to=arc.reference_to or arc.target,
         ))
     return out
 

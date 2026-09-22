@@ -83,7 +83,21 @@ function getArcGeometry(
   const prevY = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].y : src.y
   const angle = Math.atan2(pEnd.y - prevY, pEnd.x - prevX)
 
-  return { points: pts, arrowAngle: angle, arrowX: pEnd.x, arrowY: pEnd.y }
+  // §15: start-end arrow params for reversed reference direction — the
+  // tip sits at pStart pointing outward (away from the arc).
+  const nextX = arc.knots.length > 0 ? arc.knots[0].x : tgt.x
+  const nextY = arc.knots.length > 0 ? arc.knots[0].y : tgt.y
+  const startAngle = Math.atan2(pStart.y - nextY, pStart.x - nextX)
+
+  return {
+    points: pts,
+    arrowAngle: angle,
+    arrowX: pEnd.x,
+    arrowY: pEnd.y,
+    arrowStartAngle: startAngle,
+    arrowStartX: pStart.x,
+    arrowStartY: pStart.y,
+  }
 }
 
 function resolveNodeGraphical(
@@ -206,9 +220,10 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
       id: `arc-${arc.modelArcIri}`,
       kind: 'arc',
       points: geom.points,
-      arrowX: geom.arrowX,
-      arrowY: geom.arrowY,
-      arrowAngle: geom.arrowAngle,
+      arrowX: arc.referenceReversed ? geom.arrowStartX : geom.arrowX,
+      arrowY: arc.referenceReversed ? geom.arrowStartY : geom.arrowY,
+      arrowAngle: arc.referenceReversed ? geom.arrowStartAngle : geom.arrowAngle,
+      arrowReversed: arc.referenceReversed,
       stroke: isSelected ? '#e74c3c' : (g?.stroke ?? '#333'),
       strokeWidth: isSelected ? 3 : (g?.strokeWidth ?? 2),
       dash: g?.dash,
@@ -218,7 +233,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
         clickable: true,
         draggable: false,
         doubleClickable: true,
-        rightClickable: false,
+        rightClickable: true,   // §15: right-click reverses reference direction
       },
     }
     objects.push(obj)
@@ -233,9 +248,10 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
       id: `open-arc-${arc.modelArcIri}`,
       kind: 'openArc',
       points: geom.points,
-      arrowX: geom.arrowX,
-      arrowY: geom.arrowY,
-      arrowAngle: geom.arrowAngle,
+      arrowX: arc.referenceReversed ? geom.arrowStartX : geom.arrowX,
+      arrowY: arc.referenceReversed ? geom.arrowStartY : geom.arrowY,
+      arrowAngle: arc.referenceReversed ? geom.arrowStartAngle : geom.arrowAngle,
+      arrowReversed: arc.referenceReversed,
       stroke: g?.stroke ?? '#333',
       strokeWidth: g?.strokeWidth ?? 2,
       dash: g?.dash,

@@ -35,6 +35,8 @@ class ArcMembershipOut(BaseModel):
     carrier: Optional[str] = None
     sub_indices: List[str] = Field(default_factory=list)
     touches: List[str] = Field(default_factory=list)
+    reference_from: Optional[str] = None
+    reference_to: Optional[str] = None
 
 
 class ArcIndexReport(BaseModel):
@@ -55,11 +57,15 @@ def _collect(store, model_graph):
         src = model_graph.value(s, PROMO["source"])
         tgt = model_graph.value(s, PROMO["target"])
         at = model_graph.value(s, PROMO["arcType"])
+        rf = model_graph.value(s, PROMO["referenceFrom"])
+        rt = model_graph.value(s, PROMO["referenceTo"])
         arcs[str(s)] = ArcInfo(
             iri=str(s),
             source=str(src) if src else None,
             target=str(tgt) if tgt else None,
             carrier=arc_carrier(str(at) if at else None),
+            reference_from=str(rf) if rf else None,
+            reference_to=str(rt) if rt else None,
         )
 
     # Ontology side: entity-type parent chain + arc sub-index selectors,
@@ -105,7 +111,8 @@ def arc_indices(
     return ArcIndexReport(
         arcs=[ArcMembershipOut(
             arc=m.arc, carrier=m.carrier,
-            sub_indices=m.sub_indices, touches=m.touches)
+            sub_indices=m.sub_indices, touches=m.touches,
+            reference_from=m.reference_from, reference_to=m.reference_to)
             for m in memberships],
         by_sub_index=by_sub_index(memberships),
         labels=labels,

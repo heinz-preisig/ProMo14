@@ -17,6 +17,9 @@ export interface ModelArcDoc {
   sourceIri: string
   targetIri: string
   arcType: string
+  /** §15 reference direction (token-flow arcs); absent = draw order. */
+  referenceFrom?: string
+  referenceTo?: string
 }
 
 export interface ChildDoc {
@@ -57,6 +60,8 @@ export function serializeState(state: AppState): ModelDocument {
     sourceIri: a.sourceIri,
     targetIri: a.targetIri,
     arcType: a.arcType,
+    referenceFrom: a.referenceFrom,
+    referenceTo: a.referenceTo,
   }))
 
   const composites: CompositeDoc[] = [...state.tree.nodes.values()]
@@ -91,7 +96,14 @@ export function deserializeState(doc: ModelDocument): AppState {
   const modelArcs = new Map<string, ModelArc>(
     doc.arcs.map((a) => [
       a.iri,
-      { iri: a.iri, sourceIri: a.sourceIri, targetIri: a.targetIri, arcType: a.arcType },
+      {
+        iri: a.iri,
+        sourceIri: a.sourceIri,
+        targetIri: a.targetIri,
+        arcType: a.arcType,
+        referenceFrom: a.referenceFrom,
+        referenceTo: a.referenceTo,
+      },
     ]),
   )
   const knotStore = new Map<number, Map<string, Knot[]>>(
