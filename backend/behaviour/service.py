@@ -32,6 +32,7 @@ from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS, XSD
 
 from backend.core.graph_store import PROMO, get_store
+from backend.equation.checker import INSTANTIATE_CLASSES
 from backend.equation.compile_space import CompileSpace
 from backend.equation.document import _rhs_latex, _var_symbol
 from backend.ontology.service import graph_param, scoped_context
@@ -110,18 +111,29 @@ class AssignmentOut(BaseModel):
 
 
 def _collect(ctx):
-    """Flatten the scoped context into the engine's input structures."""
+    """Flatten the scoped context into the engine's input structures.
+
+    Also derives the auto-instantiated set: variables that are
+    instantiation endpoints by nature — bound-value classes
+    (``INSTANTIATE_CLASSES``: constant/parameter) or carrying a
+    pre-bound ``promo:value``.  The engine treats them as resolved
+    without an explicit marking (hint/binding pattern).
+    """
     variables: Dict[str, object] = {}
     equations: Dict[str, EquationInfo] = {}
+    auto: set = set()
     for iri, var in ctx.variables().items():
         variables[iri] = var
+        if (getattr(var, "type", None) in INSTANTIATE_CLASSES
+                or getattr(var, "value", None) is not None):
+            auto.add(iri)
         for eq in getattr(var, "equations", {}).values():
             equations[eq["iri"]] = EquationInfo(
                 iri=eq["iri"],
                 lhs=eq["lhs"],
                 incidence=list(eq.get("incidence_list") or []),
             )
-    return variables, equations
+    return variables, equations, auto
 
 
 def _labels(variables, equations) -> Dict[str, str]:
@@ -200,7 +212,7 @@ def context_endpoint(
     """Entity types plus the scoped var/expr graph for the picker UI."""
     store = get_store()
     ctx = scoped_context(store, graph_iri)
-    variables, equations = _collect(ctx)
+    variables, equations, _auto = _collect(ctx)
 
     entity_types = []
     for et in ctx.entity_types():
@@ -251,13 +263,13 @@ def evaluate_endpoint(
     """Evaluate a selection — the UI calls this after every pick."""
     store = get_store()
     ctx = scoped_context(store, graph_iri)
-    variables, equations = _collect(ctx)
+    variables, equations, auto = _collect(ctx)
     report = evaluate(equations, Selection(
         sequence=list(selection.sequence),
         base_equation=selection.base_equation,
         instantiated=set(selection.instantiated),
         ports=set(selection.ports),
-    ))
+    ), auto_instantiated=auto)
     out = asdict(report)
     out["labels"] = _labels(variables, equations)
     return out
@@ -307,13 +319,13 @@ def put_assignment(
     """
     store = get_store()
     ctx = scoped_context(store, graph_iri)
-    variables, equations = _collect(ctx)
+    variables, equations, auto = _collect(ctx)
     report = evaluate(equations, Selection(
         sequence=list(selection.sequence),
         base_equation=selection.base_equation,
         instantiated=set(selection.instantiated),
         ports=set(selection.ports),
-    ))
+    ), auto_instantiated=auto)
 
     g = _assignment_graph(store, graph_iri)
     res = _assignment_res(graph_iri, selection.entity_type)

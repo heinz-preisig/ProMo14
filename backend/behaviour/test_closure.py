@@ -169,6 +169,70 @@ def test_unreachable_equation_warns():
 
 
 # ---------------------------------------------------------------------------
+# Engine: auto-instantiated endpoints (constant/parameter class, bound value)
+# ---------------------------------------------------------------------------
+
+def test_auto_instantiated_resolves_without_marking():
+    """A bound-value variable terminates the search on its own."""
+    report = evaluate(CHAIN, Selection(
+        sequence=["E1", "E2"], base_equation="E1",
+        ports={"q"}),
+        auto_instantiated={"p"})
+    assert report.unresolved == []
+    assert [u.variable for u in report.auto_instantiated] == ["p"]
+    assert report.closed
+
+
+def test_auto_instantiated_offers_override_candidates():
+    """The hint is overridable — candidate equations are still listed."""
+    graph = _graph(
+        _eq("E1", "s", ["p"]),
+        _eq("E2", "p"),            # could define the constant anyway
+    )
+    report = evaluate(graph, Selection(
+        sequence=["E1"], base_equation="E1"),
+        auto_instantiated={"p"})
+    assert report.unresolved == []
+    assert report.auto_instantiated[0].candidates == ["E2"]
+    assert report.closed
+
+
+def test_auto_instantiated_overridden_by_equation():
+    """Selecting a defining equation wins over the class hint."""
+    graph = _graph(
+        _eq("E1", "s", ["p"]),
+        _eq("E2", "p"),
+    )
+    report = evaluate(graph, Selection(
+        sequence=["E1", "E2"], base_equation="E1"),
+        auto_instantiated={"p"})
+    assert report.auto_instantiated == []
+    assert report.defined["p"] == "E2"
+    assert report.closed
+
+
+def test_auto_instantiated_overridden_by_port():
+    """An explicit port declaration wins over the class hint."""
+    report = evaluate(CHAIN, Selection(
+        sequence=["E1", "E2"], base_equation="E1",
+        ports={"p", "q"}),
+        auto_instantiated={"p"})
+    assert report.auto_instantiated == []
+    assert report.unresolved == []
+    assert report.closed
+
+
+def test_auto_instantiated_unreferenced_not_listed():
+    """Auto vars the selection never touches stay out of the report."""
+    report = evaluate(CHAIN, Selection(
+        sequence=["E1", "E2"], base_equation="E1",
+        instantiated={"p"}, ports={"q"}),
+        auto_instantiated={"p", "other_const"})
+    assert [u.variable for u in report.auto_instantiated] == []
+    assert report.closed
+
+
+# ---------------------------------------------------------------------------
 # Endpoint tests (real store in a throwaway data dir)
 # ---------------------------------------------------------------------------
 

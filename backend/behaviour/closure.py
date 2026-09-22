@@ -87,6 +87,7 @@ class ClosureReport:
     state_variable: Optional[str]
     defined: Dict[str, str]                     # variable -> equation
     unresolved: List[UnresolvedVar]
+    auto_instantiated: List[UnresolvedVar]      # bound-value endpoints
     cycles: List[List[str]]                     # equation-IRI paths
     conflicts: List[Conflict]
     order_violations: List[OrderViolation]
@@ -95,11 +96,19 @@ class ClosureReport:
 
 
 def evaluate(equations: Dict[str, EquationInfo],
-             selection: Selection) -> ClosureReport:
+             selection: Selection,
+             auto_instantiated: Optional[Set[str]] = None
+             ) -> ClosureReport:
     """Evaluate a selection against the var/expr graph.
 
     ``equations`` is every equation in scope (selected or not) keyed by
     IRI; ``selection`` is the user's current assignment state.
+    ``auto_instantiated`` lists variables that are instantiation
+    endpoints by nature — bound-value classes (constant/parameter) or
+    carrying a pre-bound ``promo:value``.  They terminate the subgraph
+    search without an explicit marking; selecting a defining equation
+    or marking them instantiated/port overrides the hint
+    (hint/binding pattern, §6–7).
     """
     conflicts: List[Conflict] = []
     warnings: List[str] = []
@@ -157,8 +166,15 @@ def evaluate(equations: Dict[str, EquationInfo],
             detail="variable is both instantiated and a port"))
 
     # -- unresolved inputs --------------------------------------------------
+    # Effective auto endpoints: the class/value hint loses to any explicit
+    # resolution — a selected defining equation, an instantiated marking,
+    # or a port declaration.
+    auto = ((auto_instantiated or set())
+            - set(defined_by) - selection.instantiated - selection.ports)
     unresolved: List[UnresolvedVar] = []
+    auto_refs: List[UnresolvedVar] = []
     seen: Set[str] = set()
+    seen_auto: Set[str] = set()
     referenced: Set[str] = set()
     for eq_iri in selection.sequence:
         eq = equations.get(eq_iri)
@@ -166,8 +182,15 @@ def evaluate(equations: Dict[str, EquationInfo],
             continue
         for var in eq.incidence:
             referenced.add(var)
+            if var in auto and var not in seen_auto:
+                seen_auto.add(var)
+                auto_refs.append(UnresolvedVar(
+                    variable=var,
+                    candidates=[e.iri for e in equations.values()
+                                if e.lhs == var and e.iri not in position]))
             if (var in defined_by or var in selection.instantiated
-                    or var in selection.ports or var in seen):
+                    or var in selection.ports or var in auto
+                    or var in seen):
                 continue
             seen.add(var)
             candidates = [e.iri for e in equations.values()
@@ -248,6 +271,7 @@ def evaluate(equations: Dict[str, EquationInfo],
         state_variable=state_var,
         defined=defined_by,
         unresolved=unresolved,
+        auto_instantiated=auto_refs,
         cycles=cycles,
         conflicts=conflicts,
         order_violations=order_violations,

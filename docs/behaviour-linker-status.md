@@ -49,9 +49,22 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   (`promo:Assignment` type, pinned to the graph's resolution scope);
   unscoped mode uses `https://w3id.org/promo/assignments`.  Created
   lazily on first PUT.
-- `test_closure.py` — 16 tests: engine semantics (state loop allowed,
-  other cycles rejected, conflicts, ordering, warnings) + endpoint
-  roundtrips incl. rdf:List replacement on re-PUT.
+- `test_closure.py` — 21 tests: engine semantics (state loop allowed,
+  other cycles rejected, conflicts, ordering, warnings,
+  auto-instantiation) + endpoint roundtrips incl. rdf:List replacement
+  on re-PUT.
+- **Auto-instantiated endpoints (2026-09-22):** variables of a
+  bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
+  carrying a pre-bound `promo:value` terminate the subgraph search
+  without an explicit marking — the class is the ontology-level hint,
+  per the hint/binding pattern.  `evaluate()` takes an
+  `auto_instantiated` set (computed in `service._collect`); the report
+  lists referenced ones under `auto_instantiated` with their candidate
+  equations so the UI can offer an override.  Explicit resolutions win:
+  a selected defining equation, an `instantiated` marking, or a `port`
+  declaration all remove the variable from the auto set.  Auto vars are
+  NOT persisted as `hasInstantiatedVariable` — the artefact records
+  user bindings; class-based resolution re-derives from the ontology.
 
 ## Frontend
 

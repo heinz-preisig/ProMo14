@@ -476,7 +476,13 @@ system). Allowing the BL to mark anything as to-be-instantiated could
 lead to degenerate subgraphs where the equation system is trivially
 satisfied by instantiating everything.
 
-This needs discussion.
+**Partially resolved (2026-09-22)**: variables of a bound-value class
+(`constant`/`parameter`) or carrying a pre-bound `promo:value` are
+*implicit* instantiation endpoints — they terminate the search without
+a marking, and any explicit resolution (defining equation, instantiated
+marking, port) overrides the hint.  Whether marking an arbitrary
+*state-class* variable should be allowed remains open — the degenerate
+"instantiate everything" subgraph is still possible today.
 
 ### Cycle check is indirect (2026-09-13)
 

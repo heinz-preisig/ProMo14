@@ -67,6 +67,10 @@ export interface EvaluateReport {
   state_variable: string | null
   defined: Record<string, string>
   unresolved: UnresolvedVar[]
+  /** Bound-value variables (constant/parameter class or promo:value)
+   *  referenced by the selection — implicit instantiation endpoints.
+   *  Candidates are still listed so the hint can be overridden. */
+  auto_instantiated: UnresolvedVar[]
   cycles: string[][]
   conflicts: Conflict[]
   order_violations: OrderViolation[]

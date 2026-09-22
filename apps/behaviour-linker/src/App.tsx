@@ -609,6 +609,26 @@ export default function App() {
                     ))}
                     {instantiated.length === 0 && '—'}
                   </div>
+                  {(report?.auto_instantiated.length ?? 0) > 0 && (
+                    <div>
+                      <b>constants/parameters:</b>{' '}
+                      {report!.auto_instantiated.map((u) => (
+                        <span key={u.variable} style={{ marginRight: 8 }}>
+                          <code>{lab(u.variable)}</code>
+                          {u.candidates.map((c) => (
+                            <button
+                              key={c}
+                              style={{ ...btn, marginLeft: 4 }}
+                              title={`override: define via ${eqName(c)} — ${eqs.get(c)?.rhs ?? ''}`}
+                              onClick={() => resolveWith(u.variable, c)}
+                            >
+                              + {eqName(c)}
+                            </button>
+                          ))}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
