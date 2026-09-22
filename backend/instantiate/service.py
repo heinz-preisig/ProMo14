@@ -54,6 +54,7 @@ from .builder import (
 )
 from .builder import build as build_model
 from .emit_julia import emit_julia
+from .emit_matlab import emit_matlab
 from .emit_python import emit_python
 from .fbuilder import build
 from .plan import plan
@@ -492,7 +493,8 @@ def _code_space(store, vars_graph: Optional[str]) -> CompileSpace:
         accessible_networks={v.network for v in variables.values()})
 
 
-_EMITTERS = {"python": emit_python, "julia": emit_julia}
+_EMITTERS = {"python": emit_python, "julia": emit_julia,
+             "matlab": emit_matlab}
 
 
 @router.get("/code", response_model=CodeOut)

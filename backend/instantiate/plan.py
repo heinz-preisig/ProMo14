@@ -68,6 +68,7 @@ class Gather:
     elements: List[str] = field(default_factory=list)   # port elems
     map: List[int] = field(default_factory=list)        # peer pos.
     scalar: bool = False                # no bound indices → select
+    indices: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -80,6 +81,7 @@ class MatrixLit:
     rows: List[str] = field(default_factory=list)
     cols: List[str] = field(default_factory=list)
     entries: List[Tuple[int, int, int]] = field(default_factory=list)
+    indices: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -91,6 +93,7 @@ class ParamSlot:
     kind: str                           # constant|parameter|input
     name: str = ""                      # emitted identifier
     value: Optional[str] = None
+    indices: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -197,7 +200,8 @@ def plan(report: Instantiation, sched: Schedule,
                        if n in rmap and a in cmap]
             out.matrices.append(MatrixLit(
                 instance=v.instance, name=names[e.entity_type][v.var],
-                rows=rows, cols=cols, entries=entries))
+                rows=rows, cols=cols, entries=entries,
+                indices=v.indices))
 
     # -- params / inputs ------------------------------------------------------
     for e in report.entity_types:
@@ -206,10 +210,12 @@ def plan(report: Instantiation, sched: Schedule,
                 out.params.append(ParamSlot(
                     var=v.var, instance=v.instance,
                     kind=v.binding, value=v.value,
+                    indices=v.indices,
                     name=names[e.entity_type][v.var]))
             elif v.binding == "input":
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
+                    indices=v.indices,
                     name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
@@ -248,7 +254,7 @@ def plan(report: Instantiation, sched: Schedule,
             peer_name=names.get(peer_type or "", {}).get(
                 pbs[0].peer_var or "", peer_vb.instance),
             elements=elements, map=gmap,
-            scalar=not vb.indices))
+            scalar=not vb.indices, indices=vb.indices))
 
     # -- blocks in schedule order ---------------------------------------------
     for lvl in sched.levels:

@@ -31,6 +31,7 @@ from backend.instantiate.resolver import (
 from backend.equation.compile_space import CompileSpace, Index, Variable
 from backend.equation.units import Units
 from backend.instantiate.emit_julia import emit_julia
+from backend.instantiate.emit_matlab import emit_matlab
 from backend.instantiate.emit_python import emit_python
 from backend.instantiate.fbuilder import build as fbuild
 from backend.instantiate.plan import plan
@@ -634,6 +635,30 @@ def test_emit_julia():
             in src)
     assert "dy[1:2] = V_4 * V_3_lumped_capacity" in src
     assert "return nothing" in src
+
+
+def test_emit_matlab():
+    """The Matlab emitter: out-of-place ode45 signature, 1-based
+    slices/maps, sparse F wrapped in a MultiDimVar, gathers relabel
+    to the port's index, einsum for Hadamard and contraction, dy
+    unwraps via a d<lhs> temp."""
+    src = emit_matlab(_plan(_build()), _emit_space())
+    assert ("V_4 = MultiDimVar({'N', 'A_diff'}, [2 2], "
+            "{'N', 'A_diff'}, sparse([1; 2], [1; 2], [-1; 1], 2, 2))"
+            in src)
+    assert "function dy = derivative(t, y, par)" in src
+    assert "V_1 = MultiDimVar({'N'}, 2, {'N'}, y(1:2));" in src
+    assert "V_5 = MultiDimVar({}, 1, {}, par.V_5);" in src
+    assert "V_2 = V_1;" in src
+    assert ("V_6 = MultiDimVar({'A_diff'}, 2, {'A_diff'}, "
+            "V_2.value([1 2]));" in src)
+    assert "V_3_diffusion_transport = einsum(V_5, V_6);" in src
+    assert ("V_3_lumped_capacity = MultiDimVar({'A_diff'}, 2, "
+            "{'A_diff'}, V_3_diffusion_transport.value([1 2]));"
+            in src)
+    assert ("dV_1 = einsum(V_4, V_3_lumped_capacity, {'A_diff'});"
+            in src)
+    assert "dy(1:2) = dV_1.value;" in src
 
 
 def test_emit_python_instantiated_pressure():
