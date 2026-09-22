@@ -1789,10 +1789,17 @@ A new artefact type — the external app, porting the old-ProMo
 species-assignment app — declares:
 
 - the **species set** — the global `S` elements;
-- **reservoir allocation** — which reservoirs (constant environment
-  systems) inject which species;
-- **reactions** — stoichiometric rules `{reactants} → {products}`;
+- **allocations** — named species sets a reservoir can inject;
+- **reactions** — stoichiometric rules `{reactants} → {products}`
+  (open — see below);
 - **permeability** — which species each transport/membrane passes.
+
+The **species source** is a modelling act: a reservoir (constant
+environment system) is placed in the modeller, as in old ProMo, and
+references an *allocation* from the species artefact — never the
+species themselves.  So the injection point is topological (the
+modeller owns where sources sit) while the injected content is
+allocated externally.
 
 ### The distribution computation
 
@@ -1802,7 +1809,9 @@ graph-based algorithm from old ProMo:
 - **Source** — a reservoir injects its allocated set.
 - **Transport** — an arc carries `species(source) ∩ permeable(arc)`.
   A **semipermeable wall** is a transport whose permeable set is a
-  strict subset — it blocks the complement.
+  strict subset — it blocks the complement.  Permeability is set
+  **per arc**, and may be restricted to mass/species transport
+  systems (energy and signal arcs don't carry species).
 - **Reaction** — at a node, if `reactants(r) ⊆ species(node)` then
   `products(r)` are added.  Conditional: a reaction fires only when
   its reactants are present, so reactions cascade as species
@@ -1828,10 +1837,11 @@ but they break the per-type tensor when a type spans two sets.)
 
 ### Deferred / open
 
+- **Stoichiometry** — unresolved.  It belongs to the (not yet
+  designed) species/reaction app; old ProMo had a simple version but
+  never defined the stoichiometry either.  Needs resolving before
+  reactions can produce species.
 - Species artefact schema + the assignment app.
-- Where reaction stoichiometry lives — the species artefact vs the
-  `reactions` domain's behaviour.
-- Permeability granularity — per transport type vs per arc.
 - Whether `Q` (reaction index) binds by the same mechanism.
 - Whether the mask is required for correctness or only for
   compactness — absent species may already evaluate to zero.
