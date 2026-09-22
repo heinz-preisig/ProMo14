@@ -1335,7 +1335,7 @@ worthwhile when the latter is implemented.
   conservation equations.
 - **Equation editor**: unchanged — equations stay orientation-free.
 
-> **Implemented 2026-09-22** (modeller side; F-builder still open):
+> **Implemented 2026-09-22** (modeller + F-builder):
 >
 > - `ModelArc.referenceFrom`/`referenceTo` (absent = draw order),
 >   persisted as `promo:referenceFrom`/`referenceTo` — token-flow
@@ -1353,6 +1353,10 @@ worthwhile when the latter is implemented.
 >   leaf→composite→leaf); restored on `reconnectOpenArc`.
 > - `GET /api/instantiate/arc-indices` reports the effective
 >   `reference_from`/`reference_to` per arc — the F-builder input.
+> - `GET /api/instantiate/incidence` emits the signed `F[N,A]`
+>   matrices (sparse COO, +1 at `reference_to`, −1 at
+>   `reference_from`): base over all token-flow arcs + one per
+>   declared arc sub-index, shared node row space.
 
 ## 16. Arc sub-indices by token and mechanism (2026-09-20)
 

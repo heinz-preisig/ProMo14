@@ -66,7 +66,15 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   §15 `reference_from`/`reference_to` per arc; reads the model
   graph's `ModelNode`/`ModelArc` and the ontology across the
   artefact's resolution scope.
+- `fbuilder.py` — §15 signed incidence matrices `F[N,A]`: sparse COO
+  `(row, col, ±1)` — +1 at `reference_to`, −1 at `reference_from`
+  (`F·f` = net inflow).  Base matrix over all token-flow arcs + one
+  per declared arc sub-index, all sharing the full node row space.
+  `GET /api/instantiate/incidence?graph=` serves them.
 - `test_resolver.py` — 10 tests incl. a seeded-model endpoint test.
+- `test_fbuilder.py` — 6 tests: sign convention, sub-index column
+  restriction, reference-arc exclusion, dangling/self-loop edges,
+  endpoint roundtrip.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search
@@ -128,7 +136,8 @@ contract, §18 variable mutability).
    `refToExternal` across the composite boundary.  Entity-type
    `parent` now exposed via `/api/ontology/entity-types` →
    `BaseEntityDefinition.parentIri` for the is-transport check.
-   Remaining: the F-builder (membership + orientations → F[N,A]).
+   F-builder done same day: `GET /api/instantiate/incidence` emits
+   sparse `F[N,A]` per sub-index + base.
 7. ~~UI polish~~ **Done (2026-09-22):** KaTeX rendering — `/context`
    returns server-rendered `lhs_latex`/`rhs_latex` (reusing
    `document.py`'s `_var_symbol`/`_rhs_latex`); SPA renders `lhs := rhs`
