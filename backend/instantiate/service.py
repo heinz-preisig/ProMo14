@@ -57,6 +57,14 @@ from .emit_julia import emit_julia
 from .emit_matlab import emit_matlab
 from .emit_python import emit_python
 from .fbuilder import build
+from .distribute import (
+    Reaction,
+    SpeciesArc,
+    SpeciesArtefact,
+    SpeciesDistribution,
+    SpeciesNode,
+    distribute,
+)
 from .plan import plan
 from .scheduler import schedule
 from .resolver import (
@@ -245,6 +253,103 @@ def _collect(store, model_graph):
     return nodes, arcs, sub_indices, parents, labels
 
 
+def _entity_capabilities(store, model_graph) -> Dict[str, Set[str]]:
+    """entity-type IRI → capability fragments, resolved through
+    ``promo:parent`` ancestry (a subtype grants what its parents do)."""
+    direct: Dict[str, Set[str]] = {}
+    parents: Dict[str, str] = {}
+    for gi in store.resolution_scope(model_graph.identifier):
+        g = store.dataset.graph(gi)
+        for et in g.subjects(RDF.type, PROMO["EntityType"]):
+            acc = direct.setdefault(str(et), set())
+            for c in g.objects(et, PROMO["capability"]):
+                frag = str(c).rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+                acc.add(frag[4:] if frag.startswith("cap_") else frag)
+            p = g.value(et, PROMO["parent"])
+            if p is not None:
+                parents[str(et)] = str(p)
+    out: Dict[str, Set[str]] = {}
+    for et in direct:
+        acc, cur, seen = set(), et, set()
+        while cur and cur not in seen:
+            seen.add(cur)
+            acc |= direct.get(cur, set())
+            cur = parents.get(cur)
+        out[et] = acc
+    return out
+
+
+def _species_index_iri(store, model_graph) -> Optional[str]:
+    """The index carrying the ``promo:species`` token."""
+    for gi in store.resolution_scope(model_graph.identifier):
+        g = store.dataset.graph(gi)
+        for idx in g.subjects(RDF.type, PROMO["Index"]):
+            if str(g.value(idx, PROMO["token"]) or "") == str(
+                    PROMO["species"]):
+                return str(idx)
+    return None
+
+
+def _species_distribution(store, model_graph, species_graph_iri
+                          ) -> Optional[SpeciesDistribution]:
+    """Run the §20 distribution for a model against a species artefact.
+
+    Reads the species placements off the model graph (reservoir
+    ``speciesAllocation``, ``hostsReaction``, arc ``permeable``) and the
+    vocabulary off the species artefact (components, allocations,
+    reactions).  ``carries_species`` is set on arcs touching a
+    species-transport-capable node (mass/species transport).
+    """
+    if not species_graph_iri:
+        return None
+    caps = _entity_capabilities(store, model_graph)
+    sp_transport = {et for et, c in caps.items()
+                    if "species_transport" in c}
+
+    snodes: List[SpeciesNode] = []
+    node_is_transport: Dict[str, bool] = {}
+    for s in model_graph.subjects(RDF.type, PROMO["ModelNode"]):
+        et = model_graph.value(s, PROMO["entityType"])
+        alloc = model_graph.value(s, PROMO["speciesAllocation"])
+        rxns = [str(r) for r in
+                model_graph.objects(s, PROMO["hostsReaction"])]
+        snodes.append(SpeciesNode(
+            iri=str(s),
+            allocation=str(alloc) if alloc else None,
+            reactions=rxns))
+        node_is_transport[str(s)] = (
+            str(et) in sp_transport if et else False)
+
+    sarcs: List[SpeciesArc] = []
+    for s in model_graph.subjects(RDF.type, PROMO["ModelArc"]):
+        src = model_graph.value(s, PROMO["source"])
+        tgt = model_graph.value(s, PROMO["target"])
+        perm = sorted(str(p) for p in
+                      model_graph.objects(s, PROMO["permeable"]))
+        carries = bool(node_is_transport.get(str(src))
+                       or node_is_transport.get(str(tgt)))
+        sarcs.append(SpeciesArc(
+            iri=str(s),
+            source=str(src) if src else None,
+            target=str(tgt) if tgt else None,
+            carries_species=carries,
+            permeable=set(perm) if perm else None))
+
+    sg = resolve_graph(store, species_graph_iri)
+    artefact = SpeciesArtefact(
+        species=[str(c) for c in sg.subjects(RDF.type, PROMO["Component"])],
+        allocations={
+            str(a): [str(m) for m in sg.objects(a, PROMO["member"])]
+            for a in sg.subjects(RDF.type, PROMO["Allocation"])},
+        reactions={
+            str(r): Reaction(
+                str(r),
+                {str(x) for x in sg.objects(r, PROMO["reactant"])},
+                {str(x) for x in sg.objects(r, PROMO["product"])})
+            for r in sg.subjects(RDF.type, PROMO["Reaction"])})
+    return distribute(snodes, sarcs, artefact)
+
+
 @router.get("/arc-indices", response_model=ArcIndexReport)
 def arc_indices(
     graph_iri: Optional[str] = Depends(graph_param),
@@ -398,12 +503,15 @@ def _assignments_collect(store, vars_graph: Optional[str],
 def model_instantiation(
     graph_iri: Optional[str] = Depends(graph_param),
     vars: Optional[str] = None,
+    species: Optional[str] = None,
 ) -> InstantiationReportOut:
     """§19 instantiation report for a model artefact.
 
     ``graph`` is the model artefact (required); ``vars`` the var/expr
     artefact supplying variables, equations and the assignment graph
-    (default: dataset-wide scope + the default assignment graph).
+    (default: dataset-wide scope + the default assignment graph);
+    ``species`` the species artefact supplying the §20 distribution
+    vocabulary (optional — without it species indices stay symbolic).
     """
     if not graph_iri:
         raise HTTPException(
@@ -421,6 +529,11 @@ def model_instantiation(
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, vars, labels)
 
+    # §20 species distribution → bind the species index.
+    dist = _species_distribution(store, model_graph, species)
+    species_index = _species_index_iri(store, model_graph) \
+        if dist is not None else None
+
     # Entity-type labels for display.
     for graph in store.resolution_scope(model_graph.identifier):
         g = store.dataset.graph(graph)
@@ -432,7 +545,8 @@ def model_instantiation(
     report = build_model(
         nodes, arcs, memberships, sub_indices, indices,
         assignments, variables, equations,
-        token_parents, token_kinds)
+        token_parents, token_kinds,
+        species=dist, species_index=species_index)
     sched = schedule(report)
     for i, scc in enumerate(sched.loops):
         report.problems.append(Problem(
@@ -502,6 +616,7 @@ def model_code(
     graph_iri: Optional[str] = Depends(graph_param),
     vars: Optional[str] = None,
     target: str = "python",
+    species: Optional[str] = None,
 ) -> CodeOut:
     """§19 codegen: emit the model's derivative function.
 
@@ -530,10 +645,16 @@ def model_code(
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, vars, labels)
 
+    # §20 species distribution → bind the species index.
+    dist = _species_distribution(store, model_graph, species)
+    species_index = _species_index_iri(store, model_graph) \
+        if dist is not None else None
+
     report = build_model(
         nodes, arcs, memberships, sub_indices, indices,
         assignments, variables, equations,
-        token_parents, token_kinds)
+        token_parents, token_kinds,
+        species=dist, species_index=species_index)
     sched = schedule(report)
     cp = plan(report, sched, inc, equations, indices)
     try:

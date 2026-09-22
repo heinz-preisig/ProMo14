@@ -47,6 +47,9 @@ class ModelNodeDoc(BaseModel):
     iri: str
     entityType: str = ""
     label: str = ""
+    # §20 species placement (capability-gated in the modeller):
+    speciesAllocation: Optional[str] = None  # reservoir → Allocation IRI
+    reactions: List[str] = Field(default_factory=list)  # hosted Reaction IRIs
 
 
 class ModelArcDoc(BaseModel):
@@ -57,6 +60,9 @@ class ModelArcDoc(BaseModel):
     # §15 reference direction (token-flow arcs only); absent = draw order
     referenceFrom: Optional[str] = None
     referenceTo: Optional[str] = None
+    # §20 permeability (mass/species transport only): the species that
+    # pass — absent = all pass (a strict subset = semipermeable wall).
+    permeable: Optional[List[str]] = None  # Component IRIs
 
 
 class ChildDoc(BaseModel):
@@ -140,6 +146,9 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
             iri=str(s),
             entityType=_one(graph, s, PROMO["entityType"]) or "",
             label=_one(graph, s, RDFS.label) or "",
+            speciesAllocation=_one(graph, s, PROMO["speciesAllocation"]),
+            reactions=sorted(str(r) for r in
+                             graph.objects(s, PROMO["hostsReaction"])),
         ))
 
     for s in graph.subjects(RDF.type, PROMO["ModelArc"]):
@@ -150,6 +159,9 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
             arcType=_one(graph, s, PROMO["arcType"]) or "",
             referenceFrom=_one(graph, s, PROMO["referenceFrom"]),
             referenceTo=_one(graph, s, PROMO["referenceTo"]),
+            permeable=(sorted(str(p) for p in
+                              graph.objects(s, PROMO["permeable"]))
+                       or None),
         ))
 
     # treeId <-> composite IRI both ways
@@ -211,6 +223,11 @@ def put_model(
             graph.set((s, PROMO["entityType"], URIRef(n.entityType)))
         if n.label:
             graph.set((s, RDFS.label, Literal(n.label)))
+        if n.speciesAllocation:
+            graph.set((s, PROMO["speciesAllocation"],
+                       URIRef(n.speciesAllocation)))
+        for r in n.reactions:
+            graph.add((s, PROMO["hostsReaction"], URIRef(r)))
         graph.set((s, PROMO["internalID"],
                    Literal(n.iri.rsplit("/", 1)[-1])))
 
@@ -227,6 +244,8 @@ def put_model(
             graph.set((s, PROMO["referenceFrom"], URIRef(a.referenceFrom)))
         if a.referenceTo:
             graph.set((s, PROMO["referenceTo"], URIRef(a.referenceTo)))
+        for p in a.permeable or []:
+            graph.add((s, PROMO["permeable"], URIRef(p)))
         graph.set((s, PROMO["internalID"],
                    Literal(a.iri.rsplit("/", 1)[-1])))
 

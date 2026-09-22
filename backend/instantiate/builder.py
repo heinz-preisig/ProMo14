@@ -53,6 +53,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from backend.equation.checker import INSTANTIATE_CLASSES
 
+from .distribute import SpeciesDistribution
 from .resolver import (
     ArcInfo,
     ArcMembership,
@@ -251,6 +252,8 @@ def build(nodes: Dict[str, NodeInfo],
           equations: Dict[str, EqInfo],
           token_parents: Dict[str, str],
           token_kinds: Dict[str, str],
+          species: Optional[SpeciesDistribution] = None,
+          species_index: Optional[str] = None,
           ) -> Instantiation:
     """Assemble the instantiated equation set for a model.
 
@@ -258,6 +261,9 @@ def build(nodes: Dict[str, NodeInfo],
     ``assignments`` maps entity-type IRI → §13 assignment artefact;
     ``variables``/``equations`` come from the var/expr scope;
     ``token_parents``/``token_kinds`` describe the token taxonomy.
+    ``species``/``species_index`` are the §20 distribution output and
+    the species index IRI — when present, a species index binds to the
+    union of species over the variable's topological extent.
     """
     report = Instantiation()
     problems = report.problems
@@ -329,6 +335,24 @@ def build(nodes: Dict[str, NodeInfo],
         if _node_like(idx, indices):
             return list(t_nodes)
         return arc_elements(idx_iri, type_node_set)
+
+    def species_elements(arc_idx: Optional[str], node_idx: Optional[str],
+                         type_node_set: Set[str], t_nodes: List[str]
+                         ) -> Optional[List[str]]:
+        """§20 species binding: the union of species over the
+        variable's topological extent — its nodes if node-indexed, its
+        bound arcs if arc-indexed, both if both.  A pure ``[S]`` var
+        (no topological index) takes the type's whole species set."""
+        if species is None:
+            return None
+        pool: Set[str] = set()
+        if arc_idx is not None:
+            for a in (arc_elements(arc_idx, type_node_set) or []):
+                pool |= species.arcs.get(a, set())
+        if node_idx is not None or arc_idx is None:
+            for n in t_nodes:
+                pool |= species.nodes.get(n, set())
+        return sorted(pool) if pool else None
 
     # -- per entity type ------------------------------------------------------
     for et in sorted(type_nodes):
@@ -437,7 +461,11 @@ def build(nodes: Dict[str, NodeInfo],
 
             bound_indices: Dict[str, Optional[List[str]]] = {}
             for i in idx_iris:
-                bound_indices[i] = index_elements(i, t_set, t_nodes)
+                if species_index is not None and i == species_index:
+                    bound_indices[i] = species_elements(
+                        arc_idx, node_idx, t_set, t_nodes)
+                else:
+                    bound_indices[i] = index_elements(i, t_set, t_nodes)
 
             inst.variables.append(VarBinding(
                 var=v_iri,

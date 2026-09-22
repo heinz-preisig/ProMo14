@@ -157,11 +157,13 @@ ASSIGNMENTS = {
 
 
 def _build(nodes=NODES, arcs=ARCS, assignments=ASSIGNMENTS,
-           variables=VARIABLES, equations=EQUATIONS):
+           variables=VARIABLES, equations=EQUATIONS,
+           species=None, species_index=None):
     memberships = resolve(nodes, arcs, SUB_INDICES, PARENTS)
     return build(nodes, arcs, memberships, SUB_INDICES, INDICES,
                  assignments, variables, equations,
-                 TOKEN_PARENTS, TOKEN_KINDS)
+                 TOKEN_PARENTS, TOKEN_KINDS,
+                 species=species, species_index=species_index)
 
 
 def _entity(rep, et):
@@ -282,6 +284,31 @@ def test_unresolved_index_stays_symbolic():
     c = _binding(cap, _var("c"))
     assert c.indices[_idx("idx_node")] == ["c1", "c2"]
     assert c.indices[_idx("idx_species")] is None   # not topology
+
+
+def test_species_index_binds_from_distribution():
+    """§20: with a species distribution, the species index binds to
+    the union of species over the variable's topological extent —
+    here the capacity's nodes."""
+    from backend.instantiate.distribute import SpeciesDistribution
+    variables = dict(VARIABLES)
+    variables[_var("c")] = VarInfo(
+        _var("c"), "concentration", "V_7",
+        index_structures=[_idx("idx_node"), _idx("idx_species")],
+        tokens=[_tok("mass")])
+    equations = dict(EQUATIONS)
+    equations[_eq("prop")] = EqInfo(_eq("prop"), _var("p"),
+                                    [_var("m"), _var("c")], "E_2")
+    # c1 carries {A,B}, c2 carries {B,C} → the type's S = {A,B,C}.
+    dist = SpeciesDistribution(
+        nodes={"c1": {"A", "B"}, "c2": {"B", "C"}, "t1": set()},
+        arcs={})
+    rep = _build(variables=variables, equations=equations,
+                 species=dist, species_index=_idx("idx_species"))
+    cap = _entity(rep, _et("lumped_capacity"))
+    c = _binding(cap, _var("c"))
+    assert c.indices[_idx("idx_node")] == ["c1", "c2"]
+    assert c.indices[_idx("idx_species")] == ["A", "B", "C"]
 
 
 # ---------------------------------------------------------------------------
