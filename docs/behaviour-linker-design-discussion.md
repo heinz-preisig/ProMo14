@@ -1761,3 +1761,77 @@ matrix literals, ordered blocks, loop groups):
 - **`[N,A]`-indexed data variables** — resolved by the constant-class
   guard above: only `constant`-class vars of that shape bind to `F`;
   a data variable binds `local` with per-index element sets.
+
+## 20. Species allocation and distribution (2026-09-22)
+
+### The problem
+
+Non-topological indices (species `S`, reaction `Q`) have no model
+element set (§19) — species presence is a *computed* property, not a
+topological one.  Which species occupy each node and arc depends on
+what is injected, what the transports pass, and what the reactions
+produce.  This section defines the species artefact and the
+distribution computation that yields the `S` element sets.
+
+### Species-agnostic modelling
+
+The modeller never names a concrete species.  Entities reference
+species *by role* — "the species present here" — and the concrete set
+arrives from a separate **species artefact** at instantiation.  The
+same model topology + behaviour instantiates against different
+allocations (a different feedstock) with no remodelling.  This mirrors
+how the model references the ontology via `usesOntology`: the species
+artefact is another swappable input.
+
+### The species artefact
+
+A new artefact type — the external app, porting the old-ProMo
+species-assignment app — declares:
+
+- the **species set** — the global `S` elements;
+- **reservoir allocation** — which reservoirs (constant environment
+  systems) inject which species;
+- **reactions** — stoichiometric rules `{reactants} → {products}`;
+- **permeability** — which species each transport/membrane passes.
+
+### The distribution computation
+
+A monotone fixpoint propagation over the model graph — the
+graph-based algorithm from old ProMo:
+
+- **Source** — a reservoir injects its allocated set.
+- **Transport** — an arc carries `species(source) ∩ permeable(arc)`.
+  A **semipermeable wall** is a transport whose permeable set is a
+  strict subset — it blocks the complement.
+- **Reaction** — at a node, if `reactants(r) ⊆ species(node)` then
+  `products(r)` are added.  Conditional: a reaction fires only when
+  its reactants are present, so reactions cascade as species
+  propagate in.
+- **Fixpoint** — `species(n) = injected(n) ∪ transported_in(n) ∪
+  produced(n)`; `species(a) = species(source a) ∩ permeable(a)`.
+  Species only accumulate, so the iteration terminates.
+
+The computation is shared: the modeller runs it live for
+"species present" feedback; the instantiation builder runs it to bind
+`S`.
+
+### Binding `S`
+
+The distribution yields a *per-node* set, but agglomeration wants a
+rectangular `[N_T, S]` per entity type.  Reconcile by **union +
+presence mask**: the type's `S_T` is the union over its nodes, and a
+computed `present[N_T, S_T]` mask marks what is actually in each —
+the "always all + a map" pattern, where *all* is the type union, not
+the global species list.  The mask is a constant the emitters already
+handle.  (Per-distinct-set sub-indices are the compact alternative,
+but they break the per-type tensor when a type spans two sets.)
+
+### Deferred / open
+
+- Species artefact schema + the assignment app.
+- Where reaction stoichiometry lives — the species artefact vs the
+  `reactions` domain's behaviour.
+- Permeability granularity — per transport type vs per arc.
+- Whether `Q` (reaction index) binds by the same mechanism.
+- Whether the mask is required for correctness or only for
+  compactness — absent species may already evaluate to zero.
