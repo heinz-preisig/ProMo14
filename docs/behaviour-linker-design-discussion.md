@@ -1859,10 +1859,29 @@ but they break the per-type tensor when a type spans two sets.)
   stoichiometry either.  For *distribution* only the
   `{reactants}→{products}` species sets are needed; coefficients
   matter for the `reactions` domain's kinetics, a separate concern.
-- **Capability predicates** — the exact `promo:` terms for
-  species-source / reaction-host, and whether they seed on the
-  existing entity types.
-- Species artefact schema + the assignment app.
 - Whether `Q` (reaction index) binds by the same mechanism.
 - Whether the mask is required for correctness or only for
   compactness — absent species may already evaluate to zero.
+
+### Implemented (2026-09-22)
+
+- **Species artefact** — `promo:Species` graph holding
+  `promo:Component` (species), `promo:Allocation` (named injectable
+  set, `member`→Component) and `promo:Reaction`
+  (`reactant`/`product`→Component).  GET/PUT `/api/species/species`;
+  catalogue type `species`; standalone `/species` SPA edits it.
+- **Capabilities** — `promo:capability` → `promo:Capability` resources
+  on entity types, inherited through `promo:parent` ancestry:
+  `species_source` (environment), `reaction_host`
+  (lumped/distributed/point), `species_transport` (mass_transport →
+  diffusion/convection inherit).  Exposed on `/entity-types`.
+- **Modeller gestures** — capability-gated pickers in the Properties
+  panel: a `species_source` node picks its allocation
+  (`promo:speciesAllocation`), a `reaction_host` toggles reactions
+  (`promo:hostsReaction`), a `species_transport` arc gets per-species
+  permeability (`promo:permeable`; absent = all pass).  The model
+  names its species artefact via `?species=`.
+- **Distribution → `S`** — `/api/instantiate/model` and `/code` take
+  `?species=`: the service reads the placements + artefact, runs the
+  fixpoint (`instantiate/distribute.py`), and `build_model` binds the
+  species index to the union over each variable's topological extent.
