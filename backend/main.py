@@ -16,6 +16,7 @@ from backend.behaviour import router as behaviour_router
 from backend.core.catalogue import router as catalogue_router
 from backend.core.graph_store import get_store
 from backend.equation.service import router as equation_router
+from backend.instantiate import router as instantiate_router
 from backend.modeller import router as modeller_router
 from backend.ontology.service import router as ontology_router
 
@@ -53,6 +54,7 @@ app.include_router(ontology_router, prefix="/api/ontology", tags=["ontology"])
 app.include_router(equation_router, prefix="/api/equation", tags=["equation"])
 app.include_router(behaviour_router, prefix="/api/behaviour", tags=["behaviour"])
 app.include_router(modeller_router, prefix="/api/modeller", tags=["modeller"])
+app.include_router(instantiate_router, prefix="/api/instantiate", tags=["instantiate"])
 app.include_router(catalogue_router, prefix="/api/catalogue", tags=["catalogue"])
 
 

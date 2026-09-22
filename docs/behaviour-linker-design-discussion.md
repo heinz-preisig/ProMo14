@@ -1398,11 +1398,16 @@ leaves bind the continuum pair (`macro_event_dynamic` +
 
 ### Deferred
 
-- Instantiation resolver: arc → incident transport → entity type →
+- ~~Instantiation resolver: arc → incident transport → entity type →
   sub-index membership, including transitive subtype resolution
-  (`A_mass` over the leaves of `mass_transport`).
+  (`A_mass` over the leaves of `mass_transport`).~~ **Done
+  (2026-09-22):** `backend/instantiate/resolver.py` — pure resolver
+  (`resolve`, `by_sub_index`) + `GET /api/instantiate/arc-indices`.
+  Token-flow arcs only; transitive via `promo:parent`.  A
+  transport↔transport arc unions both ends' sub-indices.
 - The F-builder that turns membership + orientations (§15) into the
-  numeric matrices.
+  numeric matrices.  Blocked on §15: per-contact reference directions
+  are not captured in the modeller yet.
 - Signal arcs: no mechanism partition — they touch no transport node,
   so the selector has nothing to resolve against, and direction is
   already discriminated by rule + subtoken.  If information-domain

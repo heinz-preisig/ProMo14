@@ -53,6 +53,19 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   other cycles rejected, conflicts, ordering, warnings,
   auto-instantiation) + endpoint roundtrips incl. rdf:List replacement
   on re-PUT.
+
+`backend/instantiate/` (new, 2026-09-22) — §16 membership resolution:
+
+- `resolver.py` — pure arc→sub-index resolution: token-flow arc joins
+  every sub-index whose `selector` matches an incident node's entity
+  type or a `promo:parent` ancestor (diffusion arc → `A_diff` +
+  `A_mass`).  Reference arcs report empty membership;
+  transport↔transport unions both ends.
+- `service.py` — `GET /api/instantiate/arc-indices?graph=` returns
+  per-arc membership + inverted `by_sub_index` map; reads the model
+  graph's `ModelNode`/`ModelArc` and the ontology across the
+  artefact's resolution scope.
+- `test_resolver.py` — 8 tests incl. a seeded-model endpoint test.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search
