@@ -17,6 +17,11 @@ export interface ModelNode {
   iri: string           // Unique IRI — e.g. "promo:Model/Reactor_A1"
   entityType: string   // From ontology (e.g. "promo:Reactor")
   label: string
+  // §20 species placement (capability-gated):
+  /** species_source → the Allocation IRI this reservoir injects. */
+  speciesAllocation?: string
+  /** reaction_host → hosted Reaction IRIs. */
+  reactions?: string[]
   // No layout data — purely semantic
 }
 
@@ -30,6 +35,9 @@ export interface ModelArc {
    *  only.  Absent means draw order (sourceIri → targetIri). */
   referenceFrom?: string
   referenceTo?: string
+  /** §20 permeability (mass/species transport): the Component IRIs that
+   *  pass — absent = all pass; a strict subset = semipermeable wall. */
+  permeable?: string[]
 }
 
 // ===========================================================================

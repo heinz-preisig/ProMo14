@@ -3,7 +3,9 @@ import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
-import { GRAPH_IRI, catalogueFetchers, loadModel, saveModel, saveOntology } from './api'
+import { GRAPH_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, loadModel, saveModel, saveOntology } from './api'
+import type { SpeciesDocument } from './api'
+import { SpeciesPanel } from './SpeciesPanel'
 import { deserializeState, hasContent, serializeState } from './modelPersistence'
 import type { Command } from './state/ModelState'
 import { computeGraphView } from './tree/computeGraphView'
@@ -36,6 +38,19 @@ export default function App() {
 
   // --- Semantic catalogue: placeholder until the ontology-backed one loads ---
   const [catalogue, setCatalogue] = useState<SemanticCatalogue>(placeholderCatalogue)
+
+  // --- §20 species artefact + entity-type capabilities (gesture gating) ---
+  const [speciesDoc, setSpeciesDoc] = useState<SpeciesDocument | null>(null)
+  const [capabilities, setCapabilities] = useState<Map<string, string[]>>(new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    fetchSpecies().then((d) => { if (!cancelled) setSpeciesDoc(d) })
+    fetchEntityCapabilities()
+      .then((m) => { if (!cancelled) setCapabilities(m) })
+      .catch(() => { /* capabilities optional — gestures stay hidden */ })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -446,6 +461,31 @@ export default function App() {
               <div>To: {selectedArc.targetId}</div>
             </div>
           )}
+          {/* §20 species gestures — capability-gated, needs ?species= */}
+          {speciesDoc && (() => {
+            const selNode = selectedVisibleNode?.modelNodeIri
+              ? state.modelNodes.get(selectedVisibleNode.modelNodeIri)
+              : undefined
+            const selArc = selectedArc?.modelArcIri
+              ? state.modelArcs.get(selectedArc.modelArcIri)
+              : undefined
+            const arcTransport = selArc
+              ? [selArc.sourceIri, selArc.targetIri].some((ep) =>
+                  (capabilities.get(
+                    state.modelNodes.get(ep)?.entityType ?? '') ?? [])
+                    .includes('species_transport'))
+              : false
+            return (
+              <SpeciesPanel
+                node={selNode}
+                nodeCaps={capabilities.get(selNode?.entityType ?? '') ?? []}
+                arc={selArc}
+                arcIsTransport={arcTransport}
+                speciesDoc={speciesDoc}
+                dispatch={dispatch}
+              />
+            )
+          })()}
           {validArcTypes.length > 0 && (
             <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 8 }}>
               <strong style={{ fontSize: 12 }}>Valid arc types</strong>

@@ -41,6 +41,9 @@ export interface EntityTypeRecord {
   scale_values?: string[]
   description?: string
   parent?: string | null
+  /** §20 capability fragments (species_source | reaction_host |
+   *  species_transport), resolved through parent ancestry. */
+  capabilities?: string[]
 }
 
 export interface DomainRecord {

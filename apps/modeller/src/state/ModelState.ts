@@ -45,6 +45,8 @@ export type Command =
   | { type: 'moveKnot'; arcIri: string; knotIndex: number; x: number; y: number }
   | { type: 'addKnot'; arcIri: string; x: number; y: number }
   | { type: 'removeKnot'; arcIri: string; knotIndex: number }
+  | { type: 'setNodeSpecies'; iri: string; speciesAllocation?: string; reactions?: string[] }
+  | { type: 'setArcPermeable'; iri: string; permeable?: string[] }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -182,6 +184,26 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
 
     case 'selectArc':
       return { ...state, selectedModelArcIri: cmd.iri, selectedVisibleNodeId: null }
+
+    case 'setNodeSpecies': {
+      const modelNodes = new Map(state.modelNodes)
+      const n = modelNodes.get(cmd.iri)
+      if (n) {
+        modelNodes.set(cmd.iri, {
+          ...n,
+          speciesAllocation: cmd.speciesAllocation,
+          reactions: cmd.reactions,
+        })
+      }
+      return { ...state, modelNodes }
+    }
+
+    case 'setArcPermeable': {
+      const modelArcs = new Map(state.modelArcs)
+      const a = modelArcs.get(cmd.iri)
+      if (a) modelArcs.set(cmd.iri, { ...a, permeable: cmd.permeable })
+      return { ...state, modelArcs }
+    }
 
     case 'groupNodes': {
       const nextTree = new TreeOps(state.tree)

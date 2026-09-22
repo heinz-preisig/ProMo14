@@ -12,6 +12,11 @@ import type { ModelDocument } from './modelPersistence'
 export const GRAPH_IRI =
   new URLSearchParams(window.location.search).get('graph') || undefined
 
+/** The species artefact this model draws its vocabulary from — the
+ *  ``?species=`` param (§20).  Undefined = no species editing. */
+export const SPECIES_IRI =
+  new URLSearchParams(window.location.search).get('species') || undefined
+
 /** Append the session's graph param to an API path. */
 export function q(path: string): string {
   if (!GRAPH_IRI) return path
@@ -57,4 +62,43 @@ export async function saveModel(doc: ModelDocument): Promise<void> {
 export async function saveOntology(): Promise<void> {
   const res = await apiFetch('/api/ontology/save', { method: 'POST' })
   if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`)
+}
+
+// --- §20 species artefact (vocabulary for the capability-gated gestures) ---
+
+export interface SpeciesComponent {
+  iri: string
+  label: string
+}
+export interface SpeciesAllocation {
+  iri: string
+  label: string
+  members: string[]
+}
+export interface SpeciesReaction {
+  iri: string
+  label: string
+  reactants: string[]
+  products: string[]
+}
+export interface SpeciesDocument {
+  components: SpeciesComponent[]
+  allocations: SpeciesAllocation[]
+  reactions: SpeciesReaction[]
+}
+
+/** Load the species artefact (its own graph — not the model's). */
+export async function fetchSpecies(): Promise<SpeciesDocument | null> {
+  if (!SPECIES_IRI) return null
+  const res = await fetch(
+    `/api/species/species?graph=${encodeURIComponent(SPECIES_IRI)}`)
+  if (!res.ok) return null
+  return res.json()
+}
+
+/** Entity types with their §20 capability fragments — for gating the
+ *  species gestures (species_source / reaction_host / species_transport). */
+export async function fetchEntityCapabilities(): Promise<Map<string, string[]>> {
+  const ets = await getJson<EntityTypeRecord[]>('/api/ontology/entity-types')
+  return new Map(ets.map((e) => [e.iri, e.capabilities ?? []]))
 }

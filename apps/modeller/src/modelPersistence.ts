@@ -10,6 +10,9 @@ export interface ModelNodeDoc {
   iri: string
   entityType: string
   label: string
+  /** §20 species placement (capability-gated). */
+  speciesAllocation?: string
+  reactions?: string[]
 }
 
 export interface ModelArcDoc {
@@ -20,6 +23,8 @@ export interface ModelArcDoc {
   /** §15 reference direction (token-flow arcs); absent = draw order. */
   referenceFrom?: string
   referenceTo?: string
+  /** §20 permeability — Component IRIs that pass; absent = all pass. */
+  permeable?: string[]
 }
 
 export interface ChildDoc {
@@ -53,6 +58,8 @@ export function serializeState(state: AppState): ModelDocument {
     iri: n.iri,
     entityType: n.entityType,
     label: n.label,
+    speciesAllocation: n.speciesAllocation,
+    reactions: n.reactions,
   }))
 
   const arcs: ModelArcDoc[] = [...state.modelArcs.values()].map((a) => ({
@@ -62,6 +69,7 @@ export function serializeState(state: AppState): ModelDocument {
     arcType: a.arcType,
     referenceFrom: a.referenceFrom,
     referenceTo: a.referenceTo,
+    permeable: a.permeable,
   }))
 
   const composites: CompositeDoc[] = [...state.tree.nodes.values()]
@@ -91,7 +99,16 @@ export function serializeState(state: AppState): ModelDocument {
 
 export function deserializeState(doc: ModelDocument): AppState {
   const modelNodes = new Map<string, ModelNode>(
-    doc.nodes.map((n) => [n.iri, { iri: n.iri, entityType: n.entityType, label: n.label }]),
+    doc.nodes.map((n) => [
+      n.iri,
+      {
+        iri: n.iri,
+        entityType: n.entityType,
+        label: n.label,
+        speciesAllocation: n.speciesAllocation,
+        reactions: n.reactions,
+      },
+    ]),
   )
   const modelArcs = new Map<string, ModelArc>(
     doc.arcs.map((a) => [
@@ -103,6 +120,7 @@ export function deserializeState(doc: ModelDocument): AppState {
         arcType: a.arcType,
         referenceFrom: a.referenceFrom,
         referenceTo: a.referenceTo,
+        permeable: a.permeable,
       },
     ]),
   )
