@@ -262,7 +262,9 @@ ProMo14/
 │   ├── modeller/              # React + Konva model composer
 │   ├── equation-editor/       # React + TypeScript + Vite equation editor
 │   ├── ontology-editor/       # Frontend scaffold
-│   └── behaviour-linker/      # Frontend scaffold
+│   ├── behaviour-linker/      # Frontend scaffold
+│   ├── instantiation/         # Instantiation report / codegen viewer
+│   └── species/               # Species & reaction artefact editor (§20)
 ├── packages/
 │   └── semantic/              # Shared TS contracts, catalogue, rules
 ├── backend/
@@ -270,6 +272,8 @@ ProMo14/
 │   ├── ontology/              # Scaffold
 │   ├── behaviour/             # Scaffold
 │   ├── modeller/              # Scaffold
+│   ├── instantiate/           # §16 resolver, §19 builder, §20 distribution
+│   ├── species/               # §20 species artefact GET/PUT service
 │   └── core/                  # Shared backend services (scaffold)
 ├── docs/                      # All documentation
 ├── package.json               # npm workspaces root
@@ -326,6 +330,7 @@ is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
 - `docs/equation-editor-overview.md` + `docs/equation-editor-status.md`
 - `docs/ontology-editor-overview.md` + `docs/ontology-editor-status.md`
 - `docs/behaviour-linker-overview.md` + `docs/behaviour-linker-status.md`
+- `docs/species-status.md` — §20 species allocation & distribution
 
 ### Decision records (ADRs)
 - `docs/ADR-001-hierarchy.md` — Modeller hierarchy design
