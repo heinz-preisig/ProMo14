@@ -184,6 +184,7 @@ class EntityTypeRecord(BaseModel):
     scale_values: List[str] = Field(default_factory=list)  # scale value IRIs
     description: str = ""
     parent: Optional[str] = None  # promo:parent — entity-type taxonomy
+    capabilities: List[str] = Field(default_factory=list)  # §20, via ancestry
 
 
 # ---------------------------------------------------------------------------

@@ -1207,6 +1207,22 @@ def _list_scale_dimension_records(ctx) -> List[ScaleDimensionRecord]:
     return records
 
 
+def _capabilities(graph, s) -> List[str]:
+    """Capability fragments via ``promo:capability``, inherited through
+    ``promo:parent`` ancestry (a subtype grants what its parents do)."""
+    out: List[str] = []
+    cur, seen = s, set()
+    while cur is not None and cur not in seen:
+        seen.add(cur)
+        for c in graph.objects(cur, PROMO["capability"]):
+            frag = str(c).rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+            frag = frag[len("cap_"):] if frag.startswith("cap_") else frag
+            if frag not in out:
+                out.append(frag)
+        cur = graph.value(cur, PROMO["parent"])
+    return out
+
+
 def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
     """Load entity types from the graph."""
     graph = ctx.graph
@@ -1231,6 +1247,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
                 scale_values=scale_values,
                 description=str(doc) if doc else "",
                 parent=str(parent) if parent else None,
+                capabilities=_capabilities(graph, s),
             )
         )
     return records

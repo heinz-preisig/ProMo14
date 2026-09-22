@@ -215,6 +215,10 @@ class RdfStore:
             # arc sub-indices (§16) postdate existing ontology.trig files.
             self._seed_transport_mechanisms(g, str(self.ONTOLOGY_GRAPH_IRI))
             self._seed_arc_sub_indices(g, str(self.ONTOLOGY_GRAPH_IRI))
+            # §20 entity-type capabilities (species source / reaction
+            # host / species transport) — after transport mechanisms so
+            # the mass_transport grouping exists.
+            self._seed_capabilities(g, str(self.ONTOLOGY_GRAPH_IRI))
 
         # Load any additional var/expr named graphs that are already in the
         # data directory, but do not replace the editable ontology graph.
@@ -499,6 +503,11 @@ class RdfStore:
         # Transport mechanism subtypes (design doc §16).
         self._seed_transport_mechanisms(g, base)
 
+        # §20 entity-type capabilities (species source / reaction host /
+        # species transport) — after transport mechanisms so the
+        # mass_transport grouping exists.
+        self._seed_capabilities(g, base)
+
         # --- Connection rules ---
         # Arc semantics live in rule attributes, not in the type name:
         #   direction : unidirectional | bidirectional
@@ -734,6 +743,52 @@ class RdfStore:
                 "sub_index_of": str(arc_iri),
                 "selector": str(self.mint_iri(base, sel_frag)),
             })
+
+    def _seed_capabilities(self, g: Graph, base: str) -> None:
+        """Seed entity-type capabilities (§20): which types may inject
+        species, host reactions, or carry species.
+
+        Idempotent — guarded by the ``cap_species_source`` resource, and
+        called from ``load()`` as a migration for stores that predate
+        §20.  A capability is a ``promo:Capability`` resource the entity
+        type references via ``promo:capability``; subtypes inherit it
+        through ``promo:parent`` ancestry (the modeller checks the
+        ancestor chain).  ``species_transport`` sits on the
+        ``mass_transport`` grouping so diffusion/convection inherit it
+        while energy transport does not.
+        """
+        anchor = self.mint_iri(base, "cap_species_source")
+        if (anchor, RDF.type, PROMO["Capability"]) in g:
+            return
+        caps = {
+            "species_source":
+                "Species Source — may inject a species allocation",
+            "reaction_host":
+                "Reaction Host — may host reactions",
+            "species_transport":
+                "Species Transport — carries species (permeability)",
+        }
+        cap_iris = {}
+        for frag, desc in caps.items():
+            iri = self.mint_iri(base, f"cap_{frag}")
+            cap_iris[frag] = iri
+            g.add((iri, RDF.type, PROMO["Capability"]))
+            g.add((iri, RDFS.label, Literal(frag.replace("_", " "))))
+            g.add((iri, PROMO["doc"], Literal(desc)))
+        # entity-type frag → capability frags it grants
+        grants = {
+            "environment": ["species_source"],
+            "lumped": ["reaction_host"],
+            "distributed": ["reaction_host"],
+            "point": ["reaction_host"],
+            "mass_transport": ["species_transport"],
+        }
+        for et_frag, cap_frags in grants.items():
+            et = self.mint_iri(base, f"etype_{et_frag}")
+            if (et, RDF.type, PROMO["EntityType"]) not in g:
+                continue
+            for cf in cap_frags:
+                g.add((et, PROMO["capability"], cap_iris[cf]))
 
     def _seed_scale_regimes(self, g: Graph, base: str) -> None:
         """Group scale levels under regime values (particulate|continuum).
