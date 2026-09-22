@@ -78,6 +78,11 @@ function openArtefact(line) {
   window.location.href = `${app.path}/?graph=${encodeURIComponent(line.iri)}`;
 }
 
+function instantiateArtefact(line) {
+  window.location.href =
+    `/instantiation/?graph=${encodeURIComponent(line.iri)}`;
+}
+
 function exportVersion(iri, version) {
   const a = document.createElement('a');
   a.href = `/api/ontology/export?version=${encodeURIComponent(version)}` +
@@ -145,13 +150,16 @@ function render(lines) {
       ? `<button class="primary" onclick='openArtefact(${JSON.stringify(l)})'>Open</button>`
       : '';
     const forkBtn = `<button onclick='forkArtefact(${JSON.stringify(l.iri)})'>Fork</button>`;
+    const instBtn = (l.type === 'model' || l.type === 'glass')
+      ? `<button onclick='instantiateArtefact(${JSON.stringify(l)})'>Instantiate</button>`
+      : '';
     return `<tr>
       <td><strong>${esc(l.label)}</strong><br><span class="iri">${esc(l.iri)}</span></td>
       <td><span class="type">${esc(l.type)}</span></td>
       <td class="status-${l.status}">${esc(l.status)}</td>
       <td>${vers}</td>
       <td>${pins}</td>
-      <td>${openBtn}${forkBtn}</td>
+      <td>${openBtn}${instBtn}${forkBtn}</td>
     </tr>`;
   }).join('');
   root.innerHTML = `<table>
