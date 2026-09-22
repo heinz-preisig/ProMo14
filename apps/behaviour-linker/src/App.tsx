@@ -1,3 +1,5 @@
+import 'katex/dist/katex.min.css'
+import { renderToString } from 'katex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   deleteAssignment,
@@ -41,6 +43,32 @@ const card: React.CSSProperties = {
   marginBottom: 12,
 }
 
+/** Inline KaTeX; falls back to monospace text when no latex is stored
+ *  or rendering fails. */
+function Tex({ latex, fallback }: { latex?: string | null; fallback: string }) {
+  const html = useMemo(() => {
+    if (!latex) return null
+    try {
+      return renderToString(latex, { throwOnError: true, displayMode: false })
+    } catch {
+      return null
+    }
+  }, [latex])
+  if (html === null) return <code>{fallback}</code>
+  return <span dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+/** ``E_n: lhs := rhs`` — math when the backend supplied latex, else text. */
+function EqLine({ eq, lhsLabel }: { eq: Equation; lhsLabel: string }) {
+  return (
+    <span>
+      <Tex latex={eq.lhs_latex} fallback={lhsLabel} />
+      {' := '}
+      <Tex latex={eq.rhs_latex} fallback={eq.rhs} />
+    </span>
+  )
+}
+
 export default function App() {
   const [ctx, setCtx] = useState<BehaviourContext | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -52,6 +80,9 @@ export default function App() {
   const [report, setReport] = useState<EvaluateReport | null>(null)
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [saveMsg, setSaveMsg] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [dragIri, setDragIri] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
   const { dirty, refresh } = useStoreDirty()
   const evalTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -163,6 +194,19 @@ export default function App() {
       if (i < 0 || j < 0 || j >= s.length) return s
       const next = [...s]
       ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  }
+
+  /** Drop `dragIri` onto `target`'s position (insert before it). */
+  const dropOn = (target: string) => {
+    if (!dragIri || dragIri === target) return
+    setSequence((s) => {
+      const from = s.indexOf(dragIri)
+      const to = s.indexOf(target)
+      if (from < 0 || to < 0) return s
+      const next = s.filter((e) => e !== dragIri)
+      next.splice(next.indexOf(target), 0, dragIri)
       return next
     })
   }
@@ -292,7 +336,27 @@ export default function App() {
           <div style={{ fontSize: 11, color: '#888', margin: '4px 4px 8px' }}>
             ENTITY TYPES
           </div>
-          {(ctx?.entity_types ?? []).map((t) => {
+          <input
+            placeholder="filter…"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              fontSize: 12,
+              padding: '3px 6px',
+              marginBottom: 6,
+              border: '1px solid #ccc',
+              borderRadius: 4,
+            }}
+          />
+          {(ctx?.entity_types ?? [])
+            .filter(
+              (t) =>
+                !typeFilter ||
+                t.label.toLowerCase().includes(typeFilter.toLowerCase()),
+            )
+            .map((t) => {
             const a = assignmentByType.get(t.iri)
             const active = t.iri === entityType
             return (
@@ -358,7 +422,6 @@ export default function App() {
                       display: 'block',
                       fontSize: 12,
                       padding: '2px 0',
-                      fontFamily: 'monospace',
                     }}
                   >
                     <input
@@ -366,7 +429,8 @@ export default function App() {
                       checked={baseEquation === e.iri}
                       onChange={() => pickBase(e.iri)}
                     />{' '}
-                    {eqName(e.iri)}: {lab(e.lhs)} := {e.rhs}
+                    <code>{eqName(e.iri)}</code>:{' '}
+                    <EqLine eq={e} lhsLabel={lab(e.lhs)} />
                   </label>
                 ))}
               </div>
@@ -392,18 +456,42 @@ export default function App() {
                   return (
                     <div
                       key={eqIri}
+                      draggable
+                      onDragStart={() => setDragIri(eqIri)}
+                      onDragOver={(ev) => {
+                        ev.preventDefault()
+                        setDropTarget(eqIri)
+                      }}
+                      onDragLeave={() =>
+                        setDropTarget((d) => (d === eqIri ? null : d))
+                      }
+                      onDrop={() => {
+                        dropOn(eqIri)
+                        setDragIri(null)
+                        setDropTarget(null)
+                      }}
+                      onDragEnd={() => {
+                        setDragIri(null)
+                        setDropTarget(null)
+                      }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
                         fontSize: 12,
-                        fontFamily: 'monospace',
-                        padding: '2px 0',
+                        padding: '2px 4px',
+                        cursor: 'grab',
+                        borderTop:
+                          dropTarget === eqIri && dragIri !== eqIri
+                            ? '2px solid #06c'
+                            : '2px solid transparent',
+                        opacity: dragIri === eqIri ? 0.4 : 1,
                       }}
                     >
                       <span style={{ color: '#999', width: 18 }}>{i}</span>
                       <span style={{ flex: 1 }}>
-                        {eqName(eqIri)}: {e ? `${lab(e.lhs)} := ${e.rhs}` : '?'}
+                        <code>{eqName(eqIri)}</code>:{' '}
+                        {e ? <EqLine eq={e} lhsLabel={lab(e.lhs)} /> : '?'}
                         {eqIri === baseEquation && (
                           <span style={{ color: '#06c' }}> (base)</span>
                         )}
@@ -440,16 +528,24 @@ export default function App() {
                     }}
                   >
                     <code style={{ minWidth: 90 }}>{lab(u.variable)}</code>
-                    {u.candidates.map((c) => (
-                      <button
-                        key={c}
-                        style={btn}
-                        title={eqs.get(c)?.rhs}
-                        onClick={() => resolveWith(u.variable, c)}
-                      >
-                        + {eqName(c)}
-                      </button>
-                    ))}
+                    {u.candidates.map((c) => {
+                      const cand = eqs.get(c)
+                      return (
+                        <button
+                          key={c}
+                          style={btn}
+                          title={cand?.rhs}
+                          onClick={() => resolveWith(u.variable, c)}
+                        >
+                          + {eqName(c)}
+                          {cand?.rhs_latex && (
+                            <span style={{ marginLeft: 4, color: '#666' }}>
+                              <Tex latex={cand.rhs_latex} fallback="" />
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                     {u.candidates.length === 0 && (
                       <span style={{ color: '#999' }}>no defining eq</span>
                     )}

@@ -32,6 +32,8 @@ from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS, XSD
 
 from backend.core.graph_store import PROMO, get_store
+from backend.equation.compile_space import CompileSpace
+from backend.equation.document import _rhs_latex, _var_symbol
 from backend.ontology.service import graph_param, scoped_context
 
 from .closure import EquationInfo, Selection, evaluate
@@ -59,7 +61,9 @@ class EquationOut(BaseModel):
     iri: str
     internal_id: Optional[str] = None
     lhs: str
+    lhs_latex: Optional[str] = None
     rhs: str = ""
+    rhs_latex: Optional[str] = None
     equation_class: Optional[str] = None
     network: Optional[str] = None
     incidence: List[str] = Field(default_factory=list)
@@ -206,13 +210,23 @@ def context_endpoint(
             iri=et["iri"], label=et["label"], branch=et["branch"],
             scale_values=scale_values))
 
+    # Symbol rendering only needs index aliases — same CompileSpace
+    # shortcut as document.build_document.
+    space = CompileSpace(
+        ctx.variables(), ctx.indices(),
+        variable_definition_network="",
+        expression_definition_network="",
+    )
+
     return BehaviourContextResponse(
         entity_types=entity_types,
         equations=[EquationOut(
             iri=e["iri"],
             internal_id=e.get("internal_id"),
             lhs=e["lhs"],
+            lhs_latex=_var_symbol(var, space),
             rhs=e.get("rhs") or "",
+            rhs_latex=_rhs_latex(e, var, ctx),
             equation_class=e.get("equation_class"),
             network=e.get("network"),
             incidence=list(e.get("incidence_list") or []),

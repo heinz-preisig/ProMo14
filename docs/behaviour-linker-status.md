@@ -93,8 +93,12 @@ contract, §18 variable mutability).
    Modeller-side arc check (ADR-008 deferred item).
 5. Fix marking (three-layer binding model, ADR-008) — per-occurrence
    override belongs to the model artefact.
-6. UI polish: KaTeX rendering of equation RHS, drag-reorder of the
-   sequence, entity-type search/filter.
+6. ~~UI polish~~ **Done (2026-09-22):** KaTeX rendering — `/context`
+   returns server-rendered `lhs_latex`/`rhs_latex` (reusing
+   `document.py`'s `_var_symbol`/`_rhs_latex`); SPA renders `lhs := rhs`
+   as math with text fallback.  Sidebar entity-type filter box;
+   drag-reorder on the sequence (drop = insert before target, ↑/↓
+   buttons kept).
 
 ## Dependencies
 

@@ -11,7 +11,9 @@ export interface Equation {
   iri: string
   internal_id: string | null
   lhs: string
+  lhs_latex: string | null
   rhs: string
+  rhs_latex: string | null
   equation_class: string | null
   network: string | null
   incidence: string[]
