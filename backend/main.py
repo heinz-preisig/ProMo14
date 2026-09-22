@@ -19,6 +19,7 @@ from backend.equation.service import router as equation_router
 from backend.instantiate import router as instantiate_router
 from backend.modeller import router as modeller_router
 from backend.ontology.service import router as ontology_router
+from backend.species import router as species_router
 
 app = FastAPI(title="ProMo Suite Backend")
 
@@ -56,6 +57,7 @@ app.include_router(behaviour_router, prefix="/api/behaviour", tags=["behaviour"]
 app.include_router(modeller_router, prefix="/api/modeller", tags=["modeller"])
 app.include_router(instantiate_router, prefix="/api/instantiate", tags=["instantiate"])
 app.include_router(catalogue_router, prefix="/api/catalogue", tags=["catalogue"])
+app.include_router(species_router, prefix="/api/species", tags=["species"])
 
 
 @app.get("/api/health")

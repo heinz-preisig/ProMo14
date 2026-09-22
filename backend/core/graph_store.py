@@ -30,7 +30,8 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 # Artefact-type markers (docs/versioning-and-session-design.md): every
 # artefact graph carries ``<graphIRI> a promo:<Type>`` so the catalogue
 # can classify it.  ``promo:Version`` marks frozen graphs separately.
-ARTEFACT_TYPES = ("Ontology", "Library", "Assignment", "Model", "Glass")
+ARTEFACT_TYPES = ("Ontology", "Library", "Assignment", "Model", "Glass",
+                  "Species")
 
 # Universal constants seeded into every ontology (ADR-008): pre-bound
 # value slots, class ``constant``, network ``root`` — visible from every
