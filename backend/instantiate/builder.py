@@ -462,12 +462,17 @@ def build(nodes: Dict[str, NodeInfo],
             return None
 
         def peer_defined(peer: str) -> Set[str]:
+            """The peer's readable variables: equation-defined lhs,
+            the state variable, and instantiated vars — a port reads
+            a value, and an instantiated var has one (it is bound
+            data, not a hidden internal)."""
             peer_asg = assignments.get(nodes[peer].entity_type or "")
             if peer_asg is None:
                 return set()
             out: Set[str] = set()
             if peer_asg.state_variable:
                 out.add(peer_asg.state_variable)
+            out.update(peer_asg.instantiated)
             for eq_iri in peer_asg.sequence:
                 eq = equations.get(eq_iri)
                 if eq is not None:

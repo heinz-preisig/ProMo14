@@ -636,6 +636,33 @@ def test_emit_julia():
     assert "return nothing" in src
 
 
+def test_emit_python_instantiated_pressure():
+    """Two capacities with the pressure *instantiated* in each: p
+    binds as a parameter slot (par lookup), the prop equation drops
+    out of the schedule, and flow sits at level 0 — an instantiated
+    var is a source, like a constant."""
+    assignments = dict(ASSIGNMENTS)
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=_et("lumped_capacity"),
+        sequence=[_eq("bal")],
+        base_equation=_eq("bal"),
+        state_variable=_var("m"),
+        instantiated=[_var("p")],
+        ports=[_var("J")],
+        closed=True)
+    cp = _plan(_build(assignments=assignments))
+    # prop is gone: flow at level 0, bal at level 1.
+    seq = [b.equation for lvl in cp.levels for b in lvl]
+    assert seq == [_eq("flow"), _eq("bal")]
+    src = emit_python(cp, _emit_space())
+    assert 'V_2 = par["V_2"]' in src      # p is a parameter now
+    assert "V_2 = V_1" not in src         # no prop block
+    assert "V_6 = V_2[[0, 1]]" in src
+    assert "V_3_diffusion_transport = V_5 * V_6" in src
+    assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
+            "axes=([1], [0]))" in src)
+
+
 # ---------------------------------------------------------------------------
 # Problems
 # ---------------------------------------------------------------------------
