@@ -89,10 +89,21 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   (untyped nodes, missing/open assignments, unbound/ambiguous ports,
   unmarked inputs).  `GET /api/instantiate/model?graph=&vars=`
   serves the report incl. the incidence matrices.
-- `test_builder.py` — 20 tests: element sets, all five binding kinds,
+- `scheduler.py` — §19 evaluation scheduling (new, 2026-09-22):
+  dependency DAG over `(entity_type, equation)` blocks — intra-type
+  edges from lhs→consumers, cross-type edges via bound ports;
+  state vars are sources (integrator output, not the balance's
+  product).  Output: `levels` (condensation-DAG depth — same level =
+  parallelisable) + `loops` (SCCs = algebraic loops, reported as
+  `algebraic-loop` problems).  Served on `/model` as `schedule`.
+  Corollary: `base_equation` is the balance — stateless types
+  declare none.
+- `test_builder.py` — 23 tests: element sets, all five binding kinds,
   per-contact/scalar port resolution, R3 flag semantics (unflagged
   secondary state binds, flagged state exports, flag disambiguates),
-  signal-token comparability, problem kinds, endpoint roundtrip.
+  signal-token comparability, scheduling (linear chain, algebraic
+  loop, unbound-port edge-freedom), problem kinds, endpoint
+  roundtrip.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search

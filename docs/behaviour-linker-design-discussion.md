@@ -1686,6 +1686,36 @@ Reported, never silently dropped: `untyped-node`, `no-assignment`,
 instantiated — incidence/constant bindings exempt), plus
 `missing-equation`/`missing-variable` for dangling references.
 
+### Scheduling (`scheduler.py`)
+
+The builder assembles *what* computes; the scheduler derives *when*
+— the evaluation plan codegen consumes.  DAG nodes are
+`(entity_type, equation)` pairs — the vectorized equation blocks.
+An edge `A → B` means B consumes a variable A defines:
+
+- **intra-type** — B's input is the lhs of another equation in the
+  same entity type (the assignment's lower-triangular structure);
+- **cross-type** — B's input is a *bound* port variable; the edge
+  goes to the equation defining the peer variable in the peer's
+  entity type.
+
+**States are sources**: a state variable's value comes from the
+integrator, not from its balance equation (which yields the
+*derivative*) — consuming a state creates no edge.  This is what
+breaks the differential cycle and leaves only *algebraic* loops.
+Corollary worth stating: `base_equation` *is* the balance — a
+stateless entity (transport) has none, so no state variable, and its
+lhs vars stay ordinary defined vars in the schedule.  Constants,
+parameters, incidence matrices, unbound ports and unmarked inputs
+create no edges.
+
+Output: `levels` — blocks grouped by dependency depth on the
+condensation DAG (same level = independent, parallelisable; SCC
+members share one level since they evaluate as a unit); `loops` —
+SCCs of size > 1, the algebraic loops needing `fsolve`/tearing,
+reported as `algebraic-loop` problems.  The canonical chain:
+secondary states → flows → balances (`prop → flow → bal`).
+
 ### Deferred
 
 - **Persistence** — the report is computed per request; an

@@ -28,6 +28,7 @@ from backend.instantiate.resolver import (
     SubIndexInfo,
     resolve,
 )
+from backend.instantiate.scheduler import schedule
 from backend.main import app
 
 BASE = "https://w3id.org/promo/ontology"
@@ -138,7 +139,8 @@ ASSIGNMENTS = {
     _et("diffusion_transport"): AssignmentInfo(
         entity_type=_et("diffusion_transport"),
         sequence=[_eq("flow")],
-        base_equation=_eq("flow"),
+        # no base_equation: a stateless transport has no balance, so
+        # no state variable — J stays a defined var.
         ports=[_var("p_in")],
         instantiated=[_var("k")],
         closed=True),
@@ -439,6 +441,64 @@ def test_signal_token_comparability():
 
 
 # ---------------------------------------------------------------------------
+# Scheduling
+# ---------------------------------------------------------------------------
+
+def _levels(rep):
+    """(type, eq) -> level map from a schedule."""
+    sched = schedule(rep)
+    return {b.equation: i
+            for i, lvl in enumerate(sched.levels) for b in lvl}, sched
+
+
+def test_schedule_linear_chain():
+    """states → secondary states → flows → balances: prop (level 0)
+    feeds the transport's flow (level 1) which feeds the balance
+    (level 2).  The state var creates no edge — it is the
+    integrator's output, not the balance equation's product."""
+    rep = _build()
+    lvl, sched = _levels(rep)
+    assert lvl[_eq("prop")] == 0
+    assert lvl[_eq("flow")] == 1
+    assert lvl[_eq("bal")] == 2
+    assert sched.loops == []
+
+
+def test_schedule_algebraic_loop():
+    """prop consuming the flow port closes an algebraic cycle
+    {prop, flow} — reported as a loop; the balance stays outside."""
+    equations = dict(EQUATIONS)
+    equations[_eq("prop")] = EqInfo(_eq("prop"), _var("p"),
+                                    [_var("m"), _var("J")], "E_2")
+    rep = _build(equations=equations)
+    lvl, sched = _levels(rep)
+    assert len(sched.loops) == 1
+    assert {q for _t, q in sched.loops[0]} == {
+        _eq("prop"), _eq("flow")}
+    block_loop = {b.equation: b.loop
+                  for lvl_ in sched.levels for b in lvl_}
+    assert block_loop[_eq("prop")] == 0
+    assert block_loop[_eq("flow")] == 0
+    assert block_loop[_eq("bal")] == -1
+    assert lvl[_eq("bal")] > lvl[_eq("prop")]
+
+
+def test_schedule_unbound_port_no_edge():
+    """An unbound port contributes no dependency — flow drops to
+    level 0 alongside prop."""
+    variables = dict(VARIABLES)
+    variables[_var("p")] = VarInfo(_var("p"), "pressure", "V_2",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("energy")])
+    rep = _build(variables=variables)
+    lvl, sched = _levels(rep)
+    assert lvl[_eq("prop")] == 0
+    assert lvl[_eq("flow")] == 0
+    assert lvl[_eq("bal")] == 1     # J port still bound → flow→bal
+    assert sched.loops == []
+
+
+# ---------------------------------------------------------------------------
 # Problems
 # ---------------------------------------------------------------------------
 
@@ -585,7 +645,9 @@ def test_model_endpoint(client):
     r = client.put("/api/behaviour/assignment", json={
         "entity_type": _et("diffusion_transport"),
         "sequence": [ids["e_flow"]],
-        "base_equation": ids["e_flow"],
+        # no base_equation: stateless transport — otherwise the closure
+        # would stamp J as state variable and the scheduler would treat
+        # it as integrator output.
         "instantiated": [ids["k"]],
         "ports": [ids["pin"]],
     })
@@ -637,6 +699,15 @@ def test_model_endpoint(client):
     # A closed two-assignment model: no unbound/ambiguous port problems.
     assert not [p for p in body["problems"]
                 if p["kind"].endswith("-port")]
+
+    # Schedule: prop → flow → bal, no algebraic loops.
+    lvl = {b["equation"]: i
+           for i, level in enumerate(body["schedule"]["levels"])
+           for b in level}
+    assert lvl[ids["e_prop"]] == 0
+    assert lvl[ids["e_flow"]] == 1
+    assert lvl[ids["e_bal"]] == 2
+    assert body["schedule"]["loops"] == []
 
 
 def test_model_endpoint_requires_graph(client):

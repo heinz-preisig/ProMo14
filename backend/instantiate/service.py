@@ -44,10 +44,13 @@ from .builder import (
     AssignmentInfo,
     EqInfo,
     IndexInfo,
+    Problem,
     VarInfo,
+    _frag,
 )
 from .builder import build as build_model
 from .fbuilder import build
+from .scheduler import schedule
 from .resolver import (
     ArcInfo,
     NodeInfo,
@@ -136,6 +139,22 @@ class ProblemOut(BaseModel):
     entity_type: Optional[str] = None
 
 
+class SchedBlockOut(BaseModel):
+    """One equation block in the evaluation plan."""
+
+    entity_type: str
+    equation: str
+    lhs: str
+    loop: int = -1                       # algebraic-loop id, or -1
+
+
+class ScheduleOut(BaseModel):
+    """Evaluation order: levels of independent blocks + SCC loops."""
+
+    levels: List[List[SchedBlockOut]] = Field(default_factory=list)
+    loops: List[List[List[str]]] = Field(default_factory=list)
+
+
 class InstantiationReportOut(BaseModel):
     """The assembled model equation-set report (§19)."""
 
@@ -145,6 +164,7 @@ class InstantiationReportOut(BaseModel):
     entity_types: List[EntityInstantiationOut] = Field(default_factory=list)
     ports: List[PortBindingOut] = Field(default_factory=list)
     incidence: IncidenceReportOut
+    schedule: ScheduleOut = Field(default_factory=ScheduleOut)
     problems: List[ProblemOut] = Field(default_factory=list)
     labels: Dict[str, str] = Field(default_factory=dict)
 
@@ -394,6 +414,12 @@ def model_instantiation(
         nodes, arcs, memberships, sub_indices, indices,
         assignments, variables, equations,
         token_parents, token_kinds)
+    sched = schedule(report)
+    for i, scc in enumerate(sched.loops):
+        report.problems.append(Problem(
+            kind="algebraic-loop",
+            message=(f"algebraic loop {i}: "
+                     + ", ".join(_frag(q) for _t, q in scc))))
 
     return InstantiationReportOut(
         model=str(model_graph.identifier),
@@ -421,6 +447,12 @@ def model_instantiation(
             candidates=[list(c) for c in p.candidates])
             for p in report.ports],
         incidence=_incidence_out(inc, labels),
+        schedule=ScheduleOut(
+            levels=[[SchedBlockOut(
+                entity_type=b.entity_type, equation=b.equation,
+                lhs=b.lhs, loop=b.loop) for b in lvl]
+                for lvl in sched.levels],
+            loops=[[[t, q] for t, q in scc] for scc in sched.loops]),
         problems=[ProblemOut(
             kind=p.kind, message=p.message,
             node=p.node, entity_type=p.entity_type)
