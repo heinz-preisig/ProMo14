@@ -341,6 +341,7 @@ def _vars_collect(store, vars_graph: Optional[str]):
                 lhs=eq["lhs"],
                 inputs=list(eq.get("incidence_list") or []),
                 internal_id=eq.get("internal_id"),
+                rhs=eq.get("rhs") or "",
             )
     indices: Dict[str, IndexInfo] = {}
     for iri, idx in ctx.indices().items():

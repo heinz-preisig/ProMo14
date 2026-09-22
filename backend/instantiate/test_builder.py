@@ -28,6 +28,8 @@ from backend.instantiate.resolver import (
     SubIndexInfo,
     resolve,
 )
+from backend.instantiate.fbuilder import build as fbuild
+from backend.instantiate.plan import plan
 from backend.instantiate.scheduler import schedule
 from backend.main import app
 
@@ -215,7 +217,11 @@ def test_incidence_var_binds_matrix():
     f = _binding(cap, _var("F"))
     assert f.binding == "incidence"
     assert f.matrix == _idx("idx_arc_diffusion")
-    assert f.indices == {}          # the matrix IS the binding
+    # The bound element sets define the restricted matrix's
+    # rows/cols for codegen (the matrix IS the binding, but its
+    # extent comes from these).
+    assert f.indices[_idx("idx_node")] == ["c1", "c2"]
+    assert f.indices[_idx("idx_arc_diffusion")] == ["a1", "a2"]
 
 
 def test_incidence_requires_constant_class():
@@ -496,6 +502,68 @@ def test_schedule_unbound_port_no_edge():
     assert lvl[_eq("flow")] == 0
     assert lvl[_eq("bal")] == 1     # J port still bound → flow→bal
     assert sched.loops == []
+
+
+# ---------------------------------------------------------------------------
+# Codegen plan
+# ---------------------------------------------------------------------------
+
+def _plan(rep):
+    memberships = resolve(NODES, ARCS, SUB_INDICES, PARENTS)
+    inc = fbuild(NODES, ARCS, memberships, SUB_INDICES)
+    return plan(rep, schedule(rep), inc, EQUATIONS, INDICES)
+
+
+def test_plan_states_and_matrices():
+    """The capacity's state m gets the [c1,c2] slot; F is restricted
+    to the type's bound elements — the stateless transport row
+    drops out of the global matrix."""
+    cp = _plan(_build())
+    assert len(cp.states) == 1
+    st = cp.states[0]
+    assert st.var == _var("m")
+    assert st.instance == "V_1@etype_lumped_capacity"
+    assert st.indices[_idx("idx_node")] == ["c1", "c2"]
+    assert (st.offset, st.size) == (0, 2)
+
+    assert len(cp.matrices) == 1
+    mx = cp.matrices[0]
+    assert mx.instance == "V_4@etype_lumped_capacity"
+    assert mx.rows == ["c1", "c2"] and mx.cols == ["a1", "a2"]
+    # a1: c1 -1 (t1's row dropped); a2: c2 +1.
+    assert sorted(mx.entries) == [(0, 0, -1), (1, 1, 1)]
+
+    assert [p.instance for p in cp.params] == [
+        "V_5@etype_diffusion_transport"]
+    assert cp.inputs == []
+
+
+def test_plan_gathers():
+    """Both ports become index maps over their bound arc elements:
+    p_in gathers p at the arc's peer node; J is identity (the peer
+    var is arc-indexed over the same set)."""
+    cp = _plan(_build())
+    by_var = {g.var: g for g in cp.gathers}
+    pin = by_var[_var("p_in")]
+    assert pin.elements == ["a1", "a2"]
+    assert pin.map == [0, 1]          # a1→c1, a2→c2 in p's [c1,c2]
+    assert pin.peer_instance == "V_2@etype_lumped_capacity"
+    j = by_var[_var("J")]
+    assert j.elements == ["a1", "a2"]
+    assert j.map == [0, 1]            # identity over A_diff
+    assert j.peer_instance == "V_3@etype_diffusion_transport"
+
+
+def test_plan_blocks_carry_rhs_and_indices():
+    """Blocks follow the schedule; each carries its lhs instance and
+    bound element sets for the emitter."""
+    cp = _plan(_build())
+    seq = [b.equation for lvl in cp.levels for b in lvl]
+    assert seq == [_eq("prop"), _eq("flow"), _eq("bal")]
+    prop = cp.levels[0][0]
+    assert prop.lhs_instance == "V_2@etype_lumped_capacity"
+    assert prop.lhs_indices[_idx("idx_node")] == ["c1", "c2"]
+    assert all(b.loop == -1 for lvl in cp.levels for b in lvl)
 
 
 # ---------------------------------------------------------------------------

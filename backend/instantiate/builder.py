@@ -95,6 +95,7 @@ class EqInfo:
     lhs: str
     inputs: List[str] = field(default_factory=list)  # incidence_list
     internal_id: Optional[str] = None
+    rhs: str = ""                         # expression text (codegen)
 
 
 @dataclass
@@ -435,9 +436,8 @@ def build(nodes: Dict[str, NodeInfo],
                     entity_type=et))
 
             bound_indices: Dict[str, Optional[List[str]]] = {}
-            if binding != "incidence":
-                for i in idx_iris:
-                    bound_indices[i] = index_elements(i, t_set, t_nodes)
+            for i in idx_iris:
+                bound_indices[i] = index_elements(i, t_set, t_nodes)
 
             inst.variables.append(VarBinding(
                 var=v_iri,
