@@ -79,6 +79,45 @@ def _render_rhs(block: PlanBlock, space: CompileSpace,
                   names=names)
 
 
+def _bsize(b: PlanBlock) -> int:
+    """Flat size of a block's lhs — product of bound index sizes."""
+    n = 1
+    for els in b.lhs_indices.values():
+        n *= max(1, len(els or []))
+    return n
+
+
+def _emit_loop(out: List[str], loop_id: int, blocks: List[PlanBlock],
+               space: CompileSpace, cp: CodePlan) -> None:
+    """Emit one algebraic loop as an in-place ``nlsolve`` residual
+    block: ``_loopN!(r, x)`` writes ``rhs - lhs`` into ``r`` slices,
+    the guesses unpack 1-based."""
+    names = [b.lhs_name or _name(b.lhs_instance) for b in blocks]
+    sizes = [_bsize(b) for b in blocks]
+    total = sum(sizes)
+    out.append("    function _loop%d!(r, x)  # algebraic loop %d"
+               % (loop_id, loop_id))
+    off = 0
+    for nm, sz in zip(names, sizes):
+        out.append("        %s = x[%d:%d]" % (nm, off + 1, off + sz))
+        off += sz
+    off = 0
+    for b, nm, sz in zip(blocks, names, sizes):
+        rhs = _render_rhs(b, space, cp.names.get(b.entity_type, {}))
+        out.append("        r[%d:%d] = (%s) .- %s"
+                   % (off + 1, off + sz, rhs, nm))
+        off += sz
+    out.append("        return nothing")
+    out.append("    end")
+    out.append("    _x%d = nlsolve(_loop%d!, zeros(%d))"
+               % (loop_id, loop_id, total))
+    off = 0
+    for nm, sz in zip(names, sizes):
+        out.append("    %s = _x%d[%d:%d]"
+                   % (nm, loop_id, off + 1, off + sz))
+        off += sz
+
+
 def emit_julia(cp: CodePlan, space: CompileSpace) -> str:
     """Emit the in-place derivative function for a code plan."""
     out: List[str] = ["using SparseArrays", ""]
@@ -119,18 +158,21 @@ def emit_julia(cp: CodePlan, space: CompileSpace) -> str:
                     out.append("    %s = %s[%s]  # port gather"
                                % (gn, pn,
                                   [i + 1 for i in g.map]))
+        loops_here: Dict[int, List[PlanBlock]] = {}
         for b in lvl:
+            if b.loop >= 0:
+                loops_here.setdefault(b.loop, []).append(b)
+                continue
             rhs = _render_rhs(b, space, cp.names.get(b.entity_type, {}))
-            marker = "  # algebraic loop %d" % b.loop if b.loop >= 0 else ""
             st = state_lhs.get((b.entity_type, b.lhs))
             if st is not None:
-                out.append("    dy[%d:%d] = %s%s"
-                           % (st.offset + 1, st.offset + st.size,
-                              rhs, marker))
+                out.append("    dy[%d:%d] = %s"
+                           % (st.offset + 1, st.offset + st.size, rhs))
             else:
-                out.append("    %s = %s%s"
-                           % (b.lhs_name or _name(b.lhs_instance),
-                              rhs, marker))
+                out.append("    %s = %s"
+                           % (b.lhs_name or _name(b.lhs_instance), rhs))
+        for loop_id, blocks in sorted(loops_here.items()):
+            _emit_loop(out, loop_id, blocks, space, cp)
     out.append("    return nothing")
     out.append("end")
     out.append("")

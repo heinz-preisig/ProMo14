@@ -34,7 +34,7 @@ from backend.instantiate.emit_julia import emit_julia
 from backend.instantiate.emit_matlab import emit_matlab
 from backend.instantiate.emit_python import emit_python
 from backend.instantiate.fbuilder import build as fbuild
-from backend.instantiate.plan import plan
+from backend.instantiate.plan import CodePlan, PlanBlock, plan
 from backend.instantiate.scheduler import schedule
 from backend.main import app
 
@@ -659,6 +659,83 @@ def test_emit_matlab():
     assert ("dV_1 = einsum(V_4, V_3_lumped_capacity, {'A_diff'});"
             in src)
     assert "dy(1:2) = dV_1.value;" in src
+
+
+def test_emit_python_algebraic_loop():
+    """A 2-cycle emits an fsolve residual block: the loop's lhs vars
+    are the unknowns (packed flat), each residual is rhs - lhs."""
+    n2 = {_idx("idx_node"): ["c1", "c2"]}
+    cp = CodePlan(
+        loops=[[("et", "e1"), ("et", "e2")]],
+        names={"et": {}},
+        levels=[[
+            PlanBlock(entity_type="et", equation="e1", lhs=_var("p"),
+                      lhs_instance="V_2@et", lhs_name="V_2",
+                      lhs_indices=n2, inputs=[_var("J")],
+                      rhs="V_3", loop=0),
+            PlanBlock(entity_type="et", equation="e2", lhs=_var("J"),
+                      lhs_instance="V_3@et", lhs_name="V_3",
+                      lhs_indices=n2, inputs=[_var("p")],
+                      rhs="V_2", loop=0),
+        ]],
+    )
+    src = emit_python(cp, _emit_space())
+    assert "from scipy.optimize import fsolve" in src
+    assert "def _loop0(x):  # algebraic loop 0" in src
+    assert "V_2 = x[0:2]" in src
+    assert "V_3 = x[2:4]" in src
+    assert "_r_V_2 = (V_3) - V_2" in src
+    assert "_r_V_3 = (V_2) - V_3" in src
+    assert "_x0 = fsolve(_loop0, np.zeros(4))" in src
+    assert "V_2 = _x0[0:2]" in src
+    assert "V_3 = _x0[2:4]" in src
+
+
+def _loop_plan() -> CodePlan:
+    """A hand-built 2-cycle plan: V_2 = V_3, V_3 = V_2 (loop 0)."""
+    n2 = {_idx("idx_node"): ["c1", "c2"]}
+    return CodePlan(
+        loops=[[("et", "e1"), ("et", "e2")]],
+        names={"et": {}},
+        levels=[[
+            PlanBlock(entity_type="et", equation="e1", lhs=_var("p"),
+                      lhs_instance="V_2@et", lhs_name="V_2",
+                      lhs_indices=n2, inputs=[_var("J")],
+                      rhs="V_3", loop=0),
+            PlanBlock(entity_type="et", equation="e2", lhs=_var("J"),
+                      lhs_instance="V_3@et", lhs_name="V_3",
+                      lhs_indices=n2, inputs=[_var("p")],
+                      rhs="V_2", loop=0),
+        ]],
+    )
+
+
+def test_emit_julia_algebraic_loop():
+    """The Julia loop: in-place _loopN!(r, x) residual, nlsolve,
+    1-based slices."""
+    src = emit_julia(_loop_plan(), _emit_space())
+    assert "function _loop0!(r, x)  # algebraic loop 0" in src
+    assert "V_2 = x[1:2]" in src
+    assert "V_3 = x[3:4]" in src
+    assert "r[1:2] = (V_3) .- V_2" in src
+    assert "r[3:4] = (V_2) .- V_3" in src
+    assert "_x0 = nlsolve(_loop0!, zeros(4))" in src
+    assert "V_2 = _x0[1:2]" in src
+    assert "V_3 = _x0[3:4]" in src
+
+
+def test_emit_matlab_algebraic_loop():
+    """The Matlab loop: nested function, MultiDimVar-wrapped guesses,
+    .value residuals, fsolve."""
+    src = emit_matlab(_loop_plan(), _emit_space())
+    assert "function r = _loop0(x)  % algebraic loop 0" in src
+    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, x(1:2));" in src)
+    assert ("V_3 = MultiDimVar({'N'}, 2, {'N'}, x(3:4));" in src)
+    assert "_r0 = (V_3) - V_2;" in src
+    assert "_r1 = (V_2) - V_3;" in src
+    assert "r = [_r0.value; _r1.value];" in src
+    assert "_x0 = fsolve(@_loop0, zeros(4, 1));" in src
+    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, _x0(1:2));" in src)
 
 
 def test_emit_python_instantiated_pressure():

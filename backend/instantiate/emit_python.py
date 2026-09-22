@@ -25,9 +25,12 @@ Generated shape::
         dy[0:2] = <rhs>              # balance → derivative slice
         return dy
 
-Limitations (milestone 1): algebraic-loop blocks are emitted inline
-with a marker comment, not wrapped in a solver; multi-axis states
-are packed flat without reshape.
+Algebraic loops (scheduler SCCs) emit as ``fsolve`` residual
+blocks: the loop's lhs vars are the unknowns, packed into a flat
+guess vector, each residual is ``rhs - lhs``.
+
+Limitations (milestone 1): multi-axis states are packed flat
+without reshape; loop initial guesses are zeros.
 """
 
 from __future__ import annotations
@@ -70,9 +73,48 @@ def _render_rhs(block: PlanBlock, space: CompileSpace,
                   names=names)
 
 
+def _bsize(b: PlanBlock) -> int:
+    """Flat size of a block's lhs — product of bound index sizes."""
+    n = 1
+    for els in b.lhs_indices.values():
+        n *= max(1, len(els or []))
+    return n
+
+
+def _emit_loop(out: List[str], loop_id: int, blocks: List[PlanBlock],
+               space: CompileSpace, cp: CodePlan) -> None:
+    """Emit one algebraic loop as an ``fsolve`` residual block: the
+    loop's lhs vars are the unknowns (packed flat), each residual is
+    ``rhs - lhs`` evaluated with the guesses bound."""
+    names = [b.lhs_name or _name(b.lhs_instance) for b in blocks]
+    sizes = [_bsize(b) for b in blocks]
+    total = sum(sizes)
+    out.append("    def _loop%d(x):  # algebraic loop %d"
+               % (loop_id, loop_id))
+    off = 0
+    for nm, sz in zip(names, sizes):
+        out.append("        %s = x[%d:%d]" % (nm, off, off + sz))
+        off += sz
+    for b, nm in zip(blocks, names):
+        rhs = _render_rhs(b, space, cp.names.get(b.entity_type, {}))
+        out.append("        _r_%s = (%s) - %s" % (nm, rhs, nm))
+    out.append("        return np.concatenate([%s])"
+               % ", ".join("np.atleast_1d(_r_%s)" % nm
+                           for nm in names))
+    out.append("    _x%d = fsolve(_loop%d, np.zeros(%d))"
+               % (loop_id, loop_id, total))
+    off = 0
+    for nm, sz in zip(names, sizes):
+        out.append("    %s = _x%d[%d:%d]" % (nm, loop_id, off, off + sz))
+        off += sz
+
+
 def emit_python(cp: CodePlan, space: CompileSpace) -> str:
     """Emit the derivative function for a code plan."""
-    out: List[str] = ["import numpy as np", ""]
+    out: List[str] = ["import numpy as np"]
+    if cp.loops:
+        out.append("from scipy.optimize import fsolve")
+    out.append("")
 
     for mx in cp.matrices:
         out.append("%s = %s  # F over [%d x %d]"
@@ -111,18 +153,21 @@ def emit_python(cp: CodePlan, space: CompileSpace) -> str:
                 else:
                     out.append("    %s = %s[%s]  # port gather"
                                % (gn, pn, g.map))
+        loops_here: Dict[int, List[PlanBlock]] = {}
         for b in lvl:
+            if b.loop >= 0:
+                loops_here.setdefault(b.loop, []).append(b)
+                continue
             rhs = _render_rhs(b, space, cp.names.get(b.entity_type, {}))
-            marker = "  # algebraic loop %d" % b.loop if b.loop >= 0 else ""
             st = state_lhs.get((b.entity_type, b.lhs))
             if st is not None:
-                out.append("    dy[%d:%d] = %s%s"
-                           % (st.offset, st.offset + st.size,
-                              rhs, marker))
+                out.append("    dy[%d:%d] = %s"
+                           % (st.offset, st.offset + st.size, rhs))
             else:
-                out.append("    %s = %s%s"
-                           % (b.lhs_name or _name(b.lhs_instance),
-                              rhs, marker))
+                out.append("    %s = %s"
+                           % (b.lhs_name or _name(b.lhs_instance), rhs))
+        for loop_id, blocks in sorted(loops_here.items()):
+            _emit_loop(out, loop_id, blocks, space, cp)
     out.append("    return dy")
     out.append("")
     return "\n".join(out)

@@ -119,6 +119,47 @@ def _render_rhs(block: PlanBlock, space: CompileSpace,
                   names=names)
 
 
+def _bsize(b: PlanBlock) -> int:
+    """Flat size of a block's lhs — product of bound index sizes."""
+    n = 1
+    for els in b.lhs_indices.values():
+        n *= max(1, len(els or []))
+    return n
+
+
+def _emit_loop(out: List[str], loop_id: int, blocks: List[PlanBlock],
+               space: CompileSpace, cp: CodePlan) -> None:
+    """Emit one algebraic loop as an ``fsolve`` residual block — a
+    nested function (shares the parent's workspace) whose guesses
+    wrap as MultiDimVars and whose residuals unwrap via ``.value``."""
+    names = [b.lhs_name or _name(b.lhs_instance) for b in blocks]
+    sizes = [_bsize(b) for b in blocks]
+    total = sum(sizes)
+    out.append("  function r = _loop%d(x)  %% algebraic loop %d"
+               % (loop_id, loop_id))
+    off = 0
+    for b, nm, sz in zip(blocks, names, sizes):
+        out.append("    %s = %s;"
+                   % (nm, _mdv(b.lhs_indices, space,
+                               "x(%d:%d)" % (off + 1, off + sz))))
+        off += sz
+    for i, (b, nm) in enumerate(zip(blocks, names)):
+        rhs = _render_rhs(b, space, cp.names.get(b.entity_type, {}))
+        out.append("    _r%d = (%s) - %s;" % (i, rhs, nm))
+    out.append("    r = [%s];"
+               % "; ".join("_r%d.value" % i for i in range(len(blocks))))
+    out.append("  end")
+    out.append("  _x%d = fsolve(@_loop%d, zeros(%d, 1));"
+               % (loop_id, loop_id, total))
+    off = 0
+    for b, nm, sz in zip(blocks, names, sizes):
+        out.append("  %s = %s;"
+                   % (nm, _mdv(b.lhs_indices, space,
+                               "_x%d(%d:%d)"
+                               % (loop_id, off + 1, off + sz))))
+        off += sz
+
+
 def emit_matlab(cp: CodePlan, space: CompileSpace) -> str:
     """Emit the derivative function for a code plan."""
     out: List[str] = []
@@ -167,20 +208,23 @@ def emit_matlab(cp: CodePlan, space: CompileSpace) -> str:
                         pn, " ".join(str(i + 1) for i in g.map))
                 out.append("  %s = %s;  %% port gather"
                            % (gn, _mdv(g.indices, space, val)))
+        loops_here: Dict[int, List[PlanBlock]] = {}
         for b in lvl:
+            if b.loop >= 0:
+                loops_here.setdefault(b.loop, []).append(b)
+                continue
             rhs = _render_rhs(b, space, cp.names.get(b.entity_type, {}))
-            marker = ("  %% algebraic loop %d" % b.loop
-                      if b.loop >= 0 else "")
             st = state_lhs.get((b.entity_type, b.lhs))
             if st is not None:
                 tmp = "d%s" % (b.lhs_name or _name(b.lhs_instance))
-                out.append("  %s = %s;%s" % (tmp, rhs, marker))
+                out.append("  %s = %s;" % (tmp, rhs))
                 out.append("  dy(%d:%d) = %s.value;"
                            % (st.offset + 1, st.offset + st.size, tmp))
             else:
-                out.append("  %s = %s;%s"
-                           % (b.lhs_name or _name(b.lhs_instance),
-                              rhs, marker))
+                out.append("  %s = %s;"
+                           % (b.lhs_name or _name(b.lhs_instance), rhs))
+        for loop_id, blocks in sorted(loops_here.items()):
+            _emit_loop(out, loop_id, blocks, space, cp)
     out.append("end")
     out.append("")
     return "\n".join(out)
