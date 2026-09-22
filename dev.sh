@@ -11,8 +11,7 @@
 #   ./dev.sh save                 — persist the in-memory store to data/ontology.trig
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
-# Services: backend | ontology | equation | modeller | all (default)
-#           (behaviour is stop/logs/status only — scaffold, not startable)
+# Services: backend | ontology | equation | behaviour | modeller | all (default)
 #
 # Log files are written to logs/ in the repo root
 
@@ -141,6 +140,20 @@ _start_equation() {
     fi
 }
 
+_start_behaviour() {
+    _kill_port $BEHAVIOUR_PORT "behaviour-linker" quiet
+    echo "  Starting behaviour linker on :$BEHAVIOUR_PORT  (log: $BEHAVIOUR_LOG)"
+    cd "$REPO"
+    nohup npm run dev:behaviour \
+        > "$BEHAVIOUR_LOG" 2>&1 &
+    sleep 3
+    if _is_running $BEHAVIOUR_PORT; then
+        echo "  Behaviour linker started  →  http://localhost:$BEHAVIOUR_PORT"
+    else
+        echo "  Behaviour linker failed — check $BEHAVIOUR_LOG"
+    fi
+}
+
 _start_modeller() {
     _kill_port $MODELLER_PORT "modeller" quiet
     echo "  Starting modeller on :$MODELLER_PORT  (log: $MODELLER_LOG)"
@@ -208,11 +221,13 @@ cmd_start() {
         backend)  _start_backend ;;
         ontology) _ensure_backend; _start_ontology ;;
         equation) _ensure_backend; _start_equation ;;
+        behaviour) _ensure_backend; _start_behaviour ;;
         modeller) _ensure_backend; _start_modeller ;;
         all)
             _start_backend
             _start_ontology
             _start_equation
+            _start_behaviour
             _start_modeller
             ;;
         *) echo "Unknown service: $service"; exit 1 ;;
@@ -317,8 +332,7 @@ cmd_help() {
     echo "  save                — persist in-memory store to data/ontology.trig"
     echo "  logs    [service]   — tail log for a service"
     echo ""
-    echo "Services: backend | ontology | equation | modeller | all (default)"
-    echo "          (behaviour: stop/logs/status only — scaffold, not startable)"
+    echo "Services: backend | ontology | equation | behaviour | modeller | all (default)"
     echo ""
     echo "URLs:"
     echo "  Hub (entry point)  http://localhost:$BACKEND_PORT/"

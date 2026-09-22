@@ -257,6 +257,12 @@ Implemented as a React + TypeScript + Vite app in
   standalone tex → latex/dvipng (or vendored pnglatex.bash) → cache
   keyed by internal_id + `modified`; consider SVG over PNG.
 - RDF vocabulary finalization for equations, operators, variables.
+- External-IRI links on variables (noted 2026-09-22): old-ProMo could
+  link a variable to external IRIs (e.g. QUDT quantity kinds, external
+  ontology terms).  Needs a predicate choice (`promo:seeAlso` /
+  `owl:sameAs`-style), a field in the variable schema
+  (`VariableIn`/`add_variable_dict`), and a UI affordance in the
+  variable detail modal.
 
 ## How to run
 

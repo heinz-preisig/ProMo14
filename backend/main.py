@@ -26,6 +26,7 @@ app = FastAPI(title="ProMo Suite Backend")
 _NON_MUTATING_POSTS = {
     "/api/equation/parse",
     "/api/equation/check",
+    "/api/behaviour/evaluate",
     "/api/ontology/save",
     "/api/ontology/publish",
 }
