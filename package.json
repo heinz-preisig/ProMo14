@@ -10,6 +10,7 @@
     "dev": "npm run dev -w @promo/modeller",
     "dev:equation": "npm run dev -w @promo/equation-editor",
     "dev:behaviour": "npm run dev -w @promo/behaviour-linker",
+    "dev:instantiation": "npm run dev -w @promo/instantiation",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   }

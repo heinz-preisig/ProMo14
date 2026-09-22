@@ -155,6 +155,27 @@ def serve_behaviour_spa(full_path: str = "") -> Response:
     return _spa_index(BEHAVIOUR_STATIC_DIR, "Behaviour linker")
 
 
+INSTANTIATION_STATIC_DIR = Path(
+    os.environ.get("INSTANTIATION_STATIC_DIR", "apps/instantiation/dist")
+).resolve()
+INSTANTIATION_ASSETS_DIR = INSTANTIATION_STATIC_DIR / "assets"
+
+if INSTANTIATION_ASSETS_DIR.is_dir():
+    app.mount(
+        "/instantiation/assets",
+        StaticFiles(directory=str(INSTANTIATION_ASSETS_DIR)),
+        name="instantiation-assets",
+    )
+
+
+@app.get("/instantiation", include_in_schema=False)
+@app.get("/instantiation/", include_in_schema=False)
+@app.get("/instantiation/{full_path:path}", include_in_schema=False)
+def serve_instantiation_spa(full_path: str = "") -> Response:
+    """Serve the instantiation SPA for every /instantiation/* route."""
+    return _spa_index(INSTANTIATION_STATIC_DIR, "Instantiation")
+
+
 HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
 
 
