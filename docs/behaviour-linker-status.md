@@ -82,15 +82,17 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   (`incidence` for `constant`-class `[N,A]`-indexed vars → the
   numeric `F` matrices,
   `constant`, `parameter`, `port`, `local` with per-index element
-  sets); per-contact port resolution across arcs (peer's exported
-  `port_variable` defined vars, token-comparable via `promo:parent`
-  ancestry, `tokenKind` carrier pre-filter); problem report
+  sets); per-contact port resolution across arcs — R3 rule: peer's
+  defined vars with comparable token (`promo:parent` ancestry) minus
+  the unflagged state, `port_variable` preferred among candidates;
+  `tokenKind` carrier pre-filter; problem report
   (untyped nodes, missing/open assignments, unbound/ambiguous ports,
   unmarked inputs).  `GET /api/instantiate/model?graph=&vars=`
   serves the report incl. the incidence matrices.
-- `test_builder.py` — 16 tests: element sets, all five binding kinds,
-  per-contact/scalar port resolution, signal-token comparability,
-  problem kinds, endpoint roundtrip.
+- `test_builder.py` — 20 tests: element sets, all five binding kinds,
+  per-contact/scalar port resolution, R3 flag semantics (unflagged
+  secondary state binds, flagged state exports, flag disambiguates),
+  signal-token comparability, problem kinds, endpoint roundtrip.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search

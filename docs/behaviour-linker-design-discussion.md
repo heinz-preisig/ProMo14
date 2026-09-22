@@ -1195,7 +1195,10 @@ Two different concepts, both needed:
 - **`port_variable` (flag on `VariableRecord`)** — *structural*: a
   boundary node in the entity's bipartite (variable↔equation) graph —
   where another entity's equation system can attach.  Direction-
-  agnostic capability ("*can* be exchanged").
+  agnostic capability ("*can* be exchanged").  Refined in §19 (R3):
+  exportability is *implied* for non-state defined vars carrying a
+  token — the flag is an override, needed to export the state itself
+  and to disambiguate several same-token candidates.
 - **BL port role (`promo:hasPortVariable`)** — *directional*: consumed
   as external input in this entity's assignment ("*is* exchanged, and
   in which direction").
@@ -1641,12 +1644,19 @@ instance.
 ### Port resolution
 
 A port variable carrying token τ binds through an incident arc to the
-peer node's **exported defined** variable — `port_variable` flag
-(§14's structural "can be exchanged") *and* defined by the peer's
-assignment (sequence lhs ∪ state) *and* token-comparable (shared
-`promo:parent` ancestry, so `signal` matches `observation`/
-`manipulation`).  `tokenKind` pre-filters carriers: conserved →
-token-flow arcs, reference → reference arcs.
+peer node's **exported defined** variable.  The candidate rule (R3 —
+flag as override, not gate):
+
+```
+raw        = peer's defined vars (sequence lhs ∪ state)
+             with a comparable token (shared promo:parent ancestry,
+             so signal matches observation/manipulation)
+raw       -= the state variable, unless it is flagged port_variable
+candidates = the flagged members of raw, if any — else raw
+```
+
+`tokenKind` pre-filters carriers: conserved → token-flow arcs,
+reference → reference arcs.
 
 - **Arc-indexed ports** bind **per contact**: one `PortBinding` per
   incident carrier-matching arc.  A 2-contact transport's `p_in[A]`
@@ -1657,11 +1667,16 @@ token-flow arcs, reference → reference arcs.
   capacity's flow port → `J@a`); node-indexed at the peer node (the
   transport's effort port → `p@c`).
 
-The `port_variable` flag is what discriminates effort from state on
-the peer: `m` and `p` both carry the mass token, but only the flagged
-export is a candidate.  Unflagged peers yield `unbound` — the
-hint/binding pattern: the problem report tells the user which flag to
-set.
+Why R3: what crosses a boundary is the token's *move/drive/observe*
+manifestation (§14) — a defined var carrying a token — never the
+accumulation.  So exportability is implied for non-state defined
+vars; `port_variable` remains for (a) marking the *state* itself
+exportable and (b) disambiguating several same-token candidates.
+Consequences: the flag can add/prefer but never exclude a non-state
+defined var; flags are per-var-IRI, so they disambiguate within one
+peer's candidate set, never across contacts.  When the only
+comparable var is the unflagged state, `unbound` carries a hint
+("set port_variable or add a measurement variable").
 
 ### Problems
 

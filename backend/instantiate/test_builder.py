@@ -301,17 +301,19 @@ def test_flow_port_binds_at_arc_element():
 
 def test_unbound_and_ambiguous_ports():
     variables = dict(VARIABLES)
-    # Peer exports nothing comparable → unbound.
+    # Peer defines nothing comparable: p carries an incomparable token
+    # and the state m — though comparable — is unflagged → internal.
     variables[_var("p")] = VarInfo(_var("p"), "pressure", "V_2",
                                   index_structures=[_idx("idx_node")],
-                                  tokens=[_tok("mass")],
-                                  port_variable=False)
+                                  tokens=[_tok("energy")])
     rep = _build(variables=variables)
     ports = [p for p in rep.ports if p.var == _var("p_in")]
     assert all(p.status == "unbound" for p in ports)
     assert any(pr.kind == "unbound-port" for pr in rep.problems)
+    # …with the state-hidden hint.
+    assert any("not exported" in pr.message for pr in rep.problems)
 
-    # Two exported comparable vars on the peer → ambiguous.
+    # Two flagged comparable vars on the peer → ambiguous.
     variables = dict(VARIABLES)
     variables[_var("m")] = VarInfo(_var("m"), "mass", "V_1",
                                   index_structures=[_idx("idx_node")],
@@ -321,6 +323,77 @@ def test_unbound_and_ambiguous_ports():
     ports = [p for p in rep.ports if p.var == _var("p_in")]
     assert all(p.status == "ambiguous" for p in ports)
     assert any(pr.kind == "ambiguous-port" for pr in rep.problems)
+
+
+def test_unflagged_secondary_state_binds():
+    """R3: port_variable is an override, not a gate — an unflagged
+    defined var carrying a comparable token is still a candidate."""
+    variables = dict(VARIABLES)
+    variables[_var("p")] = VarInfo(_var("p"), "pressure", "V_2",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("mass")],
+                                  port_variable=False)
+    rep = _build(variables=variables)
+    ports = [p for p in rep.ports if p.var == _var("p_in")]
+    assert all(p.status == "bound" for p in ports)
+    assert all(p.peer_var == _var("p") for p in ports)
+
+
+def test_flagged_state_exports():
+    """Flagging the state marks it exportable — and preferred over
+    unflagged same-token candidates."""
+    variables = dict(VARIABLES)
+    variables[_var("m")] = VarInfo(_var("m"), "mass", "V_1",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("mass")],
+                                  port_variable=True)
+    variables[_var("p")] = VarInfo(_var("p"), "pressure", "V_2",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("mass")],
+                                  port_variable=False)
+    rep = _build(variables=variables)
+    ports = [p for p in rep.ports if p.var == _var("p_in")]
+    assert all(p.status == "bound" and p.peer_var == _var("m")
+               for p in ports)
+
+
+def test_flag_disambiguates_same_token_vars():
+    """Two comparable defined vars: ambiguous unflagged, the flag
+    selects the export."""
+    variables = dict(VARIABLES)
+    variables[_var("h")] = VarInfo(_var("h"), "enthalpy", "V_8",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("mass")])
+    variables[_var("p")] = VarInfo(_var("p"), "pressure", "V_2",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("mass")],
+                                  port_variable=False)
+    equations = dict(EQUATIONS)
+    equations[_eq("prop2")] = EqInfo(_eq("prop2"), _var("h"),
+                                     [_var("m")], "E_5")
+    assignments = dict(ASSIGNMENTS)
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=_et("lumped_capacity"),
+        sequence=[_eq("bal"), _eq("prop"), _eq("prop2")],
+        base_equation=_eq("bal"),
+        state_variable=_var("m"),
+        ports=[_var("J")],
+        closed=True)
+
+    rep = _build(variables=variables, equations=equations,
+                 assignments=assignments)
+    ports = [p for p in rep.ports if p.var == _var("p_in")]
+    assert all(p.status == "ambiguous" for p in ports)
+
+    variables[_var("h")] = VarInfo(_var("h"), "enthalpy", "V_8",
+                                  index_structures=[_idx("idx_node")],
+                                  tokens=[_tok("mass")],
+                                  port_variable=True)
+    rep = _build(variables=variables, equations=equations,
+                 assignments=assignments)
+    ports = [p for p in rep.ports if p.var == _var("p_in")]
+    assert all(p.status == "bound" and p.peer_var == _var("h")
+               for p in ports)
 
 
 def test_signal_token_comparability():

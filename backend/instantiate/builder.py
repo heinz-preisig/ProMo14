@@ -23,7 +23,11 @@ report:
     one global instance;
   - ``parameter`` — marked to-be-instantiated or a bound-value class;
   - ``port``      — external input, resolved per contact across an
-    arc to a peer variable;
+    arc to a peer variable.  Candidates are the peer's defined vars
+    carrying a comparable token, minus the unflagged state (the
+    accumulation stays internal — §14); ``port_variable`` marks the
+    state as exportable and disambiguates among several candidates
+    (flag = override, not gate);
   - ``local``     — state/defined vars, index structures mapped to
     element sets (node index → the type's nodes, arc index → member
     arcs incident on the type's nodes; non-topological indices such
@@ -470,13 +474,18 @@ def build(nodes: Dict[str, NodeInfo],
                     out.add(eq.lhs)
             return out
 
-        def emit_port(pb: PortBinding, var: VarInfo) -> None:
+        def emit_port(pb: PortBinding, var: VarInfo,
+                      state_hidden: bool = False) -> None:
             report.ports.append(pb)
             if pb.status != "bound":
+                msg = (f"port {var.label or _frag(pb.var)} on "
+                       f"{_frag(pb.node)} is {pb.status}")
+                if state_hidden:
+                    msg += (" — peer state is comparable but not "
+                            "exported (set port_variable or add a "
+                            "measurement variable)")
                 problems.append(Problem(
-                    kind=f"{pb.status}-port",
-                    message=(f"port {var.label or _frag(pb.var)} on "
-                             f"{_frag(pb.node)} is {pb.status}"),
+                    kind=f"{pb.status}-port", message=msg,
                     node=pb.node, entity_type=et))
 
         for n in t_nodes:
@@ -493,28 +502,42 @@ def build(nodes: Dict[str, NodeInfo],
                     _arc_like(indices.get(i), indices)
                     for i in var.index_structures)
 
-                def candidates_at(a_iri: str) -> List[Tuple[str, str]]:
+                def candidates_at(
+                        a_iri: str) -> Tuple[List[Tuple[str, str]], bool]:
+                    """Comparable exports at the arc's peer, plus whether
+                    the peer's unflagged state was comparable (drives the
+                    unbound hint).  R3: candidates = defined ∩ comparable
+                    − unflagged state; flagged candidates preferred."""
                     peer = peer_of(a_iri, n)
                     if peer is None or peer not in nodes:
-                        return []
-                    # Candidates are the peer's *exported* defined vars
-                    # (§14: port_variable = "can be exchanged") with a
-                    # comparable token.
-                    return [
-                        (peer, w_iri)
-                        for w_iri in sorted(peer_defined(peer))
-                        if (w := variables.get(w_iri)) is not None
-                        and w.port_variable
-                        and any(_comparable(t, wt, token_parents)
+                        return [], False
+                    peer_asg = assignments.get(
+                        nodes[peer].entity_type or "")
+                    state = (peer_asg.state_variable
+                             if peer_asg else None)
+                    raw: List[Tuple[str, str]] = []
+                    hidden = False
+                    for w_iri in sorted(peer_defined(peer)):
+                        w = variables.get(w_iri)
+                        if w is None or not any(
+                                _comparable(t, wt, token_parents)
                                 for t in var.tokens
-                                for wt in w.tokens)]
+                                for wt in w.tokens):
+                            continue
+                        if w_iri == state and not w.port_variable:
+                            hidden = True   # accumulation stays internal
+                            continue
+                        raw.append((peer, w_iri))
+                    flagged = [c for c in raw
+                               if variables[c[1]].port_variable]
+                    return (flagged or raw), hidden
 
                 if arc_indexed:
                     if not carrier_ok:
                         emit_port(PortBinding(node=n, var=v_iri,
                                               status="unbound"), var)
                     for a_iri in carrier_ok:
-                        cands = candidates_at(a_iri)
+                        cands, hidden = candidates_at(a_iri)
                         pb = PortBinding(
                             node=n, var=v_iri, arc=a_iri,
                             status="unbound",
@@ -532,12 +555,16 @@ def build(nodes: Dict[str, NodeInfo],
                                 else peer)
                         elif len(cands) > 1:
                             pb.status = "ambiguous"
-                        emit_port(pb, var)
+                        emit_port(pb, var, state_hidden=hidden)
                 else:
+                    per_contact = [candidates_at(a_iri)
+                                   for a_iri in carrier_ok]
                     cands = [
                         (a_iri, peer, w_iri)
-                        for a_iri in carrier_ok
-                        for peer, w_iri in candidates_at(a_iri)]
+                        for a_iri, (contact, _hidden) in zip(
+                            carrier_ok, per_contact)
+                        for peer, w_iri in contact]
+                    hidden = any(h for _c, h in per_contact)
                     pb = PortBinding(node=n, var=v_iri,
                                      status="unbound", candidates=cands)
                     if len(cands) == 1:
@@ -554,6 +581,6 @@ def build(nodes: Dict[str, NodeInfo],
                             else peer)
                     elif len(cands) > 1:
                         pb.status = "ambiguous"
-                    emit_port(pb, var)
+                    emit_port(pb, var, state_hidden=hidden)
 
     return report
