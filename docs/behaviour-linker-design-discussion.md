@@ -1574,3 +1574,113 @@ cross-artefact.
 - **Arc/port usage** — BL port bindings (`hasPortVariable`) and model
   arcs should count as usage once those writers exist.
 - **`rhs_latex` cache invalidation** on rename.
+
+## 19. Model instantiation (2026-09-22)
+
+### What instantiation produces
+
+The instantiation step binds a **model artefact** (topology:
+`ModelNode`/`ModelArc`) to **behaviour assignments** (§13, per entity
+type) and yields the assembled equation set — the input codegen
+needs.  Implemented as a computed report, not a persisted artefact
+(same pattern as the §16 resolver and §15 F-builder):
+
+```
+GET /api/instantiate/model?graph=<model>&vars=<var/expr graph>
+```
+
+`graph` is required (the model being instantiated); `vars` selects the
+var/expr artefact supplying variables, equations and the assignment
+graph (`{vars}/assignments`, or the default assignment graph when
+`vars` is absent — dataset-wide variable scope).
+
+`backend/instantiate/builder.py` is the pure engine; `service.py`
+adapts store graphs into its plain inputs.
+
+### Index element sets
+
+Symbolic indices bind to concrete element sets:
+
+- node index `N` → all model nodes;
+- base arc index `A` → all token-flow arcs;
+- each arc sub-index `A_k` → its §16 member arcs;
+- per entity type `T` → the node subset `N_T` (nodes typed `T`).
+
+Non-topological indices (species `S`, reaction `Q`, …) have no model
+element set — they stay symbolic (`null` in the binding) until their
+own element source exists (composition, reaction list).
+
+### Variable bindings
+
+Every variable an assignment references gets a **role** (state /
+defined / port / parameter / input) and a **binding**:
+
+- `incidence` — a `[node, arc]`-indexed variable binds to the numeric
+  `F` matrix for its arc index (`[N,A]` → base, `[N,A_k]` → `F_k`).
+  This is the symbolic-F convention from §15: equations reference `F`
+  by index structure, instantiation supplies the numbers.  (A genuine
+  `[N,A]`-indexed data variable would need a distinguishing marker —
+  none exists yet.)
+- `constant` — pre-bound `promo:value` (universal constants); one
+  global instance.
+- `parameter` — marked `hasInstantiatedVariable` or a bound-value
+  class (`INSTANTIATE_CLASSES`); per-entity-type slot, value filled
+  later.
+- `port` — external input, resolved per contact (below).
+- `local` — state/defined vars; each symbolic index maps to its
+  element set (node index → `N_T`; arc index → members ∩ arcs
+  incident on `N_T`).
+
+Instances are named `<internal_id>@<entity-type frag>` — one
+instantiated variable per (var, entity type), indexed by its bound
+element sets.  Two entity types using the same var IRI get distinct
+instances; the same type on several nodes shares one indexed
+instance.
+
+### Port resolution
+
+A port variable carrying token τ binds through an incident arc to the
+peer node's **exported defined** variable — `port_variable` flag
+(§14's structural "can be exchanged") *and* defined by the peer's
+assignment (sequence lhs ∪ state) *and* token-comparable (shared
+`promo:parent` ancestry, so `signal` matches `observation`/
+`manipulation`).  `tokenKind` pre-filters carriers: conserved →
+token-flow arcs, reference → reference arcs.
+
+- **Arc-indexed ports** bind **per contact**: one `PortBinding` per
+  incident carrier-matching arc.  A 2-contact transport's `p_in[A]`
+  yields two bindings — `p@c1` via `a1`, `p@c2` via `a2`.
+- **Scalar ports** aggregate all contacts: exactly one candidate →
+  bound; several → ambiguous (a scalar can't have two sources).
+- **Element**: arc-indexed peer vars bind at the arc element (the
+  capacity's flow port → `J@a`); node-indexed at the peer node (the
+  transport's effort port → `p@c`).
+
+The `port_variable` flag is what discriminates effort from state on
+the peer: `m` and `p` both carry the mass token, but only the flagged
+export is a candidate.  Unflagged peers yield `unbound` — the
+hint/binding pattern: the problem report tells the user which flag to
+set.
+
+### Problems
+
+Reported, never silently dropped: `untyped-node`, `no-assignment`,
+`assignment-open`, `unbound-port`, `ambiguous-port`,
+`unmarked-input` (an external input that is neither port nor
+instantiated — incidence/constant bindings exempt), plus
+`missing-equation`/`missing-variable` for dangling references.
+
+### Deferred
+
+- **Persistence** — the report is computed per request; an
+  instantiation artefact graph (frozen equation set for codegen) is
+  the next step once the shape is validated.
+- **Fix marking** (ADR-008 three-layer model) — per-occurrence
+  overrides belong to the model artefact.
+- **Node sub-indices** — `N_T` is derived per entity type; a declared
+  node-sub-index mechanism (symmetric to §16) is not needed yet.
+- **Port direction check** — binding is token+export based; whether
+  the arc's rule direction licenses the flow (sensor reads vs
+  actuation writes) is the modeller-side check (pending item 4).
+- **`[N,A]`-indexed data variables** — currently all bind as
+  incidence; a marker will be needed if a real one appears.

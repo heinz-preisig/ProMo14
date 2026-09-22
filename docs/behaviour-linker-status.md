@@ -75,6 +75,21 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
 - `test_fbuilder.py` — 6 tests: sign convention, sub-index column
   restriction, reference-arc exclusion, dangling/self-loop edges,
   endpoint roundtrip.
+- `builder.py` — §19 model instantiation (new, 2026-09-22): binds the
+  model artefact to §13 assignments and emits the assembled equation
+  set.  Index element sets (`N` = nodes, `A` = token-flow arcs,
+  `A_k` = members, `N_T` per entity type); variable bindings
+  (`incidence` for `[N,A]`-indexed vars → the numeric `F` matrices,
+  `constant`, `parameter`, `port`, `local` with per-index element
+  sets); per-contact port resolution across arcs (peer's exported
+  `port_variable` defined vars, token-comparable via `promo:parent`
+  ancestry, `tokenKind` carrier pre-filter); problem report
+  (untyped nodes, missing/open assignments, unbound/ambiguous ports,
+  unmarked inputs).  `GET /api/instantiate/model?graph=&vars=`
+  serves the report incl. the incidence matrices.
+- `test_builder.py` — 16 tests: element sets, all five binding kinds,
+  per-contact/scalar port resolution, signal-token comparability,
+  problem kinds, endpoint roundtrip.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search
@@ -114,7 +129,7 @@ Role is defined in ADR-004; the full mechanics are resolved in
 `behaviour-linker-design-discussion.md` (§8 closure algorithm, §12
 validation scope, §13 assignment artefact, §14 tokens/ports, §15
 reference coordinates, §16 arc sub-indices, §17 scale regimes/seed
-contract, §18 variable mutability).
+contract, §18 variable mutability, §19 model instantiation).
 
 ## Pending items
 
@@ -125,9 +140,16 @@ contract, §18 variable mutability).
 3. Equation-eligibility hints from ontology (regime/scale filtering of
    candidate lists) — engine accepts any equation today.
 4. Port satisfaction check against connection rules (§14) — needs the
-   Modeller-side arc check (ADR-008 deferred item).
+   Modeller-side arc check (ADR-008 deferred item).  §19 port
+   *binding* is done (token + `port_variable` export); the missing
+   half is the rule-direction check on connect.
 5. Fix marking (three-layer binding model, ADR-008) — per-occurrence
    override belongs to the model artefact.
+   ~~Instantiation proper~~ **Done (2026-09-22):** §19 report —
+   `GET /api/instantiate/model?graph=&vars=` assembles the equation
+   set: index element sets, variable bindings (incl. symbolic `F` →
+   numeric matrices), per-contact port resolution, problem list.
+   Persisting an instantiation artefact for codegen is the next step.
 6. ~~§15 orientation capture~~ **Done (2026-09-22, modeller side):**
    `ModelArc.referenceFrom`/`referenceTo` persisted as
    `promo:referenceFrom`/`referenceTo` (token-flow arcs only);
