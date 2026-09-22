@@ -1785,21 +1785,38 @@ artefact is another swappable input.
 
 ### The species artefact
 
-A new artefact type — the external app, porting the old-ProMo
-species-assignment app — declares:
+A new artefact type — the external **species/reaction app**, porting
+the old-ProMo species-assignment app — owns the *vocabulary*:
 
 - the **species set** — the global `S` elements;
 - **allocations** — named species sets a reservoir can inject;
 - **reactions** — stoichiometric rules `{reactants} → {products}`
-  (open — see below);
-- **permeability** — which species each transport/membrane passes.
+  (open — see below).
 
-The **species source** is a modelling act: a reservoir (constant
-environment system) is placed in the modeller, as in old ProMo, and
-references an *allocation* from the species artefact — never the
-species themselves.  So the injection point is topological (the
-modeller owns where sources sit) while the injected content is
-allocated externally.
+The modeller owns the *placement and permissions* — it never names a
+species, only references the artefact's vocabulary.
+
+### Modeller capabilities
+
+Three gestures, each gated by a **capability** on the entity type (a
+predicate the modeller checks — not a `ConnectionRule`, which governs
+arcs):
+
+- **Inject species** — a node whose type carries the *species-source*
+  capability (constant environment systems / reservoirs) may be
+  assigned an *allocation* from the species artefact.  The injection
+  point is topological (the modeller owns where sources sit); the
+  injected content is allocated externally.
+- **Set diffusivity** — a mass/species transport system may enable or
+  block each species (**per arc**).  A semipermeable wall is a
+  transport with some species blocked.  Restricted to mass/species
+  transport — energy and signal arcs carry no species.
+- **Host a reaction** — a node whose type carries the *reaction-host*
+  capability may host reactions from the artefact.  "Any other node"
+  in the requirement = any node with this capability.
+
+The species distribution then defines what species is where, on every
+node and arc.
 
 ### The distribution computation
 
@@ -1837,10 +1854,14 @@ but they break the per-type tensor when a type spans two sets.)
 
 ### Deferred / open
 
-- **Stoichiometry** — unresolved.  It belongs to the (not yet
-  designed) species/reaction app; old ProMo had a simple version but
-  never defined the stoichiometry either.  Needs resolving before
-  reactions can produce species.
+- **Stoichiometry** — unresolved.  It belongs to the species/reaction
+  app; old ProMo had a simple version but never defined the
+  stoichiometry either.  For *distribution* only the
+  `{reactants}→{products}` species sets are needed; coefficients
+  matter for the `reactions` domain's kinetics, a separate concern.
+- **Capability predicates** — the exact `promo:` terms for
+  species-source / reaction-host, and whether they seed on the
+  existing entity types.
 - Species artefact schema + the assignment app.
 - Whether `Q` (reaction index) binds by the same mechanism.
 - Whether the mask is required for correctness or only for
