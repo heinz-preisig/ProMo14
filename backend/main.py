@@ -178,6 +178,27 @@ def serve_instantiation_spa(full_path: str = "") -> Response:
     return _spa_index(INSTANTIATION_STATIC_DIR, "Instantiation")
 
 
+SPECIES_STATIC_DIR = Path(
+    os.environ.get("SPECIES_STATIC_DIR", "apps/species/dist")
+).resolve()
+SPECIES_ASSETS_DIR = SPECIES_STATIC_DIR / "assets"
+
+if SPECIES_ASSETS_DIR.is_dir():
+    app.mount(
+        "/species/assets",
+        StaticFiles(directory=str(SPECIES_ASSETS_DIR)),
+        name="species-assets",
+    )
+
+
+@app.get("/species", include_in_schema=False)
+@app.get("/species/", include_in_schema=False)
+@app.get("/species/{full_path:path}", include_in_schema=False)
+def serve_species_spa(full_path: str = "") -> Response:
+    """Serve the species/reaction SPA for every /species/* route."""
+    return _spa_index(SPECIES_STATIC_DIR, "Species")
+
+
 HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
 
 

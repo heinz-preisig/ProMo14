@@ -11,6 +11,7 @@
     "dev:equation": "npm run dev -w @promo/equation-editor",
     "dev:behaviour": "npm run dev -w @promo/behaviour-linker",
     "dev:instantiation": "npm run dev -w @promo/instantiation",
+    "dev:species": "npm run dev -w @promo/species",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   }
