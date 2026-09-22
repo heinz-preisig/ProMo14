@@ -39,6 +39,10 @@ from backend.ontology.service import (
     scoped_context,
 )
 
+from backend.equation.compile_space import CompileSpace
+from backend.equation.errors import VarError
+from backend.equation.parser import ParseError
+
 from . import router
 from .builder import (
     AssignmentInfo,
@@ -49,7 +53,10 @@ from .builder import (
     _frag,
 )
 from .builder import build as build_model
+from .emit_julia import emit_julia
+from .emit_python import emit_python
 from .fbuilder import build
+from .plan import plan
 from .scheduler import schedule
 from .resolver import (
     ArcInfo,
@@ -153,6 +160,16 @@ class ScheduleOut(BaseModel):
 
     levels: List[List[SchedBlockOut]] = Field(default_factory=list)
     loops: List[List[List[str]]] = Field(default_factory=list)
+
+
+class CodeOut(BaseModel):
+    """Generated source for one target."""
+
+    ok: bool
+    target: str
+    source: str = ""
+    error: Optional[str] = None
+    problems: List[str] = Field(default_factory=list)
 
 
 class InstantiationReportOut(BaseModel):
@@ -460,3 +477,67 @@ def model_instantiation(
             for p in report.problems],
         labels=labels,
     )
+
+
+def _code_space(store, vars_graph: Optional[str]) -> CompileSpace:
+    """A CompileSpace over the var/expr scope for RHS rendering —
+    every variable's network is accessible so unqualified labels
+    resolve."""
+    ctx = scoped_context(store, vars_graph)
+    variables = ctx.variables()
+    return CompileSpace(
+        variables, ctx.indices(),
+        variable_definition_network="",
+        expression_definition_network="",
+        accessible_networks={v.network for v in variables.values()})
+
+
+_EMITTERS = {"python": emit_python, "julia": emit_julia}
+
+
+@router.get("/code", response_model=CodeOut)
+def model_code(
+    graph_iri: Optional[str] = Depends(graph_param),
+    vars: Optional[str] = None,
+    target: str = "python",
+) -> CodeOut:
+    """§19 codegen: emit the model's derivative function.
+
+    Same assembly as ``/model`` (report + schedule + incidence),
+    then ``plan()`` lowers it to a ``CodePlan`` and the target
+    emitter renders the source.  ``target`` is ``python`` or
+    ``julia`` (matlab pending)."""
+    if not graph_iri:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= (model artefact IRI) is required")
+    if target not in _EMITTERS:
+        raise HTTPException(
+            status_code=400,
+            detail="target must be one of %s" % sorted(_EMITTERS))
+    store = get_store()
+    model_graph = resolve_graph(store, graph_iri)
+    nodes, arcs, sub_indices, parents, labels = _collect(
+        store, model_graph)
+    memberships = resolve(nodes, arcs, sub_indices, parents)
+    inc = build(nodes, arcs, memberships, sub_indices)
+
+    variables, equations, indices, var_labels = _vars_collect(
+        store, vars)
+    labels.update(var_labels)
+    token_parents, token_kinds = _token_taxonomy(store, model_graph)
+    assignments = _assignments_collect(store, vars, labels)
+
+    report = build_model(
+        nodes, arcs, memberships, sub_indices, indices,
+        assignments, variables, equations,
+        token_parents, token_kinds)
+    sched = schedule(report)
+    cp = plan(report, sched, inc, equations, indices)
+    try:
+        source = _EMITTERS[target](cp, _code_space(store, vars))
+    except (ParseError, VarError) as e:
+        return CodeOut(ok=False, target=target, error=str(e),
+                       problems=[p.kind for p in report.problems])
+    return CodeOut(ok=True, target=target, source=source,
+                   problems=[p.kind for p in report.problems])

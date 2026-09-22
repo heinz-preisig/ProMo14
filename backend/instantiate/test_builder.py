@@ -755,12 +755,14 @@ def _seed_endpoint_model(store):
             g.add((iri, PROMO["portVariable"], Literal(True)))
         return str(iri)
 
-    def eq(frag, lhs_iri, inputs, internal_id):
+    def eq(frag, lhs_iri, inputs, internal_id, rhs=""):
         iri = URIRef(_eq(frag))
         g.add((iri, RDF.type, PROMO["Equation"]))
         g.add((iri, PROMO["internalID"], Literal(internal_id)))
         g.add((iri, PROMO["incidenceList"],
                Literal(json.dumps(inputs))))
+        if rhs:
+            g.add((iri, PROMO["rhs"], Literal(rhs)))
         g.add((URIRef(lhs_iri), PROMO["hasEquation"], iri))
         return str(iri)
 
@@ -783,9 +785,9 @@ def _seed_endpoint_model(store):
     pin = var("p_in", "effort in", [_idx("idx_arc_diffusion")],
               [_tok("mass")], internal_id="V_6")
 
-    e_bal = eq("bal", m, [f, j], "E_1")
-    e_prop = eq("prop", p, [m], "E_2")
-    e_flow = eq("flow", j, [k, pin], "E_3")
+    e_bal = eq("bal", m, [f, j], "E_1", rhs="V_4 * V_3")
+    e_prop = eq("prop", p, [m], "E_2", rhs="V_1")
+    e_flow = eq("flow", j, [k, pin], "E_3", rhs="V_5 . V_6")
     return {
         "nodes": (n1, n2, n3), "m": m, "p": p, "j": j, "f": f,
         "k": k, "pin": pin,
@@ -877,4 +879,57 @@ def test_model_endpoint(client):
 
 def test_model_endpoint_requires_graph(client):
     r = client.get("/api/instantiate/model")
+    assert r.status_code == 400
+
+
+def _seed_assignments(client, ids):
+    """The two behaviour assignments for the seeded model."""
+    r = client.put("/api/behaviour/assignment", json={
+        "entity_type": _et("lumped_capacity"),
+        "sequence": [ids["e_bal"], ids["e_prop"]],
+        "base_equation": ids["e_bal"],
+        "ports": [ids["j"]],
+    })
+    assert r.status_code == 200, r.text
+    r = client.put("/api/behaviour/assignment", json={
+        "entity_type": _et("diffusion_transport"),
+        "sequence": [ids["e_flow"]],
+        "instantiated": [ids["k"]],
+        "ports": [ids["pin"]],
+    })
+    assert r.status_code == 200, r.text
+
+
+def test_code_endpoint(client):
+    """GET /api/instantiate/code emits the derivative function for
+    the seeded model — python and julia."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+
+    r = client.get("/api/instantiate/code",
+                   params={"graph": graph, "target": "python"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] and body["target"] == "python"
+    src = body["source"]
+    assert "def derivative(t, y, par):" in src
+    assert "V_1 = y[0:2]" in src
+    assert 'V_5 = par["V_5"]' in src
+    assert "V_6 = V_2[[0, 1]]" in src
+    assert "V_3_diffusion_transport = V_5 * V_6" in src
+    assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
+            "axes=([1], [0]))" in src)
+
+    r = client.get("/api/instantiate/code",
+                   params={"graph": graph, "target": "julia"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] and body["target"] == "julia"
+    assert "function derivative!(dy, y, par, t)" in body["source"]
+    assert "dy[1:2] = V_4 * V_3_lumped_capacity" in body["source"]
+
+    r = client.get("/api/instantiate/code",
+                   params={"graph": graph, "target": "cobol"})
     assert r.status_code == 400
