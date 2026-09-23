@@ -53,6 +53,8 @@ export interface ModelDocument {
   arcCounter: number
   /** §20 model-level species aliasing: Component IRI → local name. */
   speciesAliases?: Record<string, string>
+  /** §20 species-artefact pin(s) on the graph IRI (artefact metadata). */
+  usesSpecies?: string[]
 }
 
 export function serializeState(state: AppState): ModelDocument {
@@ -97,6 +99,7 @@ export function serializeState(state: AppState): ModelDocument {
     nextTreeId: state.tree.nextId,
     arcCounter: state.arcCounter,
     speciesAliases: Object.fromEntries(state.speciesAliases),
+    usesSpecies: state.speciesPin ? [state.speciesPin] : [],
   }
 }
 
@@ -172,6 +175,7 @@ export function deserializeState(doc: ModelDocument): AppState {
     selectedModelArcIri: null,
     arcCounter: doc.arcCounter,
     speciesAliases: new Map(Object.entries(doc.speciesAliases ?? {})),
+    speciesPin: doc.usesSpecies?.[0] ?? null,
   }
 }
 

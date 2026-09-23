@@ -3,7 +3,7 @@ import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
-import { GRAPH_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, loadModel, saveModel, saveOntology } from './api'
+import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, loadModel, saveModel, saveOntology } from './api'
 import type { SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
@@ -47,31 +47,38 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
-    fetchSpecies().then((d) => { if (!cancelled) setSpeciesDoc(d) })
-    fetchEntityCapabilities()
-      .then((m) => { if (!cancelled) setCapabilities(m) })
-      .catch(() => { /* capabilities optional — gestures stay hidden */ })
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
     RemoteCatalogue.load(catalogueFetchers, placeholderCatalogue).then((cat) => {
       if (!cancelled) setCatalogue(cat)
     })
     return () => { cancelled = true }
   }, [])
 
-  // Load the persisted model document once on start (ADR-007).
+  // Load the persisted model document once on start (ADR-007), then
+  // resolve the species artefact: ?species= overrides the model's
+  // promo:usesSpecies pin; a URL override is seeded into state so the
+  // next save stamps the pin (§20).
   useEffect(() => {
     let cancelled = false
+    fetchEntityCapabilities()
+      .then((m) => { if (!cancelled) setCapabilities(m) })
+      .catch(() => { /* capabilities optional — gestures stay hidden */ })
     loadModel()
       .then((doc) => {
-        if (!cancelled && hasContent(doc)) {
+        if (cancelled) return null
+        if (hasContent(doc)) {
           dispatch({ type: 'loadState', state: deserializeState(doc) })
         }
+        if (SPECIES_IRI) {
+          dispatch({ type: 'setSpeciesPin', iri: SPECIES_IRI })
+        }
+        return SPECIES_IRI ?? doc.usesSpecies?.[0] ?? null
       })
-      .catch(() => { /* backend down or empty artefact — start fresh */ })
+      .catch(() => SPECIES_IRI ?? null)  // backend down — honour the URL param
+      .then((iri) => {
+        if (cancelled || !iri) return
+        fetchSpecies(iri)
+          .then((d) => { if (!cancelled) setSpeciesDoc(d) })
+      })
     return () => { cancelled = true }
   }, [])
 

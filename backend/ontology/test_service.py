@@ -918,6 +918,52 @@ def test_catalogue_new_and_fork(client):
     assert r.json()["iri"] == f"{v_iri}-fork"
 
 
+def test_catalogue_species_pins(client):
+    """§20: usesSpecies pins — stamped at creation, replaceable via
+    PUT /pins (drafts only), copied on fork, shown on the line."""
+    store = graph_store.get_store()
+
+    r = client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/scheme", "type": "species",
+        "label": "Scheme"})
+    assert r.status_code == 200
+    r = client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/m1", "type": "model",
+        "uses_species": ["https://example.org/scheme"]})
+    assert r.status_code == 200
+
+    lines = client.get("/api/catalogue").json()["lines"]
+    m1 = [l for l in lines if l["iri"] == "https://example.org/m1"][0]
+    assert m1["usesSpecies"] == ["https://example.org/scheme"]
+
+    # PUT /pins replaces the named set only.
+    client.put("/api/catalogue/pins", json={
+        "iri": "https://example.org/m1",
+        "usesSpecies": ["https://example.org/other-scheme"]})
+    g = store.dataset.graph("https://example.org/m1")
+    pins = {str(o) for o in g.objects(
+        g.identifier, graph_store.PROMO["usesSpecies"])}
+    assert pins == {"https://example.org/other-scheme"}
+
+    # Unknown artefact -> 404; frozen graph -> 403.
+    assert client.put("/api/catalogue/pins", json={
+        "iri": "https://example.org/none",
+        "usesSpecies": []}).status_code == 404
+    v_iri = store.freeze_version("9.9-test")
+    assert client.put("/api/catalogue/pins", json={
+        "iri": str(v_iri),
+        "usesSpecies": ["https://example.org/x"]}).status_code == 403
+
+    # Fork carries the pin.
+    r = client.post("/api/catalogue/fork", json={
+        "source": "https://example.org/m1",
+        "new_iri": "https://example.org/m2"})
+    assert r.status_code == 200
+    fg = store.dataset.graph("https://example.org/m2")
+    assert (fg.identifier, graph_store.PROMO["usesSpecies"],
+            URIRef("https://example.org/other-scheme")) in fg
+
+
 def test_equation_context_scoped_by_pins(client):
     """R4 end-to-end: /api/equation/context?graph=<lib> resolves the
     library plus its transitive usesOntology pins — and nothing else."""

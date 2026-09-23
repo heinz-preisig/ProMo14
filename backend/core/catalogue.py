@@ -52,6 +52,7 @@ def _new_line(iri: str) -> Dict[str, Any]:
         "status": "frozen",
         "versions": [],
         "usesOntology": [],
+        "usesSpecies": [],
     }
 
 
@@ -87,6 +88,8 @@ def catalogue() -> Dict[str, Any]:
             line["label"] = _label(g, gid)
             line["usesOntology"] = [
                 str(o) for o in g.objects(gid, PROMO["usesOntology"])]
+            line["usesSpecies"] = [
+                str(o) for o in g.objects(gid, PROMO["usesSpecies"])]
 
     for line in lines.values():
         line["versions"].sort(key=lambda v: v["version"])
@@ -98,6 +101,7 @@ class NewArtefactRequest(BaseModel):
     type: str
     label: Optional[str] = None
     uses: List[str] = []
+    uses_species: List[str] = []
 
 
 class ForkRequest(BaseModel):
@@ -116,13 +120,49 @@ def new_artefact(req: NewArtefactRequest) -> Dict[str, Any]:
     store = get_store()
     try:
         iri = store.create_artefact_graph(
-            req.iri, req.type, label=req.label, uses=req.uses)
+            req.iri, req.type, label=req.label, uses=req.uses,
+            uses_species=req.uses_species)
     except ValueError as exc:
         detail = str(exc)
         code = 422 if "unknown artefact type" in detail else 409
         raise HTTPException(status_code=code, detail=detail)
     store.save()
     return {"iri": str(iri)}
+
+
+class PinsRequest(BaseModel):
+    iri: str
+    usesOntology: Optional[List[str]] = None
+    usesSpecies: Optional[List[str]] = None
+
+
+@router.put("/pins")
+def update_pins(req: PinsRequest) -> Dict[str, Any]:
+    """Replace an artefact's pin sets (drafts only).
+
+    Each provided pin kind is replaced wholesale; absent kinds are left
+    untouched.  Frozen version graphs are immutable (R5) — pin their
+    draft line instead.
+    """
+    store = get_store()
+    gid = URIRef(req.iri)
+    g = store.dataset.graph(gid)
+    if not len(g):
+        raise HTTPException(status_code=404,
+                            detail=f"no such artefact: {req.iri}")
+    if store.is_frozen(g):
+        raise HTTPException(status_code=403,
+                            detail="frozen versions are read-only")
+    for pred, targets in (
+        (PROMO["usesOntology"], req.usesOntology),
+        (PROMO["usesSpecies"], req.usesSpecies),
+    ):
+        if targets is None:
+            continue
+        g.remove((gid, pred, None))
+        for t in targets:
+            g.add((gid, pred, URIRef(t)))
+    return {"iri": req.iri}
 
 
 @router.post("/fork")

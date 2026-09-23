@@ -959,7 +959,8 @@ class RdfStore:
         # they never appear inside the ontology itself.  The artefact
         # type classes are declared likewise — they mark graph IRIs,
         # which live outside the ontology's own instance data.
-        for term in (PROMO["usesOntology"], PROMO["generatedFrom"],
+        for term in (PROMO["usesOntology"], PROMO["usesSpecies"],
+                     PROMO["generatedFrom"],
                      PROMO["versionOf"], PROMO["versionInfo"],
                      PROMO["publishedOn"]):
             if (term, RDF.type, RDF.Property) not in graph:
@@ -1024,12 +1025,15 @@ class RdfStore:
         artefact_type: str,
         label: Optional[str] = None,
         uses: Optional[List[Union[str, URIRef]]] = None,
+        uses_species: Optional[List[Union[str, URIRef]]] = None,
     ) -> URIRef:
         """Create an empty artefact graph with type marker and pins.
 
         ``artefact_type`` is one of ``ARTEFACT_TYPES`` (case-insensitive).
         ``uses`` stamps ``promo:usesOntology`` pins — the ontology set the
-        artefact is checked against (R2).  Raises ``ValueError`` if the
+        artefact is checked against (R2).  ``uses_species`` stamps
+        ``promo:usesSpecies`` pins — the §20 reaction scheme the artefact
+        draws its species vocabulary from.  Raises ``ValueError`` if the
         graph already exists or the type is unknown.
         """
         if artefact_type.lower() not in {t.lower() for t in ARTEFACT_TYPES}:
@@ -1046,6 +1050,8 @@ class RdfStore:
             g.add((iri, RDFS.label, Literal(label)))
         for pin in uses or []:
             g.add((iri, PROMO["usesOntology"], URIRef(str(pin))))
+        for pin in uses_species or []:
+            g.add((iri, PROMO["usesSpecies"], URIRef(str(pin))))
         self.declare_vocabulary(g)
         return iri
 
@@ -1101,6 +1107,8 @@ class RdfStore:
                 dst.add((new, RDF.type, t))
         for pin in src.objects(source, PROMO["usesOntology"]):
             dst.add((new, PROMO["usesOntology"], pin))
+        for pin in src.objects(source, PROMO["usesSpecies"]):
+            dst.add((new, PROMO["usesSpecies"], pin))
         dst.add((new, PROMO["versionOf"], source))
         if label:
             dst.add((new, RDFS.label, Literal(label)))

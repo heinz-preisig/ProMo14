@@ -12,8 +12,9 @@ import type { ModelDocument } from './modelPersistence'
 export const GRAPH_IRI =
   new URLSearchParams(window.location.search).get('graph') || undefined
 
-/** The species artefact this model draws its vocabulary from — the
- *  ``?species=`` param (§20).  Undefined = no species editing. */
+/** The species artefact override — the ``?species=`` param (§20).
+ *  When absent the model's promo:usesSpecies pin supplies the IRI
+ *  (resolved in App after loadModel).  Undefined = no override. */
 export const SPECIES_IRI =
   new URLSearchParams(window.location.search).get('species') || undefined
 
@@ -87,11 +88,13 @@ export interface SpeciesDocument {
   reactions: SpeciesReaction[]
 }
 
-/** Load the species artefact (its own graph — not the model's). */
-export async function fetchSpecies(): Promise<SpeciesDocument | null> {
-  if (!SPECIES_IRI) return null
+/** Load a species artefact (its own graph — not the model's). */
+export async function fetchSpecies(
+    iri: string | undefined,
+): Promise<SpeciesDocument | null> {
+  if (!iri) return null
   const res = await fetch(
-    `/api/species/species?graph=${encodeURIComponent(SPECIES_IRI)}`)
+    `/api/species/species?graph=${encodeURIComponent(iri)}`)
   if (!res.ok) return null
   return res.json()
 }

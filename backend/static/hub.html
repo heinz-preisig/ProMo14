@@ -28,6 +28,7 @@
   .chip { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px;
           border-radius: 10px; font-size: 11px; background: #eef3ee;
           color: #2e8b57; font-family: ui-monospace, monospace; }
+  .chip.species { background: #f1eaf7; color: #6b3fa0; }
   .ver { font-family: ui-monospace, monospace; font-size: 12px;
          white-space: nowrap; }
   .iri { font-family: ui-monospace, monospace; font-size: 11px;
@@ -103,6 +104,28 @@ async function post(path, body) {
   return r.json();
 }
 
+async function put(path, body) {
+  const r = await fetch(path, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body) });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || `${path}: ${r.status}`);
+  }
+  return r.json();
+}
+
+async function pinSpecies(line) {
+  const cur = (line.usesSpecies || [])[0] || '';
+  const iri = prompt('Species artefact IRI to pin (empty clears):', cur);
+  if (iri === null) return;
+  try {
+    await put('/api/catalogue/pins',
+              { iri: line.iri, usesSpecies: iri.trim() ? [iri.trim()] : [] });
+    location.reload();
+  } catch (e) { msg(e.message); }
+}
+
 async function forkArtefact(iri) {
   const newIri = prompt('IRI for the forked artefact:', `${iri}-fork`);
   if (!newIri) return;
@@ -122,10 +145,16 @@ async function newArtefact() {
   const label = prompt('Label (optional):', '');
   const uses = prompt('Ontology pins — comma-separated graph IRIs (optional):',
                       'https://w3id.org/promo/ontology');
+  let usesSpecies = [];
+  if (type === 'model' || type === 'glass') {
+    const sp = prompt('Species artefact pin — graph IRI (optional):', '');
+    if (sp && sp.trim()) usesSpecies = [sp.trim()];
+  }
   try {
     await post('/api/catalogue/new', {
       iri, type, label: label || null,
-      uses: uses ? uses.split(',').map(s => s.trim()).filter(Boolean) : [] });
+      uses: uses ? uses.split(',').map(s => s.trim()).filter(Boolean) : [],
+      uses_species: usesSpecies });
     location.reload();
   } catch (e) { msg(e.message); }
 }
@@ -145,6 +174,8 @@ function render(lines) {
     ).join('<br>');
     const pins = l.usesOntology.map(p =>
       `<span class="chip" title="${esc(p)}">${esc(p.split('#').pop().split('/').pop())}</span>`
+    ).join('') + (l.usesSpecies || []).map(p =>
+      `<span class="chip species" title="species: ${esc(p)}">${esc(p.split('#').pop().split('/').pop())}</span>`
     ).join('');
     const app = APPS[l.type];
     const openBtn = app
@@ -154,18 +185,21 @@ function render(lines) {
     const instBtn = (l.type === 'model' || l.type === 'glass')
       ? `<button onclick='instantiateArtefact(${JSON.stringify(l)})'>Instantiate</button>`
       : '';
+    const pinBtn = (l.type === 'model' || l.type === 'glass') && l.status === 'draft'
+      ? `<button onclick='pinSpecies(${JSON.stringify(l)})'>Species…</button>`
+      : '';
     return `<tr>
       <td><strong>${esc(l.label)}</strong><br><span class="iri">${esc(l.iri)}</span></td>
       <td><span class="type">${esc(l.type)}</span></td>
       <td class="status-${l.status}">${esc(l.status)}</td>
       <td>${vers}</td>
       <td>${pins}</td>
-      <td>${openBtn}${instBtn}${forkBtn}</td>
+      <td>${openBtn}${instBtn}${pinBtn}${forkBtn}</td>
     </tr>`;
   }).join('');
   root.innerHTML = `<table>
     <thead><tr><th>Artefact</th><th>Type</th><th>Status</th>
-    <th>Versions</th><th>Uses ontology</th><th></th></tr></thead>
+    <th>Versions</th><th>Pins</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }
 

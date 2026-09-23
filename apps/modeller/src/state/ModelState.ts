@@ -18,6 +18,9 @@ export interface AppState {
    *  ("A" :: "H2O").  The species artefact owns the vocabulary; the
    *  model owns its interpretation.  Persisted as promo:speciesAlias. */
   speciesAliases: Map<string, string>
+  /** §20 species-artefact pin (promo:usesSpecies on the graph IRI) —
+   *  which scheme this model draws its species vocabulary from. */
+  speciesPin: string | null
 }
 
 export const initialState: AppState = {
@@ -32,6 +35,7 @@ export const initialState: AppState = {
   selectedModelArcIri: null,
   arcCounter: 1,
   speciesAliases: new Map(),
+  speciesPin: null,
 }
 
 // ─── Commands (discriminated union) ───
@@ -53,6 +57,7 @@ export type Command =
   | { type: 'setNodeSpecies'; iri: string; speciesAllocation?: string; reactions?: string[] }
   | { type: 'setArcPermeable'; iri: string; permeable?: string[] }
   | { type: 'setSpeciesAlias'; componentIri: string; alias: string }
+  | { type: 'setSpeciesPin'; iri: string | null }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -218,6 +223,9 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       else speciesAliases.delete(cmd.componentIri)
       return { ...state, speciesAliases }
     }
+
+    case 'setSpeciesPin':
+      return { ...state, speciesPin: cmd.iri }
 
     case 'groupNodes': {
       const nextTree = new TreeOps(state.tree)

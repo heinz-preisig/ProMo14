@@ -23,6 +23,10 @@ RDF shape (see docs/ADR-007-model-persistence.md):
   model-local reading of an abstract species (``A`` :: ``H2O``).
   Statements about *external* subjects — the species artefact owns the
   vocabulary, the model owns its interpretation.
+- ``promo:usesSpecies`` — pin on the graph IRI naming the species
+  artefact (§20).  Artefact-level metadata, not model content: the
+  wipe below skips the graph IRI so type marker, label and pins
+  survive a document save.
 """
 
 from __future__ import annotations
@@ -103,6 +107,8 @@ class ModelDocument(BaseModel):
     arcCounter: int = 1
     # §20 model-level species aliasing: Component IRI → local name.
     speciesAliases: Dict[str, str] = Field(default_factory=dict)
+    # §20 species-artefact pin(s) on the graph IRI (artefact metadata).
+    usesSpecies: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +214,10 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
     for comp, alias in graph.subject_objects(PROMO["speciesAlias"]):
         doc.speciesAliases[str(comp)] = str(alias)
 
+    doc.usesSpecies = sorted(
+        str(o) for o in graph.objects(graph.identifier,
+                                      PROMO["usesSpecies"]))
+
     return doc
 
 
@@ -220,9 +230,13 @@ def put_model(
     store = get_store()
     graph = resolve_graph(store, graph_iri)
 
-    # wipe existing model triples
+    # wipe existing model triples — but never the graph IRI itself:
+    # it is typed promo:Model by create_artefact_graph and carries the
+    # artefact's self-description (type marker, label, pins).
     for t in _MODEL_TYPES:
         for s in list(graph.subjects(RDF.type, PROMO[t])):
+            if s == graph.identifier:
+                continue
             graph.remove((s, None, None))
     # speciesAlias subjects are external Component IRIs — not caught by
     # the typed-subject wipe above; clear them explicitly.
@@ -294,5 +308,11 @@ def put_model(
         if alias:
             graph.set((URIRef(comp), PROMO["speciesAlias"],
                        Literal(alias)))
+
+    # §20 species pin — replace the artefact's usesSpecies set with the
+    # document's (whole-document semantics).
+    graph.remove((graph.identifier, PROMO["usesSpecies"], None))
+    for pin in doc.usesSpecies:
+        graph.add((graph.identifier, PROMO["usesSpecies"], URIRef(pin)))
 
     return doc

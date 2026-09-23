@@ -63,8 +63,27 @@ The model carries placements (persisted in the model artefact):
 - `promo:permeable` — arc → Component IRIs that pass.
 
 The Properties panel (`apps/modeller/src/SpeciesPanel.tsx`) gates the
-pickers by capability.  The model names its species artefact via the
-`?species=<graph>` URL param.
+pickers by capability.
+
+## Model→species pin (implemented 2026-09-23)
+
+The model names its species artefact via a `promo:usesSpecies` pin on
+the model graph IRI — the persistent form of the `?species=` param,
+mirroring `usesOntology`:
+
+- **Stamped** at creation (`POST /api/catalogue/new` `uses_species`),
+  copied on fork, replaceable on drafts via `PUT /api/catalogue/pins`
+  (frozen → 403).  The hub shows purple species chips and a
+  **Species…** button on model lines.
+- **Read** by the modeller: `ModelDocument.usesSpecies` round-trips;
+  `?species=` overrides the pin and is seeded into state so the next
+  save stamps it (migration path from the URL param).
+- **Consumed** by `/api/instantiate/model` + `/code`: `?species=`
+  falls back to the pin (`_species_pin`).
+- **Fixed en route:** `PUT /api/modeller/model`'s typed-subject wipe
+  no longer deletes the graph IRI's self-description — it is typed
+  `promo:Model` itself, so artefact type, label and pins were being
+  wiped on every save.
 
 ## Model-level aliasing (ruled + implemented 2026-09-23)
 
@@ -131,6 +150,6 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
 - **Species-present readout** — show per-node/arc species in the
   modeller (the distribution is computed server-side; needs a small
   endpoint or reuse of the report).
-- **Model→species pin** — currently a `?species=` URL param; a
-  persistent `promo:usesSpecies` pin on the model artefact would be
-  cleaner (settable at creation / in the hub).
+- **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
+  modeller UI uses the first only; a model doc save drops additional
+  pins (single-scheme-per-model assumption).

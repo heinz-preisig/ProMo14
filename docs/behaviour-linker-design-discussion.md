@@ -1914,3 +1914,10 @@ the model graph), never in the species app.
   toolbar **Species aliases** dialog
   (`apps/modeller/src/SpeciesAliasDialog.tsx`); pickers resolve
   `alias ?? label ?? frag`.
+- **Model→species pin (2026-09-23)** — `promo:usesSpecies` on the
+  model graph IRI: stamped at creation (`uses_species` on
+  `/api/catalogue/new`), copied on fork, replaceable on drafts via
+  `PUT /api/catalogue/pins`, surfaced in the hub (chips + Species…
+  button).  The modeller resolves the scheme from the pin —
+  `?species=` is now an override that re-stamps the pin on save —
+  and `/api/instantiate/model` + `/code` fall back to it.

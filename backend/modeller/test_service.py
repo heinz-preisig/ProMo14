@@ -104,3 +104,38 @@ def test_species_aliases(client):
     client.put("/api/modeller/model", json=_doc())
     got = client.get("/api/modeller/model").json()
     assert got["speciesAliases"] == {}
+
+
+def test_uses_species_pin(client):
+    """§20: the artefact's usesSpecies pin round-trips through the
+    document, and PUT preserves the graph IRI's self-description —
+    the artefact type marker and other pins live on the graph IRI,
+    which is itself typed promo:Model and so inside the wipe set."""
+    from rdflib import RDF, URIRef
+    from backend.core.graph_store import PROMO, get_store
+
+    iri = "https://example.org/model-pin-test"
+    assert client.post("/api/catalogue/new", json={
+        "iri": iri, "type": "model",
+        "uses": ["https://w3id.org/promo/ontology"],
+        "uses_species": ["https://example.org/scheme"]}).status_code == 200
+
+    doc = _doc()
+    doc["usesSpecies"] = ["https://example.org/scheme"]
+    r = client.put(f"/api/modeller/model?graph={iri}", json=doc)
+    assert r.status_code == 200
+
+    got = client.get(f"/api/modeller/model?graph={iri}").json()
+    assert got["usesSpecies"] == ["https://example.org/scheme"]
+
+    # graph-IRI self-description survived the PUT wipe
+    g = get_store().dataset.graph(URIRef(iri))
+    gid = g.identifier
+    assert (gid, RDF.type, PROMO["Model"]) in g
+    assert (gid, PROMO["usesOntology"],
+            URIRef("https://w3id.org/promo/ontology")) in g
+
+    # doc without the pin clears it (whole-document semantics)
+    client.put(f"/api/modeller/model?graph={iri}", json=_doc())
+    got = client.get(f"/api/modeller/model?graph={iri}").json()
+    assert got["usesSpecies"] == []

@@ -290,6 +290,13 @@ def _species_index_iri(store, model_graph) -> Optional[str]:
     return None
 
 
+def _species_pin(model_graph) -> Optional[str]:
+    """The model artefact's ``promo:usesSpecies`` pin (first), if any —
+    the persistent form of the ``?species=`` param (§20)."""
+    pin = model_graph.value(model_graph.identifier, PROMO["usesSpecies"])
+    return str(pin) if pin is not None else None
+
+
 def _species_distribution(store, model_graph, species_graph_iri
                           ) -> Optional[SpeciesDistribution]:
     """Run the §20 distribution for a model against a species artefact.
@@ -529,8 +536,10 @@ def model_instantiation(
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, vars, labels)
 
-    # §20 species distribution → bind the species index.
-    dist = _species_distribution(store, model_graph, species)
+    # §20 species distribution → bind the species index.  The
+    # ?species= param overrides the artefact's usesSpecies pin.
+    dist = _species_distribution(
+        store, model_graph, species or _species_pin(model_graph))
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
 
@@ -645,8 +654,10 @@ def model_code(
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, vars, labels)
 
-    # §20 species distribution → bind the species index.
-    dist = _species_distribution(store, model_graph, species)
+    # §20 species distribution → bind the species index.  The
+    # ?species= param overrides the artefact's usesSpecies pin.
+    dist = _species_distribution(
+        store, model_graph, species or _species_pin(model_graph))
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
 
