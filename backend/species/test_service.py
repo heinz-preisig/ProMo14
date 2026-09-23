@@ -49,9 +49,7 @@ def test_species_roundtrip(client):
         "reactions": [
             {"iri": f"{graph}/Reaction_r1", "label": "r1",
              "reactants": [f"{graph}/Component_A", f"{graph}/Component_B"],
-             "products": [f"{graph}/Component_C"],
-             "stoichiometry": {f"{graph}/Component_A": 2,
-                               f"{graph}/Component_C": 3}},
+             "products": [f"{graph}/Component_C"]},
         ],
     }
     r = client.put("/api/species/species",
@@ -76,9 +74,6 @@ def test_species_roundtrip(client):
         f"{graph}/Component_A", f"{graph}/Component_B"]
     assert rxn[f"{graph}/Reaction_r1"]["products"] == [
         f"{graph}/Component_C"]
-    # §20 stoichiometry slots: member -> coefficient (missing = 1).
-    assert rxn[f"{graph}/Reaction_r1"]["stoichiometry"] == {
-        f"{graph}/Component_A": 2, f"{graph}/Component_C": 3}
 
 
 def test_species_artefact_type_in_catalogue(client):

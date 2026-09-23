@@ -154,16 +154,15 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
 
 ## Open / deferred
 
-- **Stoichiometry — scheme side done (2026-09-23).**  `Reaction`
-  carries a `promo:stoichiometry` JSON literal
-  `{componentIRI: coeff}` — positive numbers for members only
-  (missing = 1, absent = elementary step); the sign comes from
-  reactant/product membership, so the map can't contradict the sets.
-  Consumers build the signed column `N[:,r]` when binding kinetics.
-  Edited in the species app (number input on each checked member,
-  pruned on uncheck).  **Open:** the binding — reaction-domain
-  kinetics don't exist yet; when they do, instantiation reads the
-  slots and wires ν into the rate law (`r = k∏c^ν`, `dc/dt = N·r`).
+- **Stoichiometry** — ruled (2026-09-23, corrected): the scheme
+  stays at the `[A,B] → [C]` set level — no coefficients on
+  `Reaction`.  The stoichiometric vector ν enters only in the
+  reaction law (kinetics) and is supplied **at instantiation time**:
+  when a hosted reaction's equation is instantiated, ν is bound and
+  persisted with the *instantiated* model artefact — the model
+  library holds instantiated models, each self-contained.  (An
+  earlier scheme-side `promo:stoichiometry` slot was reverted the
+  same day.)
 - **`Q` (reaction index)** — could bind by the same mechanism.
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
   modeller UI uses the first only; a model doc save drops additional

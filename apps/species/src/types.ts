@@ -16,10 +16,6 @@ export interface ReactionDoc {
   label: string
   reactants: string[] // Component IRIs
   products: string[] // Component IRIs
-  /** member IRI → coefficient (positive; sign from membership,
-   *  missing = 1).  The scheme's stoichiometric slots — values bind
-   *  into kinetic equations at instantiation (§20). */
-  stoichiometry?: Record<string, number>
 }
 
 export interface SpeciesDocument {
