@@ -99,11 +99,13 @@ export async function fetchSpecies(
   return res.json()
 }
 
-/** §20 readout: species present per node / carried per arc. */
+/** §20 readout: species present per node / carried per arc, and the
+ *  active reaction set per node (the Q index's elements). */
 export interface SpeciesDistribution {
   species: string | null
   nodes: Record<string, string[]>
   arcs: Record<string, string[]>
+  reactions: Record<string, string[]>
 }
 
 /** Live species distribution for the model — ?species= overrides the

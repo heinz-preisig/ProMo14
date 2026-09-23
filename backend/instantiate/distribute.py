@@ -6,7 +6,9 @@ reservoir (constant environment system) injects an allocated set,
 transport arcs pass a permeable subset, and reactions produce species
 where their reactants are present.  The result is the element set for
 the species index ``S`` on every node and arc — the input the §19
-builder needs to bind ``S``.
+builder needs to bind ``S`` — plus the element set for the reaction
+index ``Q``: the hosted reactions whose reactants are present (the
+ones that fired) on each node.
 
 The engine is a pure function over a minimal input contract so it can
 be shared by the modeller (live "species present" feedback) and the
@@ -76,10 +78,13 @@ class SpeciesArtefact:
 
 @dataclass
 class SpeciesDistribution:
-    """The computed species set per node and per arc."""
+    """The computed species set per node and per arc, and the active
+    reaction set per node (the ``Q`` index's element set — only nodes
+    hosting at least one reaction appear)."""
 
     nodes: Dict[str, Set[str]] = field(default_factory=dict)
     arcs: Dict[str, Set[str]] = field(default_factory=dict)
+    reactions: Dict[str, Set[str]] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -136,4 +141,17 @@ def distribute(nodes: List[SpeciesNode],
                     node_sp[n_iri] |= r.products
                     changed = True
 
-    return SpeciesDistribution(nodes=node_sp, arcs=arc_sp)
+    # Q: a hosted reaction is active iff its reactants are present at
+    # the fixpoint — exactly the ones that fired above (species only
+    # accumulate, so firing is monotone).
+    node_rxn_active: Dict[str, Set[str]] = {}
+    for n in nodes:
+        if not n.reactions:
+            continue
+        node_rxn_active[n.iri] = {
+            r_id for r_id in n.reactions
+            if (r := artefact.reactions.get(r_id)) is not None
+            and r.reactants <= node_sp[n.iri]}
+
+    return SpeciesDistribution(nodes=node_sp, arcs=arc_sp,
+                               reactions=node_rxn_active)

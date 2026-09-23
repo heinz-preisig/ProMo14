@@ -99,6 +99,13 @@ nodes (also on nodes without species gestures — presence is
 informative everywhere) and **carries:** on transport arcs, rendered
 through the alias-aware `compLabel`.
 
+The same response carries **`reactions`**: node IRI → hosted
+reactions whose reactants are present at the fixpoint — the element
+set of the reaction index `Q`, bound by exactly the mechanism `S`
+uses (firing is monotone since species only accumulate).  Shown as
+**active:** on nodes.  Wiring `Q` into generated code awaits the
+reaction-domain equations (same blocker as stoichiometry).
+
 ## Model-level aliasing (ruled + implemented 2026-09-23)
 
 Species are abstract in the artefact; their *reading* is
@@ -163,7 +170,9 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
   library holds instantiated models, each self-contained.  (An
   earlier scheme-side `promo:stoichiometry` slot was reverted the
   same day.)
-- **`Q` (reaction index)** — could bind by the same mechanism.
+- **`Q` codegen binding** — the element set is computed and exposed
+  (see readout above); binding it into generated code awaits the
+  reaction-domain equations.
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
   modeller UI uses the first only; a model doc save drops additional
   pins (single-scheme-per-model assumption).

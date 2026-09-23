@@ -358,10 +358,12 @@ def _species_distribution(store, model_graph, species_graph_iri
 
 
 class SpeciesDistributionOut(BaseModel):
-    """§20 readout: species present per node / carried per arc."""
+    """§20 readout: species present per node / carried per arc, and
+    the active reaction set per node (the ``Q`` index's elements)."""
     species: Optional[str] = None   # resolved species artefact IRI
     nodes: Dict[str, List[str]] = {}
     arcs: Dict[str, List[str]] = {}
+    reactions: Dict[str, List[str]] = {}
 
 
 @router.get("/species-distribution", response_model=SpeciesDistributionOut)
@@ -389,7 +391,8 @@ def species_distribution(
     return SpeciesDistributionOut(
         species=sg_iri,
         nodes={k: sorted(v) for k, v in dist.nodes.items()},
-        arcs={k: sorted(v) for k, v in dist.arcs.items()})
+        arcs={k: sorted(v) for k, v in dist.arcs.items()},
+        reactions={k: sorted(v) for k, v in dist.reactions.items()})
 
 
 @router.get("/arc-indices", response_model=ArcIndexReport)

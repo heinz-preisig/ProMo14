@@ -52,9 +52,16 @@ export function SpeciesPanel({
     speciesDoc.components.find((c) => c.iri === iri)?.label ??
     frag(iri)
 
-  const readout = (label: string, iris: string[] | undefined) =>
+  const rxnLabel = (iri: string) =>
+    speciesDoc.reactions.find((r) => r.iri === iri)?.label ?? frag(iri)
+
+  const readout = (
+    label: string,
+    iris: string[] | undefined,
+    labelOf: (iri: string) => string = compLabel,
+  ) =>
     iris && iris.length > 0
-      ? <div style={S.muted}>{label}: {iris.map(compLabel).join(', ')}</div>
+      ? <div style={S.muted}>{label}: {iris.map(labelOf).join(', ')}</div>
       : null
 
   // ---- node gestures -------------------------------------------------------
@@ -62,11 +69,14 @@ export function SpeciesPanel({
     const canSource = nodeCaps.includes('species_source')
     const canReact = nodeCaps.includes('reaction_host')
     const present = dist?.nodes[node.iri]
-    if (!canSource && !canReact && !present?.length) return null
+    const active = dist?.reactions[node.iri]
+    if (!canSource && !canReact && !present?.length && !active?.length)
+      return null
     return (
       <div style={S.box}>
         <div style={S.head}>Species</div>
         {readout('present', present)}
+        {readout('active', active, rxnLabel)}
         {canSource && (
           <>
             <label style={S.label}>injects allocation</label>

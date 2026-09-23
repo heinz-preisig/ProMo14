@@ -1078,18 +1078,33 @@ def test_species_distribution_endpoint(client):
         e = URIRef(_et(et))
         g.add((e, RDF.type, PROMO["EntityType"]))
         g.add((e, PROMO["capability"], Literal(cap)))
+    g.add((URIRef(_et("lumped_capacity")), PROMO["capability"],
+           Literal("cap_reaction_host")))
 
-    # Species artefact: components A, B; allocation "feed" = {A, B}.
+    # Species artefact: components A, B, C; allocation "feed" = {A, B};
+    # r1 fires on the feed (A+B→C), r2 starves (D never present).
     sg = store.dataset.graph(store.create_artefact_graph(
         "https://example.org/scheme", "species"))
-    for c in ("A", "B"):
+    for c in ("A", "B", "C"):
         sg.add((URIRef(f"https://example.org/scheme#{c}"),
                 RDF.type, PROMO["Component"]))
+    for c in ("A", "B"):
         sg.add((URIRef("https://example.org/scheme#feed"),
                 PROMO["member"],
                 URIRef(f"https://example.org/scheme#{c}")))
     sg.add((URIRef("https://example.org/scheme#feed"),
             RDF.type, PROMO["Allocation"]))
+    for rid, reactants, products in (
+            ("r1", ("A", "B"), ("C",)),
+            ("r2", ("D",), ("E",))):
+        r = URIRef(f"https://example.org/scheme#{rid}")
+        sg.add((r, RDF.type, PROMO["Reaction"]))
+        for c in reactants:
+            sg.add((r, PROMO["reactant"],
+                    URIRef(f"https://example.org/scheme#{c}")))
+        for c in products:
+            sg.add((r, PROMO["product"],
+                    URIRef(f"https://example.org/scheme#{c}")))
 
     # Model artefact pinned to the scheme (and the ontology for the
     # entity types): reservoir injects feed, transport node passes it.
@@ -1104,6 +1119,10 @@ def test_species_distribution_endpoint(client):
     mg.add((r_, PROMO["entityType"], URIRef(_et("lumped_capacity"))))
     mg.add((r_, PROMO["speciesAllocation"],
             URIRef("https://example.org/scheme#feed")))
+    mg.add((r_, PROMO["hostsReaction"],
+            URIRef("https://example.org/scheme#r1")))
+    mg.add((r_, PROMO["hostsReaction"],
+            URIRef("https://example.org/scheme#r2")))
     mg.add((t_, RDF.type, PROMO["ModelNode"]))
     mg.add((t_, PROMO["entityType"], URIRef(_et("diffusion_transport"))))
     mg.add((a_, RDF.type, PROMO["ModelArc"]))
@@ -1116,10 +1135,16 @@ def test_species_distribution_endpoint(client):
     body = resp.json()
     assert body["species"] == "https://example.org/scheme"  # pin fallback
     both = {"https://example.org/scheme#A",
-            "https://example.org/scheme#B"}
+            "https://example.org/scheme#B",
+            "https://example.org/scheme#C"}     # C produced by r1
     assert set(body["nodes"][str(r_)]) == both
     assert set(body["nodes"][str(t_)]) == both   # transported
     assert set(body["arcs"][str(a_)]) == both
+
+    # Q: r1 is active on the reservoir (reactants present); r2 is
+    # hosted but starves; the transport node hosts nothing.
+    assert body["reactions"] == {
+        str(r_): ["https://example.org/scheme#r1"]}
 
     # A model with no pin and no ?species= -> empty maps.
     resp = client.get("/api/instantiate/species-distribution",
