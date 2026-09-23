@@ -1,6 +1,6 @@
 """Tests for ``backend/core/graph_store.py``."""
 
-from rdflib import Dataset, URIRef
+from rdflib import Dataset, Literal, URIRef
 from rdflib.namespace import RDF
 
 from .graph_store import PROMO, RdfStore
@@ -63,6 +63,45 @@ def test_migrate_equation_ids_noop_when_conforming(tmp_path):
     store._migrate_equation_ids()
     assert _equation_ids(g) == {"E_1", "E_2"}
     assert not store.dirty
+
+
+def test_migrate_equation_iris_rehomes_promo_namespace(tmp_path):
+    """promo#-minted equation IRIs move into the graph's own namespace
+    ({graphIRI}#) — promo# is vocabulary only — and object references
+    follow, including references from other graphs (assignment
+    sequences)."""
+    store = RdfStore(tmp_path)
+    g = store.dataset.get_context(URIRef(ARTEFACT))
+    var = URIRef(f"{ARTEFACT}#V_1")
+    old = URIRef(f"{PROMO}E_7")
+    g.add((var, RDF.type, PROMO["Variable"]))
+    g.add((old, RDF.type, PROMO["Equation"]))
+    g.add((old, PROMO["internalID"], Literal("E_7")))
+    g.add((var, PROMO["hasEquation"], old))
+    # A reference from a different graph (e.g. an assignment artefact).
+    other = store.dataset.get_context(URIRef("https://example.org/asg"))
+    res = URIRef("https://example.org/asg#a1")
+    other.add((res, PROMO["hasBaseEquation"], old))
+
+    store._migrate_equation_iris()
+
+    new = URIRef(f"{ARTEFACT}#E_7")
+    assert (new, RDF.type, PROMO["Equation"]) in g
+    assert (old, None, None) not in g
+    assert (var, PROMO["hasEquation"], new) in g
+    assert (var, PROMO["hasEquation"], old) not in g
+    assert (res, PROMO["hasBaseEquation"], new) in other
+    assert store.dirty
+
+
+def test_migrate_equation_iris_noop_when_conforming(tmp_path):
+    """Equations minted via add_variable_dict already land under the
+    artefact's namespace — the migration is a no-op."""
+    store, g = _store_with_equations(tmp_path, ["E_1"])
+    store._migrate_equation_iris()
+    assert not store.dirty
+    assert all(str(s).startswith(ARTEFACT)
+               for s in g.subjects(RDF.type, PROMO["Equation"]))
 
 
 def test_save_fans_out_per_artefact_line(tmp_path):

@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-21
+**Last updated:** 2026-09-23
 
 ## Summary
 
@@ -9,13 +9,14 @@
 | Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork` | `backend/static/hub.html` at `/` | covered by service tests | **Working** — artefact lines, pins, fork, open-in-app |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
 | Equation Editor | Parser + checker + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 8 test files; 206 backend tests total | Backend and frontend functional; `?graph=` wired |
-| Behaviour Linker | Scaffold | Scaffold | — | Design discussion started (see `docs/behaviour-linker-design-discussion.md`) |
-| Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live |
+| Behaviour Linker | `PUT`/`GET /api/behaviour/assignment` (closure-evaluated) | Scaffold | covered by service tests | Assignment artefact + closure live; UI scaffold |
+| Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures |
+| Species | `GET`/`PUT /api/species/species` | `/species` SPA (:3005) | covered by service tests | Named reaction schemes: components, allocations, reactions |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
-| Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope), catalogue, full ontology CRUD | — | — | Legacy loader archived to `archive/loader.py` |
+| Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope, value cells), catalogue, full ontology CRUD | — | — | Legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
-| Instantiation | — | — | — | Not started |
-| Code Generation | — | — | — | Not started |
+| Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values` | scaffold app (:3006) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end |
+| Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code` | — | emitter tests in `test_builder.py` | Derivative function emitted for all three targets |
 
 ## Versioning & graph selection (2026-09-17)
 
@@ -162,9 +163,11 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `variableUtils.ts::nextEquationId`); `RdfStore._migrate_equation_ids`
   renumbers legacy `E_<epoch-ms>` literals at load, dataset-wide.
 - **Next:** RDF vocabulary finalization for equations/operators;
-  equation IRIs still mint under `promo#` (should be `{graphIRI}#`);
   LaTeX→image cache deferred.  (Persistence UX done 2026-09-18:
-  store-global dirty tracking + Save button + unsaved badge.)
+  store-global dirty tracking + Save button + unsaved badge.
+  Equation/network/domain IRIs mint under `{graphIRI}#` since
+  2026-09-23 — `_migrate_equation_iris` rehomes legacy `promo#E_*`
+  subjects and rewrites `hasEquation`/assignment references at load.)
 
 ### Behaviour Linker
 
@@ -176,9 +179,30 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   is emergent (structural property of equation subgraph); transport
   system has no state.  Open questions remain on unit of selection,
   assignment artefact, interface definitions, and graphics.
-- **Backend:** `backend/behaviour/` — empty scaffold.
-- **Frontend:** `apps/behaviour-linker/` — empty scaffold.
-- **Next:** Resolve open design questions, then implement.
+- **Backend:** `backend/behaviour/` — `PUT`/`GET
+  `/api/behaviour/assignment` writes/reads `promo:BehaviourAssignment`
+  resources in the artefact's `<iri>/assignments` graph; the closure
+  evaluator stamps `closed`/`state_variable`.  `test_closure.py`.
+- **Frontend:** `apps/behaviour-linker/` — scaffold (:3003).
+- **Next:** Resolve open design questions, then implement the UI.
+
+### Instantiation & code generation
+
+- **Backend:** `backend/instantiate/` — the §15–16/§19/§20 pipeline:
+  `resolver.py` (sub-index membership), `fbuilder.py` (signed
+  incidence `F[N,A]`), `distribute.py` (§20 species fixpoint → `S`
+  and `Q` element sets), `builder.py` (per-entity-type variable
+  bindings: local/parameter/constant/port/incidence), `scheduler.py`
+  (levels + algebraic loops), `plan.py` + `emit_python|julia|matlab`.
+- **Endpoints:** `GET /api/instantiate/model` (the §19 report),
+  `/code?target=python|julia|matlab`, `/species-distribution`,
+  `/arc-indices`, `/incidence`; `PUT`/`GET /api/instantiate/values`
+  (the §20 ν value channel — `promo:ValueCell` tables on the model
+  artefact, surfaced as `values` on each report binding).
+- **Frontend:** `apps/instantiation/` — scaffold (:3006; no `dev.sh`
+  service, hub opens it on the backend path).
+- **Next:** wire value cells into `plan()`/emitters' `par` lookups;
+  value-cell editor UI; reaction-domain equations.
 
 ### Modeller
 
@@ -224,7 +248,8 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `connectionService.ts` shared by arc creation and reconnection.
 - **`backend/core`:** `RdfStore` and legacy v8 loader implemented; full
   ontology CRUD (domains, axes, entity types, connection rules, tokens);
-  shared IRI minting; seed data bootstrap.
+  shared IRI minting; seed data bootstrap; `set_value_cells`/
+  `value_cells` (§20 ν tables).
 - **`backend/main.py`:** FastAPI app mounting per-tool routers; server
   starts and `/api/health` returns `{"status":"ok"}`.
 

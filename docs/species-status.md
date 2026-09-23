@@ -173,6 +173,38 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
 - `apps/modeller/src/SpeciesPanel.tsx` — the capability-gated gestures.
 - `apps/modeller/src/SpeciesAliasDialog.tsx` — model-level alias table.
 
+## ν value channel (implemented 2026-09-23)
+
+`promo:value` is scalar, so a `[Q,S]` parameter's table lives in the
+**model artefact** as `promo:ValueCell` resources — values are model
+data, not var/expr vocabulary:
+
+```turtle
+<varIRI>   promo:valueCell       <modelIRI#cell_…> .
+<cellIRI>  a                     promo:ValueCell ;
+           promo:value           -1.0 ;
+           promo:coordinate      "[\"<r1>\",\"<A>\"]" ;   # JSON, ordered
+           promo:atIndexElement  <r1> , <A> .
+```
+
+- **Storage** — `RdfStore.set_value_cells(graph, var, cells)` /
+  `value_cells(graph, var)` (`backend/core/graph_store.py`).  Cells
+  are keyed by a coordinate string: `|`-joined index-element IRIs in
+  the variable's `indexStructure` order.  `promo:coordinate` (JSON
+  list) is the authoritative axis order; `atIndexElement` gives
+  unordered graph navigation.  Replace semantics; cell IRIs are
+  deterministic (`sha1(var|key)`).
+- **Endpoints** — `PUT /api/instantiate/values?graph=<model>` body
+  `{variable, values: {coord: scalar}}` (`editable_param`: 400 no
+  graph, 403 frozen); `GET /api/instantiate/values?graph=&variable=`.
+- **Report surface** — `VarBindingOut.values` carries the stored
+  table on every binding in `/api/instantiate/model`; the binding's
+  `indices` map already lists the required element sets, so the
+  client derives which cells are needed (coverage counting deferred).
+- **Vocabulary** — `ValueCell`/`valueCell`/`atIndexElement`/
+  `coordinate` declared unconditionally by `declare_vocabulary`
+  (artefact-consumed, like `usesOntology`).
+
 ## Open / deferred
 
 - **Stoichiometry** — ruled (2026-09-23, final): ν is an ordinary
@@ -185,11 +217,11 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
   + products by convention), so instantiation only supplies
   magnitudes.  (An earlier scheme-side `promo:stoichiometry` slot was
   reverted the same day.)
-- **ν value channel** — `promo:value` is scalar; a `[Q,S]` parameter
-  needs a value table keyed by `(reaction, species)` element pairs on
-  the instantiated artefact.  The only mechanism that doesn't exist
-  yet — the binding side (`Q` element sets, `parameter` binding,
-  `ParamSlot` indices) is all in place.
+- **ν → codegen** — stored cells are not yet wired into `plan()`/
+  emitters' `par` lookups; the emitters still expect a scalar per
+  parameter instance.
+- **Value-cell UI** — no editor surface yet (the instantiation app
+  at :3006 is a scaffold); cells are API-only.
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
   modeller UI uses the first only; a model doc save drops additional
   pins (single-scheme-per-model assumption).

@@ -13,12 +13,13 @@ from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
-from rdflib import URIRef
+from rdflib import Literal, URIRef
 from rdflib.namespace import RDF
 
 from backend.core import graph_store
 from backend.main import app
 from backend.ontology.rdf_context import RdfContext
+from backend.testing import GraphClient
 
 
 def _iri_path(iri: str) -> str:
@@ -36,10 +37,14 @@ def _iri_path(iri: str) -> str:
 
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch):
-    """Yield a ``TestClient`` backed by a fresh store in a temp dir."""
+    """Yield a ``GraphClient`` bound to the core ontology artefact,
+    backed by a fresh store in a temp dir.  Writes must name a graph
+    (``editable_param``); the client injects ``?graph=`` like the real
+    frontends."""
     monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(graph_store, "_STORE", None)
-    with TestClient(app) as c:
+    with GraphClient(
+            app, graph_iri="https://w3id.org/promo/ontology") as c:
         yield c
     monkeypatch.setattr(graph_store, "_STORE", None)
 
@@ -962,6 +967,84 @@ def test_catalogue_species_pins(client):
     fg = store.dataset.graph("https://example.org/m2")
     assert (fg.identifier, graph_store.PROMO["usesSpecies"],
             URIRef("https://example.org/other-scheme")) in fg
+
+
+def test_apply_seed_floor(client):
+    """Hub ticket #7: opt-in seed-floor migration for draft ontologies.
+
+    The core graph is stamped at load; a fresh ontology artefact is
+    stale until the floor is applied; guards reject non-ontology
+    drafts, frozen versions, and unknown graphs; forks inherit the
+    source's stamp.
+    """
+    store = graph_store.get_store()
+    PROMO = graph_store.PROMO
+
+    # The core ontology was floored at load — not stale.
+    cat = client.get("/api/catalogue").json()
+    assert cat["seedFloor"] == graph_store.SEED_FLOOR
+    core = [l for l in cat["lines"]
+            if l["iri"] == str(store.ONTOLOGY_GRAPH_IRI)][0]
+    assert core["seedFloor"] == graph_store.SEED_FLOOR
+    assert core["staleFloor"] is False
+
+    # A new ontology artefact carries no stamp -> stale.
+    r = client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/onto2", "type": "ontology"})
+    assert r.status_code == 200
+    line = [l for l in client.get("/api/catalogue").json()["lines"]
+            if l["iri"] == "https://example.org/onto2"][0]
+    assert line["staleFloor"] is True
+
+    # Guards: non-ontology draft -> 422; unknown -> 404; frozen -> 403.
+    client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/lib9", "type": "library"})
+    assert client.post("/api/ontology/apply-seed-floor"
+                       "?graph=https://example.org/lib9"
+                       ).status_code == 422
+    assert client.post("/api/ontology/apply-seed-floor"
+                       "?graph=https://example.org/none"
+                       ).status_code == 404
+    v_iri = store.freeze_version("7.7-test")
+    assert client.post("/api/ontology/apply-seed-floor"
+                       f"?graph={v_iri}").status_code == 403
+
+    # Apply: floor content lands under the artefact's own namespace
+    # and the stamp clears the staleness flag.
+    r = client.post("/api/ontology/apply-seed-floor"
+                    "?graph=https://example.org/onto2")
+    assert r.status_code == 200
+    assert r.json()["seedFloor"] == graph_store.SEED_FLOOR
+    g = store.dataset.graph("https://example.org/onto2")
+    assert (g.identifier, PROMO["seedFloor"],
+            Literal(graph_store.SEED_FLOOR)) in g
+    cap = URIRef("https://example.org/onto2#cap_species_source")
+    assert (cap, RDF.type, PROMO["Capability"]) in g
+    line = [l for l in client.get("/api/catalogue").json()["lines"]
+            if l["iri"] == "https://example.org/onto2"][0]
+    assert line["staleFloor"] is False
+
+    # A fork inherits the source's stamp — born current, not stale.
+    r = client.post("/api/catalogue/fork", json={
+        "source": "https://example.org/onto2",
+        "new_iri": "https://example.org/onto3"})
+    assert r.status_code == 200
+    line = [l for l in client.get("/api/catalogue").json()["lines"]
+            if l["iri"] == "https://example.org/onto3"][0]
+    assert line["seedFloor"] == graph_store.SEED_FLOOR
+    assert line["staleFloor"] is False
+
+
+def test_writes_require_graph(client):
+    """Ticket #1 enforcement: mutating endpoints reject calls that name
+    no artefact graph — the legacy default-to-ontology bypass is closed.
+    The fixture's GraphClient injects ``?graph=`` like the real
+    frontends, so the guard is exercised with a raw client."""
+    raw = TestClient(app)
+    iri = _iri_path("https://w3id.org/promo/ontology#tok_nograph")
+    r = raw.delete(f"/api/ontology/tokens/{iri}")
+    assert r.status_code == 400
+    assert "graph" in r.json()["detail"]
 
 
 def test_equation_context_scoped_by_pins(client):

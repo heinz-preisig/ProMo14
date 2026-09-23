@@ -1035,103 +1035,6 @@
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
 
-    promo:E_1789990215213 a promo:Equation ;
-        promo:created "2026-09-21T11:30:15.213Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:S\", \"promo:U\"]" ;
-        promo:internalID "E_1" ;
-        promo:lhs <promo:T> ;
-        promo:modified "2026-09-21T11:30:15.213Z" ;
-        promo:network "physical" ;
-        promo:rhs "ParDiff(U,S)" .
-
-    promo:E_1789990282783 a promo:Equation ;
-        promo:created "2026-09-21T11:31:22.783Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:U\", \"promo:V\"]" ;
-        promo:internalID "E_2" ;
-        promo:lhs <promo:P> ;
-        promo:modified "2026-09-21T11:31:22.783Z" ;
-        promo:network "physical" ;
-        promo:rhs "ParDiff(U,V)" .
-
-    promo:E_1789995235689 a promo:Equation ;
-        promo:created "2026-09-21T12:53:55.689Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:r_x\", \"promo:r_y\"]" ;
-        promo:internalID "E_3" ;
-        promo:lhs <promo:Axy> ;
-        promo:modified "2026-09-21T12:53:55.689Z" ;
-        promo:network "geometry" ;
-        promo:rhs "r_x . r_y" .
-
-    promo:E_1789996625082 a promo:Equation ;
-        promo:created "2026-09-21T13:17:05.082Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:P\", \"promo:k_conv\"]" ;
-        promo:internalID "E_4" ;
-        promo:lhs <promo:fm_conv> ;
-        promo:modified "2026-09-21T13:17:05.082Z" ;
-        promo:network "macroscopic" ;
-        promo:rhs "Axy * properties!k_conv  . physical!F_conv . p" .
-
-    promo:E_1789996829434 a promo:Equation ;
-        promo:created "2026-09-21T13:20:29.434Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:Mm\", \"promo:n\"]" ;
-        promo:internalID "E_5" ;
-        promo:lhs <promo:m> ;
-        promo:modified "2026-09-21T13:20:29.434Z" ;
-        promo:network "physical" ;
-        promo:rhs "Mm * n" .
-
-    promo:E_1789996894696 a promo:Equation ;
-        promo:created "2026-09-21T13:21:34.696Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:m\", \"promo:t\"]" ;
-        promo:internalID "E_6" ;
-        promo:lhs <promo:dmdt> ;
-        promo:modified "2026-09-21T13:21:34.696Z" ;
-        promo:network "physical" ;
-        promo:rhs "TotalDiff(m,t)" .
-
-    promo:E_1789997049462 a promo:Equation ;
-        promo:created "2026-09-21T13:24:09.462Z" ;
-        promo:doc "" ;
-        promo:equationClass "instantiate" ;
-        promo:internalID "E_7" ;
-        promo:lhs <promo:to> ;
-        promo:modified "2026-09-21T13:24:09.462Z" ;
-        promo:network "root" ;
-        promo:rhs "Instantiate(t)" .
-
-    promo:E_1789997094739 a promo:Equation ;
-        promo:created "2026-09-21T13:24:54.739Z" ;
-        promo:doc "" ;
-        promo:equationClass "instantiate" ;
-        promo:internalID "E_8" ;
-        promo:lhs <promo:te> ;
-        promo:modified "2026-09-21T13:24:54.739Z" ;
-        promo:network "root" ;
-        promo:rhs "Instantiate(t)" .
-
-    promo:E_9 a promo:Equation ;
-        promo:created "2026-09-21T16:43:26.574Z" ;
-        promo:doc "" ;
-        promo:equationClass "generic" ;
-        promo:incidenceList "[\"promo:dmdt\", \"promo:t\", \"promo:te\", \"promo:to\"]" ;
-        promo:internalID "E_9" ;
-        promo:lhs <promo:m> ;
-        promo:modified "2026-09-21T16:43:26.574Z" ;
-        promo:network "physical" ;
-        promo:rhs "Integral(dmdt :: t in [to,te])" .
-
     promo:aliases a rdf:Property .
 
     promo:branch a rdf:Property .
@@ -1143,6 +1046,8 @@
     promo:direction a rdf:Property .
 
     promo:doc a rdf:Property .
+
+    promo:generatedFrom a rdf:Property .
 
     promo:hasAxis a rdf:Property .
 
@@ -1167,6 +1072,8 @@
     promo:parent a rdf:Property .
 
     promo:portVariable a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
 
     promo:ruleType a rdf:Property .
 
@@ -1194,9 +1101,112 @@
 
     promo:tokenKind a rdf:Property .
 
+    promo:usesOntology a rdf:Property .
+
     promo:value a rdf:Property .
 
     promo:variableClass a rdf:Property .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/ontology#E_1> a promo:Equation ;
+        promo:created "2026-09-21T11:30:15.213Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:S\", \"promo:U\"]" ;
+        promo:internalID "E_1" ;
+        promo:lhs <promo:T> ;
+        promo:modified "2026-09-21T11:30:15.213Z" ;
+        promo:network "physical" ;
+        promo:rhs "ParDiff(U,S)" .
+
+    <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
+        promo:created "2026-09-21T11:31:22.783Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:U\", \"promo:V\"]" ;
+        promo:internalID "E_2" ;
+        promo:lhs <promo:P> ;
+        promo:modified "2026-09-21T11:31:22.783Z" ;
+        promo:network "physical" ;
+        promo:rhs "ParDiff(U,V)" .
+
+    <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
+        promo:created "2026-09-21T12:53:55.689Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:r_x\", \"promo:r_y\"]" ;
+        promo:internalID "E_3" ;
+        promo:lhs <promo:Axy> ;
+        promo:modified "2026-09-21T12:53:55.689Z" ;
+        promo:network "geometry" ;
+        promo:rhs "r_x . r_y" .
+
+    <https://w3id.org/promo/ontology#E_4> a promo:Equation ;
+        promo:created "2026-09-21T13:17:05.082Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:P\", \"promo:k_conv\"]" ;
+        promo:internalID "E_4" ;
+        promo:lhs <promo:fm_conv> ;
+        promo:modified "2026-09-21T13:17:05.082Z" ;
+        promo:network "macroscopic" ;
+        promo:rhs "Axy * properties!k_conv  . physical!F_conv . p" .
+
+    <https://w3id.org/promo/ontology#E_5> a promo:Equation ;
+        promo:created "2026-09-21T13:20:29.434Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:Mm\", \"promo:n\"]" ;
+        promo:internalID "E_5" ;
+        promo:lhs <promo:m> ;
+        promo:modified "2026-09-21T13:20:29.434Z" ;
+        promo:network "physical" ;
+        promo:rhs "Mm * n" .
+
+    <https://w3id.org/promo/ontology#E_6> a promo:Equation ;
+        promo:created "2026-09-21T13:21:34.696Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:m\", \"promo:t\"]" ;
+        promo:internalID "E_6" ;
+        promo:lhs <promo:dmdt> ;
+        promo:modified "2026-09-21T13:21:34.696Z" ;
+        promo:network "physical" ;
+        promo:rhs "TotalDiff(m,t)" .
+
+    <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
+        promo:created "2026-09-21T13:24:09.462Z" ;
+        promo:doc "" ;
+        promo:equationClass "instantiate" ;
+        promo:internalID "E_7" ;
+        promo:lhs <promo:to> ;
+        promo:modified "2026-09-21T13:24:09.462Z" ;
+        promo:network "root" ;
+        promo:rhs "Instantiate(t)" .
+
+    <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
+        promo:created "2026-09-21T13:24:54.739Z" ;
+        promo:doc "" ;
+        promo:equationClass "instantiate" ;
+        promo:internalID "E_8" ;
+        promo:lhs <promo:te> ;
+        promo:modified "2026-09-21T13:24:54.739Z" ;
+        promo:network "root" ;
+        promo:rhs "Instantiate(t)" .
+
+    <https://w3id.org/promo/ontology#E_9> a promo:Equation ;
+        promo:created "2026-09-21T16:43:26.574Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:dmdt\", \"promo:t\", \"promo:te\", \"promo:to\"]" ;
+        promo:internalID "E_9" ;
+        promo:lhs <promo:m> ;
+        promo:modified "2026-09-21T16:43:26.574Z" ;
+        promo:network "physical" ;
+        promo:rhs "Integral(dmdt :: t in [to,te])" .
 
     <https://w3id.org/promo/ontology#cap_species_source> a promo:Capability ;
         rdfs:label "species source" ;
@@ -1628,7 +1638,7 @@
     <promo:Axy> a promo:Variable ;
         rdfs:label "Axy" ;
         promo:doc "contact area in x-y plane" ;
-        promo:hasEquation promo:E_1789995235689 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_3> ;
         promo:imported false ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_17" ;
@@ -1642,7 +1652,7 @@
         rdfs:label "p" ;
         promo:aliases "{\"latex\": \"P\", \"global_ID\": \"promo:P\"}" ;
         promo:doc "Thermodynamic pressure" ;
-        promo:hasEquation promo:E_1789990282783 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
         promo:imported false ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_10" ;
@@ -1655,7 +1665,7 @@
     <promo:T> a promo:Variable ;
         rdfs:label "T" ;
         promo:doc "Temperature" ;
-        promo:hasEquation promo:E_1789990215213 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_1> ;
         promo:imported false ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_9" ;
@@ -1668,7 +1678,7 @@
     <promo:dmdt> a promo:Variable ;
         rdfs:label "dmdt" ;
         promo:doc "mass accumulation" ;
-        promo:hasEquation promo:E_1789996894696 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_6> ;
         promo:imported false ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_20" ;
@@ -1681,7 +1691,7 @@
     <promo:fm_conv> a promo:Variable ;
         rdfs:label "fm_conv" ;
         promo:doc "convective mass flow" ;
-        promo:hasEquation promo:E_1789996625082 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_4> ;
         promo:imported false ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node> ;
@@ -1695,7 +1705,7 @@
     <promo:te> a promo:Variable ;
         rdfs:label "te" ;
         promo:doc "end time" ;
-        promo:hasEquation promo:E_1789997094739 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_8> ;
         promo:imported false ;
         promo:instanceOf <promo:t> ;
         promo:internalID "V_22" ;
@@ -1708,7 +1718,7 @@
     <promo:to> a promo:Variable ;
         rdfs:label "to" ;
         promo:doc "initial time" ;
-        promo:hasEquation promo:E_1789997049462 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_7> ;
         promo:imported false ;
         promo:instanceOf <promo:t> ;
         promo:internalID "V_21" ;
@@ -1718,22 +1728,15 @@
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "parameter" .
 
-    promo:generatedFrom a rdf:Property .
-
-    promo:publishedOn a rdf:Property .
-
-    promo:usesOntology a rdf:Property .
-
-    promo:versionInfo a rdf:Property .
-
-    promo:versionOf a rdf:Property .
+    <https://w3id.org/promo/ontology> a promo:Ontology ;
+        promo:seedFloor "2026-09" .
 
     <promo:m> a promo:Variable ;
         rdfs:label "m" ;
         promo:aliases "{\"latex\": \"m\", \"global_ID\": \"promo:m\"}" ;
         promo:doc "mass" ;
-        promo:hasEquation promo:E_1789996829434,
-            promo:E_9 ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_5>,
+            <https://w3id.org/promo/ontology#E_9> ;
         promo:imported false ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_19" ;
@@ -1754,8 +1757,6 @@
         promo:portVariable true ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
-
-    <https://w3id.org/promo/ontology> a promo:Ontology .
 
     <https://w3id.org/promo/ontology#cap_reaction_host> a promo:Capability ;
         rdfs:label "reaction host" ;

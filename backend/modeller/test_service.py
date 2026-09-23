@@ -7,16 +7,26 @@ from fastapi.testclient import TestClient
 
 from backend.core import graph_store
 from backend.main import app
+from backend.testing import GraphClient
+
+
+MODEL = "https://example.org/test-model"
 
 
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch):
-    """Yield a ``TestClient`` backed by a fresh store in a temp dir —
-    ``/api/catalogue/new`` saves immediately, so an un-isolated store
-    would leak test artefacts into the tracked ``data/ontology.trig``."""
+    """Yield a ``GraphClient`` bound to a fresh ``promo:Model`` artefact
+    in a temp-dir store — ``/api/catalogue/new`` saves immediately, so
+    an un-isolated store would leak test artefacts into the tracked
+    ``data/ontology.trig``."""
     monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(graph_store, "_STORE", None)
-    with TestClient(app) as c:
+    with GraphClient(app) as c:
+        store = graph_store.get_store()
+        store.create_artefact_graph(
+            MODEL, "Model", label="test model",
+            uses=[str(store.ONTOLOGY_GRAPH_IRI)])
+        c.graph_iri = MODEL
         yield c
     monkeypatch.setattr(graph_store, "_STORE", None)
 
@@ -51,7 +61,7 @@ def _doc():
 
 
 def test_empty_model(client):
-    r = client.get("/api/modeller/model")
+    r = client.get(f"/api/modeller/model?graph={MODEL}")
     assert r.status_code == 200
     doc = r.json()
     assert doc["nodes"] == [] and doc["arcs"] == [] and doc["composites"] == []
@@ -61,7 +71,7 @@ def test_put_get_roundtrip(client):
     doc = _doc()
     assert client.put("/api/modeller/model", json=doc).status_code == 200
 
-    got = client.get("/api/modeller/model").json()
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
     assert {n["iri"] for n in got["nodes"]} == {"promo:Model/Node_1", "promo:Model/Node_2"}
     assert got["rootTreeId"] == 0
     assert got["nextTreeId"] == 4
@@ -91,7 +101,7 @@ def test_put_replaces(client):
             {"treeId": 0, "label": "Root", "parentTreeId": None,
              "children": [], "layout": {}, "knots": {}, "openArcs": []}],
         "rootTreeId": 0, "nextTreeId": 1, "arcCounter": 1})
-    got = client.get("/api/modeller/model").json()
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
     assert got["nodes"] == [] and got["arcs"] == []
     assert len(got["composites"]) == 1
 
@@ -106,12 +116,12 @@ def test_species_aliases(client):
         "http://example.org/species#B": "NaCl",
     }
     assert client.put("/api/modeller/model", json=doc).status_code == 200
-    got = client.get("/api/modeller/model").json()
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
     assert got["speciesAliases"] == doc["speciesAliases"]
 
     # second PUT without aliases clears them
     client.put("/api/modeller/model", json=_doc())
-    got = client.get("/api/modeller/model").json()
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
     assert got["speciesAliases"] == {}
 
 

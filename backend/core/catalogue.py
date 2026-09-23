@@ -17,7 +17,9 @@ from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
-from backend.core.graph_store import ARTEFACT_TYPES, PROMO, get_store
+from backend.core.graph_store import (
+    ARTEFACT_TYPES, PROMO, SEED_FLOOR, get_store,
+)
 
 router = APIRouter()
 
@@ -53,6 +55,8 @@ def _new_line(iri: str) -> Dict[str, Any]:
         "versions": [],
         "usesOntology": [],
         "usesSpecies": [],
+        "seedFloor": None,
+        "staleFloor": False,
     }
 
 
@@ -90,10 +94,21 @@ def catalogue() -> Dict[str, Any]:
                 str(o) for o in g.objects(gid, PROMO["usesOntology"])]
             line["usesSpecies"] = [
                 str(o) for o in g.objects(gid, PROMO["usesSpecies"])]
+            if atype == "ontology":
+                # Seed-floor staleness (hub ticket #7): a draft
+                # ontology whose floor stamp predates the current
+                # floor is missing seed content — the hub shows an
+                # update badge so the drift is visible and the fix
+                # stays user-consented.  Frozen versions are excluded
+                # by design (the file is the history).
+                floor = g.value(gid, PROMO["seedFloor"])
+                line["seedFloor"] = str(floor) if floor else None
+                line["staleFloor"] = str(floor) != SEED_FLOOR
 
     for line in lines.values():
         line["versions"].sort(key=lambda v: v["version"])
-    return {"lines": sorted(lines.values(), key=lambda l: l["iri"])}
+    return {"seedFloor": SEED_FLOOR,
+            "lines": sorted(lines.values(), key=lambda l: l["iri"])}
 
 
 class NewArtefactRequest(BaseModel):

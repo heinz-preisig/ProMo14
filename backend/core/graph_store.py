@@ -45,6 +45,12 @@ SEED_CONSTANTS = (
     ("const_half", "half", "0.5", r"\frac{1}{2}"),
 )
 
+# Seed-floor revision stamped as ``promo:seedFloor`` on every graph the
+# migratable seed sequence (``apply_seed_floor``) has run against.
+# Bump when any ``_seed_*`` step's content changes so the catalogue can
+# flag draft ontology forks that predate the current floor.
+SEED_FLOOR = "2026-09"
+
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
@@ -218,22 +224,13 @@ class RdfStore:
             marker = (g.identifier, RDF.type, PROMO["Ontology"])
             if marker not in g:
                 g.add(marker)
-            # Idempotent seed migration: universal constants (ADR-008)
-            # postdate existing ontology.trig files.
-            self._seed_constants(g, str(self.ONTOLOGY_GRAPH_IRI))
-            # Idempotent seed migration: transport mechanism subtypes and
-            # arc sub-indices (§16) postdate existing ontology.trig files.
-            # Scale regime layer (particulate|continuum) first — it
-            # creates scale values the transport migration binds.
-            self._seed_scale_regimes(g, str(self.ONTOLOGY_GRAPH_IRI))
-            # Idempotent seed migration: transport mechanism subtypes and
-            # arc sub-indices (§16) postdate existing ontology.trig files.
-            self._seed_transport_mechanisms(g, str(self.ONTOLOGY_GRAPH_IRI))
-            self._seed_arc_sub_indices(g, str(self.ONTOLOGY_GRAPH_IRI))
-            # §20 entity-type capabilities (species source / reaction
-            # host / species transport) — after transport mechanisms so
-            # the mass_transport grouping exists.
-            self._seed_capabilities(g, str(self.ONTOLOGY_GRAPH_IRI))
+            # Idempotent seed-floor migration: constants (ADR-008),
+            # scale regimes, transport mechanisms + arc sub-indices
+            # (§16) and §20 capabilities postdate existing
+            # ontology.trig files.  The core graph is suite-owned, so
+            # the floor is applied automatically; forks opt in via
+            # POST /api/ontology/apply-seed-floor (hub ticket #7).
+            self.apply_seed_floor(g, str(self.ONTOLOGY_GRAPH_IRI))
 
         # Load any additional var/expr named graphs that are already in the
         # data directory, but do not replace the editable ontology graph.
@@ -248,6 +245,9 @@ class RdfStore:
         # Idempotent data migration: legacy ``E_<epoch-ms>`` equation
         # ids → sequential ``E_n`` (readable in the printed document).
         self._migrate_equation_ids()
+        # …and equation IRIs minted under the promo# vocabulary
+        # namespace are rehomed into their graph's own namespace.
+        self._migrate_equation_iris()
 
         if legacy_layout:
             # Split the legacy single-file store into per-line files
@@ -280,6 +280,53 @@ class RdfStore:
             used.add(next_free)
         if legacy:
             self.mark_dirty()
+
+    def _migrate_equation_iris(self) -> None:
+        """Rehome equation IRIs minted under ``promo#`` into their
+        graph's own namespace (``{graphIRI}#``).
+
+        ``promo#`` is the vocabulary namespace — instance IRIs belong
+        to the artefact graph.  Besides the discipline violation, a
+        ``promo#E_x`` subject in two graphs is the *same* resource, so
+        rehoming also fixes cross-artefact identity collisions.  The
+        fragment prefers the (already renumbered) ``internalID``;
+        object references (``promo:hasEquation``, assignment
+        sequences) are rewritten dataset-wide."""
+        promo_ns = str(PROMO)
+        # old IRI -> {owning graph identifier: new IRI}
+        moves: Dict[str, Dict[URIRef, URIRef]] = {}
+        for g in self.dataset.contexts():
+            base = str(g.identifier)
+            for s in list(g.subjects(RDF.type, PROMO["Equation"])):
+                if not str(s).startswith(promo_ns):
+                    continue
+                frag = str(s)[len(promo_ns):]
+                iid = g.value(s, PROMO["internalID"])
+                if iid is not None and _EQUATION_ID_RE.match(str(iid)):
+                    frag = str(iid)
+                new = URIRef(f"{base}#{frag}")
+                n = 1
+                while (new, None, None) in g and new != s:
+                    new = URIRef(f"{base}#{frag}_{n}")
+                    n += 1
+                moves.setdefault(str(s), {})[g.identifier] = new
+                for _s, p, o in list(g.triples((s, None, None))):
+                    g.remove((_s, p, o))
+                    g.add((new, p, o))
+        if not moves:
+            return
+        # Rewrite object references dataset-wide: prefer the rehome in
+        # the referencing graph itself, else the unique/first target.
+        for g in self.dataset.contexts():
+            for s, p, o in list(g.triples((None, None, None))):
+                if isinstance(o, URIRef) and str(o) in moves:
+                    targets = moves[str(o)]
+                    new = targets.get(g.identifier)
+                    if new is None:
+                        new = targets[sorted(targets, key=str)[0]]
+                    g.remove((s, p, o))
+                    g.add((s, p, new))
+        self.mark_dirty()
 
     def _line_key(self, g: Graph) -> URIRef:
         """The artefact line a graph belongs to: itself, or its
@@ -589,14 +636,6 @@ class RdfStore:
                 if sf in all_scale_vals:
                     g.add((et_iri, PROMO["hasScaleValue"], all_scale_vals[sf]))
 
-        # Transport mechanism subtypes (design doc §16).
-        self._seed_transport_mechanisms(g, base)
-
-        # §20 entity-type capabilities (species source / reaction host /
-        # species transport) — after transport mechanisms so the
-        # mass_transport grouping exists.
-        self._seed_capabilities(g, base)
-
         # --- Connection rules ---
         # Arc semantics live in rule attributes, not in the type name:
         #   direction : unidirectional | bidirectional
@@ -676,17 +715,12 @@ class RdfStore:
                 "token": str(self.mint_iri(base, token_frag)) if token_frag else None,
             })
 
-        # Arc sub-indices partitioned by transport mechanism (§16).
-        self._seed_arc_sub_indices(g, base)
-
-        # Scale regime layer: particulate|continuum grouping over the
-        # scale levels seeded above.
-        self._seed_scale_regimes(g, base)
-
-        # --- Universal constants (ADR-008) ---
-        # Pre-bound value slots living on the root network — visible from
-        # every expression network via ancestor-chain resolution.
-        self._seed_constants(g, base)
+        # --- Seed floor (migratable subset) ---
+        # Universal constants (ADR-008), scale regimes, transport
+        # mechanisms + arc sub-indices (§16), §20 capabilities — the
+        # same ordered sequence load() and apply-seed-floor run, so a
+        # fresh seed and a migrated store carry the same floor.
+        self.apply_seed_floor(g, base)
 
         # --- Equation classes (top-level hierarchy) ---
         eq_classes = ["generic", "instantiate", "balance", "empirical", "user_function"]
@@ -699,6 +733,26 @@ class RdfStore:
 
         # --- Vocabulary declarations (rdfs:Class / rdf:Property) -------
         self.declare_vocabulary(g)
+
+    def apply_seed_floor(self, g: Graph, base: str) -> None:
+        """Run the migratable seed sequence against ``g`` and stamp the
+        floor revision (``promo:seedFloor``).
+
+        Shared by ``load()`` (core graph, automatic) and
+        ``POST /api/ontology/apply-seed-floor`` (draft ontology forks,
+        opt-in) so the two can't diverge.  Order matters: scale regimes
+        before transport mechanisms (regimes create scale values the
+        transport migration binds), capabilities last (they grant onto
+        the ``mass_transport`` grouping).  Every step is idempotent by
+        deterministic IRI, so re-applying the floor is a no-op plus a
+        stamp refresh.
+        """
+        self._seed_constants(g, base)
+        self._seed_scale_regimes(g, base)
+        self._seed_transport_mechanisms(g, base)
+        self._seed_arc_sub_indices(g, base)
+        self._seed_capabilities(g, base)
+        g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
         """Add the universal constants (``zero``, ``one``, ``half``).
@@ -1051,11 +1105,14 @@ class RdfStore:
         for term in (PROMO["usesOntology"], PROMO["usesSpecies"],
                      PROMO["generatedFrom"],
                      PROMO["versionOf"], PROMO["versionInfo"],
-                     PROMO["publishedOn"]):
+                     PROMO["publishedOn"], PROMO["seedFloor"],
+                     PROMO["valueCell"], PROMO["atIndexElement"],
+                     PROMO["coordinate"]):
             if (term, RDF.type, RDF.Property) not in graph:
                 graph.add((term, RDF.type, RDF.Property))
                 added += 1
-        for term in [PROMO["Version"]] + [PROMO[t] for t in ARTEFACT_TYPES]:
+        for term in ([PROMO["Version"], PROMO["ValueCell"]]
+                     + [PROMO[t] for t in ARTEFACT_TYPES]):
             if (term, RDF.type, RDFS.Class) not in graph:
                 graph.add((term, RDF.type, RDFS.Class))
                 added += 1
@@ -1198,6 +1255,13 @@ class RdfStore:
             dst.add((new, PROMO["usesOntology"], pin))
         for pin in src.objects(source, PROMO["usesSpecies"]):
             dst.add((new, PROMO["usesSpecies"], pin))
+        # The seed-floor stamp is content-accurate on a fork: the copy
+        # carries the same floor content as its source (re-homed), so
+        # it inherits the source's staleness state — a fork of a stale
+        # ontology stays stale, a fork of a current one stays current.
+        floor = src.value(source, PROMO["seedFloor"])
+        if floor is not None:
+            dst.add((new, PROMO["seedFloor"], floor))
         dst.add((new, PROMO["versionOf"], source))
         if label:
             dst.add((new, RDFS.label, Literal(label)))
@@ -1311,16 +1375,16 @@ class RdfStore:
     ) -> URIRef:
         """Add a network/domain to the ontology graph."""
         if iri is None:
-            iri = self.mint_iri(PROMO, f"network_{name}")
+            iri = self.mint_iri(graph.identifier, f"network_{name}")
         graph.add((iri, RDF.type, PROMO["Network"]))
         graph.set((iri, PROMO["name"], _as_literal(name)))
         if parent is not None:
             if isinstance(parent, str):
-                parent = self.mint_iri(PROMO, f"network_{parent}")
+                parent = self.mint_iri(graph.identifier, f"network_{parent}")
             graph.set((iri, PROMO["parent"], parent))
         if children:
             for child in children:
-                child_iri = self.mint_iri(PROMO, f"network_{child}")
+                child_iri = self.mint_iri(graph.identifier, f"network_{child}")
                 graph.add((iri, PROMO["child"], child_iri))
                 # Also make sure the child resource exists.
                 self.add_network(graph, child, iri=child_iri)
@@ -1337,7 +1401,7 @@ class RdfStore:
     ) -> URIRef:
         """Add a domain to the ontology graph with branch and token bindings."""
         if iri is None:
-            iri = self.mint_iri(PROMO, f"domain_{name}")
+            iri = self.mint_iri(graph.identifier, f"domain_{name}")
         graph.add((iri, RDF.type, PROMO["Domain"]))
         graph.set((iri, PROMO["name"], _as_literal(name)))
         if parent is not None:
@@ -1413,7 +1477,7 @@ class RdfStore:
         equations = var.get("equations")
         if equations:
             for eq_id, eq in equations.items():
-                eq_iri = eq.get("iri") or str(self.mint_iri(str(PROMO).rstrip("#"), eq_id))
+                eq_iri = eq.get("iri") or str(self.mint_iri(graph.identifier, eq_id))
                 self.add_equation(graph, URIRef(eq_iri), iri, eq)
 
         return iri
@@ -1445,6 +1509,80 @@ class RdfStore:
             self._add_aliases(graph, iri, idx["aliases"])
 
         return iri
+
+    # ------------------------------------------------------------------
+    # Value cells — the (reaction, species)-keyed value channel (§20 ν)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _coord_key(elements: List[str]) -> str:
+        """Serialise one cell coordinate: element IRIs in index order,
+        ``|``-joined (IRIs never contain ``|``)."""
+        return "|".join(elements)
+
+    def set_value_cells(
+        self,
+        graph: Graph,
+        variable: Union[str, URIRef],
+        cells: Dict[str, Any],
+    ) -> None:
+        """Replace a variable's value-cell table in ``graph``.
+
+        ``cells`` maps a coordinate key — ``|``-joined index-element
+        IRIs in the variable's ``indexStructure`` order — to a scalar
+        value.  Each entry becomes a ``promo:ValueCell`` resource under
+        the artefact's IRI space: the variable links to it via
+        ``promo:valueCell``; the cell carries ``promo:value``,
+        ``promo:coordinate`` (the ordered element list as a JSON
+        literal — the authoritative axis order) and one
+        ``promo:atIndexElement`` per element for graph navigation.
+        Existing cells of the variable are wiped first (replace
+        semantics, like ``add_variable_dict`` aliases).
+        """
+        var = URIRef(str(variable))
+        for cell in list(graph.objects(var, PROMO["valueCell"])):
+            graph.remove((cell, None, None))
+        graph.remove((var, PROMO["valueCell"], None))
+        for key, value in cells.items():
+            elements = [e for e in str(key).split("|") if e]
+            digest = hashlib.sha1(
+                f"{var}|{key}".encode()).hexdigest()[:12]
+            cell = self.mint_iri(graph.identifier, f"cell_{digest}")
+            graph.add((cell, RDF.type, PROMO["ValueCell"]))
+            graph.add((var, PROMO["valueCell"], cell))
+            graph.set((cell, PROMO["coordinate"],
+                       Literal(json.dumps(elements))))
+            for el in elements:
+                graph.add((cell, PROMO["atIndexElement"], URIRef(el)))
+            graph.set((cell, PROMO["value"], _as_literal(value)))
+
+    def value_cells(
+        self,
+        graph: Graph,
+        variable: Union[str, URIRef],
+    ) -> Dict[str, Any]:
+        """Read a variable's value-cell table back as
+        ``{coordinate_key: value}`` — the inverse of
+        ``set_value_cells``.  The key is rebuilt from the cell's
+        ``promo:coordinate`` literal (ordered); cells without one fall
+        back to their sorted ``atIndexElement`` set."""
+        var = URIRef(str(variable))
+        out: Dict[str, Any] = {}
+        for cell in graph.objects(var, PROMO["valueCell"]):
+            coord = graph.value(cell, PROMO["coordinate"])
+            if coord is not None:
+                try:
+                    elements = json.loads(str(coord))
+                except ValueError:
+                    elements = []
+            else:
+                elements = sorted(
+                    str(e) for e in
+                    graph.objects(cell, PROMO["atIndexElement"]))
+            val = graph.value(cell, PROMO["value"])
+            if val is not None:
+                out[self._coord_key(elements)] = val.toPython()
+        return out
 
     def add_token(self, graph: Graph, iri: URIRef, label: str, parent: Optional[URIRef] = None, kind: Optional[str] = None) -> URIRef:
         """Add a token type to the graph.

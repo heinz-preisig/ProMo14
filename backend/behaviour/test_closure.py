@@ -17,6 +17,7 @@ from backend.behaviour.closure import (
 )
 from backend.core import graph_store
 from backend.main import app
+from backend.testing import GraphClient
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +241,8 @@ def test_auto_instantiated_unreferenced_not_listed():
 def client(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(graph_store, "_STORE", None)
-    with TestClient(app) as c:
+    with GraphClient(
+            app, graph_iri="https://w3id.org/promo/ontology") as c:
         yield c
     monkeypatch.setattr(graph_store, "_STORE", None)
 
@@ -313,7 +315,8 @@ def test_assignment_roundtrip(client):
     assert r.json()["closed"]
 
     r = client.get("/api/behaviour/assignment",
-                   params={"entity_type": et})
+                   params={"entity_type": et,
+                           "graph": "https://w3id.org/promo/ontology"})
     assert r.status_code == 200
     body = r.json()
     assert body["sequence"] == payload["sequence"]
@@ -322,10 +325,12 @@ def test_assignment_roundtrip(client):
     assert body["closed"]
 
     r = client.delete("/api/behaviour/assignment",
-                      params={"entity_type": et})
+                      params={"entity_type": et,
+                           "graph": "https://w3id.org/promo/ontology"})
     assert r.status_code == 204
     r = client.get("/api/behaviour/assignment",
-                   params={"entity_type": et})
+                   params={"entity_type": et,
+                           "graph": "https://w3id.org/promo/ontology"})
     assert r.status_code == 404
 
 
@@ -342,5 +347,6 @@ def test_assignment_update_replaces_sequence(client):
         "base_equation": base})
     assert r.json()["closed"]
     r = client.get("/api/behaviour/assignment",
-                   params={"entity_type": et})
+                   params={"entity_type": et,
+                           "graph": "https://w3id.org/promo/ontology"})
     assert len(r.json()["sequence"]) == 2

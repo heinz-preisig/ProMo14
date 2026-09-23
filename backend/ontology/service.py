@@ -15,7 +15,9 @@ from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
-from backend.core.graph_store import PROMO, PROMOLG, QUDT, get_store
+from backend.core.graph_store import (
+    PROMO, PROMOLG, QUDT, SEED_FLOOR, get_store,
+)
 from backend.ontology.rdf_context import RdfContext
 
 from .models import (
@@ -49,16 +51,26 @@ def graph_param(graph: Optional[str] = None) -> Optional[str]:
 
 def editable_param(graph: Optional[str] = None) -> Optional[str]:
     """Like ``graph_param`` but rejects frozen version graphs (R5) and
-    graphs that were never created.
+    graphs that were never created — and is *required* on writes.
+
+    Writes must name their artefact explicitly (hub ticket #1): the
+    legacy "no graph means the working ontology" default let writes
+    silently land in the core graph.  Reads keep the legacy default
+    via ``graph_param``; only mutating endpoints use this guard.
 
     A write must not materialize an artefact: creation goes through
     ``/api/catalogue/new`` or ``/fork`` so the type marker and
     ``usesOntology`` pins are born with it (hub ticket #3).  A properly
     created artefact is never empty — the marker triple is always
     stamped — so ``len(g) == 0`` means the IRI names nothing."""
+    if graph is None:
+        raise HTTPException(
+            status_code=400,
+            detail="?graph= is required on writes — open the artefact "
+                   "from the hub so the session carries its graph IRI")
     store = get_store()
-    g = store.ontology_graph if graph is None else store.graph(graph)
-    if graph is not None and not len(g):
+    g = store.graph(graph)
+    if not len(g):
         raise HTTPException(
             status_code=404,
             detail=f"no such artefact: {graph} — create it via the hub "
@@ -1021,6 +1033,35 @@ def store_status() -> Dict[str, Any]:
         "dirty": store.dirty,
         "last_saved": store.last_saved.isoformat() if store.last_saved else None,
     }
+
+
+@router.post("/apply-seed-floor")
+def apply_seed_floor(
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> Dict[str, Any]:
+    """Apply the current seed floor to a draft ontology graph.
+
+    Opt-in migration for ontology forks (hub ticket #7): the core
+    graph is auto-migrated at ``load()``, but forked ontologies only
+    receive new seed content (constants, scale regimes, transport
+    mechanisms, arc sub-indices, §20 capabilities) through this
+    endpoint.  Requires the ``promo:Ontology`` marker — models,
+    libraries and assignments consume semantics through their
+    ``usesOntology`` pins, so seeding them would pollute them with
+    ontology vocabulary.  Frozen versions are rejected by
+    ``editable_param`` (R5).  Stamps ``promo:seedFloor`` so the
+    catalogue can flag stale drafts.
+    """
+    store = get_store()
+    g = resolve_graph(store, graph_iri)
+    if (g.identifier, RDF.type, PROMO["Ontology"]) not in g:
+        raise HTTPException(
+            status_code=422,
+            detail="seed floor applies to promo:Ontology drafts only — "
+                   "other artefact types consume semantics via their "
+                   "usesOntology pins")
+    store.apply_seed_floor(g, str(g.identifier))
+    return {"graph": str(g.identifier), "seedFloor": SEED_FLOOR}
 
 
 _VERSION_RE = re.compile(r"\d+\.\d+(\.\d+)?")

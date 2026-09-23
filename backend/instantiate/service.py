@@ -22,7 +22,7 @@ and the default assignment graph).
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -34,6 +34,7 @@ from backend.behaviour.service import (
 )
 from backend.core.graph_store import PROMO, get_store
 from backend.ontology.service import (
+    editable_param,
     graph_param,
     resolve_graph,
     scoped_context,
@@ -119,6 +120,8 @@ class VarBindingOut(BaseModel):
     indices: Dict[str, Optional[List[str]]] = Field(default_factory=dict)
     matrix: Optional[str] = None         # incidence: arc index IRI
     value: Optional[str] = None          # constant: pre-bound value
+    values: Dict[str, Any] = Field(default_factory=dict)
+    # parameter: supplied value cells, keyed by |-joined element IRIs
 
 
 class EqBindingOut(BaseModel):
@@ -179,6 +182,23 @@ class CodeOut(BaseModel):
     source: str = ""
     error: Optional[str] = None
     problems: List[str] = Field(default_factory=list)
+
+
+class ValueCellsIn(BaseModel):
+    """PUT body: one variable's value-cell table (§20 ν channel).
+
+    ``values`` maps a coordinate key — ``|``-joined index-element IRIs
+    in the variable's ``indexStructure`` order — to a scalar.  The
+    report's ``indices`` on each parameter binding lists the element
+    sets the key is drawn from."""
+
+    variable: str
+    values: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ValueCellsOut(BaseModel):
+    variable: str
+    values: Dict[str, Any] = Field(default_factory=dict)
 
 
 class InstantiationReportOut(BaseModel):
@@ -556,6 +576,42 @@ def _assignments_collect(store, vars_graph: Optional[str],
     return out
 
 
+@router.put("/values", response_model=ValueCellsOut)
+def put_values(
+    body: ValueCellsIn,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> ValueCellsOut:
+    """Store a variable's value cells on the model artefact (§20).
+
+    The artefact named by ``?graph=`` owns the table — values are
+    model data, not var/expr vocabulary.  Replace semantics: the
+    variable's whole cell set is rewritten.
+    """
+    store = get_store()
+    graph = resolve_graph(store, graph_iri)
+    store.set_value_cells(graph, body.variable, body.values)
+    return ValueCellsOut(
+        variable=body.variable,
+        values=store.value_cells(graph, body.variable))
+
+
+@router.get("/values", response_model=ValueCellsOut)
+def get_values(
+    variable: str,
+    graph_iri: Optional[str] = Depends(graph_param),
+) -> ValueCellsOut:
+    """Read a variable's stored value cells from the artefact."""
+    if not graph_iri:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= (model artefact IRI) is required")
+    store = get_store()
+    graph = resolve_graph(store, graph_iri)
+    return ValueCellsOut(
+        variable=variable,
+        values=store.value_cells(graph, variable))
+
+
 @router.get("/model", response_model=InstantiationReportOut)
 def model_instantiation(
     graph_iri: Optional[str] = Depends(graph_param),
@@ -642,7 +698,8 @@ def model_instantiation(
             variables=[VarBindingOut(
                 var=v.var, role=v.role, binding=v.binding,
                 instance=v.instance, indices=v.indices,
-                matrix=v.matrix, value=v.value)
+                matrix=v.matrix, value=v.value,
+                values=store.value_cells(model_graph, v.var))
                 for v in e.variables],
             equations=[EqBindingOut(
                 equation=q.equation, lhs=q.lhs, inputs=q.inputs)

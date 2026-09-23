@@ -37,6 +37,7 @@ from backend.instantiate.fbuilder import build as fbuild
 from backend.instantiate.plan import CodePlan, PlanBlock, plan
 from backend.instantiate.scheduler import schedule
 from backend.main import app
+from backend.testing import GraphClient
 
 BASE = "https://w3id.org/promo/ontology"
 
@@ -875,7 +876,8 @@ def test_unmarked_input_problem():
 def client(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(graph_store, "_STORE", None)
-    with TestClient(app) as c:
+    with GraphClient(
+            app, graph_iri="https://w3id.org/promo/ontology") as c:
         yield c
     monkeypatch.setattr(graph_store, "_STORE", None)
 
@@ -981,7 +983,10 @@ def test_model_endpoint(client):
     })
     assert r.status_code == 200, r.text
 
-    r = client.get("/api/instantiate/model", params={"graph": graph})
+    # vars= names the artefact the assignments were PUT under — its
+    # derived <iri>/assignments graph is where they live.
+    r = client.get("/api/instantiate/model",
+                   params={"graph": graph, "vars": graph})
     assert r.status_code == 200, r.text
     body = r.json()
 
@@ -1070,7 +1075,8 @@ def test_code_endpoint(client):
     graph = str(store.ONTOLOGY_GRAPH_IRI)
 
     r = client.get("/api/instantiate/code",
-                   params={"graph": graph, "target": "python"})
+                   params={"graph": graph, "vars": graph,
+                           "target": "python"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] and body["target"] == "python"
@@ -1084,7 +1090,8 @@ def test_code_endpoint(client):
             "axes=([1], [0]))" in src)
 
     r = client.get("/api/instantiate/code",
-                   params={"graph": graph, "target": "julia"})
+                   params={"graph": graph, "vars": graph,
+                           "target": "julia"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] and body["target"] == "julia"
@@ -1200,3 +1207,40 @@ def test_species_distribution_endpoint(client):
                       params={"graph": base})
     assert resp.status_code == 200
     assert resp.json()["nodes"] == {}
+
+
+def test_values_endpoint(client):
+    """§20 ν channel: value cells persist on the model artefact and
+    surface on the parameter binding in the /model report."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+
+    cells = {"r1|A": -1.0, "r1|B": -1.0, "r1|C": 1.0}
+    r = client.put("/api/instantiate/values",
+                   json={"variable": ids["k"], "values": cells})
+    assert r.status_code == 200, r.text
+    assert r.json()["values"] == cells
+
+    # GET reads the same table back.
+    r = client.get("/api/instantiate/values",
+                   params={"graph": graph, "variable": ids["k"]})
+    assert r.status_code == 200
+    assert r.json()["values"] == cells
+
+    # The /model report surfaces supplied cells on the binding.
+    r = client.get("/api/instantiate/model",
+                   params={"graph": graph, "vars": graph})
+    assert r.status_code == 200, r.text
+    tr = next(e for e in r.json()["entity_types"]
+              if e["entity_type"] == _et("diffusion_transport"))
+    k = next(v for v in tr["variables"] if v["var"] == ids["k"])
+    assert k["binding"] == "parameter"
+    assert k["values"] == cells
+
+    # Replace semantics: a second PUT rewrites the whole table.
+    r = client.put("/api/instantiate/values",
+                   json={"variable": ids["k"], "values": {"r2|D": 2.0}})
+    assert r.status_code == 200, r.text
+    assert r.json()["values"] == {"r2|D": 2.0}

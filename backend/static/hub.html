@@ -39,6 +39,20 @@
   button:hover { background: #f0f4f8; }
   button.primary { background: #0b7cbe; border-color: #0b7cbe; color: #fff; }
   button.primary:hover { background: #096aa5; }
+  button.warn { border-color: #d98600; color: #a36a00; font-weight: 600; }
+  button.warn:hover { background: #fdf3e3; }
+  .dirty { color: #a36a00; font-size: 12px; font-weight: 600; margin-left: 8px; }
+  #newform { background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
+             padding: 14px 16px; margin-bottom: 14px; display: none; }
+  #newform label { display: block; font-size: 12px; font-weight: 600;
+                   color: #5a6068; margin: 8px 0 2px; }
+  #newform input[type=text], #newform select { width: 100%; padding: 5px 8px;
+      font-size: 13px; border: 1px solid #cdd3da; border-radius: 6px;
+      background: #fff; }
+  #newform select[multiple] { height: 90px; }
+  #newform .row { display: flex; gap: 14px; }
+  #newform .row > div { flex: 1; min-width: 0; }
+  #newform .actions { margin-top: 10px; }
   #msg { margin: 12px 0; font-size: 13px; color: #a33; min-height: 1em; }
   .empty { padding: 40px; text-align: center; color: #8a9098; }
   .toolbar { margin-bottom: 14px; }
@@ -51,7 +65,45 @@
 </header>
 <main>
   <div class="toolbar">
-    <button onclick="newArtefact()">New artefact…</button>
+    <button onclick="toggleNewForm()">New artefact…</button>
+    <button id="saveBtn" onclick="saveAll()" style="display:none">Save</button>
+    <span id="dirtyBadge" class="dirty" style="display:none">● unsaved changes</span>
+    <a id="modeToggle" href="?dev" style="float:right;font-size:12px;color:#5a6068">dev mode</a>
+  </div>
+  <div id="newform">
+    <div class="row">
+      <div>
+        <label for="nfType">Type</label>
+        <select id="nfType">
+          <option>ontology</option>
+          <option>library</option>
+          <option>assignment</option>
+          <option>model</option>
+          <option>glass</option>
+          <option>species</option>
+        </select>
+      </div>
+      <div>
+        <label for="nfLabel">Label (optional)</label>
+        <input type="text" id="nfLabel">
+      </div>
+    </div>
+    <label for="nfIri">Graph IRI</label>
+    <input type="text" id="nfIri">
+    <div class="row">
+      <div>
+        <label for="nfUses">Ontology pins — usesOntology (draft or frozen version)</label>
+        <select id="nfUses" multiple></select>
+      </div>
+      <div id="nfSpeciesRow">
+        <label for="nfUsesSpecies">Species pins — usesSpecies</label>
+        <select id="nfUsesSpecies" multiple></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="createArtefact()">Create</button>
+      <button onclick="toggleNewForm()">Cancel</button>
+    </div>
   </div>
   <div id="msg"></div>
   <div id="catalogue"><div class="empty">Loading…</div></div>
@@ -67,6 +119,14 @@ const APPS = {
   species:    { path: '/species', label: 'Species' },
 };
 
+// Dev-mode entry split (hub ticket #6): `?dev` in the hub URL points
+// Open at the Vite dev servers (dev.sh ports) instead of the
+// backend-served builds.  Instantiation has no dev.sh service — it
+// stays on the backend path in both modes.
+const DEV = new URLSearchParams(location.search).has('dev');
+const DEV_PORTS = { ontology: 3001, library: 3002, assignment: 3003,
+                    model: 3004, glass: 3004, species: 3005 };
+
 const msg = (t) => { document.getElementById('msg').textContent = t || ''; };
 
 function esc(s) {
@@ -74,15 +134,53 @@ function esc(s) {
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Unsaved changes live in the server-side store — switching artefacts
+// loses nothing in memory, but nothing is on disk either.  The guard
+// makes that choice explicit (hub ticket #5).
+function guardDirty() {
+  return !DIRTY || confirm(
+    'There are unsaved changes in the store. They persist in memory ' +
+    'across apps but are not written to disk — open anyway?');
+}
+
 function openArtefact(line) {
   const app = APPS[line.type];
   if (!app) { msg(`No app for artefact type "${line.type}"`); return; }
-  window.location.href = `${app.path}/?graph=${encodeURIComponent(line.iri)}`;
+  if (!guardDirty()) return;
+  const base = DEV && DEV_PORTS[line.type]
+    ? `http://localhost:${DEV_PORTS[line.type]}/`
+    : `${app.path}/`;
+  window.location.href = `${base}?graph=${encodeURIComponent(line.iri)}`;
+}
+
+function openVersion(type, iri) {
+  // Frozen versions open in the same app; writes are rejected
+  // server-side by the R5 frozen guard (editable_param -> 403).
+  openArtefact({ iri, type });
 }
 
 function instantiateArtefact(line) {
+  if (!guardDirty()) return;
   window.location.href =
     `/instantiation/?graph=${encodeURIComponent(line.iri)}`;
+}
+
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/ontology/status');
+    const d = await r.json();
+    DIRTY = !!d.dirty;
+    document.getElementById('dirtyBadge').style.display = DIRTY ? '' : 'none';
+    document.getElementById('saveBtn').style.display = DIRTY ? '' : 'none';
+  } catch (e) { /* status is advisory — never block the catalogue */ }
+}
+
+async function saveAll() {
+  try {
+    await post('/api/ontology/save', {});
+    msg('Saved.');
+    refreshStatus();
+  } catch (e) { msg(e.message); }
 }
 
 function exportVersion(iri, version) {
@@ -126,6 +224,14 @@ async function pinSpecies(line) {
   } catch (e) { msg(e.message); }
 }
 
+async function applyFloor(iri) {
+  try {
+    await post(`/api/ontology/apply-seed-floor?graph=${encodeURIComponent(iri)}`,
+              {});
+    location.reload();
+  } catch (e) { msg(e.message); }
+}
+
 async function forkArtefact(iri) {
   const newIri = prompt('IRI for the forked artefact:', `${iri}-fork`);
   if (!newIri) return;
@@ -137,24 +243,60 @@ async function forkArtefact(iri) {
   } catch (e) { msg(e.message); }
 }
 
-async function newArtefact() {
-  const type = prompt('Artefact type (ontology, library, assignment, model, glass):', 'ontology');
-  if (!type) return;
-  const iri = prompt('Graph IRI for the new artefact:', `https://w3id.org/promo/${type}s/`);
-  if (!iri) return;
-  const label = prompt('Label (optional):', '');
-  const uses = prompt('Ontology pins — comma-separated graph IRIs (optional):',
-                      'https://w3id.org/promo/ontology');
-  let usesSpecies = [];
-  if (type === 'model' || type === 'glass') {
-    const sp = prompt('Species artefact pin — graph IRI (optional):', '');
-    if (sp && sp.trim()) usesSpecies = [sp.trim()];
+// --- New-artefact form (replaces the prompt() chain — hub ticket #5) ---
+
+const TYPE_DEFAULT_IRI = t => `https://w3id.org/promo/${t}s/`;
+
+function toggleNewForm() {
+  const f = document.getElementById('newform');
+  f.style.display = f.style.display === 'block' ? 'none' : 'block';
+}
+
+function onTypeChange() {
+  const t = document.getElementById('nfType').value;
+  const iri = document.getElementById('nfIri');
+  // Refresh the default IRI only while the user hasn't edited it.
+  if (!iri.dataset.touched) iri.value = TYPE_DEFAULT_IRI(t);
+  document.getElementById('nfSpeciesRow').style.display =
+    (t === 'model' || t === 'glass') ? '' : 'none';
+}
+
+function pinOptions() {
+  // Pin candidates: every ontology/species line's draft IRI plus its
+  // frozen version IRIs — pinning a version is the reproducible choice.
+  for (const [id, type] of [['nfUses', 'ontology'],
+                            ['nfUsesSpecies', 'species']]) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '';
+    for (const l of LINES.filter(x => x.type === type)) {
+      const d = document.createElement('option');
+      d.value = l.iri; d.textContent = `${l.label} (draft)`;
+      sel.appendChild(d);
+      for (const v of l.versions) {
+        const o = document.createElement('option');
+        o.value = v.iri; o.textContent = `${l.label} @${v.version}`;
+        sel.appendChild(o);
+      }
+    }
   }
+  // Sensible default: pin the core ontology draft.
+  for (const o of document.getElementById('nfUses').options)
+    o.selected = o.value === 'https://w3id.org/promo/ontology';
+}
+
+const selectedValues = id =>
+  Array.from(document.getElementById(id).selectedOptions).map(o => o.value);
+
+async function createArtefact() {
+  const type = document.getElementById('nfType').value;
+  const iri = document.getElementById('nfIri').value.trim();
+  const label = document.getElementById('nfLabel').value.trim();
+  if (!iri) { msg('Graph IRI is required'); return; }
   try {
     await post('/api/catalogue/new', {
       iri, type, label: label || null,
-      uses: uses ? uses.split(',').map(s => s.trim()).filter(Boolean) : [],
-      uses_species: usesSpecies });
+      uses: selectedValues('nfUses'),
+      uses_species: selectedValues('nfUsesSpecies') });
     location.reload();
   } catch (e) { msg(e.message); }
 }
@@ -168,6 +310,7 @@ function render(lines) {
   const rows = lines.map(l => {
     const vers = l.versions.map(v =>
       `<span class="ver">${esc(v.version)}</span>` +
+      ` <button onclick='openVersion(${JSON.stringify(l.type)},${JSON.stringify(v.iri)})'>open</button>` +
       (l.type === 'ontology'
         ? ` <button onclick='exportVersion(${JSON.stringify(l.iri)},${JSON.stringify(v.version)})'>export</button>`
         : '')
@@ -188,10 +331,13 @@ function render(lines) {
     const pinBtn = (l.type === 'model' || l.type === 'glass') && l.status === 'draft'
       ? `<button onclick='pinSpecies(${JSON.stringify(l)})'>Species…</button>`
       : '';
+    const floorBadge = l.type === 'ontology' && l.status === 'draft' && l.staleFloor
+      ? `<br><button class="warn" title="seed floor ${esc(l.seedFloor || 'none')} → ${esc(CURRENT_FLOOR)} — apply the current seed floor" onclick='applyFloor(${JSON.stringify(l.iri)})'>update floor</button>`
+      : '';
     return `<tr>
       <td><strong>${esc(l.label)}</strong><br><span class="iri">${esc(l.iri)}</span></td>
       <td><span class="type">${esc(l.type)}</span></td>
-      <td class="status-${l.status}">${esc(l.status)}</td>
+      <td class="status-${l.status}">${esc(l.status)}${floorBadge}</td>
       <td>${vers}</td>
       <td>${pins}</td>
       <td>${openBtn}${instBtn}${pinBtn}${forkBtn}</td>
@@ -203,11 +349,34 @@ function render(lines) {
     <tbody>${rows}</tbody></table>`;
 }
 
+let CURRENT_FLOOR = '';
+let DIRTY = false;
+let LINES = [];
+
+// Mode toggle: offer the opposite of the current mode.
+{
+  const t = document.getElementById('modeToggle');
+  if (DEV) { t.textContent = 'user mode'; t.href = location.pathname; }
+}
+
+document.getElementById('nfType').addEventListener('change', onTypeChange);
+document.getElementById('nfIri').addEventListener('input',
+  e => { e.target.dataset.touched = '1'; });
+onTypeChange();
+
 fetch('/api/catalogue')
   .then(r => { if (!r.ok) throw new Error(`catalogue: ${r.status}`); return r.json(); })
-  .then(d => render(d.lines))
+  .then(d => {
+    CURRENT_FLOOR = d.seedFloor || '';
+    LINES = d.lines;
+    pinOptions();
+    render(d.lines);
+  })
   .catch(e => { msg(`Failed to load catalogue: ${e.message}`);
                 document.getElementById('catalogue').innerHTML = ''; });
+
+refreshStatus();
+setInterval(refreshStatus, 5000);
 </script>
 </body>
 </html>

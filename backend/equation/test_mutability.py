@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from backend.core import graph_store
 from backend.main import app
+from backend.testing import GraphClient
 
 
 def _iri_path(iri: str) -> str:
@@ -28,7 +29,8 @@ def _iri_path(iri: str) -> str:
 def client(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(graph_store, "_STORE", None)
-    with TestClient(app) as c:
+    with GraphClient(
+            app, graph_iri="https://w3id.org/promo/ontology") as c:
         yield c
     monkeypatch.setattr(graph_store, "_STORE", None)
 

@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   base: '/instantiation/',
   server: {
-    port: 3004,
+    port: 3006,
     open: true,
     proxy: {
       '/api': {
