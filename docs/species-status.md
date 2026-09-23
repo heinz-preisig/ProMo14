@@ -103,8 +103,16 @@ The same response carries **`reactions`**: node IRI → hosted
 reactions whose reactants are present at the fixpoint — the element
 set of the reaction index `Q`, bound by exactly the mechanism `S`
 uses (firing is monotone since species only accumulate).  Shown as
-**active:** on nodes.  Wiring `Q` into generated code awaits the
-reaction-domain equations (same blocker as stoichiometry).
+**active:** on nodes.
+
+**`Q` binding (implemented 2026-09-23):** `build_model` takes
+`reaction_index` — the `indexClass "conversion"` index
+(`idx_reaction_q`, found by `_reaction_index_iri`; reactions carry no
+token, the class is the discriminator).  A `Q`-indexed variable binds
+to the union of *active* reactions over the type's nodes — reactions
+are node-hosted, so the extent is always the node set even for
+arc-indexed kinetic variables.  Wired into `/model` + `/code`
+whenever a distribution runs.
 
 ## Model-level aliasing (ruled + implemented 2026-09-23)
 
@@ -167,18 +175,21 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
 
 ## Open / deferred
 
-- **Stoichiometry** — ruled (2026-09-23, corrected): the scheme
-  stays at the `[A,B] → [C]` set level — no coefficients on
-  `Reaction`.  The stoichiometric vector ν enters only in the
-  reaction law (kinetics) and is supplied **at instantiation time**:
-  when a hosted reaction's equation is instantiated, ν is bound and
-  persisted with the *instantiated* model artefact — the model
-  library holds instantiated models, each self-contained.  (An
-  earlier scheme-side `promo:stoichiometry` slot was reverted the
-  same day.)
-- **`Q` codegen binding** — the element set is computed and exposed
-  (see readout above); binding it into generated code awaits the
-  reaction-domain equations.
+- **Stoichiometry** — ruled (2026-09-23, final): ν is an ordinary
+  **parameter-class variable indexed `[Q,S]`** in the var/expr
+  artefact — used symbolically in the algebra (`ν[q,s]·r[q]`),
+  marked to-be-instantiated, values supplied at instantiation and
+  persisted with the instantiated model artefact.  The scheme needs
+  **no coefficient slots at all**: the non-zero pattern is derivable
+  (`ν[q,s] ≠ 0` iff `s ∈ reactants(q) ∪ products(q)`; − reactants,
+  + products by convention), so instantiation only supplies
+  magnitudes.  (An earlier scheme-side `promo:stoichiometry` slot was
+  reverted the same day.)
+- **ν value channel** — `promo:value` is scalar; a `[Q,S]` parameter
+  needs a value table keyed by `(reaction, species)` element pairs on
+  the instantiated artefact.  The only mechanism that doesn't exist
+  yet — the binding side (`Q` element sets, `parameter` binding,
+  `ParamSlot` indices) is all in place.
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
   modeller UI uses the first only; a model doc save drops additional
   pins (single-scheme-per-model assumption).

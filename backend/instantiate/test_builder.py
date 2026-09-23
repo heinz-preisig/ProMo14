@@ -97,6 +97,9 @@ INDICES = {
         short_name="A_diff"),
     _idx("idx_species"): IndexInfo(_idx("idx_species"), source="token",
                                    short_name="S"),
+    _idx("idx_reaction_q"): IndexInfo(_idx("idx_reaction_q"),
+                                      source="conversion",
+                                      short_name="q"),
 }
 
 TOKEN_PARENTS = {_tok("observation"): _tok("signal")}
@@ -158,12 +161,13 @@ ASSIGNMENTS = {
 
 def _build(nodes=NODES, arcs=ARCS, assignments=ASSIGNMENTS,
            variables=VARIABLES, equations=EQUATIONS,
-           species=None, species_index=None):
+           species=None, species_index=None, reaction_index=None):
     memberships = resolve(nodes, arcs, SUB_INDICES, PARENTS)
     return build(nodes, arcs, memberships, SUB_INDICES, INDICES,
                  assignments, variables, equations,
                  TOKEN_PARENTS, TOKEN_KINDS,
-                 species=species, species_index=species_index)
+                 species=species, species_index=species_index,
+                 reaction_index=reaction_index)
 
 
 def _entity(rep, et):
@@ -309,6 +313,34 @@ def test_species_index_binds_from_distribution():
     c = _binding(cap, _var("c"))
     assert c.indices[_idx("idx_node")] == ["c1", "c2"]
     assert c.indices[_idx("idx_species")] == ["A", "B", "C"]
+
+
+def test_reaction_index_binds_active_reactions():
+    """§20: a ``[Q,S]``-indexed parameter (stoichiometry ν) binds Q to
+    the union of *active* reactions over the type's nodes — hosted but
+    starved reactions are not elements."""
+    from backend.instantiate.distribute import SpeciesDistribution
+    variables = dict(VARIABLES)
+    variables[_var("nu")] = VarInfo(
+        _var("nu"), "stoichiometry", "V_8",
+        index_structures=[_idx("idx_reaction_q"), _idx("idx_species")],
+        var_class="parameter")
+    assignments = {et: AssignmentInfo(**{**a.__dict__})
+                   for et, a in ASSIGNMENTS.items()}
+    assignments[_et("lumped_capacity")].instantiated = [_var("nu")]
+    # r1 fired on c1; c2 hosts r2 but its reactants never arrived.
+    dist = SpeciesDistribution(
+        nodes={"c1": {"A", "B"}, "c2": {"B", "C"}, "t1": set()},
+        arcs={},
+        reactions={"c1": {"r1"}, "c2": set()})
+    rep = _build(assignments=assignments, variables=variables,
+                 species=dist, species_index=_idx("idx_species"),
+                 reaction_index=_idx("idx_reaction_q"))
+    cap = _entity(rep, _et("lumped_capacity"))
+    nu = _binding(cap, _var("nu"))
+    assert nu.binding == "parameter"
+    assert nu.indices[_idx("idx_reaction_q")] == ["r1"]
+    assert nu.indices[_idx("idx_species")] == ["A", "B", "C"]
 
 
 # ---------------------------------------------------------------------------

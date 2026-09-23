@@ -290,6 +290,18 @@ def _species_index_iri(store, model_graph) -> Optional[str]:
     return None
 
 
+def _reaction_index_iri(store, model_graph) -> Optional[str]:
+    """The ``Q`` index — ``indexClass "conversion"`` (reactions carry
+    no token; the class is the discriminator)."""
+    for gi in store.resolution_scope(model_graph.identifier):
+        g = store.dataset.graph(gi)
+        for idx in g.subjects(RDF.type, PROMO["Index"]):
+            if str(g.value(idx, PROMO["indexClass"]) or "") \
+                    == "conversion":
+                return str(idx)
+    return None
+
+
 def _species_pin(model_graph) -> Optional[str]:
     """The model artefact's ``promo:usesSpecies`` pin (first), if any —
     the persistent form of the ``?species=`` param (§20)."""
@@ -580,6 +592,8 @@ def model_instantiation(
     dist = _species_distribution(store, model_graph, sg_iri)
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
+    reaction_index = _reaction_index_iri(store, model_graph) \
+        if dist is not None else None
 
     # Species element labels for the report: the artefact's component
     # label as base, the model's speciesAlias overriding (§20
@@ -606,7 +620,8 @@ def model_instantiation(
         nodes, arcs, memberships, sub_indices, indices,
         assignments, variables, equations,
         token_parents, token_kinds,
-        species=dist, species_index=species_index)
+        species=dist, species_index=species_index,
+        reaction_index=reaction_index)
     sched = schedule(report)
     for i, scc in enumerate(sched.loops):
         report.problems.append(Problem(
@@ -711,12 +726,15 @@ def model_code(
         store, model_graph, species or _species_pin(model_graph))
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
+    reaction_index = _reaction_index_iri(store, model_graph) \
+        if dist is not None else None
 
     report = build_model(
         nodes, arcs, memberships, sub_indices, indices,
         assignments, variables, equations,
         token_parents, token_kinds,
-        species=dist, species_index=species_index)
+        species=dist, species_index=species_index,
+        reaction_index=reaction_index)
     sched = schedule(report)
     cp = plan(report, sched, inc, equations, indices)
     try:

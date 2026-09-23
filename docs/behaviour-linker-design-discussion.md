@@ -1872,15 +1872,20 @@ the model graph), never in the species app.
 
 ### Deferred / open
 
-- **Stoichiometry** — unresolved.  It belongs to the species/reaction
-  app; old ProMo had a simple version but never defined the
-  stoichiometry either.  For *distribution* only the
-  `{reactants}→{products}` species sets are needed; coefficients
-  matter for the `reactions` domain's kinetics, a separate concern.
-  Ruled refinement (2026-09-23): coefficient *slots* belong to the
-  Reaction in the scheme; *values* bind at kinetic-equation
-  instantiation, after the model topology exists.
-- Whether `Q` (reaction index) binds by the same mechanism.
+- **Stoichiometry** — ruled (2026-09-23, final): ν is a
+  parameter-class variable indexed `[Q,S]` in the var/expr artefact,
+  used symbolically in the algebra and valued at instantiation
+  (persisted with the instantiated model artefact).  The scheme needs
+  no coefficient slots — the non-zero pattern is derivable from
+  `reactants(q) ∪ products(q)` with the −/+ convention; only
+  magnitudes are supplied.  Open: the value channel — `promo:value`
+  is scalar, a `[Q,S]` parameter needs a `(reaction, species)`-keyed
+  table on the instantiated artefact.
+- ~~Whether `Q` (reaction index) binds by the same mechanism.~~
+  **Yes (2026-09-23):** `build_model`'s `reaction_index` binds a
+  `Q`-indexed variable to the union of active reactions over the
+  type's nodes — the `indexClass "conversion"` index is the
+  discriminator (reactions carry no token).
 - Whether the mask is required for correctness or only for
   compactness — absent species may already evaluate to zero.
 - Alias target is a literal; an IRI-valued alias (substance catalogue

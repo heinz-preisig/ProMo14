@@ -254,6 +254,7 @@ def build(nodes: Dict[str, NodeInfo],
           token_kinds: Dict[str, str],
           species: Optional[SpeciesDistribution] = None,
           species_index: Optional[str] = None,
+          reaction_index: Optional[str] = None,
           ) -> Instantiation:
     """Assemble the instantiated equation set for a model.
 
@@ -264,6 +265,10 @@ def build(nodes: Dict[str, NodeInfo],
     ``species``/``species_index`` are the §20 distribution output and
     the species index IRI — when present, a species index binds to the
     union of species over the variable's topological extent.
+    ``reaction_index`` is the ``Q`` index IRI — it binds to the union
+    of *active* reactions (reactants present at the fixpoint) over the
+    type's nodes; reactions are node-hosted, so the extent is always
+    the node set.
     """
     report = Instantiation()
     problems = report.problems
@@ -352,6 +357,18 @@ def build(nodes: Dict[str, NodeInfo],
         if node_idx is not None or arc_idx is None:
             for n in t_nodes:
                 pool |= species.nodes.get(n, set())
+        return sorted(pool) if pool else None
+
+    def reaction_elements(t_nodes: List[str]) -> Optional[List[str]]:
+        """§20 ``Q`` binding: the union of active reactions over the
+        type's nodes.  Reactions are node-hosted (``hostsReaction``),
+        so the topological extent is always the node set — an
+        arc-indexed kinetic variable still draws ``Q`` from nodes."""
+        if species is None:
+            return None
+        pool: Set[str] = set()
+        for n in t_nodes:
+            pool |= species.reactions.get(n, set())
         return sorted(pool) if pool else None
 
     # -- per entity type ------------------------------------------------------
@@ -464,6 +481,8 @@ def build(nodes: Dict[str, NodeInfo],
                 if species_index is not None and i == species_index:
                     bound_indices[i] = species_elements(
                         arc_idx, node_idx, t_set, t_nodes)
+                elif reaction_index is not None and i == reaction_index:
+                    bound_indices[i] = reaction_elements(t_nodes)
                 else:
                     bound_indices[i] = index_elements(i, t_set, t_nodes)
 
