@@ -1,11 +1,24 @@
 """Roundtrip test for the species artefact service (§20)."""
 
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
+from backend.core import graph_store
 from backend.core.graph_store import get_store
 from backend.main import app
 
-client = TestClient(app)
+
+@pytest.fixture()
+def client(tmp_path: Path, monkeypatch):
+    """Fresh store in a temp dir — artefact creation must not touch
+    the tracked ``data/ontology.trig``."""
+    monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(graph_store, "_STORE", None)
+    with TestClient(app) as c:
+        yield c
+    monkeypatch.setattr(graph_store, "_STORE", None)
 
 
 _n = [0]
@@ -21,7 +34,7 @@ def _fresh_species_graph() -> str:
     return str(iri)
 
 
-def test_species_roundtrip():
+def test_species_roundtrip(client):
     graph = _fresh_species_graph()
     doc = {
         "components": [
@@ -63,7 +76,7 @@ def test_species_roundtrip():
         f"{graph}/Component_C"]
 
 
-def test_species_artefact_type_in_catalogue():
+def test_species_artefact_type_in_catalogue(client):
     """A Species graph classifies as ``species`` in the catalogue."""
     graph = _fresh_species_graph()
     r = client.get("/api/catalogue")

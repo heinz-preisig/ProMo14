@@ -99,6 +99,28 @@ export async function fetchSpecies(
   return res.json()
 }
 
+/** §20 readout: species present per node / carried per arc. */
+export interface SpeciesDistribution {
+  species: string | null
+  nodes: Record<string, string[]>
+  arcs: Record<string, string[]>
+}
+
+/** Live species distribution for the model — ?species= overrides the
+ *  model's usesSpecies pin server-side. */
+export async function fetchSpeciesDistribution(
+  speciesIri: string | undefined,
+): Promise<SpeciesDistribution | null> {
+  let path = '/api/instantiate/species-distribution'
+  path = q(path)
+  if (speciesIri) {
+    path += `${path.includes('?') ? '&' : '?'}species=${encodeURIComponent(speciesIri)}`
+  }
+  const res = await fetch(path)
+  if (!res.ok) return null
+  return res.json()
+}
+
 /** Entity types with their §20 capability fragments — for gating the
  *  species gestures (species_source / reaction_host / species_transport). */
 export async function fetchEntityCapabilities(): Promise<Map<string, string[]>> {

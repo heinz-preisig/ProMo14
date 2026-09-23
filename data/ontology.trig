@@ -866,38 +866,6 @@
         promo:name "time" .
 }
 
-<https://example.org/model-pin-test> {
-    promo:Assignment a rdfs:Class .
-
-    promo:Glass a rdfs:Class .
-
-    promo:Library a rdfs:Class .
-
-    promo:Model a rdfs:Class .
-
-    promo:Ontology a rdfs:Class .
-
-    promo:Species a rdfs:Class .
-
-    promo:Version a rdfs:Class .
-
-    <https://example.org/model-pin-test> a promo:Model ;
-        promo:usesOntology <https://w3id.org/promo/ontology> ;
-        promo:usesSpecies <https://example.org/scheme> .
-
-    promo:usesSpecies a rdf:Property .
-
-    promo:generatedFrom a rdf:Property .
-
-    promo:publishedOn a rdf:Property .
-
-    promo:usesOntology a rdf:Property .
-
-    promo:versionInfo a rdf:Property .
-
-    promo:versionOf a rdf:Property .
-}
-
 <https://w3id.org/promo/ontology> {
     promo:Assignment a rdfs:Class .
 
@@ -942,27 +910,6 @@
     <https://w3id.org/promo/ontology#Model> a rdfs:Class .
 
     <https://w3id.org/promo/ontology#Version> a rdfs:Class .
-
-    <https://w3id.org/promo/ontology/Composite_2> a promo:Composite ;
-        rdfs:label "Group" ;
-        promo:children "[{\"id\": 3, \"iri\": \"promo:Model/Node_2\"}]" ;
-        promo:internalID 2 ;
-        promo:layout "{\"3\": {\"x\": 5.0, \"y\": 5.0}}" ;
-        promo:openArcs "[{\"iri\": \"promo:Arc/Arc_9\", \"externalIri\": \"promo:Model/Node_1\", \"arcType\": \"promo:ArcType/token-flow\", \"isSource\": true, \"refToExternal\": true}]" ;
-        promo:parent <https://w3id.org/promo/ontology/Composite_0> .
-
-    <https://w3id.org/promo/ontology/Model> a promo:Model ;
-        promo:arcCounter 2 ;
-        promo:nextTreeId 4 ;
-        promo:rootComposite <https://w3id.org/promo/ontology/Composite_0> .
-
-    <promo:Arc/Arc_1> a promo:ModelArc ;
-        promo:arcType <promo:ArcType/token-flow> ;
-        promo:internalID "Arc_1" ;
-        promo:referenceFrom <promo:Model/Node_2> ;
-        promo:referenceTo <promo:Model/Node_1> ;
-        promo:source <promo:Model/Node_1> ;
-        promo:target <promo:Model/Node_2> .
 
     <promo:F_conv> a promo:Variable ;
         rdfs:label "F_conv" ;
@@ -1780,23 +1727,6 @@
     promo:versionInfo a rdf:Property .
 
     promo:versionOf a rdf:Property .
-
-    <https://w3id.org/promo/ontology/Composite_0> a promo:Composite ;
-        rdfs:label "Root" ;
-        promo:children "[{\"id\": 1, \"iri\": \"promo:Model/Node_1\"}, {\"id\": 2, \"iri\": null}]" ;
-        promo:internalID 0 ;
-        promo:knots "{\"promo:Arc/Arc_1\": [{\"x\": 10.0, \"y\": 20.0}]}" ;
-        promo:layout "{\"1\": {\"x\": 0.0, \"y\": 0.0}, \"2\": {\"x\": 100.0, \"y\": 50.0}}" .
-
-    <promo:Model/Node_1> a promo:ModelNode ;
-        rdfs:label "Reactor" ;
-        promo:entityType <promo:EntityType/capacity> ;
-        promo:internalID "Node_1" .
-
-    <promo:Model/Node_2> a promo:ModelNode ;
-        rdfs:label "Tank" ;
-        promo:entityType <promo:EntityType/capacity> ;
-        promo:internalID "Node_2" .
 
     <promo:m> a promo:Variable ;
         rdfs:label "m" ;

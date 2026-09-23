@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ModelArc, ModelNode } from './types'
-import type { SpeciesDocument } from './api'
+import type { SpeciesDistribution, SpeciesDocument } from './api'
 import type { Command } from './state/ModelState'
 
 const frag = (iri: string) =>
@@ -33,6 +33,7 @@ export function SpeciesPanel({
   arcIsTransport,
   speciesDoc,
   aliases,
+  dist,
   dispatch,
 }: {
   node?: ModelNode
@@ -42,6 +43,8 @@ export function SpeciesPanel({
   speciesDoc: SpeciesDocument
   /** §20 model-level alias map (Component IRI → local name). */
   aliases: Map<string, string>
+  /** §20 live distribution — species present per element. */
+  dist?: SpeciesDistribution | null
   dispatch: (c: Command) => void
 }) {
   const compLabel = (iri: string) =>
@@ -49,14 +52,21 @@ export function SpeciesPanel({
     speciesDoc.components.find((c) => c.iri === iri)?.label ??
     frag(iri)
 
+  const readout = (label: string, iris: string[] | undefined) =>
+    iris && iris.length > 0
+      ? <div style={S.muted}>{label}: {iris.map(compLabel).join(', ')}</div>
+      : null
+
   // ---- node gestures -------------------------------------------------------
   if (node) {
     const canSource = nodeCaps.includes('species_source')
     const canReact = nodeCaps.includes('reaction_host')
-    if (!canSource && !canReact) return null
+    const present = dist?.nodes[node.iri]
+    if (!canSource && !canReact && !present?.length) return null
     return (
       <div style={S.box}>
         <div style={S.head}>Species</div>
+        {readout('present', present)}
         {canSource && (
           <>
             <label style={S.label}>injects allocation</label>
@@ -121,6 +131,7 @@ export function SpeciesPanel({
     return (
       <div style={S.box}>
         <div style={S.head}>Permeability</div>
+        {readout('carries', dist?.arcs[arc.iri])}
         <label style={S.check}>
           <input
             type="checkbox"

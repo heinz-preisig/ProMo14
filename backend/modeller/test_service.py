@@ -1,15 +1,24 @@
 """Tests for the modeller model persistence endpoints (ADR-007)."""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.core import graph_store
 from backend.main import app
 
 
 @pytest.fixture()
-def client():
+def client(tmp_path: Path, monkeypatch):
+    """Yield a ``TestClient`` backed by a fresh store in a temp dir —
+    ``/api/catalogue/new`` saves immediately, so an un-isolated store
+    would leak test artefacts into the tracked ``data/ontology.trig``."""
+    monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(graph_store, "_STORE", None)
     with TestClient(app) as c:
         yield c
+    monkeypatch.setattr(graph_store, "_STORE", None)
 
 
 def _doc():

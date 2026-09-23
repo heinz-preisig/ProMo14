@@ -357,6 +357,41 @@ def _species_distribution(store, model_graph, species_graph_iri
     return distribute(snodes, sarcs, artefact)
 
 
+class SpeciesDistributionOut(BaseModel):
+    """§20 readout: species present per node / carried per arc."""
+    species: Optional[str] = None   # resolved species artefact IRI
+    nodes: Dict[str, List[str]] = {}
+    arcs: Dict[str, List[str]] = {}
+
+
+@router.get("/species-distribution", response_model=SpeciesDistributionOut)
+def species_distribution(
+    graph_iri: Optional[str] = Depends(graph_param),
+    species: Optional[str] = None,
+) -> SpeciesDistributionOut:
+    """Which species occupy each node and arc (§20).
+
+    ``?species=`` overrides the model artefact's ``usesSpecies`` pin;
+    with neither, the maps come back empty.  This is the live readout
+    the modeller shows while placements are edited — the same engine
+    that binds ``S`` at instantiation.
+    """
+    if not graph_iri:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= (model artefact IRI) is required")
+    store = get_store()
+    model_graph = resolve_graph(store, graph_iri)
+    sg_iri = species or _species_pin(model_graph)
+    dist = _species_distribution(store, model_graph, sg_iri)
+    if dist is None:
+        return SpeciesDistributionOut(species=sg_iri)
+    return SpeciesDistributionOut(
+        species=sg_iri,
+        nodes={k: sorted(v) for k, v in dist.nodes.items()},
+        arcs={k: sorted(v) for k, v in dist.arcs.items()})
+
+
 @router.get("/arc-indices", response_model=ArcIndexReport)
 def arc_indices(
     graph_iri: Optional[str] = Depends(graph_param),

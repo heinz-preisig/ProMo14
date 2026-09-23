@@ -85,6 +85,20 @@ mirroring `usesOntology`:
   `promo:Model` itself, so artefact type, label and pins were being
   wiped on every save.
 
+## Species-present readout (implemented 2026-09-23)
+
+`GET /api/instantiate/species-distribution?graph=<model>[&species=]`
+returns the fixpoint's per-element sets — `{nodes: {iri: [compIris]},
+arcs: {iri: [compIris]}}` — running the same `distribute()` engine
+that binds `S` at instantiation.  `?species=` falls back to the
+model's `usesSpecies` pin.
+
+The modeller fetches it debounced (400 ms) whenever `modelNodes`/
+`modelArcs` change and shows it in `SpeciesPanel`: **present:** on
+nodes (also on nodes without species gestures — presence is
+informative everywhere) and **carries:** on transport arcs, rendered
+through the alias-aware `compLabel`.
+
 ## Model-level aliasing (ruled + implemented 2026-09-23)
 
 Species are abstract in the artefact; their *reading* is
@@ -147,9 +161,6 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
   fixed); *values* bind at kinetic-equation instantiation, after the
   model topology exists.
 - **`Q` (reaction index)** — could bind by the same mechanism.
-- **Species-present readout** — show per-node/arc species in the
-  modeller (the distribution is computed server-side; needs a small
-  endpoint or reuse of the report).
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
   modeller UI uses the first only; a model doc save drops additional
   pins (single-scheme-per-model assumption).

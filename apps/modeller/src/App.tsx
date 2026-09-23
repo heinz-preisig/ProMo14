@@ -3,8 +3,8 @@ import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
-import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, loadModel, saveModel, saveOntology } from './api'
-import type { SpeciesDocument } from './api'
+import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, fetchSpeciesDistribution, loadModel, saveModel, saveOntology } from './api'
+import type { SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { deserializeState, hasContent, serializeState } from './modelPersistence'
@@ -42,6 +42,8 @@ export default function App() {
 
   // --- §20 species artefact + entity-type capabilities (gesture gating) ---
   const [speciesDoc, setSpeciesDoc] = useState<SpeciesDocument | null>(null)
+  const [speciesIri, setSpeciesIri] = useState<string | undefined>(undefined)
+  const [dist, setDist] = useState<SpeciesDistribution | null>(null)
   const [capabilities, setCapabilities] = useState<Map<string, string[]>>(new Map())
   const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
 
@@ -76,11 +78,26 @@ export default function App() {
       .catch(() => SPECIES_IRI ?? null)  // backend down — honour the URL param
       .then((iri) => {
         if (cancelled || !iri) return
+        setSpeciesIri(iri)
         fetchSpecies(iri)
           .then((d) => { if (!cancelled) setSpeciesDoc(d) })
       })
     return () => { cancelled = true }
   }, [])
+
+  // §20 live readout: recompute the species distribution whenever the
+  // model's nodes/arcs change (debounced — placements are edited in
+  // bursts).  Selection-only commands reuse the same Map refs and do
+  // not retrigger.
+  useEffect(() => {
+    if (!speciesIri) return
+    let cancelled = false
+    const t = setTimeout(() => {
+      fetchSpeciesDistribution(SPECIES_IRI ?? speciesIri)
+        .then((d) => { if (!cancelled) setDist(d) })
+    }, 400)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [state.modelNodes, state.modelArcs, speciesIri])
 
   const onSave = useCallback(async () => {
     try {
@@ -498,6 +515,7 @@ export default function App() {
                 arcIsTransport={arcTransport}
                 speciesDoc={speciesDoc}
                 aliases={state.speciesAliases}
+                dist={dist}
                 dispatch={dispatch}
               />
             )

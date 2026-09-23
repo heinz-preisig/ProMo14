@@ -1062,3 +1062,67 @@ def test_code_endpoint(client):
     r = client.get("/api/instantiate/code",
                    params={"graph": graph, "target": "cobol"})
     assert r.status_code == 400
+
+
+def test_species_distribution_endpoint(client):
+    """§20 readout: per-node/arc species sets, resolved through the
+    model artefact's usesSpecies pin (no ?species= param)."""
+    store = graph_store.get_store()
+    base = str(store.ONTOLOGY_GRAPH_IRI)
+    g = store.ontology_graph
+
+    # Capabilities on the entity types used below (frag-stripped by
+    # _entity_capabilities: cap_species_source -> species_source).
+    for et, cap in (("lumped_capacity", "cap_species_source"),
+                    ("diffusion_transport", "cap_species_transport")):
+        e = URIRef(_et(et))
+        g.add((e, RDF.type, PROMO["EntityType"]))
+        g.add((e, PROMO["capability"], Literal(cap)))
+
+    # Species artefact: components A, B; allocation "feed" = {A, B}.
+    sg = store.dataset.graph(store.create_artefact_graph(
+        "https://example.org/scheme", "species"))
+    for c in ("A", "B"):
+        sg.add((URIRef(f"https://example.org/scheme#{c}"),
+                RDF.type, PROMO["Component"]))
+        sg.add((URIRef("https://example.org/scheme#feed"),
+                PROMO["member"],
+                URIRef(f"https://example.org/scheme#{c}")))
+    sg.add((URIRef("https://example.org/scheme#feed"),
+            RDF.type, PROMO["Allocation"]))
+
+    # Model artefact pinned to the scheme (and the ontology for the
+    # entity types): reservoir injects feed, transport node passes it.
+    miri = store.create_artefact_graph(
+        "https://example.org/m", "model",
+        uses=[base], uses_species=["https://example.org/scheme"])
+    mg = store.dataset.graph(miri)
+    r_, t_, a_ = (URIRef(f"{miri}/ModelNode_r"),
+                  URIRef(f"{miri}/ModelNode_t"),
+                  URIRef(f"{miri}/ModelArc_a"))
+    mg.add((r_, RDF.type, PROMO["ModelNode"]))
+    mg.add((r_, PROMO["entityType"], URIRef(_et("lumped_capacity"))))
+    mg.add((r_, PROMO["speciesAllocation"],
+            URIRef("https://example.org/scheme#feed")))
+    mg.add((t_, RDF.type, PROMO["ModelNode"]))
+    mg.add((t_, PROMO["entityType"], URIRef(_et("diffusion_transport"))))
+    mg.add((a_, RDF.type, PROMO["ModelArc"]))
+    mg.add((a_, PROMO["source"], r_))
+    mg.add((a_, PROMO["target"], t_))
+
+    resp = client.get("/api/instantiate/species-distribution",
+                      params={"graph": str(miri)})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["species"] == "https://example.org/scheme"  # pin fallback
+    both = {"https://example.org/scheme#A",
+            "https://example.org/scheme#B"}
+    assert set(body["nodes"][str(r_)]) == both
+    assert set(body["nodes"][str(t_)]) == both   # transported
+    assert set(body["arcs"][str(a_)]) == both
+
+    # A model with no pin and no ?species= -> empty maps.
+    resp = client.get("/api/instantiate/species-distribution",
+                      params={"graph": base})
+    assert resp.status_code == 200
+    assert resp.json()["nodes"] == {}
