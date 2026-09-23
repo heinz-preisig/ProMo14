@@ -62,27 +62,47 @@ const S: Record<string, React.CSSProperties> = {
            marginRight: 10, fontSize: 11, cursor: 'pointer' },
   muted: { fontSize: 11, color: '#9ca3af' },
   err: { padding: 12, color: '#b91c1c', fontSize: 12 },
+  coeff: { width: 34, fontSize: 10, padding: '0 2px', marginLeft: 2,
+           border: '1px solid #d1d5db', borderRadius: 3 },
 }
 
 function CheckList({
-  options, selected, onToggle,
+  options, selected, onToggle, coeffs, onCoeff,
 }: {
   options: ComponentDoc[]
   selected: string[]
   onToggle: (iri: string) => void
+  /** §20 stoichiometry slots — shown on checked members when given. */
+  coeffs?: Record<string, number>
+  onCoeff?: (iri: string, v: number | null) => void
 }) {
   return (
     <div>
-      {options.map((c) => (
-        <label key={c.iri} style={S.check}>
-          <input
-            type="checkbox"
-            checked={selected.includes(c.iri)}
-            onChange={() => onToggle(c.iri)}
-          />
-          {c.label || frag(c.iri)}
-        </label>
-      ))}
+      {options.map((c) => {
+        const on = selected.includes(c.iri)
+        return (
+          <label key={c.iri} style={S.check}>
+            <input
+              type="checkbox"
+              checked={on}
+              onChange={() => onToggle(c.iri)}
+            />
+            {c.label || frag(c.iri)}
+            {on && onCoeff && (
+              <input
+                type="number" min="0" step="any" style={S.coeff}
+                title="stoichiometric coefficient (default 1)"
+                placeholder="1"
+                value={coeffs?.[c.iri] ?? ''}
+                onChange={(e) =>
+                  onCoeff(c.iri,
+                    e.target.value === '' ? null : Number(e.target.value))
+                }
+              />
+            )}
+          </label>
+        )
+      })}
     </div>
   )
 }
@@ -119,16 +139,34 @@ export default function App() {
   ) =>
     setDoc((d) => ({
       ...d,
-      [coll]: d[coll].map((x: any) =>
-        x.iri === iri
-          ? {
-              ...x,
-              [list]: x[list].includes(comp)
-                ? x[list].filter((m: string) => m !== comp)
-                : [...x[list], comp],
-            }
-          : x,
-      ),
+      [coll]: d[coll].map((x: any) => {
+        if (x.iri !== iri) return x
+        const removing = x[list].includes(comp)
+        const next = {
+          ...x,
+          [list]: removing
+            ? x[list].filter((m: string) => m !== comp)
+            : [...x[list], comp],
+        }
+        // stoichiometry keys are members only — prune on uncheck.
+        if (removing && coll === 'reactions' && next.stoichiometry) {
+          next.stoichiometry = { ...next.stoichiometry }
+          delete next.stoichiometry[comp]
+        }
+        return next
+      }),
+    }))
+
+  const setCoeff = (iri: string, comp: string, v: number | null) =>
+    setDoc((d) => ({
+      ...d,
+      reactions: d.reactions.map((x) => {
+        if (x.iri !== iri) return x
+        const stoichiometry = { ...(x.stoichiometry ?? {}) }
+        if (v === null || v === 1) delete stoichiometry[comp]
+        else stoichiometry[comp] = v
+        return { ...x, stoichiometry }
+      }),
     }))
 
   const addComponent = () => {
@@ -287,12 +325,16 @@ export default function App() {
                   options={doc.components}
                   selected={r.reactants}
                   onToggle={(c) => toggle('reactants', 'reactions', r.iri, c)}
+                  coeffs={r.stoichiometry}
+                  onCoeff={(c, v) => setCoeff(r.iri, c, v)}
                 />
                 <div style={S.muted}>products</div>
                 <CheckList
                   options={doc.components}
                   selected={r.products}
                   onToggle={(c) => toggle('products', 'reactions', r.iri, c)}
+                  coeffs={r.stoichiometry}
+                  onCoeff={(c, v) => setCoeff(r.iri, c, v)}
                 />
               </div>
             ))}

@@ -16,14 +16,20 @@ RDF shape:
 - ``promo:Allocation`` — a named species set a reservoir injects:
   ``member`` → Component IRI (multi-valued).
 - ``promo:Reaction`` — a stoichiometric rule: ``reactant`` /
-  ``product`` → Component IRI (multi-valued).  For distribution only
-  the species sets matter; coefficients are a kinetics concern (§20
-  open).
+  ``product`` → Component IRI (multi-valued) plus a
+  ``promo:stoichiometry`` JSON literal ``{componentIRI: coeff}`` —
+  positive coefficients for members only (absent member = 1, absent
+  literal = elementary step).  The sign comes from membership
+  (reactant −ν / product +ν), so the map can't contradict the sets;
+  consumers build the signed stoichiometric matrix column N[:,r]
+  when binding kinetics at instantiation.  Distribution uses the
+  membership sets only.
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+import json
+from typing import Dict, List, Optional
 
 from fastapi import Depends
 from pydantic import BaseModel, Field
@@ -58,6 +64,8 @@ class ReactionDoc(BaseModel):
     label: str = ""
     reactants: List[str] = Field(default_factory=list)  # Component IRIs
     products: List[str] = Field(default_factory=list)   # Component IRIs
+    # member IRI → coefficient (positive; sign from membership).
+    stoichiometry: Dict[str, float] = Field(default_factory=dict)
 
 
 class SpeciesDocument(BaseModel):
@@ -101,10 +109,12 @@ def get_species(graph_iri: Optional[str] = Depends(graph_param)
             iri=str(s), label=_one(graph, s, RDFS.label) or "",
             members=_members(graph, s, PROMO["member"])))
     for s in graph.subjects(RDF.type, PROMO["Reaction"]):
+        raw = _one(graph, s, PROMO["stoichiometry"])
         doc.reactions.append(ReactionDoc(
             iri=str(s), label=_one(graph, s, RDFS.label) or "",
             reactants=_members(graph, s, PROMO["reactant"]),
-            products=_members(graph, s, PROMO["product"])))
+            products=_members(graph, s, PROMO["product"]),
+            stoichiometry=json.loads(raw) if raw else {}))
     return doc
 
 
@@ -150,5 +160,8 @@ def put_species(
             graph.add((s, PROMO["reactant"], URIRef(m)))
         for m in r.products:
             graph.add((s, PROMO["product"], URIRef(m)))
+        if r.stoichiometry:
+            graph.set((s, PROMO["stoichiometry"],
+                       Literal(json.dumps(r.stoichiometry))))
 
     return doc
