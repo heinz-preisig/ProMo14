@@ -1852,6 +1852,24 @@ the global species list.  The mask is a constant the emitters already
 handle.  (Per-distinct-set sub-indices are the compact alternative,
 but they break the per-type tensor when a type spans two sets.)
 
+### Model-level aliasing (ruled 2026-09-23)
+
+Components are **abstract** (`A`, `B`, `C` …) — the artefact is a
+named reaction scheme, reusable across models.  What a species *means*
+is model-dependent, so the alias is a per-model binding stored in the
+**model graph**:
+
+```turtle
+<componentIRI>  promo:speciesAlias  "H2O" .
+```
+
+The split rule: the artefact owns *what exists and what can happen*
+(components, allocations, reactions); the model owns *where it happens
+and what things mean here* (placements, permeability, aliases).
+Reactions stay in the artefact — they are scheme structure, not
+model state.  Aliases are edited in the modeller (the app that owns
+the model graph), never in the species app.
+
 ### Deferred / open
 
 - **Stoichiometry** — unresolved.  It belongs to the species/reaction
@@ -1859,9 +1877,15 @@ but they break the per-type tensor when a type spans two sets.)
   stoichiometry either.  For *distribution* only the
   `{reactants}→{products}` species sets are needed; coefficients
   matter for the `reactions` domain's kinetics, a separate concern.
+  Ruled refinement (2026-09-23): coefficient *slots* belong to the
+  Reaction in the scheme; *values* bind at kinetic-equation
+  instantiation, after the model topology exists.
 - Whether `Q` (reaction index) binds by the same mechanism.
 - Whether the mask is required for correctness or only for
   compactness — absent species may already evaluate to zero.
+- Alias target is a literal; an IRI-valued alias (substance catalogue
+  or ontology subtoken → `component_mass` balances) is the migration
+  path.
 
 ### Implemented (2026-09-22)
 
@@ -1885,3 +1909,8 @@ but they break the per-type tensor when a type spans two sets.)
   `?species=`: the service reads the placements + artefact, runs the
   fixpoint (`instantiate/distribute.py`), and `build_model` binds the
   species index to the union over each variable's topological extent.
+- **Model-level aliases (2026-09-23)** — `promo:speciesAlias` map in
+  the model document (`GET`/`PUT /api/modeller/model`); modeller
+  toolbar **Species aliases** dialog
+  (`apps/modeller/src/SpeciesAliasDialog.tsx`); pickers resolve
+  `alias ?? label ?? frag`.

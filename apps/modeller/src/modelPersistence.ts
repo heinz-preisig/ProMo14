@@ -51,6 +51,8 @@ export interface ModelDocument {
   rootTreeId: number
   nextTreeId: number
   arcCounter: number
+  /** §20 model-level species aliasing: Component IRI → local name. */
+  speciesAliases?: Record<string, string>
 }
 
 export function serializeState(state: AppState): ModelDocument {
@@ -94,6 +96,7 @@ export function serializeState(state: AppState): ModelDocument {
     rootTreeId: state.tree.rootId,
     nextTreeId: state.tree.nextId,
     arcCounter: state.arcCounter,
+    speciesAliases: Object.fromEntries(state.speciesAliases),
   }
 }
 
@@ -168,6 +171,7 @@ export function deserializeState(doc: ModelDocument): AppState {
     selectedVisibleNodeId: null,
     selectedModelArcIri: null,
     arcCounter: doc.arcCounter,
+    speciesAliases: new Map(Object.entries(doc.speciesAliases ?? {})),
   }
 }
 

@@ -19,6 +19,10 @@ RDF shape (see docs/ADR-007-model-persistence.md):
   parent Composite (absent on root), ``children``/``layout``/
   ``knots``/``openArcs`` JSON literals.  Knots are per (view, arc):
   an arc renders differently on each GraphView.
+- ``promo:speciesAlias`` — Component IRI → literal alias (§20): the
+  model-local reading of an abstract species (``A`` :: ``H2O``).
+  Statements about *external* subjects — the species artefact owns the
+  vocabulary, the model owns its interpretation.
 """
 
 from __future__ import annotations
@@ -97,6 +101,8 @@ class ModelDocument(BaseModel):
     rootTreeId: int = 1
     nextTreeId: int = 1
     arcCounter: int = 1
+    # §20 model-level species aliasing: Component IRI → local name.
+    speciesAliases: Dict[str, str] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +205,9 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
             if raw is not None:
                 setattr(doc, field, int(raw))
 
+    for comp, alias in graph.subject_objects(PROMO["speciesAlias"]):
+        doc.speciesAliases[str(comp)] = str(alias)
+
     return doc
 
 
@@ -215,6 +224,9 @@ def put_model(
     for t in _MODEL_TYPES:
         for s in list(graph.subjects(RDF.type, PROMO[t])):
             graph.remove((s, None, None))
+    # speciesAlias subjects are external Component IRIs — not caught by
+    # the typed-subject wipe above; clear them explicitly.
+    graph.remove((None, PROMO["speciesAlias"], None))
 
     for n in doc.nodes:
         s = URIRef(n.iri)
@@ -277,5 +289,10 @@ def put_model(
                _composite_iri(graph, doc.rootTreeId)))
     graph.set((model, PROMO["nextTreeId"], Literal(doc.nextTreeId)))
     graph.set((model, PROMO["arcCounter"], Literal(doc.arcCounter)))
+
+    for comp, alias in doc.speciesAliases.items():
+        if alias:
+            graph.set((URIRef(comp), PROMO["speciesAlias"],
+                       Literal(alias)))
 
     return doc

@@ -11,7 +11,7 @@
 #   ./dev.sh save                 — persist the in-memory store to data/ontology.trig
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
-# Services: backend | ontology | equation | behaviour | modeller | all (default)
+# Services: backend | ontology | equation | behaviour | modeller | species | all (default)
 #
 # Log files are written to logs/ in the repo root
 
@@ -25,6 +25,7 @@ ONTOLOGY_PORT=3001
 EQUATION_PORT=3002
 BEHAVIOUR_PORT=3003
 MODELLER_PORT=3004
+SPECIES_PORT=3005
 
 LOG_DIR="$REPO/logs"
 mkdir -p "$LOG_DIR"
@@ -34,6 +35,7 @@ ONTOLOGY_LOG="$LOG_DIR/ontology.log"
 EQUATION_LOG="$LOG_DIR/equation.log"
 BEHAVIOUR_LOG="$LOG_DIR/behaviour.log"
 MODELLER_LOG="$LOG_DIR/modeller.log"
+SPECIES_LOG="$LOG_DIR/species.log"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -168,6 +170,20 @@ _start_modeller() {
     fi
 }
 
+_start_species() {
+    _kill_port $SPECIES_PORT "species" quiet
+    echo "  Starting species editor on :$SPECIES_PORT  (log: $SPECIES_LOG)"
+    cd "$REPO"
+    nohup npm run dev:species \
+        > "$SPECIES_LOG" 2>&1 &
+    sleep 3
+    if _is_running $SPECIES_PORT; then
+        echo "  Species editor started  →  http://localhost:$SPECIES_PORT"
+    else
+        echo "  Species editor failed — check $SPECIES_LOG"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -181,6 +197,7 @@ cmd_status() {
     _status_line "equation-editor"  $EQUATION_PORT  "http://localhost:$EQUATION_PORT"
     _status_line "behaviour-linker" $BEHAVIOUR_PORT "http://localhost:$BEHAVIOUR_PORT"
     _status_line "modeller"         $MODELLER_PORT  "http://localhost:$MODELLER_PORT"
+    _status_line "species"          $SPECIES_PORT   "http://localhost:$SPECIES_PORT"
     echo ""
     echo "  Data dir: $DATA_DIR"
     local trig_count
@@ -223,12 +240,14 @@ cmd_start() {
         equation) _ensure_backend; _start_equation ;;
         behaviour) _ensure_backend; _start_behaviour ;;
         modeller) _ensure_backend; _start_modeller ;;
+        species)  _ensure_backend; _start_species ;;
         all)
             _start_backend
             _start_ontology
             _start_equation
             _start_behaviour
             _start_modeller
+            _start_species
             ;;
         *) echo "Unknown service: $service"; exit 1 ;;
     esac
@@ -246,12 +265,14 @@ cmd_stop() {
         equation)  _kill_port $EQUATION_PORT  "equation-editor" ;;
         behaviour) _kill_port $BEHAVIOUR_PORT "behaviour-linker" ;;
         modeller)  _kill_port $MODELLER_PORT  "modeller" ;;
+        species)   _kill_port $SPECIES_PORT   "species" ;;
         all)
             _kill_port $BACKEND_PORT   "backend"
             _kill_port $ONTOLOGY_PORT  "ontology-editor"
             _kill_port $EQUATION_PORT  "equation-editor"
             _kill_port $BEHAVIOUR_PORT "behaviour-linker"
             _kill_port $MODELLER_PORT  "modeller"
+            _kill_port $SPECIES_PORT   "species"
             ;;
         *) echo "Unknown service: $service"; exit 1 ;;
     esac
@@ -313,6 +334,7 @@ cmd_logs() {
         equation)  tail -f "$EQUATION_LOG" ;;
         behaviour) tail -f "$BEHAVIOUR_LOG" ;;
         modeller)  tail -f "$MODELLER_LOG" ;;
+        species)   tail -f "$SPECIES_LOG" ;;
         *) echo "Unknown service: $service"; exit 1 ;;
     esac
 }
@@ -332,7 +354,7 @@ cmd_help() {
     echo "  save                — persist in-memory store to data/ontology.trig"
     echo "  logs    [service]   — tail log for a service"
     echo ""
-    echo "Services: backend | ontology | equation | behaviour | modeller | all (default)"
+    echo "Services: backend | ontology | equation | behaviour | modeller | species | all (default)"
     echo ""
     echo "URLs:"
     echo "  Hub (entry point)  http://localhost:$BACKEND_PORT/"
@@ -341,6 +363,7 @@ cmd_help() {
     echo "  Equation Editor    http://localhost:$EQUATION_PORT"
     echo "  Behaviour Linker   http://localhost:$BEHAVIOUR_PORT"
     echo "  Modeller           http://localhost:$MODELLER_PORT"
+    echo "  Species Editor     http://localhost:$SPECIES_PORT"
     echo ""
 }
 

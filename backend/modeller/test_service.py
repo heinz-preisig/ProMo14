@@ -85,3 +85,22 @@ def test_put_replaces(client):
     got = client.get("/api/modeller/model").json()
     assert got["nodes"] == [] and got["arcs"] == []
     assert len(got["composites"]) == 1
+
+
+def test_species_aliases(client):
+    """§20: the model-local alias map (Component IRI → name) round-trips
+    and is wiped with the document — its subjects are external IRIs, so
+    the typed-subject wipe alone would leave stale aliases behind."""
+    doc = _doc()
+    doc["speciesAliases"] = {
+        "http://example.org/species#A": "H2O",
+        "http://example.org/species#B": "NaCl",
+    }
+    assert client.put("/api/modeller/model", json=doc).status_code == 200
+    got = client.get("/api/modeller/model").json()
+    assert got["speciesAliases"] == doc["speciesAliases"]
+
+    # second PUT without aliases clears them
+    client.put("/api/modeller/model", json=_doc())
+    got = client.get("/api/modeller/model").json()
+    assert got["speciesAliases"] == {}

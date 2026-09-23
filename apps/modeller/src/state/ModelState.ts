@@ -14,6 +14,10 @@ export interface AppState {
   selectedVisibleNodeId: string | null
   selectedModelArcIri: string | null
   arcCounter: number
+  /** §20 model-level species aliasing: Component IRI → local name
+   *  ("A" :: "H2O").  The species artefact owns the vocabulary; the
+   *  model owns its interpretation.  Persisted as promo:speciesAlias. */
+  speciesAliases: Map<string, string>
 }
 
 export const initialState: AppState = {
@@ -27,6 +31,7 @@ export const initialState: AppState = {
   selectedVisibleNodeId: null,
   selectedModelArcIri: null,
   arcCounter: 1,
+  speciesAliases: new Map(),
 }
 
 // ─── Commands (discriminated union) ───
@@ -47,6 +52,7 @@ export type Command =
   | { type: 'removeKnot'; arcIri: string; knotIndex: number }
   | { type: 'setNodeSpecies'; iri: string; speciesAllocation?: string; reactions?: string[] }
   | { type: 'setArcPermeable'; iri: string; permeable?: string[] }
+  | { type: 'setSpeciesAlias'; componentIri: string; alias: string }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -203,6 +209,14 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const a = modelArcs.get(cmd.iri)
       if (a) modelArcs.set(cmd.iri, { ...a, permeable: cmd.permeable })
       return { ...state, modelArcs }
+    }
+
+    case 'setSpeciesAlias': {
+      const speciesAliases = new Map(state.speciesAliases)
+      const alias = cmd.alias.trim()
+      if (alias) speciesAliases.set(cmd.componentIri, alias)
+      else speciesAliases.delete(cmd.componentIri)
+      return { ...state, speciesAliases }
     }
 
     case 'groupNodes': {

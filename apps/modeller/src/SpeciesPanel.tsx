@@ -32,6 +32,7 @@ export function SpeciesPanel({
   arc,
   arcIsTransport,
   speciesDoc,
+  aliases,
   dispatch,
 }: {
   node?: ModelNode
@@ -39,10 +40,14 @@ export function SpeciesPanel({
   arc?: ModelArc
   arcIsTransport: boolean
   speciesDoc: SpeciesDocument
+  /** §20 model-level alias map (Component IRI → local name). */
+  aliases: Map<string, string>
   dispatch: (c: Command) => void
 }) {
   const compLabel = (iri: string) =>
-    speciesDoc.components.find((c) => c.iri === iri)?.label ?? frag(iri)
+    aliases.get(iri) ??
+    speciesDoc.components.find((c) => c.iri === iri)?.label ??
+    frag(iri)
 
   // ---- node gestures -------------------------------------------------------
   if (node) {

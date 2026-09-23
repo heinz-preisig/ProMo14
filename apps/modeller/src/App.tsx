@@ -6,6 +6,7 @@ import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, Remot
 import { GRAPH_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, loadModel, saveModel, saveOntology } from './api'
 import type { SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
+import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { deserializeState, hasContent, serializeState } from './modelPersistence'
 import type { Command } from './state/ModelState'
 import { computeGraphView } from './tree/computeGraphView'
@@ -42,6 +43,7 @@ export default function App() {
   // --- §20 species artefact + entity-type capabilities (gesture gating) ---
   const [speciesDoc, setSpeciesDoc] = useState<SpeciesDocument | null>(null)
   const [capabilities, setCapabilities] = useState<Map<string, string[]>>(new Map())
+  const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -247,6 +249,12 @@ export default function App() {
         <span style={{ fontSize: 13, color: '#555' }}>Model: untitled</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 13 }}>
           <span style={{ color: '#555' }}>View: {state.tree.nodes.get(state.currentViewNodeId)?.label ?? 'Root'}</span>
+          {speciesDoc && (
+            <button style={{ fontSize: 12 }}
+                    onClick={() => setAliasDialogOpen(true)}>
+              Species aliases
+            </button>
+          )}
           <button style={{ fontSize: 12 }} onClick={onSave}>Save</button>
           <button style={{ fontSize: 12 }}>Screenshot</button>
         </div>
@@ -482,6 +490,7 @@ export default function App() {
                 arc={selArc}
                 arcIsTransport={arcTransport}
                 speciesDoc={speciesDoc}
+                aliases={state.speciesAliases}
                 dispatch={dispatch}
               />
             )
@@ -555,6 +564,16 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* §20 model-level species aliases (only with a pinned artefact) */}
+      {aliasDialogOpen && speciesDoc && (
+        <SpeciesAliasDialog
+          speciesDoc={speciesDoc}
+          aliases={state.speciesAliases}
+          dispatch={dispatch}
+          onClose={() => setAliasDialogOpen(false)}
+        />
+      )}
 
       {/* Bottom status bar */}
       <div

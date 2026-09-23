@@ -2,7 +2,7 @@
 
 Implementation status of §20 in
 `docs/behaviour-linker-design-discussion.md` (species allocation and
-distribution).  Last updated 2026-09-22.
+distribution).  Last updated 2026-09-23.
 
 ## Concept
 
@@ -34,6 +34,12 @@ A `promo:Species` graph (catalogue type `species`) holds:
 Service: `GET`/`PUT /api/species/species?graph=` (whole-document,
 mirrors the modeller pattern).  Edited in the standalone `/species` SPA.
 
+**Ruled (2026-09-23):** the artefact is a *named reaction scheme* —
+abstract and reusable.  Components are generic (`A`, `B`, `C` …);
+reactions are simple `{reactants} → {products}` rules (complex schemes
+are built from single reactions, not long lists).  What is
+model-specific stays out: placements, permeability, and the alias map.
+
 ## Capabilities
 
 `promo:capability` → `promo:Capability` resources on entity types,
@@ -60,6 +66,33 @@ The Properties panel (`apps/modeller/src/SpeciesPanel.tsx`) gates the
 pickers by capability.  The model names its species artefact via the
 `?species=<graph>` URL param.
 
+## Model-level aliasing (ruled + implemented 2026-09-23)
+
+Species are abstract in the artefact; their *reading* is
+model-dependent (`A :: H2O`).  The alias is a per-model binding, so it
+lives in the **model graph** — the artefact stays reusable across
+models that read the same scheme differently:
+
+```turtle
+<componentIRI>  promo:speciesAlias  "H2O" .   # in the model graph
+```
+
+- Edited in the modeller's **Species aliases** dialog (toolbar,
+  `apps/modeller/src/SpeciesAliasDialog.tsx`) — model-level, not
+  per-node.  The species app never sees aliases (it edits the
+  vocabulary, not its interpretation).
+- `AppState.speciesAliases` (Map) ↔ `ModelDocument.speciesAliases`
+  (dict); PUT wipes `(_, promo:speciesAlias, _)` explicitly since the
+  subjects are external IRIs.
+- `SpeciesPanel.compLabel` resolves `alias ?? label ?? frag` — pickers
+  show `H2O` once aliased.
+- `promo:speciesAlias` (not `promo:alias`) — the latter is the
+  variable-alias JSON mechanism (`_add_aliases`).
+
+**Open:** alias target is a literal today; an IRI-valued alias (a
+shared substance catalogue, or an ontology subtoken linking to
+`component_mass` balances) is the migration path.
+
 ## Distribution → `S` binding
 
 `GET /api/instantiate/model?graph=<model>&vars=<vars>&species=<species>`
@@ -82,14 +115,18 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
   `ARTEFACT_TYPES`.
 - `backend/modeller/service.py` — `speciesAllocation`/`hostsReaction`/
   `permeable` persistence.
-- `apps/species/` — the `/species` SPA (port 3005).
+- `apps/species/` — the `/species` SPA (port 3005, `dev.sh species`).
 - `apps/modeller/src/SpeciesPanel.tsx` — the capability-gated gestures.
+- `apps/modeller/src/SpeciesAliasDialog.tsx` — model-level alias table.
 
 ## Open / deferred
 
 - **Stoichiometry** — coefficients belong to the `reactions` domain's
   kinetics, not distribution (only `{reactants}→{products}` sets are
-  needed for presence).
+  needed for presence).  Ruled refinement (2026-09-23): coefficient
+  *slots* belong to the Reaction in the scheme (the chemistry is
+  fixed); *values* bind at kinetic-equation instantiation, after the
+  model topology exists.
 - **`Q` (reaction index)** — could bind by the same mechanism.
 - **Species-present readout** — show per-node/arc species in the
   modeller (the distribution is computed server-side; needs a small
