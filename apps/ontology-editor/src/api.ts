@@ -286,11 +286,11 @@ export async function deleteConnectionRule(iri: string): Promise<{ deleted: stri
   return res.json()
 }
 
-export async function saveOntology(filename: string): Promise<{ saved: string }> {
+export async function saveOntology(): Promise<{ saved: string }> {
   const res = await apiFetch('/api/ontology/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({}),
   })
   if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`)
   return res.json()

@@ -8,7 +8,7 @@
 #   ./dev.sh status               — show what is running
 #   ./dev.sh wipe                 — delete all data files (ontology.trig etc.)
 #   ./dev.sh wipe-restart         — wipe data, reseed (seed + HAP ext), restart backend
-#   ./dev.sh save                 — persist the in-memory store to data/ontology.trig
+#   ./dev.sh save                 — persist the in-memory store (one .trig per artefact line)
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
 # Services: backend | ontology | equation | behaviour | modeller | species | all (default)
@@ -351,7 +351,7 @@ cmd_help() {
     echo "  wipe                — delete all data files (backend reseeds on start)"
     echo "  wipe-restart        — wipe data + reseed (seed + HAP ext) + restart backend"
     echo "                        (bare seed: ./dev.sh wipe && ./dev.sh start backend)"
-    echo "  save                — persist in-memory store to data/ontology.trig"
+    echo "  save                — persist in-memory store (one .trig per artefact line)"
     echo "  logs    [service]   — tail log for a service"
     echo ""
     echo "Services: backend | ontology | equation | behaviour | modeller | species | all (default)"

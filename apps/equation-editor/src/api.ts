@@ -163,12 +163,12 @@ export async function getStoreStatus(): Promise<StoreStatus> {
   return res.json()
 }
 
-/** Persist the whole dataset (ontology + artefact graphs) to ontology.trig. */
-export async function saveOntology(filename = 'ontology.trig'): Promise<{ saved: string }> {
+/** Persist the dataset — one .trig per artefact line under PROMO_DATA_DIR. */
+export async function saveOntology(): Promise<{ saved: string }> {
   const res = await apiFetch('/api/ontology/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({}),
   })
   if (!res.ok) throw new Error(`Failed to save: ${res.status}`)
   return res.json()

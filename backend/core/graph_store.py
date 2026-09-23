@@ -12,6 +12,7 @@ The store uses the ProMo vocabulary (``https://w3id.org/promo#``).  When no
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -188,11 +189,25 @@ class RdfStore:
         ontology graph is still empty, the default ontology is seeded.
         """
         ontology_path = self.data_dir / "ontology.trig"
+        legacy_layout = False
         if ontology_path.exists():
             try:
                 self.dataset.parse(str(ontology_path), format="trig")
             except Exception:
                 pass
+            else:
+                # Legacy single-file layout: ontology.trig held the
+                # whole dataset.  At this point the dataset contains
+                # only that file's graphs — any non-empty graph outside
+                # the ontology line (the ontology plus its versionOf
+                # children) means a split is needed.
+                line = {self.ONTOLOGY_GRAPH_IRI} | {
+                    g.identifier for g in self.dataset.graphs()
+                    if (g.identifier, PROMO["versionOf"],
+                        self.ONTOLOGY_GRAPH_IRI) in g}
+                legacy_layout = any(
+                    len(g) and g.identifier not in line
+                    for g in self.dataset.graphs())
 
         if not len(self.ontology_graph):
             self.seed_default_ontology()
@@ -234,6 +249,12 @@ class RdfStore:
         # ids → sequential ``E_n`` (readable in the printed document).
         self._migrate_equation_ids()
 
+        if legacy_layout:
+            # Split the legacy single-file store into per-line files
+            # now — before any edit lands — so the tracked files match
+            # the per-artefact layout (hub ticket #4).
+            self.save()
+
     def _migrate_equation_ids(self) -> None:
         """Renumber non-conforming equation ``internalID`` literals.
 
@@ -260,17 +281,85 @@ class RdfStore:
         if legacy:
             self.mark_dirty()
 
-    def save(self, filename: str = "ontology.trig") -> Path:
-        """Serialise the dataset to ``PROMO_DATA_DIR/filename``.
+    def _line_key(self, g: Graph) -> URIRef:
+        """The artefact line a graph belongs to: itself, or its
+        ``versionOf`` target for frozen version graphs."""
+        base = g.value(g.identifier, PROMO["versionOf"])
+        return URIRef(str(base)) if base is not None else g.identifier
 
-        Returns the written file path.
+    @staticmethod
+    def _line_filename(line_iri: URIRef, taken: set) -> str:
+        """Filesystem name for a line: the IRI's last segment, with a
+        deterministic hash suffix when two lines slug alike."""
+        text = str(line_iri)
+        seg = text.rstrip("/").rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "_", seg).strip("_") \
+            or "graph"
+        name = f"{slug}.trig"
+        if name in taken:
+            digest = hashlib.sha1(text.encode()).hexdigest()[:6]
+            name = f"{slug}-{digest}.trig"
+        taken.add(name)
+        return name
+
+    def save(self, filename: Optional[str] = None) -> Path:
+        """Serialise the dataset — one ``.trig`` per artefact line.
+
+        A line file holds the draft graph plus its frozen version
+        graphs ("the file is the history"); the core ontology line
+        keeps the tracked ``ontology.trig`` name.  ``filename``
+        selects the legacy whole-dataset single-file form (explicit
+        export only).  Returns the data directory (fan-out) or the
+        written file (single-file).
         """
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        path = self.data_dir / filename
-        self.dataset.serialize(str(path), format="trig")
+        if filename:
+            path = self.data_dir / filename
+            self.dataset.serialize(str(path), format="trig")
+            self.dirty = False
+            self.last_saved = datetime.datetime.now(datetime.timezone.utc)
+            return path
+
+        default_id = self.dataset.default_graph.identifier
+        lines: Dict[URIRef, List[Graph]] = {}
+        for g in self.dataset.graphs():
+            if not len(g) or g.identifier == default_id:
+                continue
+            lines.setdefault(self._line_key(g), []).append(g)
+
+        # Default-graph triples (e.g. a hand-edited file's unnamed
+        # block) ride along in the ontology line file so they
+        # round-trip back into the default graph.
+        default = self.dataset.default_graph
+        default_home = (
+            self.ONTOLOGY_GRAPH_IRI if self.ONTOLOGY_GRAPH_IRI in lines
+            else (sorted(lines, key=str)[0] if lines else None))
+
+        written: set = set()
+        for line_iri in sorted(lines, key=str):
+            out = Dataset()
+            for pfx, ns in self.dataset.namespaces():
+                out.bind(pfx, ns)
+            for g in lines[line_iri]:
+                og = out.graph(g.identifier)
+                for t in g:
+                    og.add(t)
+            if len(default) and line_iri == default_home:
+                for t in default:
+                    out.default_graph.add(t)
+            name = self._line_filename(line_iri, written)
+            out.serialize(str(self.data_dir / name), format="trig")
+            written.add(name)
+
+        # Remove files whose line no longer exists (renamed IRIs).
+        if written:
+            for stale in self.data_dir.glob("*.trig"):
+                if stale.name not in written:
+                    stale.unlink()
+
         self.dirty = False
         self.last_saved = datetime.datetime.now(datetime.timezone.utc)
-        return path
+        return self.data_dir
 
     def mark_dirty(self) -> None:
         """Flag the dataset as having unsaved changes."""

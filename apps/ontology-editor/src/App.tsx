@@ -223,7 +223,7 @@ export default function App() {
 
   const onSaveOntology = async () => {
     try {
-      const result = await saveOntology('ontology.trig')
+      const result = await saveOntology()
       refreshDirty()
       msg(`Saved to ${result.saved}`)
     } catch (err) {

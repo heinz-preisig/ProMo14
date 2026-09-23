@@ -71,19 +71,18 @@ guard); `_assignment_graph` already stamped the derived assignment
 artefact correctly (`uses = resolution_scope(source)`).  Reads keep
 the legacy default for tooling.
 
-## 4. Per-artefact `.trig` persistence
+## 4. Per-artefact `.trig` persistence — DONE
 
-**Problem:** the whole dataset serialises to one `data/ontology.trig`.
-The design says one file per artefact line (draft + its frozen
-versions); "the file is the history".  Single-file storage also makes
-per-machine sync all-or-nothing.
-
-**Files:** `backend/core/graph_store.py` (`load`, `save`, `freeze_version`),
-`dev.sh` wipe semantics, `data/README.md`.
-
-**Notes:** `load()` already globs `*.trig`; the work is in `save()`
-(fan-out per artefact line) and `freeze_version` (keep versions in the
-line's file).  Migration: split existing `ontology.trig` on first load.
+`RdfStore.save()` (no arg) fans out one `.trig` per artefact line —
+the draft graph plus its `versionOf` children ("the file is the
+history") — named by the line IRI's last segment (`lib.trig`), with a
+hash suffix on slug collision.  The ontology line keeps the tracked
+`ontology.trig` name; default-graph triples ride along in it.  Stale
+line files are removed on save.  `save(filename)` remains as the
+explicit whole-dataset single-file export.  `load()` detects a legacy
+single-file `ontology.trig` (non-empty graphs outside the ontology
+line) and splits it on first load.  `POST /api/ontology/save` with no
+`filename` (all editors, `dev.sh save`) uses the fan-out.
 
 ## 5. Hub UX gaps
 

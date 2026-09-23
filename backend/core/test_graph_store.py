@@ -1,11 +1,18 @@
 """Tests for ``backend/core/graph_store.py``."""
 
-from rdflib import URIRef
+from rdflib import Dataset, URIRef
 from rdflib.namespace import RDF
 
 from .graph_store import PROMO, RdfStore
 
 ARTEFACT = "https://example.org/artefact"
+
+
+def _graph_ids(path):
+    """Non-empty graph IRIs in a .trig file."""
+    probe = Dataset()
+    probe.parse(str(path), format="trig")
+    return {str(g.identifier) for g in probe.graphs() if len(g)}
 
 
 def _store_with_equations(tmp_path, eq_ids):
@@ -56,3 +63,55 @@ def test_migrate_equation_ids_noop_when_conforming(tmp_path):
     store._migrate_equation_ids()
     assert _equation_ids(g) == {"E_1", "E_2"}
     assert not store.dirty
+
+
+def test_save_fans_out_per_artefact_line(tmp_path):
+    """Hub #4: save() writes one .trig per artefact line — the draft
+    plus its frozen versions — named by the line IRI's last segment."""
+    store = RdfStore(tmp_path)
+    store.load()  # seeds the ontology line
+    store.create_artefact_graph(
+        "https://example.org/lib", "Library", label="lib",
+        uses=[str(store.ONTOLOGY_GRAPH_IRI)])
+    store.freeze_version("1.0", "https://example.org/lib")
+    store.save()
+
+    ont = tmp_path / "ontology.trig"
+    lib = tmp_path / "lib.trig"
+    assert ont.is_file() and lib.is_file()
+    # ontology.trig holds only the ontology line; lib.trig holds the
+    # draft plus its frozen version ("the file is the history").
+    assert _graph_ids(ont) == {str(store.ONTOLOGY_GRAPH_IRI)}
+    assert _graph_ids(lib) == {
+        "https://example.org/lib", "https://example.org/lib/1.0"}
+    assert not store.dirty
+
+
+def test_load_splits_legacy_single_file(tmp_path):
+    """Hub #4 migration: an ontology.trig holding the whole dataset is
+    split into per-line files on first load."""
+    store = RdfStore(tmp_path)
+    store.load()
+    store.create_artefact_graph("https://example.org/m", "Model")
+    store.save("ontology.trig")  # legacy whole-dataset layout
+    assert not (tmp_path / "m.trig").exists()
+
+    fresh = RdfStore(tmp_path)
+    fresh.load()
+    assert (tmp_path / "m.trig").is_file()
+    assert _graph_ids(tmp_path / "ontology.trig") == \
+        {str(store.ONTOLOGY_GRAPH_IRI)}
+    # the model graph survived the split
+    assert len(fresh.dataset.graph(URIRef("https://example.org/m")))
+
+
+def test_save_removes_stale_line_files(tmp_path):
+    """A .trig whose line no longer exists is removed on save."""
+    store = RdfStore(tmp_path)
+    store.load()
+    stale = tmp_path / "ghost.trig"
+    stale.write_text(
+        "<https://example.org/ghost> { "
+        "<https://example.org/ghost> a <urn:x> }")
+    store.save()
+    assert not stale.exists()

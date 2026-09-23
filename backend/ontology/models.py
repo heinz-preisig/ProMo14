@@ -210,7 +210,9 @@ class ConnectionRuleRecord(BaseModel):
 
 
 class SaveRequest(BaseModel):
-    filename: str = "ontology.trig"
+    # None → per-artefact-line fan-out (hub ticket #4); an explicit
+    # filename selects the legacy whole-dataset single-file export.
+    filename: Optional[str] = None
 
 
 class PublishRequest(BaseModel):
