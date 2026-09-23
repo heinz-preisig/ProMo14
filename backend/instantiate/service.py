@@ -576,10 +576,23 @@ def model_instantiation(
 
     # §20 species distribution → bind the species index.  The
     # ?species= param overrides the artefact's usesSpecies pin.
-    dist = _species_distribution(
-        store, model_graph, species or _species_pin(model_graph))
+    sg_iri = species or _species_pin(model_graph)
+    dist = _species_distribution(store, model_graph, sg_iri)
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
+
+    # Species element labels for the report: the artefact's component
+    # label as base, the model's speciesAlias overriding (§20
+    # aliasing) — so index element sets render as names, not IRIs.
+    if sg_iri:
+        sg = resolve_graph(store, sg_iri)
+        for c in sg.subjects(RDF.type, PROMO["Component"]):
+            lbl = sg.value(c, RDFS.label)
+            if lbl is not None:
+                labels.setdefault(str(c), str(lbl))
+        for c, alias in model_graph.subject_objects(
+                PROMO["speciesAlias"]):
+            labels[str(c)] = str(alias)
 
     # Entity-type labels for display.
     for graph in store.resolution_scope(model_graph.identifier):

@@ -126,6 +126,12 @@ models that read the same scheme differently:
   subjects are external IRIs.
 - `SpeciesPanel.compLabel` resolves `alias ?? label ?? frag` — pickers
   show `H2O` once aliased.
+- `/api/instantiate/model` report `labels` map: component `rdfs:label`
+  as base, `speciesAlias` overriding — `indices[S]` element lists stay
+  IRIs (positional semantics downstream), `labels` carries the display
+  name.  (Generated code is positional — no IRIs render — and the
+  LaTeX document covers equation contexts, not the instantiated model,
+  so the report is the surface.)
 - `promo:speciesAlias` (not `promo:alias`) — the latter is the
   variable-alias JSON mechanism (`_add_aliases`).
 

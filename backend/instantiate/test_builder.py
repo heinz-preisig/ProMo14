@@ -1088,6 +1088,10 @@ def test_species_distribution_endpoint(client):
     for c in ("A", "B", "C"):
         sg.add((URIRef(f"https://example.org/scheme#{c}"),
                 RDF.type, PROMO["Component"]))
+    sg.add((URIRef("https://example.org/scheme#A"), RDFS.label,
+            Literal("comp A")))
+    sg.add((URIRef("https://example.org/scheme#B"), RDFS.label,
+            Literal("comp B")))
     for c in ("A", "B"):
         sg.add((URIRef("https://example.org/scheme#feed"),
                 PROMO["member"],
@@ -1123,6 +1127,9 @@ def test_species_distribution_endpoint(client):
             URIRef("https://example.org/scheme#r1")))
     mg.add((r_, PROMO["hostsReaction"],
             URIRef("https://example.org/scheme#r2")))
+    # §20 model-level alias: A reads as H2O in this model.
+    mg.add((URIRef("https://example.org/scheme#A"),
+            PROMO["speciesAlias"], Literal("H2O")))
     mg.add((t_, RDF.type, PROMO["ModelNode"]))
     mg.add((t_, PROMO["entityType"], URIRef(_et("diffusion_transport"))))
     mg.add((a_, RDF.type, PROMO["ModelArc"]))
@@ -1145,6 +1152,16 @@ def test_species_distribution_endpoint(client):
     # hosted but starves; the transport node hosts nothing.
     assert body["reactions"] == {
         str(r_): ["https://example.org/scheme#r1"]}
+
+    # §20 report labels: the alias wins over the artefact label;
+    # unlabelled components get no entry.
+    resp = client.get("/api/instantiate/model",
+                      params={"graph": str(miri)})
+    assert resp.status_code == 200, resp.text
+    labels = resp.json()["labels"]
+    assert labels["https://example.org/scheme#A"] == "H2O"
+    assert labels["https://example.org/scheme#B"] == "comp B"
+    assert "https://example.org/scheme#C" not in labels
 
     # A model with no pin and no ?species= -> empty maps.
     resp = client.get("/api/instantiate/species-distribution",
