@@ -27,41 +27,49 @@ behaviour.
 
 ---
 
-## 1. Make the graph choice unavoidable
+## 1. Make the graph choice unavoidable — DONE (2026-09-23, frontend)
 
 **Problem:** opening an app without `?graph=` falls back to legacy
 dataset-wide scope (`scoped_context` default).  Edits then land in the
 working ontology graph regardless of intent — silent misattribution.
 
-**Files:** `apps/*/src/api.ts`, app entry components,
-`backend/ontology/service.py` (`graph_param`/`scoped_context`).
+**Done:** every app's `main.tsx` renders a `MissingGraph` guard (link
+to the hub — `http://localhost:8000/` under `import.meta.env.DEV`,
+`/` in prod) when `?graph=` is absent.  A redirect to `/` was rejected:
+in dev Vite serves the app at `/`, so it would loop.  Applies to all
+six apps uniformly — the core ontology is itself a `promo:Ontology`
+catalogue line opened via `?graph=`.
 
-**Options:**
+**Deferred:** backend enforcement (`?graph=` required on write
+endpoints).  The test suite deliberately exercises the legacy default
+(~15 call sites across equation/modeller/species/behaviour tests write
+without `?graph=`); enforcement needs those fixtures to create
+artefact graphs first.  Revisit when per-artefact `.trig` lands.
 
-- App without `?graph=` redirects to the hub (`/`) — simplest, matches
-  "switching subject = back to the hub".
-- Or app shows an artefact picker that sets `?graph=` and reloads.
-- Backend could additionally *require* `?graph=` on write endpoints
-  (defence in depth); reads may keep the legacy default for tooling.
+## 2. Missing SPA routes — DONE (stale ticket)
 
-## 2. Missing SPA routes
+`main.py` already serves `/modeller/*`, `/behaviour/*`,
+`/instantiation/*`, `/species/*` with per-app asset mounts;
+`apps/modeller/dist` is built and hub→Open works.  `/behaviour` and
+`/species` correctly 404 ("not built") until those apps ship a dist.
 
-**Problem:** `main.py` serves `/ontology/*` and `/equation/*` plus the
-hub catch-all.  `/modeller` and `/behaviour` have no routes — hub→Open
-for model/glass artefacts serves the hub page again.
-
-**Files:** `backend/main.py` (add `MODELLER_STATIC_DIR` +
-`serve_modeller_spa`; behaviour when it gets a UI).
-
-## 3. `usesOntology` auto-stamping at creation
+## 3. `usesOntology` auto-stamping at creation — DONE (2026-09-23)
 
 **Problem:** `POST /api/catalogue/new` accepts a `uses` pin list, but
 artefacts created *inside* editors (new variable library, new model)
 don't stamp pins — the dependency edge is never born.
 
-**Files:** `backend/ontology/service.py`, `backend/equation/service.py`,
-`backend/core/catalogue.py`; editor creation dialogs should offer the
-pin set (default: current resolution scope).
+**Done:** no editor has an artefact-creation dialog — the real
+loophole was write endpoints *materializing* an empty graph on any
+`?graph=` IRI (no type marker, no pins; a pinless graph resolves to
+itself only, so such an artefact sees no ontology at all).
+`editable_param` now 404s when `?graph=` names an empty graph —
+creation goes only through `/api/catalogue/new` or `/fork`, where pins
+are born.  Behaviour's `PUT`/`DELETE /assignment` moved from
+`graph_param` to `editable_param` (they also lacked the R5 frozen
+guard); `_assignment_graph` already stamped the derived assignment
+artefact correctly (`uses = resolution_scope(source)`).  Reads keep
+the legacy default for tooling.
 
 ## 4. Per-artefact `.trig` persistence
 

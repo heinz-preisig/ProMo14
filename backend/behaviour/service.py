@@ -35,7 +35,11 @@ from backend.core.graph_store import PROMO, get_store
 from backend.equation.checker import INSTANTIATE_CLASSES
 from backend.equation.compile_space import CompileSpace
 from backend.equation.document import _rhs_latex, _var_symbol
-from backend.ontology.service import graph_param, scoped_context
+from backend.ontology.service import (
+    editable_param,
+    graph_param,
+    scoped_context,
+)
 
 from .closure import EquationInfo, Selection, evaluate
 
@@ -309,7 +313,7 @@ def get_assignment(
 @router.put("/assignment", response_model=AssignmentOut)
 def put_assignment(
     selection: SelectionIn,
-    graph_iri: Optional[str] = Depends(graph_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> AssignmentOut:
     """Persist a selection as the entity type's assignment artefact.
 
@@ -370,7 +374,7 @@ def put_assignment(
 @router.delete("/assignment", status_code=204)
 def delete_assignment(
     entity_type: str,
-    graph_iri: Optional[str] = Depends(graph_param),
+    graph_iri: Optional[str] = Depends(editable_param),
 ) -> None:
     """Drop an entity type's assignment (404 if none)."""
     store = get_store()

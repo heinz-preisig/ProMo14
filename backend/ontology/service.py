@@ -48,9 +48,21 @@ def graph_param(graph: Optional[str] = None) -> Optional[str]:
 
 
 def editable_param(graph: Optional[str] = None) -> Optional[str]:
-    """Like ``graph_param`` but rejects frozen version graphs (R5)."""
+    """Like ``graph_param`` but rejects frozen version graphs (R5) and
+    graphs that were never created.
+
+    A write must not materialize an artefact: creation goes through
+    ``/api/catalogue/new`` or ``/fork`` so the type marker and
+    ``usesOntology`` pins are born with it (hub ticket #3).  A properly
+    created artefact is never empty — the marker triple is always
+    stamped — so ``len(g) == 0`` means the IRI names nothing."""
     store = get_store()
     g = store.ontology_graph if graph is None else store.graph(graph)
+    if graph is not None and not len(g):
+        raise HTTPException(
+            status_code=404,
+            detail=f"no such artefact: {graph} — create it via the hub "
+                   "(/api/catalogue/new) so its pins are born")
     try:
         store.assert_editable(g)
     except ValueError as exc:

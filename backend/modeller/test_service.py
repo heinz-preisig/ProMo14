@@ -148,3 +148,14 @@ def test_uses_species_pin(client):
     client.put(f"/api/modeller/model?graph={iri}", json=_doc())
     got = client.get(f"/api/modeller/model?graph={iri}").json()
     assert got["usesSpecies"] == []
+
+
+def test_put_rejects_uncreated_graph(client):
+    """Hub #3: a write must not materialize an artefact — ``?graph=``
+    naming a graph that was never created via ``/api/catalogue/new``
+    or ``/fork`` gets a 404, so the type marker and ``usesOntology``
+    pins are always born at creation."""
+    iri = "https://example.org/never-created"
+    r = client.put(f"/api/modeller/model?graph={iri}", json=_doc())
+    assert r.status_code == 404
+    assert "no such artefact" in r.json()["detail"]
