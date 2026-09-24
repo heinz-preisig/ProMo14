@@ -52,14 +52,18 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   (implementation plan), `docs/ontology-editor-design.md`,
   `docs/ontology-data-model.md`, ADR-004, ADR-006.
   Key decisions: two-branch domain tree (physical/information),
-  multi-axis variable classification (variable_class → "role" axis),
+  multi-axis variable classification (physical: determination
+  {constant, variable} + function {…, parameter}; information: role;
+  port/derived are structural, not axis terms — 2026-09-24),
   entity types from CWA 17960, 5 connection rules, transport system
   as node (not arc), event dynamics fits existing taxonomy.
 - **Backend:** All v1 steps implemented and verified:
   - `backend/core/graph_store.py` — PROMO vocabulary for Domain,
     ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
     EquationClass. CRUD methods for all. `seed_default_ontology()`
-    bootstraps two-branch tree, 7 tokens, role axes, entity types, 5
+    bootstraps two-branch tree, 7 tokens, classification axes
+    (determination/function on physical, role on information),
+    entity types, 5
     connection rules, 5 equation classes, indices (species/node/arc +
     7 arc sub-indices).  `add_domain`/`add_connection_rule` use replace
     semantics for `hasToken`/`sharedTokens`.
@@ -126,7 +130,10 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   single **Check** action, LaTeX preview, error display, variable
   palette with cascade delete, equation list, and a debug equation
   context JSON editor.  `api.ts` reads `?graph=` from the URL once and
-  appends it to every call.
+  appends it to every call.  Per-axis classification dropdowns
+  (`AxisClassifications`, 2026-09-24) replace the flat class select —
+  `/context` serves `axes` + `domains`; `variableClass` is bridged
+  from the `classifications` map on save.
 - **Codegen (2026-09-18):** `POST /api/equation/generate` renders the
   checked tree to python (NumPy, provisional), matlab (`MultiDimVar`
   Einstein library, vendored at `runtime/matlab/@MultiDimVar`), and

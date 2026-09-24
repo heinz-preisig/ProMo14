@@ -4,6 +4,7 @@ import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '.
 import AxisClassifications, {
   applicableAxes,
   deriveType,
+  FIELD_LABEL_STYLE,
 } from '../axisClassifications'
 import {
   findNameCollision,
@@ -148,94 +149,102 @@ export default function PortVariableEditor({
       >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
             marginBottom: 16,
             paddingBottom: 12,
             borderBottom: '1px solid #ccc',
-            flexWrap: 'wrap',
           }}
         >
-          <h3 style={{ margin: 0 }}>New port variable</h3>
+          {/* Row 1: title + actions */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+            <h3 style={{ margin: 0 }}>New port variable</h3>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button type="button" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleAccept} disabled={!canAccept}>
+                Add variable
+              </button>
+            </div>
+          </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            Domain:
-            <NetworkTreeSelect tree={networkTree} selected={domain} onSelect={setDomain} />
-          </label>
-
-          {applicableAxes(axes, domain, domains).length ? (
-            <AxisClassifications
-              axes={axes}
-              domain={domain}
-              domains={domains}
-              value={classifications}
-              hiddenAxes={['determination']}
-              onChange={(next) => {
-                setClassifications(next)
-                setVariableClass(deriveType(axes, next))
-              }}
-            />
-          ) : (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              Class:
-              <select value={variableClass} onChange={(e) => setVariableClass(e.target.value)}>
-                <option value="">Select…</option>
-                {VARIABLE_CLASSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+          {/* Row 2: domain tree + stacked classification/name fields */}
+          <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              Domain:
+              <NetworkTreeSelect
+                tree={networkTree}
+                selected={domain}
+                onSelect={setDomain}
+                maxHeight={220}
+              />
             </label>
-          )}
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            Name:
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. rho"
-              title={VARIABLE_NAME_HINT}
-              style={{
-                width: 120,
-                borderColor: name.trim() && !nameValid ? '#c62828' : undefined,
-              }}
-            />
-            {name.trim() && !nameValid && (
-              <span style={{ fontSize: 11, color: '#c62828' }}>{VARIABLE_NAME_HINT}</span>
-            )}
-            {nameValid && collision === 'exact' && (
-              <span style={{ fontSize: 11, color: '#c62828' }}>
-                A variable named {name.trim()} already exists — saving overwrites it
-              </span>
-            )}
-            {nameValid && collision === 'similar' && (
-              <span style={{ fontSize: 11, color: '#b8860b' }}>
-                Differs only by case from an existing variable — names are case-sensitive
-              </span>
-            )}
-          </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={FIELD_LABEL_STYLE}>Name:</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. rho"
+                  title={VARIABLE_NAME_HINT}
+                  style={{
+                    width: 120,
+                    borderColor: name.trim() && !nameValid ? '#c62828' : undefined,
+                  }}
+                />
+                {name.trim() && !nameValid && (
+                  <span style={{ fontSize: 11, color: '#c62828' }}>{VARIABLE_NAME_HINT}</span>
+                )}
+                {nameValid && collision === 'exact' && (
+                  <span style={{ fontSize: 11, color: '#c62828' }}>
+                    A variable named {name.trim()} already exists — saving overwrites it
+                  </span>
+                )}
+                {nameValid && collision === 'similar' && (
+                  <span style={{ fontSize: 11, color: '#b8860b' }}>
+                    Differs only by case from an existing variable — names are case-sensitive
+                  </span>
+                )}
+              </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            LaTeX:
-            <input
-              type="text"
-              value={latexSym}
-              onChange={(e) => setLatexSym(e.target.value)}
-              placeholder="e.g. \\rho — defaults to name"
-              style={{ width: 140 }}
-            />
-          </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={FIELD_LABEL_STYLE}>LaTeX:</span>
+                <input
+                  type="text"
+                  value={latexSym}
+                  onChange={(e) => setLatexSym(e.target.value)}
+                  placeholder="e.g. \\rho — defaults to name"
+                  style={{ width: 140 }}
+                />
+              </label>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="button" onClick={handleAccept} disabled={!canAccept}>
-              Add variable
-            </button>
+              {applicableAxes(axes, domain, domains).length ? (
+                <AxisClassifications
+                  axes={axes}
+                  domain={domain}
+                  domains={domains}
+                  value={classifications}
+                  hiddenAxes={['determination']}
+                  onChange={(next) => {
+                    setClassifications(next)
+                    setVariableClass(deriveType(axes, next))
+                  }}
+                />
+              ) : (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={FIELD_LABEL_STYLE}>Class:</span>
+                  <select value={variableClass} onChange={(e) => setVariableClass(e.target.value)}>
+                    <option value="">Select…</option>
+                    {VARIABLE_CLASSES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
           </div>
         </div>
 

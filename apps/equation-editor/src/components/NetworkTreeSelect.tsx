@@ -5,6 +5,8 @@ export interface NetworkTreeSelectProps {
   tree: NetworkTree
   selected: string
   onSelect: (network: string) => void
+  /** Scroll height cap in px — default 160. */
+  maxHeight?: number
 }
 
 function childrenOf(tree: NetworkTree, parent: string): string[] {
@@ -81,6 +83,7 @@ export default function NetworkTreeSelect({
   tree,
   selected,
   onSelect,
+  maxHeight = 160,
 }: NetworkTreeSelectProps) {
   // True roots: keys no other key lists as a child.  The backend hangs
   // every parentless network under 'root', so this is normally just
@@ -95,7 +98,7 @@ export default function NetworkTreeSelect({
         border: '1px solid #ccc',
         borderRadius: 4,
         padding: 4,
-        maxHeight: 160,
+        maxHeight,
         overflowY: 'auto',
         background: '#fff',
       }}

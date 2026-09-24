@@ -62,7 +62,30 @@ Unqualified variable resolution is, in order:
 Qualified names (``network!label``) always bypass the hierarchy and require
 an exact network + label match.
 
-## 4. Service endpoint consumption
+## 4. Classification axes (2026-09-24)
+
+``RdfContext`` additionally exposes the ontology's classification
+vocabulary so the editor can render per-axis dropdowns:
+
+- ``axes()`` — ``promo:ClassificationAxis`` records: IRI, bound domain
+  IRI, name, and their ``promo:AxisTerm`` terms (IRI, label, parent).
+- ``domains()`` — ``promo:Domain`` records: IRI, name, parent IRI.
+  The frontend maps a variable's ``network`` (a domain *name*) to its
+  ancestor IRIs and shows the axes bound to any of them.
+
+Variables carry ``classifications`` — a map of axis IRI → axis term IRI
+(``promo:axisValue`` triples).  The legacy ``variableClass`` literal is
+derived on save (``_class_from_classifications``): any term labelled
+``constant``|``parameter`` wins; a classified variable with neither is
+solved (``"state"``).
+
+Physical-branch axes (seeded): ``determination`` {constant, variable}
+and ``function`` {state, effort, flow, frame, reaction, parameter}.
+``port``/``derived`` are **not** axis terms — port-ness is the
+structural ``promo:portVariable`` flag, derived-ness is implied by
+having equations.  The information branch keeps a single ``role`` axis.
+
+## 5. Service endpoint consumption
 
 ``/api/equation/check`` accepts:
 
@@ -75,7 +98,7 @@ constructs ``CompileSpace``.  In the future this will be replaced by a
 graph-store provider that implements ``EquationContext``; the checker will not
 change.
 
-## 5. Hierarchy-aware resolution
+## 6. Hierarchy-aware resolution
 
 The domain tree determines which variables are visible for unqualified
 label resolution.  Once the ontology work provides the tree and the real

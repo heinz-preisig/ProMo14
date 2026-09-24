@@ -1,6 +1,6 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-20
+**Last updated:** 2026-09-24
 
 ## Current state
 
@@ -94,6 +94,31 @@ Implemented as a React + TypeScript + Vite app in
   `Index` interface.  Seven arc sub-indices are seeded (`A_mass`,
   `A_energy`, `A_diff`, `A_conv`, `A_heat`, `A_rad`, `A_work`); the
   checker treats them as plain distinct indices.
+- **Multi-axis classifications (2026-09-24):** `/context` serves
+  `axes` + `domains`; `AxisClassifications` (`axisClassifications.tsx`)
+  renders one dropdown per applicable axis (resolved via domain
+  ancestry) in all three variable editors.  Variables round-trip a
+  `classifications` map (axis IRI → term IRI → `promo:axisValue`);
+  the legacy `variableClass` is derived on save
+  (`_class_from_classifications`: `constant`/`parameter` label wins,
+  else `state`).  `hiddenAxes` prop hides axes that are structural —
+  `determination` is hidden on port variables (port-ness is the
+  `port_variable` flag, not a pick).
+- **Axis merge (2026-09-24):** physical axes are `determination`
+  {constant, variable} + `function` {…, parameter} — `variability`
+  dissolved, `port`/`derived` dropped as terms (structural: flag +
+  equation presence).  Parameter is a *function* term — a
+  characteristic value in a function, often embodying an assumption.
+- **Domain tree fix (2026-09-24):** `NetworkTreeSelect` rendered
+  root's children twice (nested + top-level); now computes true roots.
+  `maxHeight` prop added (editors pass 220).
+- **SPA caching (2026-09-24):** `_spa_index` serves `index.html` with
+  `Cache-Control: no-cache` — a stale cached index 404'd the hashed
+  bundle after rebuilds (blank page).
+- **Editor header layout (2026-09-24):** two-row header in both
+  variable editors — title + actions on top; domain tree left,
+  Name/LaTeX/axis dropdowns stacked right with aligned fixed-width
+  label cells (`FIELD_LABEL_STYLE`).
 
 ## Pending items
 

@@ -6,7 +6,7 @@ ProMo14 RDF topology that the graph-store provider will implement.  The goal
 is a single, stable contract with the equation editor:
 :ref:`backend/equation/context.py`.
 
-> **Scope note (2026-09-13):** This document covers the var/expr RDF\nschema (variables, indices, equations, tokens, domain tree) that is\nshared between the Ontology Editor and Equation Editor.  It does **not**\nyet cover the newer ontology concepts: classification axes, scale\ndimensions, entity types, connection rules, or abstract graphical\nsymbols.  These are defined in\n`docs/ontology-design-discussion-2026-09-11.md` (§8–9, §13, §19) and\nwill be added to the RDF schema once the design stabilises.
+> **Scope note (2026-09-13, updated 2026-09-24):** This document covers the var/expr RDF\nschema (variables, indices, equations, tokens, domain tree) that is\nshared between the Ontology Editor and Equation Editor.  It does **not**\nyet cover the newer ontology concepts: scale\ndimensions, entity types, connection rules, or abstract graphical\nsymbols.  These are defined in\n`docs/ontology-design-discussion-2026-09-11.md` (§8–9, §13, §19).\nClassification axes have since stabilised (2026-09-24): physical branch\n`determination` {constant, variable} + `function` {state, effort, flow,\nframe, reaction, parameter}; information branch `role`; `port`/`derived`\nare structural (`promo:portVariable` flag / equation presence), not axis\nterms.  Variables classify via `promo:axisValue` (§predicate table).
 
 ## 1. What the old ProMo13 code stores
 

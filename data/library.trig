@@ -1,6 +1,7 @@
 @prefix promo: <https://w3id.org/promo#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://w3id.org/promo/library/> {
     promo:Assignment a rdfs:Class .
@@ -41,5 +42,48 @@
 
     <https://w3id.org/promo/library/> a promo:Library ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
+
+    <promo:V> a promo:Variable ;
+        rdfs:label "V" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
+        promo:doc "volum" ;
+        promo:imported false ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_23" ;
+        promo:latex "V" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <https://w3id.org/promo/library/#E_10> a promo:Equation ;
+        promo:created "2026-09-24T16:30:26.792Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:incidenceList "[\"promo:V\", \"promo:n\"]" ;
+        promo:internalID "E_10" ;
+        promo:lhs <promo:c> ;
+        promo:modified "2026-09-24T16:30:26.792Z" ;
+        promo:network "macroscopic" ;
+        promo:rhs "inv(V) . n" .
+
+    <promo:c> a promo:Variable ;
+        rdfs:label "c" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_intensive>,
+            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
+        promo:doc "molar concentration" ;
+        promo:hasEquation <https://w3id.org/promo/library/#E_10> ;
+        promo:imported false ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_24" ;
+        promo:latex "c" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
 }
 

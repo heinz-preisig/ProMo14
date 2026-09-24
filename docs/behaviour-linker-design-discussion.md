@@ -700,10 +700,18 @@ This means the mathematics domain also needs to understand:
 
 - ~~Does the BL need to know about the PDAE/ODAE distinction?~~
   **Resolved**: No. PDAE vs ODAE is a numerical issue.
-- Should the ontology define a "mathematical role" classification axis,
-  or is this determined entirely by the equation subgraph structure?
-  (The BL mechanics imply the role from subgraph position — but ontology
-  hints could help the UI suggest defaults.)
+- ~~Should the ontology define a "mathematical role" classification axis,
+  or is this determined entirely by the equation subgraph structure?~~
+  **Resolved (2026-09-24)**: structural roles are *not* axis terms.
+  `port` is the `promo:portVariable` flag (bipartite-graph position —
+  fundamental for the graph build); `derived` is implied by having a
+  defining equation.  The physical `determination` axis keeps only the
+  declarative fixity terms {constant, variable}; `parameter` moved to
+  the `function` axis — a parameter is a characteristic value in a
+  function (part of the function definition, often embodying a specific
+  assumption), not a determination mode.  The earlier `variability`
+  axis was dissolved ('variable' = not given; it overlapped and could
+  contradict determination).
 - Where does meshing live — code generation, instantiation, or a
   separate step?
 

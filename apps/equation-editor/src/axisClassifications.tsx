@@ -5,7 +5,17 @@
  *  IRIs and inherit down the domain tree, so applicability is resolved
  *  via the domain records' parent chain.
  */
+import type { CSSProperties } from 'react'
 import type { AxisTerm, ClassificationAxis, Domain } from './types'
+
+/** Shared label-cell style: the field name sits in a fixed-width
+ *  column so every input/select in a stacked form starts at the
+ *  same x position. */
+export const FIELD_LABEL_STYLE: CSSProperties = {
+  display: 'inline-block',
+  width: 100,
+  flexShrink: 0,
+}
 
 /** Domain IRIs applicable to a variable in network ``domainName``:
  *  the domain itself plus every ancestor.  Unknown names yield the
@@ -125,7 +135,7 @@ export default function AxisClassifications({
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           title={disabled ? 'Locked — variable is referenced by equations' : axis.iri}
         >
-          {axis.name}:
+          <span style={FIELD_LABEL_STYLE}>{axis.name}:</span>
           <select
             value={value[axis.iri] ?? ''}
             disabled={disabled}
