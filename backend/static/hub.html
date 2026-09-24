@@ -56,6 +56,35 @@
   #msg { margin: 12px 0; font-size: 13px; color: #a33; min-height: 1em; }
   .empty { padding: 40px; text-align: center; color: #8a9098; }
   .toolbar { margin-bottom: 14px; }
+  #help { background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
+          padding: 10px 16px; margin-bottom: 14px; font-size: 13px; }
+  #help summary { cursor: pointer; font-weight: 600; color: #1c3a5e; }
+  #help p { margin: 8px 0; color: #3c4046; line-height: 1.45; }
+  #help table { box-shadow: none; border: 1px solid #eceef1; margin: 6px 0; }
+  #help td { padding: 4px 10px; font-size: 12px; }
+  #help td:first-child { font-family: ui-monospace, monospace;
+                         white-space: nowrap; }
+  #map { background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
+         padding: 10px 16px; margin-bottom: 14px; font-size: 13px; }
+  #map summary { cursor: pointer; font-weight: 600; color: #1c3a5e; }
+  #map svg { width: 100%; height: auto; display: block; margin-top: 6px; }
+  .stage { cursor: pointer; }
+  .stage rect { fill: #fff; stroke: #1c3a5e; stroke-width: 1.2; }
+  .stage:hover rect { fill: #e8eef5; }
+  .stage text { pointer-events: none; }
+  .stage .t { font-size: 13px; font-weight: 600; fill: #1c3a5e;
+              text-anchor: middle; }
+  .stage .s { font-size: 10px; fill: #5a6068; text-anchor: middle; }
+  .stage.future rect { stroke: #8a9098; stroke-dasharray: 4 3; }
+  .stage.future .t, .stage.future .s { fill: #8a9098; }
+  .stage .n { font-size: 11px; font-weight: 700; fill: #0b7cbe;
+              text-anchor: end; }
+  .arrow { stroke: #5a6068; stroke-width: 1.4; fill: none;
+           marker-end: url(#arr); }
+  .arrow.future { stroke: #8a9098; stroke-dasharray: 4 3; }
+  #mapHint { font-size: 12px; color: #3c4046; min-height: 1.2em;
+             margin-top: 4px; }
+  tr.hit td { background: #fdf3e3; }
 </style>
 </head>
 <body>
@@ -68,7 +97,7 @@
     <button onclick="toggleNewForm()">New artefact…</button>
     <button id="saveBtn" onclick="saveAll()" style="display:none">Save</button>
     <span id="dirtyBadge" class="dirty" style="display:none">● unsaved changes</span>
-    <a id="modeToggle" href="?dev" style="float:right;font-size:12px;color:#5a6068">dev mode</a>
+    <a id="modeToggle" href="?dev" style="float:right;font-size:12px;color:#5a6068"></a>
   </div>
   <div id="newform">
     <div class="row">
@@ -106,6 +135,121 @@
     </div>
   </div>
   <div id="msg"></div>
+  <details id="help">
+    <summary>What am I looking at?</summary>
+    <p><strong>Each row is an artefact line</strong> — a named, versioned
+    graph in the store.  The <em>type</em> decides which app opens it:</p>
+    <table>
+      <tr><td>ontology</td><td>Ontology Editor — vocabulary: entity types,
+        domains, tokens, indices, capabilities</td></tr>
+      <tr><td>library</td><td>Equation Editor — variables and equations
+        (the var/expr artefact)</td></tr>
+      <tr><td>assignment</td><td>Behaviour Linker — equation sequences
+        per entity type</td></tr>
+      <tr><td>model / glass</td><td>Modeller — topology, placements,
+        species gestures</td></tr>
+      <tr><td>species</td><td>Species — components, allocations,
+        reactions ({A,B} → {C})</td></tr>
+    </table>
+    <p><strong>Status</strong> — <span class="status-draft">draft</span>
+    is the editable working copy; <span class="status-frozen">frozen</span>
+    versions are immutable snapshots (open them read-only, export an
+    ontology version as .ttl).</p>
+    <p><strong>Pins</strong> — which artefacts this one builds on.
+    Chips are labelled by pin kind:
+    <span class="chip">ont:name</span> = usesOntology (green),
+    <span class="chip species">spec:name</span> = usesSpecies (purple).
+    Pin a frozen version for reproducibility.</p>
+    <p><strong>Actions</strong> — Open edits the draft; view opens a
+    frozen version read-only.  Instantiate a model (instantiation
+    view), Species… pins a scheme to a model, Fork duplicates the
+    artefact to a new IRI — branch it without touching the original.
+    Or click a stage in the suite map — it opens the app directly when
+    the artefact is unambiguous.</p>
+    <p><strong>Store</strong> — all apps share one server-side store;
+    <span class="dirty">● unsaved changes</span> means nothing is on disk
+    yet — Save writes one .trig per artefact line.</p>
+    <p><strong>Mode</strong> — the top-right toggle switches where
+    <em>Open</em> sends you.  <em>user</em>: the backend-served builds
+    (<code>:8000/modeller/</code> …) — the normal path.
+    <em>dev</em>: the vite dev servers (<code>:3001</code>–<code>:3006</code>)
+    — hot reload and devtools for frontend work.  The label shows the
+    current mode and where a click takes you.</p>
+  </details>
+  <details id="map" open>
+    <summary>The suite — click a stage to open its app</summary>
+    <svg viewBox="0 0 1000 175" role="img" aria-label="ProMo suite pipeline">
+      <defs>
+        <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#5a6068"/>
+        </marker>
+      </defs>
+      <line class="arrow" x1="140" y1="37" x2="171" y2="37"/>
+      <line class="arrow" x1="305" y1="37" x2="336" y2="37"/>
+      <line class="arrow" x1="470" y1="37" x2="501" y2="37"/>
+      <line class="arrow" x1="635" y1="37" x2="666" y2="37"/>
+      <line class="arrow" x1="800" y1="37" x2="831" y2="37"/>
+      <line class="arrow" x1="570" y1="110" x2="570" y2="63"/>
+      <line class="arrow future" x1="735" y1="59" x2="735" y2="106"/>
+      <polyline class="arrow future" points="830,130 910,130 910,63"/>
+      <g class="stage" onclick="stageClick(['ontology'],
+        'Ontology artefacts hold the vocabulary — entity types, domains, tokens, indices, capabilities.  Everything downstream references them.')">
+        <rect x="10" y="15" width="130" height="44" rx="6"/>
+        <text class="n" data-count-for="ontology" x="132" y="27"></text>
+        <text class="t" x="75" y="33">Ontology Editor</text>
+        <text class="s" x="75" y="48">ontology artefact</text>
+      </g>
+      <g class="stage" onclick="stageClick(['library'],
+        'Library (var/expr) artefacts hold variables and equations — the user-authored physics.  Open one in the Equation Editor.')">
+        <rect x="175" y="15" width="130" height="44" rx="6"/>
+        <text class="n" data-count-for="library" x="297" y="27"></text>
+        <text class="t" x="240" y="33">Equation Editor</text>
+        <text class="s" x="240" y="48">library artefact</text>
+      </g>
+      <g class="stage" onclick="stageClick(['assignment'],
+        'Assignment artefacts hold behaviour closures — the ordered equation set per entity type.  Open one in the Behaviour Linker.')">
+        <rect x="340" y="15" width="130" height="44" rx="6"/>
+        <text class="n" data-count-for="assignment" x="462" y="27"></text>
+        <text class="t" x="405" y="33">Behaviour Linker</text>
+        <text class="s" x="405" y="48">assignment artefact</text>
+      </g>
+      <g class="stage" onclick="stageClick(['model','glass'],
+        'Model artefacts hold topology + placements — nodes, arcs, species gestures.  Open one in the Modeller; Species… pins a scheme to it.')">
+        <rect x="505" y="15" width="130" height="44" rx="6"/>
+        <text class="n" data-count-for="model,glass" x="627" y="27"></text>
+        <text class="t" x="570" y="33">Modeller</text>
+        <text class="s" x="570" y="48">model artefact</text>
+      </g>
+      <g class="stage" onclick="stageClick(['species'],
+        'Species artefacts hold the scheme vocabulary — components, allocations, reactions ({A,B} → {C}).  A model pins one via usesSpecies.')">
+        <rect x="505" y="110" width="130" height="40" rx="6"/>
+        <text class="n" data-count-for="species" x="627" y="122"></text>
+        <text class="t" x="570" y="127">Species</text>
+        <text class="s" x="570" y="141">species artefact</text>
+      </g>
+      <g class="stage" onclick="stageClick(['model','glass'],
+        'Instantiation is a computed view over a model — it opens the instantiation app on the model (several models: pick one below).',
+        'instantiate')">
+        <rect x="670" y="15" width="130" height="44" rx="6"/>
+        <text class="t" x="735" y="33">Instantiation</text>
+        <text class="s" x="735" y="48">model → report</text>
+      </g>
+      <g class="stage future" onclick="stageClick([],
+        'Meshing (future) — discretises distributed (PDE) systems into lumped networks before codegen.  Lumped and event-dynamic systems skip it.')">
+        <rect x="690" y="110" width="140" height="40" rx="6"/>
+        <text class="t" x="760" y="127">Meshing</text>
+        <text class="s" x="760" y="141">future — PDE → lumped</text>
+      </g>
+      <g class="stage" onclick="stageClick([],
+        'Code generation has no app — GET /api/instantiate/code?graph=<model>&target=python|julia|matlab emits the derivative function.')">
+        <rect x="835" y="15" width="150" height="44" rx="6"/>
+        <text class="t" x="910" y="33">Code Generation</text>
+        <text class="s" x="910" y="48">python · julia · matlab</text>
+      </g>
+    </svg>
+    <div id="mapHint"></div>
+  </details>
   <div id="catalogue"><div class="empty">Loading…</div></div>
 </main>
 <script>
@@ -121,11 +265,11 @@ const APPS = {
 
 // Dev-mode entry split (hub ticket #6): `?dev` in the hub URL points
 // Open at the Vite dev servers (dev.sh ports) instead of the
-// backend-served builds.  Instantiation has no dev.sh service — it
-// stays on the backend path in both modes.
+// backend-served builds.
 const DEV = new URLSearchParams(location.search).has('dev');
 const DEV_PORTS = { ontology: 3001, library: 3002, assignment: 3003,
                     model: 3004, glass: 3004, species: 3005 };
+const INSTANTIATION_DEV_PORT = 3006;
 
 const msg = (t) => { document.getElementById('msg').textContent = t || ''; };
 
@@ -161,8 +305,10 @@ function openVersion(type, iri) {
 
 function instantiateArtefact(line) {
   if (!guardDirty()) return;
+  const base = DEV ? `http://localhost:${INSTANTIATION_DEV_PORT}/`
+                   : '/instantiation/';
   window.location.href =
-    `/instantiation/?graph=${encodeURIComponent(line.iri)}`;
+    `${base}?graph=${encodeURIComponent(line.iri)}`;
 }
 
 async function refreshStatus() {
@@ -310,21 +456,22 @@ function render(lines) {
   const rows = lines.map(l => {
     const vers = l.versions.map(v =>
       `<span class="ver">${esc(v.version)}</span>` +
-      ` <button onclick='openVersion(${JSON.stringify(l.type)},${JSON.stringify(v.iri)})'>open</button>` +
+      ` <button title="frozen snapshot — read-only" onclick='openVersion(${JSON.stringify(l.type)},${JSON.stringify(v.iri)})'>view</button>` +
       (l.type === 'ontology'
         ? ` <button onclick='exportVersion(${JSON.stringify(l.iri)},${JSON.stringify(v.version)})'>export</button>`
         : '')
     ).join('<br>');
+    const frag = p => p.split('#').pop().split('/').pop();
     const pins = l.usesOntology.map(p =>
-      `<span class="chip" title="${esc(p)}">${esc(p.split('#').pop().split('/').pop())}</span>`
+      `<span class="chip" title="usesOntology → ${esc(p)}">ont:${esc(frag(p))}</span>`
     ).join('') + (l.usesSpecies || []).map(p =>
-      `<span class="chip species" title="species: ${esc(p)}">${esc(p.split('#').pop().split('/').pop())}</span>`
+      `<span class="chip species" title="usesSpecies → ${esc(p)}">spec:${esc(frag(p))}</span>`
     ).join('');
     const app = APPS[l.type];
     const openBtn = app
       ? `<button class="primary" onclick='openArtefact(${JSON.stringify(l)})'>Open</button>`
       : '';
-    const forkBtn = `<button onclick='forkArtefact(${JSON.stringify(l.iri)})'>Fork</button>`;
+    const forkBtn = `<button title="copy this artefact to a new IRI — branch it without touching the original" onclick='forkArtefact(${JSON.stringify(l.iri)})'>Fork</button>`;
     const instBtn = (l.type === 'model' || l.type === 'glass')
       ? `<button onclick='instantiateArtefact(${JSON.stringify(l)})'>Instantiate</button>`
       : '';
@@ -334,7 +481,7 @@ function render(lines) {
     const floorBadge = l.type === 'ontology' && l.status === 'draft' && l.staleFloor
       ? `<br><button class="warn" title="seed floor ${esc(l.seedFloor || 'none')} → ${esc(CURRENT_FLOOR)} — apply the current seed floor" onclick='applyFloor(${JSON.stringify(l.iri)})'>update floor</button>`
       : '';
-    return `<tr>
+    return `<tr data-type="${esc(l.type)}">
       <td><strong>${esc(l.label)}</strong><br><span class="iri">${esc(l.iri)}</span></td>
       <td><span class="type">${esc(l.type)}</span></td>
       <td class="status-${l.status}">${esc(l.status)}${floorBadge}</td>
@@ -349,14 +496,65 @@ function render(lines) {
     <tbody>${rows}</tbody></table>`;
 }
 
+// Suite map = the launcher: clicking a stage opens its app when the
+// artefact is unambiguous (exactly one line of that type), highlights
+// the candidates when several exist, and pre-sets the New-artefact
+// form when none.  `action` overrides the default open (e.g.
+// 'instantiate' opens the instantiation view on the model).
+function stageClick(types, hint, action) {
+  document.querySelectorAll('#catalogue tr.hit')
+    .forEach(r => r.classList.remove('hit'));
+  const lines = LINES.filter(l => types.includes(l.type));
+  for (const l of lines)
+    document.querySelectorAll(`#catalogue tr[data-type="${l.type}"]`)
+      .forEach(r => r.classList.add('hit'));
+  if (lines.length === 1) {
+    (action === 'instantiate' ? instantiateArtefact : openArtefact)
+      (lines[0]);
+    return;
+  }
+  const sel = document.getElementById('nfType');
+  if (types.length === 1 &&
+      [...sel.options].some(o => o.value === types[0])) {
+    sel.value = types[0];
+    onTypeChange();
+  }
+  document.getElementById('mapHint').textContent = hint +
+    (lines.length > 1
+      ? `  (${lines.length} artefacts — pick one below.)`
+      : types.length
+        ? '  — none yet: “New artefact…” is pre-set to it.'
+        : '');
+}
+
+// Live artefact counts on the map nodes ("+" = none yet — click to
+// pre-set the New form).
+function updateCounts() {
+  document.querySelectorAll('[data-count-for]').forEach(t => {
+    const types = t.dataset.countFor.split(',');
+    const n = LINES.filter(l => types.includes(l.type)).length;
+    t.textContent = n || '+';
+  });
+}
+
 let CURRENT_FLOOR = '';
 let DIRTY = false;
 let LINES = [];
 
-// Mode toggle: offer the opposite of the current mode.
+// Mode toggle: show the current mode and where a click takes you.
 {
   const t = document.getElementById('modeToggle');
-  if (DEV) { t.textContent = 'user mode'; t.href = location.pathname; }
+  if (DEV) {
+    t.textContent = 'mode: dev → user';
+    t.href = location.pathname;
+    t.title = 'Open uses the vite dev servers (:3001–:3006) — hot ' +
+              'reload, devtools.  Click for user mode (backend-served ' +
+              'builds on :8000).';
+  } else {
+    t.textContent = 'mode: user → dev';
+    t.title = 'Open uses the backend-served builds (:8000/…).  Click ' +
+              'for dev mode (vite dev servers :3001–:3006).';
+  }
 }
 
 document.getElementById('nfType').addEventListener('change', onTypeChange);
@@ -371,6 +569,7 @@ fetch('/api/catalogue')
     LINES = d.lines;
     pinOptions();
     render(d.lines);
+    updateCounts();
   })
   .catch(e => { msg(`Failed to load catalogue: ${e.message}`);
                 document.getElementById('catalogue').innerHTML = ''; });

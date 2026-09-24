@@ -11,7 +11,7 @@
 #   ./dev.sh save                 — persist the in-memory store (one .trig per artefact line)
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
-# Services: backend | ontology | equation | behaviour | modeller | species | all (default)
+# Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)
 #
 # Log files are written to logs/ in the repo root
 
@@ -26,6 +26,7 @@ EQUATION_PORT=3002
 BEHAVIOUR_PORT=3003
 MODELLER_PORT=3004
 SPECIES_PORT=3005
+INSTANTIATION_PORT=3006
 
 LOG_DIR="$REPO/logs"
 mkdir -p "$LOG_DIR"
@@ -36,6 +37,7 @@ EQUATION_LOG="$LOG_DIR/equation.log"
 BEHAVIOUR_LOG="$LOG_DIR/behaviour.log"
 MODELLER_LOG="$LOG_DIR/modeller.log"
 SPECIES_LOG="$LOG_DIR/species.log"
+INSTANTIATION_LOG="$LOG_DIR/instantiation.log"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -184,6 +186,20 @@ _start_species() {
     fi
 }
 
+_start_instantiation() {
+    _kill_port $INSTANTIATION_PORT "instantiation" quiet
+    echo "  Starting instantiation app on :$INSTANTIATION_PORT  (log: $INSTANTIATION_LOG)"
+    cd "$REPO"
+    nohup npm run dev:instantiation \
+        > "$INSTANTIATION_LOG" 2>&1 &
+    sleep 3
+    if _is_running $INSTANTIATION_PORT; then
+        echo "  Instantiation app started  →  http://localhost:$INSTANTIATION_PORT"
+    else
+        echo "  Instantiation app failed — check $INSTANTIATION_LOG"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -198,6 +214,7 @@ cmd_status() {
     _status_line "behaviour-linker" $BEHAVIOUR_PORT "http://localhost:$BEHAVIOUR_PORT"
     _status_line "modeller"         $MODELLER_PORT  "http://localhost:$MODELLER_PORT"
     _status_line "species"          $SPECIES_PORT   "http://localhost:$SPECIES_PORT"
+    _status_line "instantiation"    $INSTANTIATION_PORT "http://localhost:$INSTANTIATION_PORT"
     echo ""
     echo "  Data dir: $DATA_DIR"
     local trig_count
@@ -241,6 +258,7 @@ cmd_start() {
         behaviour) _ensure_backend; _start_behaviour ;;
         modeller) _ensure_backend; _start_modeller ;;
         species)  _ensure_backend; _start_species ;;
+        instantiation) _ensure_backend; _start_instantiation ;;
         all)
             _start_backend
             _start_ontology
@@ -248,6 +266,7 @@ cmd_start() {
             _start_behaviour
             _start_modeller
             _start_species
+            _start_instantiation
             ;;
         *) echo "Unknown service: $service"; exit 1 ;;
     esac
@@ -266,6 +285,7 @@ cmd_stop() {
         behaviour) _kill_port $BEHAVIOUR_PORT "behaviour-linker" ;;
         modeller)  _kill_port $MODELLER_PORT  "modeller" ;;
         species)   _kill_port $SPECIES_PORT   "species" ;;
+        instantiation) _kill_port $INSTANTIATION_PORT "instantiation" ;;
         all)
             _kill_port $BACKEND_PORT   "backend"
             _kill_port $ONTOLOGY_PORT  "ontology-editor"
@@ -273,6 +293,7 @@ cmd_stop() {
             _kill_port $BEHAVIOUR_PORT "behaviour-linker"
             _kill_port $MODELLER_PORT  "modeller"
             _kill_port $SPECIES_PORT   "species"
+            _kill_port $INSTANTIATION_PORT "instantiation"
             ;;
         *) echo "Unknown service: $service"; exit 1 ;;
     esac
@@ -335,6 +356,7 @@ cmd_logs() {
         behaviour) tail -f "$BEHAVIOUR_LOG" ;;
         modeller)  tail -f "$MODELLER_LOG" ;;
         species)   tail -f "$SPECIES_LOG" ;;
+        instantiation) tail -f "$INSTANTIATION_LOG" ;;
         *) echo "Unknown service: $service"; exit 1 ;;
     esac
 }
@@ -354,7 +376,7 @@ cmd_help() {
     echo "  save                — persist in-memory store (one .trig per artefact line)"
     echo "  logs    [service]   — tail log for a service"
     echo ""
-    echo "Services: backend | ontology | equation | behaviour | modeller | species | all (default)"
+    echo "Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)"
     echo ""
     echo "URLs:"
     echo "  Hub (entry point)  http://localhost:$BACKEND_PORT/"
@@ -364,6 +386,7 @@ cmd_help() {
     echo "  Behaviour Linker   http://localhost:$BEHAVIOUR_PORT"
     echo "  Modeller           http://localhost:$MODELLER_PORT"
     echo "  Species Editor     http://localhost:$SPECIES_PORT"
+    echo "  Instantiation      http://localhost:$INSTANTIATION_PORT"
     echo ""
 }
 
