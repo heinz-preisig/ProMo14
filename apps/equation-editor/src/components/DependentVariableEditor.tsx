@@ -142,7 +142,7 @@ export default function DependentVariableEditor({
       if (parseRes.ok && parseRes.ast) {
         setAst(parseRes.ast)
         // Instantiate LHS must be constant|parameter — sync the
-        // variability pick so the request below already carries an
+        // determination pick so the request below already carries an
         // allowed class (ADR-008).
         if (
           !structuralLocked &&
@@ -150,7 +150,7 @@ export default function DependentVariableEditor({
           !INSTANTIATE_CLASSES.includes(variableClass)
         ) {
           setVariableClass('parameter')
-          const hit = findTermIri(axes, 'variability', 'parameter')
+          const hit = findTermIri(axes, 'determination', 'parameter')
           if (hit) {
             setClassifications((prev) => ({ ...prev, [hit.axisIri]: hit.termIri }))
           }

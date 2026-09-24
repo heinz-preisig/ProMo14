@@ -484,11 +484,13 @@ class RdfStore:
         g.add((root_iri, PROMO["hasToken"], signal_iri))
 
         # --- Classification axes ---
-        # Physical branch: three axes, one question each
+        # Physical branch: two axes, one question each
         # (design discussion 2026-09-24):
-        #   determination — where is the value determined? interior|boundary
+        #   determination — is the value given, and how?  constant|parameter
+        #     (the only declarative part: solved-ness is structural —
+        #     derived = has a defining equation, port = port_variable flag
+        #     on the bipartite graph, so neither is an axis term)
         #   function      — what does the variable physically do?
-        #   variability   — is the value given or solved?
         # Information branch keeps a single "role" axis; differential-state
         # lives there for the control canonical form dx/dt = A.x + B.u —
         # A needs two distinct index objects over the state set (a
@@ -508,8 +510,8 @@ class RdfStore:
 
         seed_axis("determination_physical", "determination",
                   "determination", phys_iri, [
-                      ("derived", None),
-                      ("port", None),
+                      ("constant", None),
+                      ("parameter", None),
                   ])
         seed_axis("function_physical", "function", "function", phys_iri, [
             ("state", None),
@@ -520,12 +522,6 @@ class RdfStore:
             ("frame", None),
             ("reaction", None),
         ])
-        seed_axis("variability_physical", "variability",
-                  "variability", phys_iri, [
-                      ("constant", None),
-                      ("parameter", None),
-                      ("variable", None),
-                  ])
         seed_axis("role_information", "info_role", "role", info_iri, [
             ("state", None),
             ("differential-state", "state"),

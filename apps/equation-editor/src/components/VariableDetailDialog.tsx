@@ -215,6 +215,7 @@ export default function VariableDetailDialog({
                   domains={domains}
                   value={classifications}
                   disabled={locked}
+                  hiddenAxes={variable.port_variable ? ['determination'] : undefined}
                   onChange={(next) => {
                     setClassifications(next)
                     setVariableClass(deriveType(axes, next))

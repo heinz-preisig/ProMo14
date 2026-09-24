@@ -1,5 +1,5 @@
 /** Multi-axis variable classification — one dropdown per applicable
- *  axis (determination / function / variability / role …).
+ *  axis (determination / function / role …).
  *
  *  A variable's ``network`` is a domain *name*; axes bind to domain
  *  IRIs and inherit down the domain tree, so applicability is resolved
@@ -97,6 +97,10 @@ export interface AxisClassificationsProps {
   value: Record<string, string>
   onChange: (next: Record<string, string>) => void
   disabled?: boolean
+  /** Axis names to hide — e.g. 'determination' on port variables,
+   *  where port-ness is the structural port_variable flag, not a
+   *  classification pick. */
+  hiddenAxes?: string[]
 }
 
 /** One select per applicable axis; each option is an axis term. */
@@ -107,8 +111,11 @@ export default function AxisClassifications({
   value,
   onChange,
   disabled,
+  hiddenAxes,
 }: AxisClassificationsProps) {
-  const applicable = applicableAxes(axes, domain, domains)
+  const applicable = applicableAxes(axes, domain, domains).filter(
+    (a) => !hiddenAxes?.includes(a.name),
+  )
   if (!applicable.length) return null
   return (
     <>

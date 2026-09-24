@@ -92,11 +92,18 @@ def test_seed_axes(client):
     assert r.status_code == 200
     axes = r.json()
     names = {a["name"] for a in axes}
-    # Physical branch split into three axes (2026-09-24 restructure);
-    # information keeps a single role axis.
-    assert {"determination", "function", "variability", "role"} <= names
+    # Physical branch: determination + function (2026-09-24 merge —
+    # port/derived are structural, not axis terms); information keeps a
+    # single role axis.
+    assert {"determination", "function", "role"} <= names
+    assert "variability" not in names
     for ax in axes:
         assert len(ax["terms"]) > 0
+    # determination carries only the given-ness terms — the declarative
+    # part the checker's INSTANTIATE_CLASSES reads.
+    determination = next(a for a in axes if a["name"] == "determination")
+    det_labels = {t["label"] for t in determination["terms"]}
+    assert det_labels == {"constant", "parameter"}
     # function carries the state hierarchy; role carries
     # differential-state under state (control canonical form needs two
     # distinct index objects over the state set).
@@ -107,9 +114,6 @@ def test_seed_axes(client):
     role = next(a for a in axes if a["name"] == "role")
     role_labels = {t["label"] for t in role["terms"]}
     assert {"state", "differential-state", "input", "output"} <= role_labels
-    variability = next(a for a in axes if a["name"] == "variability")
-    var_labels = {t["label"] for t in variability["terms"]}
-    assert {"constant", "parameter", "variable"} <= var_labels
 
 
 def test_seed_entity_types(client):

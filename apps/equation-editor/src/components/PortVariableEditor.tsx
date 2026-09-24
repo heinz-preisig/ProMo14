@@ -4,7 +4,6 @@ import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '.
 import AxisClassifications, {
   applicableAxes,
   deriveType,
-  findTermIri,
 } from '../axisClassifications'
 import {
   findNameCollision,
@@ -58,11 +57,9 @@ export default function PortVariableEditor({
 
   useEffect(() => {
     if (open) {
-      // Port variables are boundary positions — pre-fill
-      // determination=port when the axis applies.
+      // Port-ness is structural (port_variable flag) — no
+      // determination pick; the axis is hidden below.
       const cls = { ...initialClassifications }
-      const port = findTermIri(axes, 'determination', 'port')
-      if (port) cls[port.axisIri] = cls[port.axisIri] ?? port.termIri
       setDomain(initialDomain)
       setClassifications(cls)
       setVariableClass(deriveType(axes, cls))
@@ -173,6 +170,7 @@ export default function PortVariableEditor({
               domain={domain}
               domains={domains}
               value={classifications}
+              hiddenAxes={['determination']}
               onChange={(next) => {
                 setClassifications(next)
                 setVariableClass(deriveType(axes, next))

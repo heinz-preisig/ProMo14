@@ -911,12 +911,12 @@
 
     <https://w3id.org/promo/ontology#Version> a rdfs:Class .
 
-    <https://w3id.org/promo/ontology#term_determination_derived> a promo:AxisTerm ;
-        rdfs:label "derived" ;
+    <https://w3id.org/promo/ontology#term_determination_constant> a promo:AxisTerm ;
+        rdfs:label "constant" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_determination_physical> .
 
-    <https://w3id.org/promo/ontology#term_determination_port> a promo:AxisTerm ;
-        rdfs:label "port" ;
+    <https://w3id.org/promo/ontology#term_determination_parameter> a promo:AxisTerm ;
+        rdfs:label "parameter" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_determination_physical> .
 
     <https://w3id.org/promo/ontology#term_function_effort> a promo:AxisTerm ;
@@ -949,18 +949,6 @@
         rdfs:label "differential-state" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> ;
         promo:parent <https://w3id.org/promo/ontology#term_info_role_state> .
-
-    <https://w3id.org/promo/ontology#term_variability_constant> a promo:AxisTerm ;
-        rdfs:label "constant" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_variability_physical> .
-
-    <https://w3id.org/promo/ontology#term_variability_parameter> a promo:AxisTerm ;
-        rdfs:label "parameter" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_variability_physical> .
-
-    <https://w3id.org/promo/ontology#term_variability_variable> a promo:AxisTerm ;
-        rdfs:label "variable" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_variability_physical> .
 
     <promo:F_conv> a promo:Variable ;
         rdfs:label "F_conv" ;
@@ -1782,10 +1770,6 @@
         promo:portVariable true ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
-
-    <https://w3id.org/promo/ontology#axis_variability_physical> a promo:ClassificationAxis ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "variability" .
 
     <https://w3id.org/promo/ontology#cap_reaction_host> a promo:Capability ;
         rdfs:label "reaction host" ;
