@@ -95,10 +95,16 @@ _mount_assets("/ontology/assets", ONTOLOGY_ASSETS_DIR, "ontology-assets")
 
 
 def _spa_index(static_dir: Path, name: str) -> Response:
-    """Serve a built SPA's index.html, or a plain 404 if not built yet."""
+    """Serve a built SPA's index.html, or a plain 404 if not built yet.
+
+    ``no-cache`` forces revalidation every load: a rebuild changes the
+    hashed bundle name, and a stale cached index.html would 404 the JS
+    and render a blank page.  The hashed assets themselves stay
+    cacheable."""
     index = static_dir / "index.html"
     if index.is_file():
-        return FileResponse(str(index))
+        return FileResponse(
+            str(index), headers={"Cache-Control": "no-cache"})
     return PlainTextResponse(
         f"{name} frontend not built (missing {index})", status_code=404
     )

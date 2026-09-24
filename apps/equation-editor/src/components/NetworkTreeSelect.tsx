@@ -82,9 +82,12 @@ export default function NetworkTreeSelect({
   selected,
   onSelect,
 }: NetworkTreeSelectProps) {
-  const roots = childrenOf(tree, 'root')
-  // If 'root' is not the only root or user can select it, include it.
-  const top = ['root', ...roots.filter((r) => r !== 'root')]
+  // True roots: keys no other key lists as a child.  The backend hangs
+  // every parentless network under 'root', so this is normally just
+  // ['root'] — rendering root's children again as top-level nodes would
+  // duplicate every branch below the fold.
+  const childNames = new Set(Object.values(tree).flat())
+  const top = Object.keys(tree).filter((k) => !childNames.has(k))
 
   return (
     <div
