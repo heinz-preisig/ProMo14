@@ -911,6 +911,57 @@
 
     <https://w3id.org/promo/ontology#Version> a rdfs:Class .
 
+    <https://w3id.org/promo/ontology#term_determination_derived> a promo:AxisTerm ;
+        rdfs:label "derived" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_determination_physical> .
+
+    <https://w3id.org/promo/ontology#term_determination_port> a promo:AxisTerm ;
+        rdfs:label "port" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_determination_physical> .
+
+    <https://w3id.org/promo/ontology#term_function_effort> a promo:AxisTerm ;
+        rdfs:label "effort" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
+    <https://w3id.org/promo/ontology#term_function_flow> a promo:AxisTerm ;
+        rdfs:label "flow" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
+    <https://w3id.org/promo/ontology#term_function_frame> a promo:AxisTerm ;
+        rdfs:label "frame" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
+    <https://w3id.org/promo/ontology#term_function_fundamental_state> a promo:AxisTerm ;
+        rdfs:label "fundamental-state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> ;
+        promo:parent <https://w3id.org/promo/ontology#term_function_state> .
+
+    <https://w3id.org/promo/ontology#term_function_reaction> a promo:AxisTerm ;
+        rdfs:label "reaction" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
+    <https://w3id.org/promo/ontology#term_function_secondary_state> a promo:AxisTerm ;
+        rdfs:label "secondary-state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> ;
+        promo:parent <https://w3id.org/promo/ontology#term_function_state> .
+
+    <https://w3id.org/promo/ontology#term_info_role_differential_state> a promo:AxisTerm ;
+        rdfs:label "differential-state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> ;
+        promo:parent <https://w3id.org/promo/ontology#term_info_role_state> .
+
+    <https://w3id.org/promo/ontology#term_variability_constant> a promo:AxisTerm ;
+        rdfs:label "constant" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_variability_physical> .
+
+    <https://w3id.org/promo/ontology#term_variability_parameter> a promo:AxisTerm ;
+        rdfs:label "parameter" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_variability_physical> .
+
+    <https://w3id.org/promo/ontology#term_variability_variable> a promo:AxisTerm ;
+        rdfs:label "variable" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_variability_physical> .
+
     <promo:F_conv> a promo:Variable ;
         rdfs:label "F_conv" ;
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
@@ -1591,44 +1642,6 @@
         rdfs:label "parameter" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> .
 
-    <https://w3id.org/promo/ontology#term_info_role_state> a promo:AxisTerm ;
-        rdfs:label "state" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> .
-
-    <https://w3id.org/promo/ontology#term_role_constant> a promo:AxisTerm ;
-        rdfs:label "constant" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_differential_state> a promo:AxisTerm ;
-        rdfs:label "differential-state" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> ;
-        promo:parent <https://w3id.org/promo/ontology#term_role_state> .
-
-    <https://w3id.org/promo/ontology#term_role_effort> a promo:AxisTerm ;
-        rdfs:label "effort" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_flow> a promo:AxisTerm ;
-        rdfs:label "flow" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_frame> a promo:AxisTerm ;
-        rdfs:label "frame" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_parameter> a promo:AxisTerm ;
-        rdfs:label "parameter" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_port> a promo:AxisTerm ;
-        rdfs:label "port" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_secondary_state> a promo:AxisTerm ;
-        rdfs:label "secondary-state" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> ;
-        promo:parent <https://w3id.org/promo/ontology#term_role_derived> .
-
     <https://w3id.org/promo/ontology#usesOntology> a rdf:Property .
 
     <https://w3id.org/promo/ontology#versionInfo> a rdf:Property .
@@ -1731,6 +1744,18 @@
     <https://w3id.org/promo/ontology> a promo:Ontology ;
         promo:seedFloor "2026-09" .
 
+    <https://w3id.org/promo/ontology#axis_determination_physical> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "determination" .
+
+    <https://w3id.org/promo/ontology#term_function_state> a promo:AxisTerm ;
+        rdfs:label "state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
+    <https://w3id.org/promo/ontology#term_info_role_state> a promo:AxisTerm ;
+        rdfs:label "state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> .
+
     <promo:m> a promo:Variable ;
         rdfs:label "m" ;
         promo:aliases "{\"latex\": \"m\", \"global_ID\": \"promo:m\"}" ;
@@ -1757,6 +1782,10 @@
         promo:portVariable true ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
+
+    <https://w3id.org/promo/ontology#axis_variability_physical> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "variability" .
 
     <https://w3id.org/promo/ontology#cap_reaction_host> a promo:Capability ;
         rdfs:label "reaction host" ;
@@ -1869,14 +1898,6 @@
         rdfs:label "particulate" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> .
 
-    <https://w3id.org/promo/ontology#term_role_derived> a promo:AxisTerm ;
-        rdfs:label "derived" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
-    <https://w3id.org/promo/ontology#term_role_state> a promo:AxisTerm ;
-        rdfs:label "state" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_physical> .
-
     <https://w3id.org/promo/ontology#token_manipulation> a promo:Token ;
         rdfs:label "Manipulation" ;
         promo:parent <https://w3id.org/promo/ontology#token_signal> ;
@@ -1952,6 +1973,10 @@
         rdfs:label "Momentum" ;
         promo:tokenKind "conserved" .
 
+    <https://w3id.org/promo/ontology#axis_function_physical> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "function" .
+
     <https://w3id.org/promo/ontology#domain_root> a promo:Domain ;
         promo:hasToken <https://w3id.org/promo/ontology#token_signal> ;
         promo:name "root" .
@@ -2012,10 +2037,6 @@
         rdfs:label "continuum" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> .
 
-    <https://w3id.org/promo/ontology#axis_role_information> a promo:ClassificationAxis ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_information> ;
-        promo:name "role" .
-
     <https://w3id.org/promo/ontology#scale_phase> a promo:ScaleDimension ;
         promo:dimensionKind "content" ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
@@ -2024,6 +2045,10 @@
     <https://w3id.org/promo/ontology#token_signal> a promo:Token ;
         rdfs:label "Signal" ;
         promo:tokenKind "reference" .
+
+    <https://w3id.org/promo/ontology#axis_role_information> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_information> ;
+        promo:name "role" .
 
     <https://w3id.org/promo/ontology#domain_information> a promo:Domain ;
         promo:branch "information" ;
@@ -2055,10 +2080,6 @@
         rdfs:label "event-dynamic" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
         promo:parent <https://w3id.org/promo/ontology#sval_time_macro> .
-
-    <https://w3id.org/promo/ontology#axis_role_physical> a promo:ClassificationAxis ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "role" .
 
     <https://w3id.org/promo/ontology#domain_physical> a promo:Domain ;
         promo:branch "physical" ;

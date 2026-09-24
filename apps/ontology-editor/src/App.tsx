@@ -568,7 +568,19 @@ export default function App() {
         }}>Save axis</button>
 
         <div style={{ ...S.section, marginTop: 24, borderTop: '1px solid #eee', paddingTop: 12 }}>
-          <h3 style={S.h3}>Add term to axis</h3>
+          <h3 style={S.h3}>
+            {draftAxisTerm.iri
+              ? `Edit term — ${draftAxisTerm.label}`
+              : 'Add term to axis'}
+            {draftAxisTerm.iri && (
+              <button
+                style={{ ...S.buttonGhost, marginLeft: 8, fontSize: 11 }}
+                onClick={() =>
+                  setDraftAxisTerm({ ...EMPTY_AXIS_TERM, axis: draftAxisTerm.axis })
+                }
+              >+ new term</button>
+            )}
+          </h3>
           <label style={S.label}>Axis</label>
           <select style={S.select} value={draftAxisTerm.axis} onChange={(e) => setDraftAxisTerm({ ...draftAxisTerm, axis: e.target.value, parent: null })}>
             <option value="">(select axis)</option>

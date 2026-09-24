@@ -483,39 +483,57 @@ class RdfStore:
             g.add((phys_iri, PROMO["hasToken"], tok_iri))
         g.add((root_iri, PROMO["hasToken"], signal_iri))
 
-        # --- Classification axes: "role" axis on both branches ---
-        role_phys_iri = self.mint_iri(base, "axis_role_physical")
-        self.add_classification_axis(g, role_phys_iri, phys_iri, "role")
-        role_info_iri = self.mint_iri(base, "axis_role_information")
-        self.add_classification_axis(g, role_info_iri, info_iri, "role")
+        # --- Classification axes ---
+        # Physical branch: three axes, one question each
+        # (design discussion 2026-09-24):
+        #   determination — where is the value determined? interior|boundary
+        #   function      — what does the variable physically do?
+        #   variability   — is the value given or solved?
+        # Information branch keeps a single "role" axis; differential-state
+        # lives there for the control canonical form dx/dt = A.x + B.u —
+        # A needs two distinct index objects over the state set (a
+        # variable's index structure may not repeat an index).
+        def seed_axis(axis_frag, term_prefix, name, domain_iri, terms):
+            axis_iri = self.mint_iri(base, f"axis_{axis_frag}")
+            self.add_classification_axis(g, axis_iri, domain_iri, name)
+            term_iris: Dict[str, URIRef] = {}
+            for term, parent_label in terms:
+                frag = term.replace("-", "_")
+                term_iri = self.mint_iri(base, f"term_{term_prefix}_{frag}")
+                parent_iri = (term_iris.get(parent_label)
+                              if parent_label else None)
+                self.add_axis_term(g, term_iri, axis_iri, term,
+                                   parent=parent_iri)
+                term_iris[term] = term_iri
 
-        # Role axis = var/expr graph position only — no domain echoes
-        # (see docs/ontology-design-discussion-2026-09-16.md).
-        physical_role_terms = [
+        seed_axis("determination_physical", "determination",
+                  "determination", phys_iri, [
+                      ("derived", None),
+                      ("port", None),
+                  ])
+        seed_axis("function_physical", "function", "function", phys_iri, [
             ("state", None),
-            ("differential-state", "state"),
-            ("derived", None),
-            ("secondary-state", "derived"),
+            ("fundamental-state", "state"),
+            ("secondary-state", "state"),
             ("effort", None),
             ("flow", None),
-            ("port", None),
             ("frame", None),
+            ("reaction", None),
+        ])
+        seed_axis("variability_physical", "variability",
+                  "variability", phys_iri, [
+                      ("constant", None),
+                      ("parameter", None),
+                      ("variable", None),
+                  ])
+        seed_axis("role_information", "info_role", "role", info_iri, [
+            ("state", None),
+            ("differential-state", "state"),
+            ("input", None),
+            ("output", None),
             ("constant", None),
             ("parameter", None),
-        ]
-        role_term_iris: Dict[str, URIRef] = {}
-        for term, parent_label in physical_role_terms:
-            frag = term.replace("-", "_")
-            term_iri = self.mint_iri(base, f"term_role_{frag}")
-            parent_iri = role_term_iris.get(parent_label) if parent_label else None
-            self.add_axis_term(g, term_iri, role_phys_iri, term,
-                               parent=parent_iri)
-            role_term_iris[term] = term_iri
-
-        information_role_terms = ["state", "input", "output", "constant", "parameter"]
-        for term in information_role_terms:
-            term_iri = self.mint_iri(base, f"term_info_role_{term}")
-            self.add_axis_term(g, term_iri, role_info_iri, term)
+        ])
 
         # --- Scale dimensions + values (seed) ---
         # Time scale: 4 levels, each with triple-domain children
