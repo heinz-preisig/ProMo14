@@ -69,11 +69,21 @@ def health() -> dict[str, str]:
 # Static frontend (built equation editor)
 # ---------------------------------------------------------------------------
 
+def _mount_assets(prefix: str, assets_dir: Path, name: str) -> None:
+    """Mount a SPA's assets unconditionally.
+
+    check_dir=False: dist/ may not exist at startup — building an app
+    later must not require a backend restart (missing files 404).
+    """
+    app.mount(prefix,
+              StaticFiles(directory=str(assets_dir), check_dir=False),
+              name=name)
+
+
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", "apps/equation-editor/dist")).resolve()
 ASSETS_DIR = STATIC_DIR / "assets"
 
-if ASSETS_DIR.is_dir():
-    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+_mount_assets("/assets", ASSETS_DIR, "assets")
 
 
 ONTOLOGY_STATIC_DIR = Path(
@@ -81,12 +91,7 @@ ONTOLOGY_STATIC_DIR = Path(
 ).resolve()
 ONTOLOGY_ASSETS_DIR = ONTOLOGY_STATIC_DIR / "assets"
 
-if ONTOLOGY_ASSETS_DIR.is_dir():
-    app.mount(
-        "/ontology/assets",
-        StaticFiles(directory=str(ONTOLOGY_ASSETS_DIR)),
-        name="ontology-assets",
-    )
+_mount_assets("/ontology/assets", ONTOLOGY_ASSETS_DIR, "ontology-assets")
 
 
 def _spa_index(static_dir: Path, name: str) -> Response:
@@ -120,12 +125,7 @@ MODELLER_STATIC_DIR = Path(
 ).resolve()
 MODELLER_ASSETS_DIR = MODELLER_STATIC_DIR / "assets"
 
-if MODELLER_ASSETS_DIR.is_dir():
-    app.mount(
-        "/modeller/assets",
-        StaticFiles(directory=str(MODELLER_ASSETS_DIR)),
-        name="modeller-assets",
-    )
+_mount_assets("/modeller/assets", MODELLER_ASSETS_DIR, "modeller-assets")
 
 
 @app.get("/modeller", include_in_schema=False)
@@ -141,12 +141,7 @@ BEHAVIOUR_STATIC_DIR = Path(
 ).resolve()
 BEHAVIOUR_ASSETS_DIR = BEHAVIOUR_STATIC_DIR / "assets"
 
-if BEHAVIOUR_ASSETS_DIR.is_dir():
-    app.mount(
-        "/behaviour/assets",
-        StaticFiles(directory=str(BEHAVIOUR_ASSETS_DIR)),
-        name="behaviour-assets",
-    )
+_mount_assets("/behaviour/assets", BEHAVIOUR_ASSETS_DIR, "behaviour-assets")
 
 
 @app.get("/behaviour", include_in_schema=False)
@@ -162,12 +157,8 @@ INSTANTIATION_STATIC_DIR = Path(
 ).resolve()
 INSTANTIATION_ASSETS_DIR = INSTANTIATION_STATIC_DIR / "assets"
 
-if INSTANTIATION_ASSETS_DIR.is_dir():
-    app.mount(
-        "/instantiation/assets",
-        StaticFiles(directory=str(INSTANTIATION_ASSETS_DIR)),
-        name="instantiation-assets",
-    )
+_mount_assets("/instantiation/assets", INSTANTIATION_ASSETS_DIR,
+              "instantiation-assets")
 
 
 @app.get("/instantiation", include_in_schema=False)
@@ -183,12 +174,7 @@ SPECIES_STATIC_DIR = Path(
 ).resolve()
 SPECIES_ASSETS_DIR = SPECIES_STATIC_DIR / "assets"
 
-if SPECIES_ASSETS_DIR.is_dir():
-    app.mount(
-        "/species/assets",
-        StaticFiles(directory=str(SPECIES_ASSETS_DIR)),
-        name="species-assets",
-    )
+_mount_assets("/species/assets", SPECIES_ASSETS_DIR, "species-assets")
 
 
 @app.get("/species", include_in_schema=False)

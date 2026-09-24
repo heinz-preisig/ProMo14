@@ -417,7 +417,14 @@ async function forkArtefact(iri) {
 
 // --- New-artefact form (replaces the prompt() chain — hub ticket #5) ---
 
-const TYPE_DEFAULT_IRI = t => `https://w3id.org/promo/${t}/`;
+// Default IRI dodges existing lines (trailing-slash-insensitive) —
+// promo/ontology/ would near-collide with the core promo/ontology.
+function TYPE_DEFAULT_IRI(t) {
+  const taken = new Set(LINES.map(l => l.iri.replace(/\/+$/, '')));
+  let base = `https://w3id.org/promo/${t}`;
+  for (let n = 2; taken.has(base); n++) base = `https://w3id.org/promo/${t}-${n}`;
+  return base + '/';
+}
 
 function toggleNewForm() {
   const f = document.getElementById('newform');
@@ -619,6 +626,7 @@ fetch('/api/catalogue')
     pinOptions();
     render(d.lines);
     updateCounts();
+    onTypeChange();   // re-mint default IRI now that LINES is known
   })
   .catch(e => { msg(`Failed to load catalogue: ${e.message}`);
                 document.getElementById('catalogue').innerHTML = ''; });

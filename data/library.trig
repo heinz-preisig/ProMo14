@@ -1,0 +1,45 @@
+@prefix promo: <https://w3id.org/promo#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://w3id.org/promo/library/> {
+    promo:Assignment a rdfs:Class .
+
+    promo:Glass a rdfs:Class .
+
+    promo:Library a rdfs:Class .
+
+    promo:Model a rdfs:Class .
+
+    promo:Ontology a rdfs:Class .
+
+    promo:Species a rdfs:Class .
+
+    promo:ValueCell a rdfs:Class .
+
+    promo:Version a rdfs:Class .
+
+    promo:atIndexElement a rdf:Property .
+
+    promo:coordinate a rdf:Property .
+
+    promo:generatedFrom a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
+
+    promo:seedFloor a rdf:Property .
+
+    promo:usesOntology a rdf:Property .
+
+    promo:usesSpecies a rdf:Property .
+
+    promo:valueCell a rdf:Property .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/library/> a promo:Library ;
+        promo:usesOntology <https://w3id.org/promo/ontology> .
+}
+
