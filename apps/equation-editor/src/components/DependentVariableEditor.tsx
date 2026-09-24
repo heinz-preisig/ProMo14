@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, CodegenTarget, Index, NetworkTree, SavedEquation, Variable } from '../types'
+import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, Index, NetworkTree, SavedEquation, Variable } from '../types'
+import AxisClassifications, {
+  applicableAxes,
+  deriveType,
+  findTermIri,
+} from '../axisClassifications'
 import { nextInternalId } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
 import ExpressionInput from './ExpressionInput'
@@ -25,13 +30,15 @@ export interface DependentVariableEditorProps {
   variables: Variable[]
   indices: Index[]
   networkTree: NetworkTree
+  axes: ClassificationAxis[]
+  domains: Domain[]
   initialDomain: string
-  initialClass: string
+  initialClassifications: Record<string, string>
   /** When set, the editor attaches the equation to this existing
    *  variable instead of minting a new one — fields are prefilled and
    *  structural ones lock while the variable is used (§18). */
   editing?: Variable | null
-  onDefaultsChange?: (domain: string, variableClass: string) => void
+  onDefaultsChange?: (domain: string, classifications: Record<string, string>) => void
   onAccept: (v: Variable, eq: SavedEquation) => void
 }
 
@@ -41,14 +48,17 @@ export default function DependentVariableEditor({
   variables,
   indices,
   networkTree,
+  axes,
+  domains,
   initialDomain,
-  initialClass,
+  initialClassifications,
   editing,
   onDefaultsChange,
   onAccept,
 }: DependentVariableEditorProps) {
   const [domain, setDomain] = useState(initialDomain)
-  const [variableClass, setVariableClass] = useState(initialClass)
+  const [classifications, setClassifications] = useState<Record<string, string>>({})
+  const [variableClass, setVariableClass] = useState('')
   const [name, setName] = useState('')
   const [latexSym, setLatexSym] = useState('')
 
@@ -67,8 +77,10 @@ export default function DependentVariableEditor({
 
   useEffect(() => {
     if (open) {
+      const cls = editing?.classifications ?? initialClassifications
       setDomain(editing?.network ?? initialDomain)
-      setVariableClass(editing?.type ?? initialClass)
+      setClassifications(cls)
+      setVariableClass(editing?.type ?? deriveType(axes, cls))
       setName(editing?.label ?? '')
       setLatexSym(editing?.aliases?.latex ?? '')
       setText('')
@@ -91,12 +103,13 @@ export default function DependentVariableEditor({
     setGenCode(null)
   }, [name, domain, variableClass, text, latexSym])
 
-  // Report the current domain/class so the app can offer them as
-  // defaults next time either variable editor is opened.  Skipped in
-  // editing mode — the existing variable's values aren't user defaults.
+  // Report the current domain/classifications so the app can offer
+  // them as defaults next time either variable editor is opened.
+  // Skipped in editing mode — the existing variable's values aren't
+  // user defaults.
   useEffect(() => {
-    if (!editing) onDefaultsChange?.(domain, variableClass)
-  }, [domain, variableClass, editing])
+    if (!editing) onDefaultsChange?.(domain, classifications)
+  }, [domain, classifications, editing])
 
   // Instantiate RHS → LHS class restricted to constant|parameter.  The
   // text heuristic covers the pre-check state (ast only exists after a
@@ -128,14 +141,19 @@ export default function DependentVariableEditor({
       const parseRes = await parseExpression(text)
       if (parseRes.ok && parseRes.ast) {
         setAst(parseRes.ast)
-        // Instantiate LHS must be constant|parameter — sync the select so
-        // the request below already carries an allowed class (ADR-008).
+        // Instantiate LHS must be constant|parameter — sync the
+        // variability pick so the request below already carries an
+        // allowed class (ADR-008).
         if (
           !structuralLocked &&
           parseRes.ast.type === 'Instantiate' &&
           !INSTANTIATE_CLASSES.includes(variableClass)
         ) {
           setVariableClass('parameter')
+          const hit = findTermIri(axes, 'variability', 'parameter')
+          if (hit) {
+            setClassifications((prev) => ({ ...prev, [hit.axisIri]: hit.termIri }))
+          }
         }
       } else {
         setParseError(parseRes.error ?? 'Parse failed')
@@ -174,10 +192,11 @@ export default function DependentVariableEditor({
       index_structures: checkResult?.indices ?? editing?.index_structures ?? [],
       internal_id: editing?.internal_id ?? nextInternalId(variables),
       port_variable: editing?.port_variable ?? false,
+      classifications,
       aliases,
       doc,
     }
-  }, [name, domain, effectiveClass, variables, checkResult, latexSym, doc, editing])
+  }, [name, domain, effectiveClass, variables, checkResult, latexSym, doc, editing, classifications])
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
@@ -305,24 +324,38 @@ export default function DependentVariableEditor({
             </span>
           </label>
 
-          <label
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
-          >
-            Class:
-            <select
-              value={effectiveClass}
-              onChange={(e) => setVariableClass(e.target.value)}
+          {applicableAxes(axes, domain, domains).length ? (
+            <AxisClassifications
+              axes={axes}
+              domain={domain}
+              domains={domains}
+              value={classifications}
               disabled={structuralLocked}
+              onChange={(next) => {
+                setClassifications(next)
+                setVariableClass(deriveType(axes, next))
+              }}
+            />
+          ) : (
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
             >
-              <option value="">Select…</option>
-              {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+              Class:
+              <select
+                value={effectiveClass}
+                onChange={(e) => setVariableClass(e.target.value)}
+                disabled={structuralLocked}
+              >
+                <option value="">Select…</option>
+                {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             Name:

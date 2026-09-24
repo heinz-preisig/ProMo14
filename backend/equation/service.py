@@ -35,7 +35,7 @@ from backend.ontology.service import (
     scoped_context,
 )
 
-from .checker import check
+from .checker import INSTANTIATE_CLASSES, check
 from .codegen import TARGETS, render
 from .compile_space import CompileSpace, Index, Variable
 from .context import DictContext
@@ -125,6 +125,8 @@ class VariableIn(BaseModel):
     tokens: List[str] = Field(default_factory=list)
     value: Optional[str] = None  # pre-bound promo:value (constants)
     equations: Dict[str, EquationIn] = Field(default_factory=dict)
+    # Multi-axis classifications: axis IRI -> axis term IRI.
+    classifications: Dict[str, str] = Field(default_factory=dict)
 
     @field_validator("label")
     @classmethod
@@ -188,6 +190,11 @@ class ContextResponse(BaseModel):
     variables: List[VariableIn] = Field(default_factory=list)
     indices: List[IndexIn] = Field(default_factory=list)
     network_tree: Dict[str, List[str]] = Field(default_factory=dict)
+    # Classification axes with their terms — drives the per-axis
+    # dropdowns in the variable editors.  Domains are included so the
+    # UI can map a variable's network (a domain name) to axis ancestry.
+    axes: List[Dict[str, Any]] = Field(default_factory=list)
+    domains: List[Dict[str, Any]] = Field(default_factory=list)
     # Host capabilities the UI adapts to — e.g. {"pdf": false} when no
     # TeX toolchain is installed (default Docker image).
     capabilities: Dict[str, bool] = Field(default_factory=dict)
@@ -226,6 +233,7 @@ def context_endpoint(
                 tokens=v.tokens,
                 value=getattr(v, "value", None),
                 equations=getattr(v, "equations", {}),
+                classifications=getattr(v, "classifications", {}),
             )
         )
 
@@ -252,6 +260,8 @@ def context_endpoint(
         variables=variables,
         indices=indices,
         network_tree=ctx.tree(),
+        axes=ctx.axes(),
+        domains=ctx.domains(),
         capabilities={"pdf": pdf_available()},
     )
 
@@ -456,6 +466,24 @@ def _link_instances(graph, var_iri: URIRef, protos: List[str],
             graph.add((var_iri, PROMO["instanceOf"], proto))
 
 
+def _class_from_classifications(graph, classifications) -> Optional[str]:
+    """Derive the legacy ``variableClass`` from the classifications map.
+
+    Any classified term labelled ``constant``|``parameter`` wins (the
+    variability axis carries those labels); a classified variable with
+    neither is a solved variable (``"state"``).  Returns ``None`` when
+    no classifications are present so the caller keeps the explicit
+    legacy field.
+    """
+    if not classifications:
+        return None
+    for term_iri in classifications.values():
+        label = graph.value(URIRef(term_iri), RDFS.label)
+        if label is not None and str(label) in INSTANTIATE_CLASSES:
+            return str(label)
+    return "state"
+
+
 @router.post("/variables", response_model=VariableRecord)
 def create_variable(
     record: VariableRecord,
@@ -478,7 +506,16 @@ def create_variable(
 
     protos = _instantiate_protos(record)
     var = record.model_dump()
-    if var.get("variable_class"):
+    # Bridge: the legacy variableClass literal is what checker/builder
+    # read (INSTANTIATE_CLASSES).  Derive it from the classifications —
+    # a term labelled constant|parameter on any axis wins; classified
+    # but neither means a solved variable ("state").  Unclassified
+    # variables keep the explicit variable_class.
+    derived_class = _class_from_classifications(graph, record.classifications)
+    if derived_class is not None:
+        var["variable_class"] = derived_class
+        var["type"] = derived_class
+    elif var.get("variable_class"):
         var["type"] = var["variable_class"]
     var_iri = store.add_variable_dict(graph, var)
     _link_instances(graph, var_iri, protos, record.network)

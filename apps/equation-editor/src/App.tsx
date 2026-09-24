@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { deleteVariable, documentUrl, loadContext, saveOntology, saveVariable } from './api'
 import { useStoreDirty } from './useStoreDirty'
-import type { Index, NetworkTree, SavedEquation, Variable } from './types'
+import type { ClassificationAxis, Domain, Index, NetworkTree, SavedEquation, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
@@ -16,6 +16,8 @@ export default function App() {
   const [variables, setVariables] = useState<Variable[]>([])
   const [indices, setIndices] = useState<Index[]>(demoIndices)
   const [networkTree, setNetworkTree] = useState<NetworkTree>(demoNetworkTree)
+  const [axes, setAxes] = useState<ClassificationAxis[]>([])
+  const [domains, setDomains] = useState<Domain[]>([])
   const [expressionNetwork, setExpressionNetwork] = useState('root')
 
   const [equations, setEquations] = useState<SavedEquation[]>([])
@@ -25,10 +27,10 @@ export default function App() {
   // Set when the equation editor attaches to an existing variable
   // ("Add equation…" in the detail dialog) instead of minting a new one.
   const [dependentEditing, setDependentEditing] = useState<Variable | null>(null)
-  // Last domain/class picked in either variable editor — offered as
-  // defaults the next time one is opened.
+  // Last domain/classifications picked in either variable editor —
+  // offered as defaults the next time one is opened.
   const [lastDomain, setLastDomain] = useState('')
-  const [lastClass, setLastClass] = useState('')
+  const [lastClassifications, setLastClassifications] = useState<Record<string, string>>({})
 
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
@@ -56,6 +58,8 @@ export default function App() {
         setVariables(ctx.variables)
         setIndices(ctx.indices)
         setNetworkTree(ctx.network_tree)
+        setAxes(ctx.axes ?? [])
+        setDomains(ctx.domains ?? [])
         setPdfCapable(ctx.capabilities?.pdf ?? false)
         // Rebuild SavedEquation list from persisted equations
         const saved: SavedEquation[] = []
@@ -88,6 +92,8 @@ export default function App() {
     setVariables(ctx.variables)
     setIndices(ctx.indices)
     setNetworkTree(ctx.network_tree)
+    setAxes(ctx.axes ?? [])
+    setDomains(ctx.domains ?? [])
     // A rename changes the displayed lhs of the variable's equations —
     // refresh them from the reloaded records (keeps session ast/check).
     const eqIds = new Set(Object.keys(v.equations ?? {}))
@@ -304,6 +310,8 @@ export default function App() {
           variable={selectedVariable}
           indices={indices}
           networkTree={networkTree}
+          axes={axes}
+          domains={domains}
           onSave={saveEditedVariable}
           onAddEquation={(v) => {
             setDependentEditing(v)
@@ -319,11 +327,13 @@ export default function App() {
         variables={variables}
         indices={indices}
         networkTree={networkTree}
+        axes={axes}
+        domains={domains}
         initialDomain={lastDomain}
-        initialClass={lastClass}
+        initialClassifications={lastClassifications}
         onDefaultsChange={(d, c) => {
           setLastDomain(d)
-          setLastClass(c)
+          setLastClassifications(c)
         }}
         onAccept={addPortVariable}
       />
@@ -346,12 +356,14 @@ export default function App() {
         variables={variables}
         indices={indices}
         networkTree={networkTree}
+        axes={axes}
+        domains={domains}
         initialDomain={lastDomain}
-        initialClass={lastClass}
+        initialClassifications={lastClassifications}
         editing={dependentEditing}
         onDefaultsChange={(d, c) => {
           setLastDomain(d)
-          setLastClass(c)
+          setLastClassifications(c)
         }}
         onAccept={acceptDependent}
       />

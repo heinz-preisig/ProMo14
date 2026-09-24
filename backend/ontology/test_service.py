@@ -91,12 +91,25 @@ def test_seed_axes(client):
     r = client.get("/api/ontology/axes")
     assert r.status_code == 200
     axes = r.json()
-    assert len(axes) >= 2
-    role_axes = [a for a in axes if a["name"] == "role"]
-    assert len(role_axes) >= 2  # one per branch
-    # Each role axis should have terms
-    for ax in role_axes:
+    names = {a["name"] for a in axes}
+    # Physical branch split into three axes (2026-09-24 restructure);
+    # information keeps a single role axis.
+    assert {"determination", "function", "variability", "role"} <= names
+    for ax in axes:
         assert len(ax["terms"]) > 0
+    # function carries the state hierarchy; role carries
+    # differential-state under state (control canonical form needs two
+    # distinct index objects over the state set).
+    function = next(a for a in axes if a["name"] == "function")
+    fn_labels = {t["label"] for t in function["terms"]}
+    assert {"state", "fundamental-state", "secondary-state",
+            "effort", "flow", "frame", "reaction"} <= fn_labels
+    role = next(a for a in axes if a["name"] == "role")
+    role_labels = {t["label"] for t in role["terms"]}
+    assert {"state", "differential-state", "input", "output"} <= role_labels
+    variability = next(a for a in axes if a["name"] == "variability")
+    var_labels = {t["label"] for t in variability["terms"]}
+    assert {"constant", "parameter", "variable"} <= var_labels
 
 
 def test_seed_entity_types(client):

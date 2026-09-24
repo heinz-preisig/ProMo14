@@ -51,10 +51,32 @@ export interface NetworkTree {
   [parent: string]: string[]
 }
 
+export interface AxisTerm {
+  iri: string
+  label: string
+  parent?: string | null
+}
+
+export interface ClassificationAxis {
+  iri: string
+  domain: string
+  name: string
+  parent?: string | null
+  terms: AxisTerm[]
+}
+
+export interface Domain {
+  iri: string
+  name: string
+  parent?: string | null
+}
+
 export interface ContextResponse {
   variables: Variable[]
   indices: Index[]
   network_tree: NetworkTree
+  axes?: ClassificationAxis[]
+  domains?: Domain[]
   /** Host capabilities the UI adapts to — e.g. `{ pdf: false }` when
    *  the backend host has no TeX toolchain (default Docker image). */
   capabilities?: Record<string, boolean>

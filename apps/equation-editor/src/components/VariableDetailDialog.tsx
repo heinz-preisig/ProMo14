@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { Index, NetworkTree, Variable } from '../types'
+import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
 import { indexShortLabel } from '../latex'
 import { useVariableLock } from '../useVariableLock'
 import { VARIABLE_CLASSES } from '../validation'
+import AxisClassifications, { applicableAxes, deriveType } from '../axisClassifications'
 import NetworkTreeSelect from './NetworkTreeSelect'
 
 const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current', 'light', 'nil']
@@ -11,6 +12,8 @@ export interface VariableDetailDialogProps {
   variable: Variable
   indices: Index[]
   networkTree: NetworkTree
+  axes: ClassificationAxis[]
+  domains: Domain[]
   /** Persist the edited variable (POST /variables). Throws on failure. */
   onSave: (v: Variable) => Promise<void>
   /** Open the equation editor to attach another equation (§18). */
@@ -29,6 +32,8 @@ export default function VariableDetailDialog({
   variable,
   indices,
   networkTree,
+  axes,
+  domains,
   onSave,
   onAddEquation,
   onClose,
@@ -37,6 +42,9 @@ export default function VariableDetailDialog({
   const [latexSym, setLatexSym] = useState(variable.aliases?.latex ?? '')
   const [doc, setDoc] = useState(variable.doc ?? '')
   const [network, setNetwork] = useState(variable.network)
+  const [classifications, setClassifications] = useState<Record<string, string>>(
+    variable.classifications ?? {},
+  )
   const [variableClass, setVariableClass] = useState(variable.type ?? '')
   const [units, setUnits] = useState<number[]>(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
   const [selectedIndices, setSelectedIndices] = useState<Set<string>>(
@@ -52,6 +60,7 @@ export default function VariableDetailDialog({
     setLatexSym(variable.aliases?.latex ?? '')
     setDoc(variable.doc ?? '')
     setNetwork(variable.network)
+    setClassifications(variable.classifications ?? {})
     setVariableClass(variable.type ?? '')
     setUnits(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
     setSelectedIndices(new Set(variable.index_structures ?? []))
@@ -81,6 +90,7 @@ export default function VariableDetailDialog({
       label: label.trim(),
       network,
       type: variableClass,
+      classifications,
       units: [...units],
       index_structures: Array.from(selectedIndices),
       aliases,
@@ -150,9 +160,9 @@ export default function VariableDetailDialog({
               padding: '6px 8px',
             }}
           >
-            Referenced by {refCount} equation(s) — network, class, units and
-            index structures are locked. Name, LaTeX and documentation stay
-            editable.
+            Referenced by {refCount} equation(s) — network, classifications,
+            units and index structures are locked. Name, LaTeX and
+            documentation stay editable.
           </div>
         )}
 
@@ -194,21 +204,40 @@ export default function VariableDetailDialog({
           </div>
 
           <div style={lockStyle}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              Variable class <span style={{ color: '#c62828' }}>*</span>
-              <select
-                value={variableClass}
-                onChange={(e) => setVariableClass(e.target.value)}
-                disabled={locked}
-              >
-                <option value="">Select a class…</option>
-                {VARIABLE_CLASSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {applicableAxes(axes, network, domains).length ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span>
+                  Classification <span style={{ color: '#c62828' }}>*</span>
+                </span>
+                <AxisClassifications
+                  axes={axes}
+                  domain={network}
+                  domains={domains}
+                  value={classifications}
+                  disabled={locked}
+                  onChange={(next) => {
+                    setClassifications(next)
+                    setVariableClass(deriveType(axes, next))
+                  }}
+                />
+              </div>
+            ) : (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                Variable class <span style={{ color: '#c62828' }}>*</span>
+                <select
+                  value={variableClass}
+                  onChange={(e) => setVariableClass(e.target.value)}
+                  disabled={locked}
+                >
+                  <option value="">Select a class…</option>
+                  {VARIABLE_CLASSES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...lockStyle }}>

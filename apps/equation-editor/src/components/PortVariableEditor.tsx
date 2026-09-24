@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { indexShortLabel } from '../latex'
-import type { Index, NetworkTree, Variable } from '../types'
+import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
+import AxisClassifications, {
+  applicableAxes,
+  deriveType,
+  findTermIri,
+} from '../axisClassifications'
 import {
   findNameCollision,
   isValidVariableName,
@@ -18,9 +23,11 @@ export interface PortVariableEditorProps {
   variables: Variable[]
   indices: Index[]
   networkTree: NetworkTree
+  axes: ClassificationAxis[]
+  domains: Domain[]
   initialDomain?: string
-  initialClass?: string
-  onDefaultsChange?: (domain: string, variableClass: string) => void
+  initialClassifications?: Record<string, string>
+  onDefaultsChange?: (domain: string, classifications: Record<string, string>) => void
   onAccept: (v: Variable) => void
 }
 
@@ -33,13 +40,16 @@ export default function PortVariableEditor({
   variables,
   indices,
   networkTree,
+  axes,
+  domains,
   initialDomain = '',
-  initialClass = '',
+  initialClassifications = {},
   onDefaultsChange,
   onAccept,
 }: PortVariableEditorProps) {
   const [domain, setDomain] = useState(initialDomain)
-  const [variableClass, setVariableClass] = useState(initialClass)
+  const [classifications, setClassifications] = useState<Record<string, string>>({})
+  const [variableClass, setVariableClass] = useState('')
   const [name, setName] = useState('')
   const [latexSym, setLatexSym] = useState('')
   const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
@@ -48,8 +58,14 @@ export default function PortVariableEditor({
 
   useEffect(() => {
     if (open) {
+      // Port variables are boundary positions — pre-fill
+      // determination=port when the axis applies.
+      const cls = { ...initialClassifications }
+      const port = findTermIri(axes, 'determination', 'port')
+      if (port) cls[port.axisIri] = cls[port.axisIri] ?? port.termIri
       setDomain(initialDomain)
-      setVariableClass(initialClass)
+      setClassifications(cls)
+      setVariableClass(deriveType(axes, cls))
       setName('')
       setLatexSym('')
       setUnits([0, 0, 0, 0, 0, 0, 0, 0])
@@ -58,11 +74,11 @@ export default function PortVariableEditor({
     }
   }, [open])
 
-  // Report the current domain/class so the app can offer them as
-  // defaults next time either variable editor is opened.
+  // Report the current domain/classifications so the app can offer
+  // them as defaults next time either variable editor is opened.
   useEffect(() => {
-    onDefaultsChange?.(domain, variableClass)
-  }, [domain, variableClass])
+    onDefaultsChange?.(domain, classifications)
+  }, [domain, classifications])
 
   const toggleIndex = (iri: string) => {
     setSelectedIndices((prev) => {
@@ -94,6 +110,7 @@ export default function PortVariableEditor({
       index_structures: Array.from(selectedIndices),
       internal_id: nextInternalId(variables),
       port_variable: true,
+      classifications,
       aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
       doc: doc.trim(),
     }
@@ -150,17 +167,30 @@ export default function PortVariableEditor({
             <NetworkTreeSelect tree={networkTree} selected={domain} onSelect={setDomain} />
           </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            Class:
-            <select value={variableClass} onChange={(e) => setVariableClass(e.target.value)}>
-              <option value="">Select…</option>
-              {VARIABLE_CLASSES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+          {applicableAxes(axes, domain, domains).length ? (
+            <AxisClassifications
+              axes={axes}
+              domain={domain}
+              domains={domains}
+              value={classifications}
+              onChange={(next) => {
+                setClassifications(next)
+                setVariableClass(deriveType(axes, next))
+              }}
+            />
+          ) : (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              Class:
+              <select value={variableClass} onChange={(e) => setVariableClass(e.target.value)}>
+                <option value="">Select…</option>
+                {VARIABLE_CLASSES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             Name:
