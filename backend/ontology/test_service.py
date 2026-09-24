@@ -99,18 +99,18 @@ def test_seed_axes(client):
     assert "variability" not in names
     for ax in axes:
         assert len(ax["terms"]) > 0
-    # determination carries only the given-ness terms — the declarative
-    # part the checker's INSTANTIATE_CLASSES reads.
+    # determination carries the fixity terms — constant|variable.
     determination = next(a for a in axes if a["name"] == "determination")
     det_labels = {t["label"] for t in determination["terms"]}
-    assert det_labels == {"constant", "parameter"}
-    # function carries the state hierarchy; role carries
+    assert det_labels == {"constant", "variable"}
+    # function carries the state hierarchy plus parameter (a tunable
+    # coefficient is a role in the equation structure); role carries
     # differential-state under state (control canonical form needs two
     # distinct index objects over the state set).
     function = next(a for a in axes if a["name"] == "function")
     fn_labels = {t["label"] for t in function["terms"]}
     assert {"state", "fundamental-state", "secondary-state",
-            "effort", "flow", "frame", "reaction"} <= fn_labels
+            "effort", "flow", "frame", "reaction", "parameter"} <= fn_labels
     role = next(a for a in axes if a["name"] == "role")
     role_labels = {t["label"] for t in role["terms"]}
     assert {"state", "differential-state", "input", "output"} <= role_labels

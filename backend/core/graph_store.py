@@ -486,11 +486,17 @@ class RdfStore:
         # --- Classification axes ---
         # Physical branch: two axes, one question each
         # (design discussion 2026-09-24):
-        #   determination — is the value given, and how?  constant|parameter
-        #     (the only declarative part: solved-ness is structural —
-        #     derived = has a defining equation, port = port_variable flag
-        #     on the bipartite graph, so neither is an axis term)
+        #   determination — is the value fixed or does it vary?
+        #     constant|variable (solved-ness itself is structural —
+        #     derived = has a defining equation, port = port_variable
+        #     flag on the bipartite graph, so neither is an axis term)
         #   function      — what does the variable physically do?
+        #     parameter lives here: a parameter is a characteristic
+        #     value in a function — part of the function definition,
+        #     often embodying a specific assumption — not a
+        #     determination mode.  determination=variable +
+        #     function=parameter is a rebindable parameter,
+        #     constant + parameter a fixed one.
         # Information branch keeps a single "role" axis; differential-state
         # lives there for the control canonical form dx/dt = A.x + B.u —
         # A needs two distinct index objects over the state set (a
@@ -511,7 +517,7 @@ class RdfStore:
         seed_axis("determination_physical", "determination",
                   "determination", phys_iri, [
                       ("constant", None),
-                      ("parameter", None),
+                      ("variable", None),
                   ])
         seed_axis("function_physical", "function", "function", phys_iri, [
             ("state", None),
@@ -521,6 +527,7 @@ class RdfStore:
             ("flow", None),
             ("frame", None),
             ("reaction", None),
+            ("parameter", None),
         ])
         seed_axis("role_information", "info_role", "role", info_iri, [
             ("state", None),

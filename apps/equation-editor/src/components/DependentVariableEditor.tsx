@@ -4,6 +4,7 @@ import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenT
 import AxisClassifications, {
   applicableAxes,
   deriveType,
+  FIELD_LABEL_STYLE,
   findTermIri,
 } from '../axisClassifications'
 import { nextInternalId } from '../variableUtils'
@@ -142,15 +143,15 @@ export default function DependentVariableEditor({
       if (parseRes.ok && parseRes.ast) {
         setAst(parseRes.ast)
         // Instantiate LHS must be constant|parameter — sync the
-        // determination pick so the request below already carries an
-        // allowed class (ADR-008).
+        // function pick (parameter lives on the function axis) so the
+        // request below already carries an allowed class (ADR-008).
         if (
           !structuralLocked &&
           parseRes.ast.type === 'Instantiate' &&
           !INSTANTIATE_CLASSES.includes(variableClass)
         ) {
           setVariableClass('parameter')
-          const hit = findTermIri(axes, 'determination', 'parameter')
+          const hit = findTermIri(axes, 'function', 'parameter')
           if (hit) {
             setClassifications((prev) => ({ ...prev, [hit.axisIri]: hit.termIri }))
           }
@@ -296,126 +297,135 @@ export default function DependentVariableEditor({
       >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
             marginBottom: 16,
             paddingBottom: 12,
             borderBottom: '1px solid #ccc',
           }}
         >
-          <h3 style={{ margin: 0 }}>
-            {editing ? `Add equation — ${editing.label}` : 'New dependent variable'}
-          </h3>
+          {/* Row 1: title + actions */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+            <h3 style={{ margin: 0 }}>
+              {editing ? `Add equation — ${editing.label}` : 'New dependent variable'}
+            </h3>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button type="button" onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAccept}
+                disabled={!nameValid || !domain || !effectiveClass || !checkResult?.ok}
+                title={
+                  !nameValid
+                    ? `Invalid name — ${VARIABLE_NAME_HINT}`
+                    : !domain || !effectiveClass
+                      ? 'Domain and class are required'
+                      : !checkResult?.ok
+                        ? 'Run Check on the RHS first'
+                        : undefined
+                }
+              >
+                {editing ? 'Add equation' : 'Accept'}
+              </button>
+            </div>
+          </div>
 
-          <label
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
-          >
-            Domain:
-            <span
-              style={
-                structuralLocked
-                  ? { pointerEvents: 'none', opacity: 0.55, display: 'inline-flex' }
-                  : { display: 'inline-flex' }
-              }
-            >
-              <NetworkTreeSelect tree={networkTree} selected={domain} onSelect={setDomain} />
-            </span>
-          </label>
-
-          {applicableAxes(axes, domain, domains).length ? (
-            <AxisClassifications
-              axes={axes}
-              domain={domain}
-              domains={domains}
-              value={classifications}
-              disabled={structuralLocked}
-              onChange={(next) => {
-                setClassifications(next)
-                setVariableClass(deriveType(axes, next))
-              }}
-            />
-          ) : (
+          {/* Row 2: domain tree + stacked classification/name fields */}
+          <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
             <label
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
               title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
             >
-              Class:
-              <select
-                value={effectiveClass}
-                onChange={(e) => setVariableClass(e.target.value)}
-                disabled={structuralLocked}
+              Domain:
+              <span
+                style={
+                  structuralLocked
+                    ? { pointerEvents: 'none', opacity: 0.55, display: 'inline-flex' }
+                    : { display: 'inline-flex' }
+                }
               >
-                <option value="">Select…</option>
-                {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                <NetworkTreeSelect
+                  tree={networkTree}
+                  selected={domain}
+                  onSelect={setDomain}
+                  maxHeight={220}
+                />
+              </span>
             </label>
-          )}
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            Name:
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="LHS name"
-              title={VARIABLE_NAME_HINT}
-              style={{
-                width: 120,
-                borderColor: name.trim() && !nameValid ? '#c62828' : undefined,
-              }}
-            />
-            {name.trim() && !nameValid && (
-              <span style={{ fontSize: 11, color: '#c62828' }}>{VARIABLE_NAME_HINT}</span>
-            )}
-            {nameValid && collision === 'exact' && (
-              <span style={{ fontSize: 11, color: '#c62828' }}>
-                A variable named {name.trim()} already exists — saving overwrites it
-              </span>
-            )}
-            {nameValid && collision === 'similar' && (
-              <span style={{ fontSize: 11, color: '#b8860b' }}>
-                Differs only by case from an existing variable — names are case-sensitive
-              </span>
-            )}
-          </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={FIELD_LABEL_STYLE}>Name:</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="LHS name"
+                  title={VARIABLE_NAME_HINT}
+                  style={{
+                    width: 120,
+                    borderColor: name.trim() && !nameValid ? '#c62828' : undefined,
+                  }}
+                />
+                {name.trim() && !nameValid && (
+                  <span style={{ fontSize: 11, color: '#c62828' }}>{VARIABLE_NAME_HINT}</span>
+                )}
+                {nameValid && collision === 'exact' && (
+                  <span style={{ fontSize: 11, color: '#c62828' }}>
+                    A variable named {name.trim()} already exists — saving overwrites it
+                  </span>
+                )}
+                {nameValid && collision === 'similar' && (
+                  <span style={{ fontSize: 11, color: '#b8860b' }}>
+                    Differs only by case from an existing variable — names are case-sensitive
+                  </span>
+                )}
+              </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            LaTeX:
-            <input
-              type="text"
-              value={latexSym}
-              onChange={(e) => setLatexSym(e.target.value)}
-              placeholder="e.g. \\rho — defaults to name"
-              style={{ width: 140 }}
-            />
-          </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={FIELD_LABEL_STYLE}>LaTeX:</span>
+                <input
+                  type="text"
+                  value={latexSym}
+                  onChange={(e) => setLatexSym(e.target.value)}
+                  placeholder="e.g. \\rho — defaults to name"
+                  style={{ width: 140 }}
+                />
+              </label>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleAccept}
-              disabled={!nameValid || !domain || !effectiveClass || !checkResult?.ok}
-              title={
-                !nameValid
-                  ? `Invalid name — ${VARIABLE_NAME_HINT}`
-                  : !domain || !effectiveClass
-                    ? 'Domain and class are required'
-                    : !checkResult?.ok
-                      ? 'Run Check on the RHS first'
-                      : undefined
-              }
-            >
-              {editing ? 'Add equation' : 'Accept'}
-            </button>
+              {applicableAxes(axes, domain, domains).length ? (
+                <AxisClassifications
+                  axes={axes}
+                  domain={domain}
+                  domains={domains}
+                  value={classifications}
+                  disabled={structuralLocked}
+                  onChange={(next) => {
+                    setClassifications(next)
+                    setVariableClass(deriveType(axes, next))
+                  }}
+                />
+              ) : (
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
+                >
+                  <span style={FIELD_LABEL_STYLE}>Class:</span>
+                  <select
+                    value={effectiveClass}
+                    onChange={(e) => setVariableClass(e.target.value)}
+                    disabled={structuralLocked}
+                  >
+                    <option value="">Select…</option>
+                    {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
           </div>
         </div>
 
