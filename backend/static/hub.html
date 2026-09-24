@@ -79,6 +79,8 @@
   .stage.future .t, .stage.future .s { fill: #8a9098; }
   .stage .n { font-size: 11px; font-weight: 700; fill: #0b7cbe;
               text-anchor: end; }
+  .stage.need rect { stroke: #d98600; stroke-width: 2.2; }
+  .stage.need .t { fill: #a36a00; }
   .arrow { stroke: #5a6068; stroke-width: 1.4; fill: none;
            marker-end: url(#arr); }
   .arrow.future { stroke: #8a9098; stroke-dasharray: 4 3; }
@@ -177,7 +179,7 @@
     current mode and where a click takes you.</p>
   </details>
   <details id="map" open>
-    <summary>The suite — click a stage to open its app</summary>
+    <summary>The suite — click a stage: opens its app, or shows what it needs first</summary>
     <svg viewBox="0 0 1000 175" role="img" aria-label="ProMo suite pipeline">
       <defs>
         <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4"
@@ -193,56 +195,70 @@
       <line class="arrow" x1="570" y1="110" x2="570" y2="63"/>
       <line class="arrow future" x1="735" y1="59" x2="735" y2="106"/>
       <polyline class="arrow future" points="830,130 910,130 910,63"/>
-      <g class="stage" onclick="stageClick(['ontology'],
-        'Ontology artefacts hold the vocabulary — entity types, domains, tokens, indices, capabilities.  Everything downstream references them.')">
+      <line class="arrow future" x1="405" y1="59" x2="405" y2="106"/>
+      <line class="arrow future" x1="480" y1="118" x2="540" y2="63"/>
+      <g class="stage" data-stage="ontology" onclick="stageClick(['ontology'],
+        'Ontology artefacts hold the vocabulary — entity types, domains, tokens, indices, capabilities.  Everything downstream references them.', [])">
         <rect x="10" y="15" width="130" height="44" rx="6"/>
         <text class="n" data-count-for="ontology" x="132" y="27"></text>
         <text class="t" x="75" y="33">Ontology Editor</text>
         <text class="s" x="75" y="48">ontology artefact</text>
       </g>
-      <g class="stage" onclick="stageClick(['library'],
-        'Library (var/expr) artefacts hold variables and equations — the user-authored physics.  Open one in the Equation Editor.')">
+      <g class="stage" data-stage="library" onclick="stageClick(['library'],
+        'Library (var/expr) artefacts hold variables and equations — the user-authored physics.  Open one in the Equation Editor.',
+        [{types:['ontology'], stage:'ontology', label:'an ontology artefact'}])">
         <rect x="175" y="15" width="130" height="44" rx="6"/>
         <text class="n" data-count-for="library" x="297" y="27"></text>
         <text class="t" x="240" y="33">Equation Editor</text>
         <text class="s" x="240" y="48">library artefact</text>
       </g>
-      <g class="stage" onclick="stageClick(['assignment'],
-        'Assignment artefacts hold behaviour closures — the ordered equation set per entity type.  Open one in the Behaviour Linker.')">
+      <g class="stage" data-stage="assignment" onclick="stageClick(['assignment'],
+        'Assignment artefacts hold behaviour closures — the ordered equation set per entity type.  Open one in the Behaviour Linker.',
+        [{types:['ontology'], stage:'ontology', label:'an ontology'},
+         {types:['library'], stage:'library', label:'a var/expr library'}])">
         <rect x="340" y="15" width="130" height="44" rx="6"/>
         <text class="n" data-count-for="assignment" x="462" y="27"></text>
         <text class="t" x="405" y="33">Behaviour Linker</text>
         <text class="s" x="405" y="48">assignment artefact</text>
       </g>
-      <g class="stage" onclick="stageClick(['model','glass'],
-        'Model artefacts hold topology + placements — nodes, arcs, species gestures.  Open one in the Modeller; Species… pins a scheme to it.')">
+      <g class="stage" data-stage="modeller" onclick="stageClick(['model','glass'],
+        'Model artefacts hold topology + placements — nodes, arcs, species gestures.  Open one in the Modeller; Species… pins a scheme to it.',
+        [{types:['ontology'], stage:'ontology', label:'an ontology'}])">
         <rect x="505" y="15" width="130" height="44" rx="6"/>
         <text class="n" data-count-for="model,glass" x="627" y="27"></text>
         <text class="t" x="570" y="33">Modeller</text>
         <text class="s" x="570" y="48">model artefact</text>
       </g>
-      <g class="stage" onclick="stageClick(['species'],
-        'Species artefacts hold the scheme vocabulary — components, allocations, reactions ({A,B} → {C}).  A model pins one via usesSpecies.')">
+      <g class="stage" data-stage="species" onclick="stageClick(['species'],
+        'Species artefacts hold the scheme vocabulary — components, allocations, reactions ({A,B} → {C}).  A model pins one via usesSpecies.', [])">
         <rect x="505" y="110" width="130" height="40" rx="6"/>
         <text class="n" data-count-for="species" x="627" y="122"></text>
         <text class="t" x="570" y="127">Species</text>
         <text class="s" x="570" y="141">species artefact</text>
       </g>
-      <g class="stage" onclick="stageClick(['model','glass'],
+      <g class="stage" data-stage="instantiation" onclick="stageClick(['model','glass'],
         'Instantiation is a computed view over a model — it opens the instantiation app on the model (several models: pick one below).',
+        [{types:['model','glass'], stage:'modeller', label:'a model artefact'}],
         'instantiate')">
         <rect x="670" y="15" width="130" height="44" rx="6"/>
         <text class="t" x="735" y="33">Instantiation</text>
         <text class="s" x="735" y="48">model → report</text>
       </g>
-      <g class="stage future" onclick="stageClick([],
-        'Meshing (future) — discretises distributed (PDE) systems into lumped networks before codegen.  Lumped and event-dynamic systems skip it.')">
+      <g class="stage future" data-stage="meshing" onclick="stageClick([],
+        'Meshing (future) — discretises distributed (PDE) systems into lumped networks before codegen.  Lumped and event-dynamic systems skip it.', [])">
         <rect x="690" y="110" width="140" height="40" rx="6"/>
         <text class="t" x="760" y="127">Meshing</text>
         <text class="s" x="760" y="141">future — PDE → lumped</text>
       </g>
-      <g class="stage" onclick="stageClick([],
-        'Code generation has no app — GET /api/instantiate/code?graph=<model>&target=python|julia|matlab emits the derivative function.')">
+      <g class="stage future" data-stage="goe" onclick="stageClick([],
+        'Graphic Object Editor (future) — edits the graphical symbols: level-1/2 entity graphics (behaviour linker) and level-3 composite graphics (modeller).  Not yet built.', [])">
+        <rect x="340" y="110" width="140" height="40" rx="6"/>
+        <text class="t" x="410" y="127">Graphic Object Ed.</text>
+        <text class="s" x="410" y="141">future — entity graphics</text>
+      </g>
+      <g class="stage" data-stage="codegen" onclick="stageClick([],
+        'Code generation has no app — GET /api/instantiate/code?graph=<model>&target=python|julia|matlab emits the derivative function.',
+        [{types:['model','glass'], stage:'modeller', label:'a model artefact'}])">
         <rect x="835" y="15" width="150" height="44" rx="6"/>
         <text class="t" x="910" y="33">Code Generation</text>
         <text class="s" x="910" y="48">python · julia · matlab</text>
@@ -270,6 +286,16 @@ const DEV = new URLSearchParams(location.search).has('dev');
 const DEV_PORTS = { ontology: 3001, library: 3002, assignment: 3003,
                     model: 3004, glass: 3004, species: 3005 };
 const INSTANTIATION_DEV_PORT = 3006;
+// What each artefact type holds — used to explain a missing
+// prerequisite, not just name it.
+const TYPE_INFO = {
+  ontology:   'the vocabulary — entity types, domains, tokens, indices, capabilities',
+  library:    'the variables & equations you author (the ontology’s own vars are seeded constants only)',
+  assignment: 'the ordered equation set per entity type — behaviour closures',
+  model:      'topology + placements — nodes, arcs, species gestures',
+  glass:      'a visual skin for the modeller',
+  species:    'the scheme vocabulary — components, allocations, reactions',
+};
 
 const msg = (t) => { document.getElementById('msg').textContent = t || ''; };
 
@@ -391,7 +417,7 @@ async function forkArtefact(iri) {
 
 // --- New-artefact form (replaces the prompt() chain — hub ticket #5) ---
 
-const TYPE_DEFAULT_IRI = t => `https://w3id.org/promo/${t}s/`;
+const TYPE_DEFAULT_IRI = t => `https://w3id.org/promo/${t}/`;
 
 function toggleNewForm() {
   const f = document.getElementById('newform');
@@ -501,9 +527,33 @@ function render(lines) {
 // the candidates when several exist, and pre-sets the New-artefact
 // form when none.  `action` overrides the default open (e.g.
 // 'instantiate' opens the instantiation view on the model).
-function stageClick(types, hint, action) {
+function stageClick(types, hint, needs, action) {
   document.querySelectorAll('#catalogue tr.hit')
     .forEach(r => r.classList.remove('hit'));
+  document.querySelectorAll('.stage.need')
+    .forEach(g => g.classList.remove('need'));
+  // Prerequisites first: a stage whose inputs are missing does not
+  // open — the missing producer nodes light up and the New form is
+  // pre-set to the first gap.
+  const missing = (needs || []).filter(n =>
+    !LINES.some(l => n.types.includes(l.type)));
+  const sel = document.getElementById('nfType');
+  if (missing.length) {
+    for (const m of missing)
+      document.querySelectorAll(`.stage[data-stage="${m.stage}"]`)
+        .forEach(g => g.classList.add('need'));
+    const t0 = missing[0].types[0];
+    if ([...sel.options].some(o => o.value === t0)) {
+      sel.value = t0;
+      onTypeChange();
+    }
+    const what = TYPE_INFO[missing[0].types[0]];
+    document.getElementById('mapHint').textContent =
+      'Missing first: ' + missing.map(m => m.label).join(', ') +
+      (what ? ` — ${what}` : '') +
+      '.  Highlighted above; “New artefact…” is pre-set.';
+    return;
+  }
   const lines = LINES.filter(l => types.includes(l.type));
   for (const l of lines)
     document.querySelectorAll(`#catalogue tr[data-type="${l.type}"]`)
@@ -513,8 +563,7 @@ function stageClick(types, hint, action) {
       (lines[0]);
     return;
   }
-  const sel = document.getElementById('nfType');
-  if (types.length === 1 &&
+  if (types.length &&
       [...sel.options].some(o => o.value === types[0])) {
     sel.value = types[0];
     onTypeChange();
