@@ -1016,12 +1016,13 @@ def resolve_connection(
 
 
 @router.post("/save")
-def save_ontology(req: SaveRequest) -> Dict[str, str]:
+def save_ontology(req: Optional[SaveRequest] = None) -> Dict[str, str]:
     """Serialise the dataset — one ``.trig`` per artefact line under
     ``PROMO_DATA_DIR`` (an explicit ``filename`` selects the legacy
-    whole-dataset single-file export)."""
+    whole-dataset single-file export).  Body is optional: several app
+    clients POST with none."""
     store = get_store()
-    path = store.save(req.filename)
+    path = store.save(req.filename if req else None)
     return {"saved": str(path)}
 
 

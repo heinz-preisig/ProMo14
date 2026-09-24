@@ -320,7 +320,8 @@ function openArtefact(line) {
   const base = DEV && DEV_PORTS[line.type]
     ? `http://localhost:${DEV_PORTS[line.type]}/`
     : `${app.path}/`;
-  window.location.href = `${base}?graph=${encodeURIComponent(line.iri)}`;
+  // New tab: the hub stays open as the persistent portal/launcher.
+  window.open(`${base}?graph=${encodeURIComponent(line.iri)}`, '_blank');
 }
 
 function openVersion(type, iri) {
@@ -333,8 +334,7 @@ function instantiateArtefact(line) {
   if (!guardDirty()) return;
   const base = DEV ? `http://localhost:${INSTANTIATION_DEV_PORT}/`
                    : '/instantiation/';
-  window.location.href =
-    `${base}?graph=${encodeURIComponent(line.iri)}`;
+  window.open(`${base}?graph=${encodeURIComponent(line.iri)}`, '_blank');
 }
 
 async function refreshStatus() {

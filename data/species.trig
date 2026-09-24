@@ -1,0 +1,81 @@
+@prefix promo: <https://w3id.org/promo#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://w3id.org/promo/species/> {
+    promo:Assignment a rdfs:Class .
+
+    promo:Glass a rdfs:Class .
+
+    promo:Library a rdfs:Class .
+
+    promo:Model a rdfs:Class .
+
+    promo:Ontology a rdfs:Class .
+
+    promo:Species a rdfs:Class .
+
+    promo:ValueCell a rdfs:Class .
+
+    promo:Version a rdfs:Class .
+
+    promo:atIndexElement a rdf:Property .
+
+    promo:coordinate a rdf:Property .
+
+    promo:generatedFrom a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
+
+    promo:seedFloor a rdf:Property .
+
+    promo:usesOntology a rdf:Property .
+
+    promo:usesSpecies a rdf:Property .
+
+    promo:valueCell a rdf:Property .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/species/> a promo:Species ;
+        promo:usesOntology <https://w3id.org/promo/ontology> .
+
+    <https://w3id.org/promo/species/Allocation_mufi5tl5> a promo:Allocation ;
+        rdfs:label "feed" ;
+        promo:internalID "Allocation_mufi5tl5" ;
+        promo:member <https://w3id.org/promo/species/Component_mufi5olv>,
+            <https://w3id.org/promo/species/Component_mufi5qax> .
+
+    <https://w3id.org/promo/species/Allocation_mufi66z5> a promo:Allocation ;
+        rdfs:label "product" ;
+        promo:internalID "Allocation_mufi66z5" ;
+        promo:member <https://w3id.org/promo/species/Component_mufi5r89> .
+
+    <https://w3id.org/promo/species/Reaction_mufi6ep2> a promo:Reaction ;
+        rdfs:label "reaction" ;
+        promo:internalID "Reaction_mufi6ep2" ;
+        promo:product <https://w3id.org/promo/species/Component_mufi5r89> ;
+        promo:reactant <https://w3id.org/promo/species/Component_mufi5olv>,
+            <https://w3id.org/promo/species/Component_mufi5qax> .
+
+    <https://w3id.org/promo/species/Reaction_mufi6k8u> a promo:Reaction ;
+        rdfs:label "reaction" ;
+        promo:internalID "Reaction_mufi6k8u" ;
+        promo:product <https://w3id.org/promo/species/Component_mufi5olv> ;
+        promo:reactant <https://w3id.org/promo/species/Component_mufi5r89> .
+
+    <https://w3id.org/promo/species/Component_mufi5qax> a promo:Component ;
+        rdfs:label "B" ;
+        promo:internalID "Component_mufi5qax" .
+
+    <https://w3id.org/promo/species/Component_mufi5olv> a promo:Component ;
+        rdfs:label "A" ;
+        promo:internalID "Component_mufi5olv" .
+
+    <https://w3id.org/promo/species/Component_mufi5r89> a promo:Component ;
+        rdfs:label "C" ;
+        promo:internalID "Component_mufi5r89" .
+}
+

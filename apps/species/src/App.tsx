@@ -62,6 +62,12 @@ const S: Record<string, React.CSSProperties> = {
            marginRight: 10, fontSize: 11, cursor: 'pointer' },
   muted: { fontSize: 11, color: '#9ca3af' },
   err: { padding: 12, color: '#b91c1c', fontSize: 12 },
+  help: {
+    margin: '0 12px', padding: '6px 10px', fontSize: 12,
+    background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+    color: '#374151',
+  },
+  helpSummary: { cursor: 'pointer', fontWeight: 600, color: '#2563eb' },
 }
 
 function CheckList({
@@ -93,19 +99,38 @@ export default function App() {
   const [doc, setDoc] = useState<SpeciesDocument>({
     components: [], allocations: [], reactions: [],
   })
+  // Snapshot of the last-saved/fetched doc — local edits don't reach
+  // the store until Save, so the server dirty flag can't see them.
+  const [savedDoc, setSavedDoc] = useState<SpeciesDocument | null>(null)
   const [err, setErr] = useState('')
   const [newLabel, setNewLabel] = useState('')
 
   useEffect(() => {
     fetchSpecies(graph)
-      .then(setDoc)
+      .then((d) => { setDoc(d); setSavedDoc(d) })
       .catch((e) => setErr(String(e)))
   }, [graph])
+
+  const localDirty = savedDoc !== null &&
+    JSON.stringify(doc) !== JSON.stringify(savedDoc)
+  const anythingToSave = localDirty || dirty
+
+  // Same tab-close warning the store-dirty hook gives, for local edits.
+  useEffect(() => {
+    if (!localDirty) return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [localDirty])
 
   const save = useCallback(async () => {
     try {
       await saveSpecies(doc, graph)
       await saveStore()
+      setSavedDoc(doc)
     } catch (e) {
       setErr(String(e))
     }
@@ -186,11 +211,43 @@ export default function App() {
       <div style={S.header}>
         <span style={S.title}>Species &amp; Reactions</span>
         <span style={S.iri}>{graph ?? '(no graph)'}</span>
-        {dirty && <span style={S.dirty}>● unsaved</span>}
+        {anythingToSave && <span style={S.dirty}>● unsaved</span>}
         <span style={{ marginLeft: 'auto' }}>
-          <button style={S.primary} onClick={save}>Save</button>
+          <button
+            style={{
+              ...S.primary,
+              opacity: anythingToSave ? 1 : 0.45,
+              cursor: anythingToSave ? 'pointer' : 'default',
+            }}
+            disabled={!anythingToSave}
+            title={anythingToSave
+              ? 'Write this artefact to the store and disk'
+              : 'Nothing to save — artefact is clean'}
+            onClick={save}>Save</button>
         </span>
       </div>
+      <details style={S.help}>
+        <summary style={S.helpSummary}>What am I looking at?</summary>
+        <ul style={{ margin: '6px 0', paddingLeft: 18, lineHeight: 1.5 }}>
+          <li><b>Components</b> — the species vocabulary: what exists
+            (A, B, C, …).</li>
+          <li><b>Allocations</b> — named <i>sets</i> of components
+            (e.g. feed = {'{A,B}'}).  A reservoir/source node in the
+            modeller injects a set by name
+            (<code>speciesAllocation</code>) — the set is the
+            &ldquo;what&rdquo;, placement is the modeller&rsquo;s
+            &ldquo;where&rdquo;.</li>
+          <li><b>Reactions</b> — named {'{reactants}'} → {'{products}'}
+            declarations (A+B → C), placed on reaction-capable nodes
+            (<code>hostsReaction</code>).  Qualitative only —
+            stoichiometry &amp; kinetics are equations you author in the
+            library, bound at instantiation.</li>
+          <li><b>Save</b> — writes this artefact to the store and disk.
+            The distribution fixpoint (which species are present where)
+            is computed at instantiation from the model&rsquo;s
+            placements.</li>
+        </ul>
+      </details>
       {err && <div style={S.err}>{err}</div>}
       <div style={S.body}>
         {/* Components */}

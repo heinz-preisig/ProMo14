@@ -36,5 +36,6 @@ export async function storeStatus(): Promise<{ dirty: boolean }> {
 }
 
 export async function saveStore(): Promise<void> {
-  await fetch('/api/ontology/save', { method: 'POST' })
+  const r = await fetch('/api/ontology/save', { method: 'POST' })
+  if (!r.ok) throw new Error(`save: ${r.status} ${await r.text()}`)
 }
