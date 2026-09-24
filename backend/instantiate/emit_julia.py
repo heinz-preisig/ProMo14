@@ -55,6 +55,28 @@ def _name(instance: str) -> str:
     return re.sub(r"\W", "_", instance.split("@")[0])
 
 
+def _num(v) -> str:
+    """One cell value as a literal; missing cells are NaN."""
+    return "NaN" if v is None else repr(v)
+
+
+def _array_lit(flat: List, dims: List[int]) -> str:
+    """A flat C-order value table as a Julia array literal shaped to
+    the bound index sizes.  Julia is column-major: an n-D table is
+    reshaped to the reversed dims and permuted back so element order
+    matches the C-order coordinate enumeration."""
+    items = ", ".join(_num(v) for v in flat)
+    if not dims:
+        return items or "NaN"
+    if len(dims) == 1:
+        return "[%s]" % items
+    n = len(dims)
+    rev = ", ".join(str(d) for d in reversed(dims))
+    perm = ", ".join(str(i) for i in range(n, 0, -1))
+    return ("permutedims(reshape([%s], %s), (%s))"
+            % (items, rev, perm))
+
+
 def _sparse(entries: List[Tuple[int, int, int]],
             rows: int, cols: int) -> str:
     """A COO entry list as a ``sparse(I, J, V, m, n)`` literal —
@@ -139,7 +161,13 @@ def emit_julia(cp: CodePlan, space: CompileSpace) -> str:
         if p.kind == "constant" and p.value is not None:
             continue                      # inlined by the renderer
         nm = p.name or _name(p.instance)
-        out.append("    %s = par.%s" % (nm, nm))
+        if p.values is not None:
+            dims = [max(1, len(els or []))
+                    for els in p.indices.values()]
+            out.append("    %s = %s  # value cells"
+                       % (nm, _array_lit(p.values, dims)))
+        else:
+            out.append("    %s = par.%s" % (nm, nm))
 
     state_lhs = {(s.entity_type, s.var): s for s in cp.states}
     emitted_gathers = set()

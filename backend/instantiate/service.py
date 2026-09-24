@@ -793,7 +793,12 @@ def model_code(
         species=dist, species_index=species_index,
         reaction_index=reaction_index)
     sched = schedule(report)
-    cp = plan(report, sched, inc, equations, indices)
+    # §20 ν channel: stored value-cell tables on the model artefact,
+    # keyed by variable IRI — plan() expands them over each binding's
+    # element sets; emitters render them as literals.
+    values = {v.var: store.value_cells(model_graph, v.var)
+              for e in report.entity_types for v in e.variables}
+    cp = plan(report, sched, inc, equations, indices, values=values)
     try:
         source = _EMITTERS[target](cp, _code_space(store, vars))
     except (ParseError, VarError) as e:

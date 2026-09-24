@@ -34,7 +34,12 @@ from backend.instantiate.emit_julia import emit_julia
 from backend.instantiate.emit_matlab import emit_matlab
 from backend.instantiate.emit_python import emit_python
 from backend.instantiate.fbuilder import build as fbuild
-from backend.instantiate.plan import CodePlan, PlanBlock, plan
+from backend.instantiate.plan import (
+    CodePlan,
+    ParamSlot,
+    PlanBlock,
+    plan,
+)
 from backend.instantiate.scheduler import schedule
 from backend.main import app
 from backend.testing import GraphClient
@@ -575,10 +580,22 @@ def test_schedule_unbound_port_no_edge():
 # Codegen plan
 # ---------------------------------------------------------------------------
 
-def _plan(rep):
+def _plan(rep, values=None):
     memberships = resolve(NODES, ARCS, SUB_INDICES, PARENTS)
     inc = fbuild(NODES, ARCS, memberships, SUB_INDICES)
-    return plan(rep, schedule(rep), inc, EQUATIONS, INDICES)
+    return plan(rep, schedule(rep), inc, EQUATIONS, INDICES,
+                values=values)
+
+
+def _build_indexed_k():
+    """The shared fixture with k arc-indexed over A_diff — an
+    instantiated parameter with a real element set for the ν tests."""
+    variables = dict(VARIABLES)
+    variables[_var("k")] = VarInfo(
+        _var("k"), "conductivity", "V_5",
+        index_structures=[_idx("idx_arc_diffusion")],
+        var_class="parameter")
+    return _build(variables=variables)
 
 
 def test_plan_states_and_matrices():
@@ -631,6 +648,21 @@ def test_plan_blocks_carry_rhs_and_indices():
     assert prop.lhs_instance == "V_2@etype_lumped_capacity"
     assert prop.lhs_indices[_idx("idx_node")] == ["c1", "c2"]
     assert all(b.loop == -1 for lvl in cp.levels for b in lvl)
+
+
+def test_plan_param_values():
+    """§20 ν → plan: a parameter's stored cells expand over its bound
+    element sets in index order (missing cells → None); no table →
+    the slot keeps the par-lookup fallback."""
+    rep = _build_indexed_k()
+    cp = _plan(rep, values={_var("k"): {"a1": 1.5}})
+    k = next(p for p in cp.params if p.var == _var("k"))
+    assert k.indices[_idx("idx_arc_diffusion")] == ["a1", "a2"]
+    assert k.values == [1.5, None]              # a2 missing
+
+    cp = _plan(rep)
+    assert next(p for p in cp.params
+                if p.var == _var("k")).values is None
 
 
 def _emit_space():
@@ -719,6 +751,47 @@ def test_emit_matlab():
     assert ("dV_1 = einsum(V_4, V_3_lumped_capacity, {'A_diff'});"
             in src)
     assert "dy(1:2) = dV_1.value;" in src
+
+
+def test_emit_values_indexed():
+    """ν → emitters: an arc-indexed parameter with a partial table
+    emits as an array literal (missing cell → NaN) instead of the
+    par lookup — python, julia, matlab."""
+    cp = _plan(_build_indexed_k(), values={_var("k"): {"a1": 1.5}})
+
+    src = emit_python(cp, _emit_space())
+    assert "V_5 = np.array([1.5, np.nan])  # value cells" in src
+    assert 'par["V_5"]' not in src
+
+    src = emit_julia(cp, _emit_space())
+    assert "V_5 = [1.5, NaN]  # value cells" in src
+    assert "par.V_5" not in src
+
+    src = emit_matlab(cp, _emit_space())
+    assert ("V_5 = MultiDimVar({'A_diff'}, 2, {'A_diff'}, "
+            "[1.5; NaN]);  % value cells" in src)
+    assert "par.V_5" not in src
+
+
+def test_emit_values_2d():
+    """A 2-index table emits shaped to the bound dims: numpy reshape
+    (row-major); julia/matlab reshape+permute (column-major) so the
+    C-order cell enumeration lands on the right coordinates."""
+    idx = {_idx("idx_reaction_q"): ["r1", "r2"],
+           _idx("idx_species"): ["A", "B"]}
+    slot = ParamSlot(var="v", instance="V_9@et", kind="parameter",
+                     name="V_9", indices=idx,
+                     values=[-1.0, -2.0, 1.0, None])
+    cp = CodePlan(params=[slot], names={})
+
+    assert ("V_9 = np.array([-1.0, -2.0, 1.0, np.nan])"
+            ".reshape((2, 2))"
+            in emit_python(cp, _emit_space()))
+    assert ("V_9 = permutedims(reshape([-1.0, -2.0, 1.0, NaN], "
+            "2, 2), (2, 1))"
+            in emit_julia(cp, _emit_space()))
+    assert ("permute(reshape([-1.0, -2.0, 1.0, NaN], 2 2), [2 1])"
+            in emit_matlab(cp, _emit_space()))
 
 
 def test_emit_python_algebraic_loop():
@@ -1244,3 +1317,24 @@ def test_values_endpoint(client):
                    json={"variable": ids["k"], "values": {"r2|D": 2.0}})
     assert r.status_code == 200, r.text
     assert r.json()["values"] == {"r2|D": 2.0}
+
+
+def test_code_endpoint_values(client):
+    """§20 ν → codegen: a stored cell turns the scalar parameter into
+    a literal in the emitted source (no par lookup)."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+
+    r = client.put("/api/instantiate/values",
+                   json={"variable": ids["k"], "values": {"": 1.5}})
+    assert r.status_code == 200, r.text
+
+    r = client.get("/api/instantiate/code",
+                   params={"graph": graph, "vars": graph,
+                           "target": "python"})
+    assert r.status_code == 200, r.text
+    src = r.json()["source"]
+    assert "V_5 = 1.5  # value cells" in src
+    assert 'par["V_5"]' not in src

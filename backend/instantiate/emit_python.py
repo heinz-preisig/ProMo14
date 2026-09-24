@@ -52,6 +52,23 @@ def _name(instance: str) -> str:
     return re.sub(r"\W", "_", instance.split("@")[0])
 
 
+def _num(v) -> str:
+    """One cell value as a literal; missing cells are NaN."""
+    return "np.nan" if v is None else repr(v)
+
+
+def _array_lit(flat: List, dims: List[int]) -> str:
+    """A flat C-order value table as an ``np.array`` literal shaped
+    to the bound index sizes — the ν channel's codegen form."""
+    items = ", ".join(_num(v) for v in flat)
+    if not dims:
+        return items or "np.nan"
+    arr = "np.array([%s])" % items
+    if len(dims) > 1:
+        arr += ".reshape((%s))" % ", ".join(str(d) for d in dims)
+    return arr
+
+
 def _dense(rows: int, cols: int,
            entries: List[Tuple[int, int, int]]) -> str:
     """A COO entry list as a dense ``np.array`` literal."""
@@ -135,7 +152,13 @@ def emit_python(cp: CodePlan, space: CompileSpace) -> str:
         if p.kind == "constant" and p.value is not None:
             continue                      # inlined by the renderer
         nm = p.name or _name(p.instance)
-        out.append('    %s = par["%s"]' % (nm, nm))
+        if p.values is not None:
+            dims = [max(1, len(els or []))
+                    for els in p.indices.values()]
+            out.append("    %s = %s  # value cells"
+                       % (nm, _array_lit(p.values, dims)))
+        else:
+            out.append('    %s = par["%s"]' % (nm, nm))
 
     state_lhs = {(s.entity_type, s.var): s for s in cp.states}
     emitted_gathers = set()

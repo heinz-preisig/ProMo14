@@ -217,9 +217,12 @@ data, not var/expr vocabulary:
   + products by convention), so instantiation only supplies
   magnitudes.  (An earlier scheme-side `promo:stoichiometry` slot was
   reverted the same day.)
-- **ν → codegen** — stored cells are not yet wired into `plan()`/
-  emitters' `par` lookups; the emitters still expect a scalar per
-  parameter instance.
+- ~~**ν → codegen**~~ — **done (2026-09-24):** `/code` collects each
+  bound var's cell table; `plan()` expands it flat in C order over
+  the binding's element sets (`ParamSlot.values`, `None` = missing
+  cell → NaN) and the emitters render it as a shaped array literal
+  (numpy `reshape`; julia/matlab `reshape`+`permute` for
+  column-major).  No table → the `par` lookup fallback stays.
 - **Value-cell UI** — no editor surface yet (the instantiation app
   at :3006 is a scaffold); cells are API-only.
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the

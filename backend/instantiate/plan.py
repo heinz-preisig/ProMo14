@@ -29,7 +29,8 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from itertools import product
+from typing import Any, Dict, List, Optional, Tuple
 
 from .builder import (
     EqInfo,
@@ -94,6 +95,11 @@ class ParamSlot:
     name: str = ""                      # emitted identifier
     value: Optional[str] = None
     indices: Dict[str, List[str]] = field(default_factory=dict)
+    #: §20 ν channel: the var's stored value cells expanded over the
+    #: bound element sets, flat in C (row-major) order; ``None``
+    #: entries are missing cells (emitters render them as NaN).
+    #: ``None`` = no table — the emitter falls back to a par lookup.
+    values: Optional[List[Any]] = None
 
 
 @dataclass
@@ -130,8 +136,15 @@ class CodePlan:
 def plan(report: Instantiation, sched: Schedule,
          incidence: IncidenceReport,
          equations: Dict[str, EqInfo],
-         indices: Dict[str, IndexInfo]) -> CodePlan:
-    """Lower an instantiation report + schedule into a CodePlan."""
+         indices: Dict[str, IndexInfo],
+         values: Optional[Dict[str, Dict[str, Any]]] = None
+         ) -> CodePlan:
+    """Lower an instantiation report + schedule into a CodePlan.
+
+    ``values`` maps a variable IRI to its stored value-cell table
+    (``{coordinate_key: scalar}`` — the §20 ν channel); parameter and
+    input slots carrying a table emit as literals instead of runtime
+    ``par`` lookups."""
     out = CodePlan()
 
     bindings: Dict[Tuple[str, str], VarBinding] = {}
@@ -211,11 +224,13 @@ def plan(report: Instantiation, sched: Schedule,
                     var=v.var, instance=v.instance,
                     kind=v.binding, value=v.value,
                     indices=v.indices,
+                    values=_value_table(v, values or {}),
                     name=names[e.entity_type][v.var]))
             elif v.binding == "input":
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
                     indices=v.indices,
+                    values=_value_table(v, values or {}),
                     name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
@@ -276,6 +291,28 @@ def plan(report: Instantiation, sched: Schedule,
         out.levels.append(out_lvl)
     out.loops = sched.loops
     return out
+
+
+def _value_table(v: VarBinding,
+                 values: Dict[str, Dict[str, Any]]
+                 ) -> Optional[List[Any]]:
+    """A var's stored value cells expanded over its bound element
+    sets — flat in C order (last index varies fastest), ``None`` for
+    missing cells.  ``None`` when the var carries no table or one of
+    its indices is unbound (symbolic extent).
+
+    The coordinate key joins element IRIs in ``indexStructure`` order
+    — the same order ``v.indices`` is built in — so the product of
+    the bound element sets enumerates every cell exactly once."""
+    cells = values.get(v.var)
+    if not cells:
+        return None
+    axes: List[List[str]] = []
+    for els in v.indices.values():
+        if els is None:
+            return None
+        axes.append(els)
+    return [cells.get("|".join(coord)) for coord in product(*axes)]
 
 
 def _bound_elements(v: VarBinding, indices: Dict[str, IndexInfo],
