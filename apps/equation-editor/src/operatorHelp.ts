@@ -58,7 +58,7 @@ export const OPERATOR_HELP: OperatorHelpEntry[] = [
     description: 'maximum or minimum of two expressions',
   },
   {
-    label: 'sin cos exp log sqrt abs neg inv',
+    label: 'sin cos exp log sqrt abs neg inv sign',
     syntax: 'f(x)',
     description: 'unary functions',
   },

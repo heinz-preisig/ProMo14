@@ -24,7 +24,11 @@ const OP_BUTTONS: { label: string; value: string; tip?: string }[] = [
 /** Tooltip text for an operator button — syntax + meaning from the
  *  shared reference table. */
 const tipFor = (label: string) => {
-  const h = OPERATOR_HELP.find((e) => e.label === label)
+  const h = OPERATOR_HELP.find(
+    (e) =>
+      e.label === label ||
+      e.label.split(/\s*\/\s*|\s+/).includes(label),
+  )
   return h ? `${h.syntax} — ${h.description}` : undefined
 }
 
@@ -44,6 +48,7 @@ const FUNC_BUTTONS = [
   'abs',
   'neg',
   'inv',
+  'sign',
 ]
 
 export default function ExpressionInput({
