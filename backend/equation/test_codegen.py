@@ -277,7 +277,27 @@ def test_latex_alias_with_own_subscript_braced():
         variable_definition_network="thermo",
         expression_definition_network="thermo",
     )
-    assert gen("rz", "latex", space) == r"{r_z}_{N}"
+    # Unbraced subscript runs are braced — a bare ``_`` consumes one
+    # token, so ``r_z`` alone renders ``r_z`` anyway but ``F_conv``
+    # would render ``F_c`` + stray ``onv``.
+    assert gen("rz", "latex", space) == r"{r_{z}}_{N}"
+
+
+def test_latex_alias_multi_char_subscript_braced():
+    # Real data: ``F_conv``'s alias is the label verbatim — a bare ``_``
+    # would subscript only ``c``; bracing gives ``F_{conv}``.
+    n_idx = Index(iri=N, label="species", network="thermo",
+                  aliases={"internal_code": "N"})
+    f = Variable(iri="http://promo.example/var/f", internal_id="V_31",
+                 label="F_conv", network="thermo", type="state",
+                 units=Units(), index_structures=[N],
+                 aliases={"latex": "F_conv"})
+    space = CompileSpace(
+        {f.iri: f}, {n_idx.iri: n_idx},
+        variable_definition_network="thermo",
+        expression_definition_network="thermo",
+    )
+    assert gen("F_conv", "latex", space) == r"{F_{conv}}_{N}"
 
 
 def test_latex_instantiate():

@@ -1,10 +1,11 @@
 """Tests for the variable mutability policy (design doc §18).
 
-A variable referenced by an equation has its structural fields locked
-(units, index structures, tokens, classifications, port_variable,
-network, reference-key names); surface names and the value slot stay
-free.  Enforcement lives in ``backend/equation/service.py`` — POST and
-PUT both guard, DELETE is blocked by foreign references.
+A variable referenced by an equation keeps units, index structures, tokens,
+port status and reference-key names locked.  Role/classifications remain
+editable; network remains editable only while references are its own defining
+LHS equations.  Surface names and the value slot stay free.  Enforcement lives
+in ``backend/equation/service.py`` — POST and PUT both guard, DELETE is blocked
+by foreign references.
 """
 
 from __future__ import annotations
@@ -109,16 +110,57 @@ def test_surface_edit_free_when_referenced(client):
     assert r.status_code == 200, r.text
 
 
-def test_own_equation_counts_as_usage(client):
-    """A variable's own defining equation locks its structural fields."""
+def test_role_edit_allowed_when_referenced(client):
+    """Role/classification edits do not change reference resolution."""
     _post(client, _var("V_1"))
     _post(client, _var("V_2", equations={
         "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
     }))
 
-    r = _put(client, _var("V_2", variable_class="parameter"))
+    r = _put(client, _var(
+        "V_1",
+        variable_class="parameter",
+        classifications={"axis:function": "term:parameter"},
+    ))
+    assert r.status_code == 200, r.text
+
+
+def test_own_equation_allows_role_change(client):
+    """A variable's own defining equation does not lock its role."""
+    _post(client, _var("V_1", equations={
+        "root": _eq("E_1", f"{BASE}#V_1", "2"),
+    }))
+
+    r = _put(client, _var("V_1", variable_class="parameter"))
+    assert r.status_code == 200, r.text
+
+
+def test_network_edit_allowed_with_own_equation_only(client):
+    """Moving a variable and its own definition together is safe."""
+    _post(client, _var("V_1", equations={
+        "root": _eq("E_1", f"{BASE}#V_1", "2"),
+    }))
+
+    moved = _var("V_1", network="physical", equations={
+        "root": {
+            **_eq("E_1", f"{BASE}#V_1", "2"),
+            "network": "physical",
+        },
+    })
+    r = _put(client, moved)
+    assert r.status_code == 200, r.text
+
+
+def test_network_edit_blocked_with_foreign_reference(client):
+    """A domain move could invalidate qualified references elsewhere."""
+    _post(client, _var("V_1"))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    r = _put(client, _var("V_1", network="physical"))
     assert r.status_code == 409
-    assert "variable_class" in r.json()["detail"]["locked_fields"]
+    assert "network" in r.json()["detail"]["locked_fields"]
 
 
 def test_structural_edit_free_when_unused(client):

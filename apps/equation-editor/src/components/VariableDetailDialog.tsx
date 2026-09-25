@@ -23,11 +23,10 @@ export interface VariableDetailDialogProps {
 
 /** Variable detail + edit dialog.
  *
- *  Mutability policy (design doc §18): label, LaTeX alias and doc are
- *  always editable; structural fields (network, class, units, index
- *  structures) are locked while an equation references the variable —
- *  the backend enforces the same rule with a 409, this lock is the
- *  proactive half. */
+ *  Mutability policy (design doc §18): label, LaTeX alias, doc and role
+ *  classifications remain editable; domain is editable while references are
+ *  only this variable's own definitions. Units and index structures lock
+ *  while referenced. The backend enforces the same field-level policy. */
 export default function VariableDetailDialog({
   variable,
   indices,
@@ -51,8 +50,10 @@ export default function VariableDetailDialog({
     new Set(variable.index_structures ?? []),
   )
   const [msg, setMsg] = useState('')
-  // §18 usage lock — structural fields grey out while referenced.
-  const { count: refCount } = useVariableLock(variable.iri)
+  // §18 usage lock — distinguish own defining equations from equations
+  // belonging to other variables.  Role edits never alter reference
+  // resolution; domain edits are safe only without foreign references.
+  const { count: refCount, references } = useVariableLock(variable.iri)
 
   // Reinitialise + refresh the usage lock whenever another variable is shown.
   useEffect(() => {
@@ -68,6 +69,8 @@ export default function VariableDetailDialog({
   }, [variable])
 
   const locked = (refCount ?? 0) > 0
+  const foreignRefCount = references.filter((ref) => ref.via !== 'lhs').length
+  const networkLocked = foreignRefCount > 0
   const canSave = label.trim() && network && variableClass
 
   const toggleIndex = (iri: string) => {
@@ -85,6 +88,12 @@ export default function VariableDetailDialog({
     const aliases = { ...(variable.aliases ?? {}) }
     if (latexSym.trim()) aliases.latex = latexSym.trim()
     else delete aliases.latex
+    const equations = Object.fromEntries(
+      Object.entries(variable.equations ?? {}).map(([key, equation]) => [
+        key,
+        network !== variable.network ? { ...equation, network } : equation,
+      ]),
+    )
     return {
       ...variable,
       label: label.trim(),
@@ -95,6 +104,7 @@ export default function VariableDetailDialog({
       index_structures: Array.from(selectedIndices),
       aliases,
       doc: doc.trim(),
+      equations,
     }
   }
 
@@ -111,8 +121,12 @@ export default function VariableDetailDialog({
 
   const storedEqs = Object.entries(variable.equations ?? {})
 
-  // Locked structural controls: render but inert.
+  // Units and index structures remain locked while referenced.  Domain
+  // has its own narrower lock; role/classification remains editable.
   const lockStyle: React.CSSProperties = locked
+    ? { pointerEvents: 'none', opacity: 0.55 }
+    : {}
+  const networkLockStyle: React.CSSProperties = networkLocked
     ? { pointerEvents: 'none', opacity: 0.55 }
     : {}
 
@@ -160,9 +174,11 @@ export default function VariableDetailDialog({
               padding: '6px 8px',
             }}
           >
-            Referenced by {refCount} equation(s) — network, classifications,
-            units and index structures are locked. Name, LaTeX and
-            documentation stay editable.
+            Referenced by {refCount} equation(s) — role remains editable.
+            {networkLocked
+              ? ` Domain is locked because ${foreignRefCount} other equation(s) reference this variable.`
+              : ' Domain remains editable because references are only its own defining equations.'}
+            {' '}Units and index structures remain locked.
           </div>
         )}
 
@@ -196,25 +212,40 @@ export default function VariableDetailDialog({
             />
           </label>
 
-          <div style={lockStyle}>
+          <div style={networkLockStyle}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               Domain / network <span style={{ color: '#c62828' }}>*</span>
               <NetworkTreeSelect tree={networkTree} selected={network} onSelect={setNetwork} />
             </label>
           </div>
 
-          <div style={lockStyle}>
+          <div>
             {applicableAxes(axes, network, domains).length ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span>
                   Classification <span style={{ color: '#c62828' }}>*</span>
                 </span>
+                {Object.keys(classifications).length === 0 && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#8d6e00',
+                      background: '#fff8e1',
+                      border: '1px solid #ffe082',
+                      borderRadius: 4,
+                      padding: '6px 8px',
+                    }}
+                  >
+                    No role classifications are stored for this variable. Its legacy class
+                    “{variable.type || 'unknown'}” cannot determine the individual roles;
+                    select the applicable roles below.
+                  </div>
+                )}
                 <AxisClassifications
                   axes={axes}
                   domain={network}
                   domains={domains}
                   value={classifications}
-                  disabled={locked}
                   hiddenAxes={variable.port_variable ? ['determination'] : undefined}
                   onChange={(next) => {
                     setClassifications(next)
@@ -228,7 +259,6 @@ export default function VariableDetailDialog({
                 <select
                   value={variableClass}
                   onChange={(e) => setVariableClass(e.target.value)}
-                  disabled={locked}
                 >
                   <option value="">Select a class…</option>
                   {VARIABLE_CLASSES.map((c) => (

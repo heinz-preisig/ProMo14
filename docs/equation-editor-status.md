@@ -1,6 +1,6 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-24
+**Last updated:** 2026-09-25
 
 ## Current state
 
@@ -119,6 +119,28 @@ Implemented as a React + TypeScript + Vite app in
   variable editors — title + actions on top; domain tree left,
   Name/LaTeX/axis dropdowns stacked right with aligned fixed-width
   label cells (`FIELD_LABEL_STYLE`).
+- **Variable selection and validation UX (2026-09-25):** palette chips
+  show bare labels under their network headings; groups sort by relevance
+  to the expression domain, filtering also matches network names, and
+  insertion qualifies foreign variables as `network!label`.  Disabled
+  Accept/Add actions now show the blocking reason inline.  Check requests
+  omit an invalid unnamed draft LHS, and non-2xx/FastAPI validation bodies
+  are converted to readable result-panel errors instead of a blank “Error”.
+- **KaTeX/LaTeX normalization (2026-09-25):** preview and backend emit
+  standard commands (`\arcsin`, `\arccos`, `\arctan`, `\sqrt`, and
+  `\left|…\right|` for `abs`) rather than undefined macros.  Raw LaTeX
+  aliases normalize unbraced subscript runs (`F_conv` → `F_{conv}`;
+  `\hat{m}_conv` → `\hat{m}_{conv}`) consistently in preview, codegen,
+  and the printable variable table; already braced `_{…}` and escaped
+  `\_` remain unchanged.
+- **Focused domain/role correction (2026-09-25):** the existing-variable
+  dialog keeps role classifications editable even when equations reference
+  the variable.  Domain remains editable when references are only its own
+  defining LHS equations (which move with it), but is locked when foreign
+  equations reference it.  Units and index structures remain usage-locked.
+  The backend enforces the same field-level policy.  Legacy variables with
+  an empty `classifications` map show an explicit warning and editable blank
+  role selectors; roles are not guessed from the lossy legacy class.
 
 ## Pending items
 

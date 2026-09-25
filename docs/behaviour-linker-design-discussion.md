@@ -443,7 +443,7 @@ This means the BL's algorithm is:
    variables, which must be resolved the same way.
 5. The subgraph is **closed** when every RHS variable in every selected
    equation is either defined within the subgraph, marked to be
-   instantiated, or declared as an external input.
+   instantiated, or declared as an external input (port).
 
 ### The `Instantiate` operator (2026-09-13)
 
@@ -1356,7 +1356,7 @@ worthwhile when the latter is implemented.
 > **Implemented 2026-09-22** (modeller + F-builder):
 >
 > - `ModelArc.referenceFrom`/`referenceTo` (absent = draw order),
->   persisted as `promo:referenceFrom`/`referenceTo` — token-flow
+>   persisted as `promo:referenceFrom`/`promo:referenceTo` — token-flow
 >   arcs only; signal/reference arcs keep their inherent direction.
 > - Insertion default in `defaultOrientation()` (ModelGraph.ts):
 >   through-path — a second arc on a transport complements the
@@ -1545,10 +1545,16 @@ structural fields locked while referenced.
   `global_ID`; for indices, `internal_code`.  These are the reference
   keys inside stored expressions.
 - **Locked while used** — `units`, `index_structures`, `tokens`,
-  `classifications` / `variable_class`, `port_variable`, `network`.
-  Class is locked too: §14 makes class+token the variable's identity
-  (roles are the token's manifestation modes), so reclassifying a used
-  `state` → `parameter` would silently change what `d(x)/dt` means.
+  `port_variable`, and reference-key identities.  Two focused corrections
+  remain available in the existing-variable editor:
+  - `classifications` / derived `variable_class` (the variable's role) stay
+    editable because changing them does not alter reference resolution;
+  - `network` stays editable only when every reference is the variable's
+    own defining `lhs`; its stored equations move to the new network with it.
+    A foreign equation reference locks the network because qualified or
+    scope-dependent names could otherwise change meaning.
+  These edits preserve the variable IRI.  Units and index structures remain
+  locked because changing either invalidates already-checked equations.
 - **Data, editable** — `value` (changes results, not structure;
   seeded constants stay permanent by convention).
 
@@ -1564,10 +1570,13 @@ cross-artefact.
 
 ### Enforcement (`backend/equation/service.py`)
 
-- `POST`/`PUT /variables/{iri}` — field-level diff; structural change
-  + non-empty usage → **409** with `locked_fields` + `references`.
-  (POST guards too: the editor updates via POST, and re-POST now
-  replaces rather than merging multi-valued triples.)
+- `POST`/`PUT /variables/{iri}` — field-level diff; a disallowed structural
+  change + non-empty usage → **409** with `locked_fields` + `references`.
+  (POST guards too: the editor updates via POST, and re-POST replaces rather than merging multi-valued triples.)
+  Role/classification changes are allowed under usage; network changes are
+  allowed only without foreign references.  (POST guards too: the editor
+  updates via POST, and re-POST replaces rather than merging multi-valued
+  triples.)
 - `DELETE /variables/{iri}` — 409 while *foreign* equations reference
   it; own equations are deleted with the variable.  Delete also
   removes the variable's equation nodes — previously they were
@@ -1575,16 +1584,17 @@ cross-artefact.
 - `GET /variables/{iri}/references` — `{used, references[]}` for
   proactive UI locking; `api.ts` surfaces the 409 `detail` message.
 - Editor side: `VariableDetailDialog` (the variable detail modal) edits
-  name/LaTeX/doc always, greys out network, class, units and index
-  structures while `used`, and its "Add equation…" button opens
+  name/LaTeX/doc and role classifications while used; it permits a domain
+  correction when references are only the variable's own defining equations,
+  but locks domain under foreign references.  Units and index structures stay
+  greyed out while used.  Legacy records with no classifications show an
+  explicit warning and editable blank role selectors rather than guessing
+  roles from the lossy legacy class.  Its “Add equation…” button opens
   `DependentVariableEditor` in editing mode — the same check/parse/
-  generate/preview UI as for new variables, prefilled, structural
-  fields locked while `used`, attaching the equation to the existing
-  record (adding one makes the variable `used`, so its own structural
-  fields lock).  The repository table edits name and doc inline
-  (click cell → Enter/blur commits, Esc cancels).  `saveVariable`
-  carries `equations`,
-  `classifications`, `imported` and audit fields through the
+  generate/preview UI as for new variables, attaching the equation to the
+  existing record.  The repository table edits name and doc inline
+  (click cell → Enter/blur commits, Esc cancels).  `saveVariable` carries
+  `equations`, `classifications`, `imported` and audit fields through the
   replace-semantics POST — previously a re-save silently dropped them.
 
 ### Deferred
@@ -1934,3 +1944,5 @@ the model graph), never in the species app.
   button).  The modeller resolves the scheme from the pin —
   `?species=` is now an override that re-stamps the pin on save —
   and `/api/instantiate/model` + `/code` fall back to it.
+
+```

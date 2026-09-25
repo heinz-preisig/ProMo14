@@ -465,10 +465,9 @@ def _class_from_classifications(graph, classifications) -> Optional[str]:
     """Derive the legacy ``variableClass`` from the classifications map.
 
     Any classified term labelled ``constant``|``parameter`` wins (the
-    variability axis carries those labels); a classified variable with
-    neither is a solved variable (``"state"``).  Returns ``None`` when
-    no classifications are present so the caller keeps the explicit
-    legacy field.
+    same rule the lexer applies (parser.py): letters, digits, underscore,
+    not starting with a digit.  The ``!`` qualifier is for references,
+    never part of a variable's own label.
     """
     if not classifications:
         return None
@@ -496,7 +495,7 @@ def create_variable(
     # POST doubles as the editor's update path (the frontend never PUTs):
     # enforce the mutability guard and replace — not merge — when the
     # variable already exists.
-    _guard_structural_edit(store, graph, record.iri, record)
+    _guard_structural_edit(store, graph, record.iri, record, graph_iri)
     _remove_variable(graph, URIRef(record.iri))
 
     protos = _instantiate_protos(record)
@@ -628,26 +627,35 @@ def _remove_variable(graph, subject: URIRef) -> None:
 
 
 def _guard_structural_edit(store, graph, iri: str,
-                           record: VariableRecord) -> None:
+                           record: VariableRecord,
+                           graph_iri: Optional[str] = None) -> None:
     """409 when ``record`` changes structural fields of a variable that
     equations reference.  No-op when the variable does not exist in
-    ``graph`` (plain create)."""
+    ``graph`` (plain create).
+
+    ``old`` is resolved in the write-graph's own scope — the same view
+    the editor fetched and submitted — not dataset-wide: a shadow copy
+    in an artefact graph would otherwise diff against the ontology
+    copy and produce phantom locked-field 409s."""
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         return
-    old = RdfContext(store).variables().get(iri)
+    old = scoped_context(store, graph_iri).variables().get(iri)
     changed = _structural_changes(old, record) if old is not None else []
-    if not changed:
-        return
     refs = _variable_references(store, iri)
-    if refs:
+    foreign_refs = [ref for ref in refs if ref["via"] != "lhs"]
+    allowed = {"classifications", "variable_class"}
+    if not foreign_refs:
+        allowed.add("network")
+    blocked = [field for field in changed if field not in allowed]
+    if refs and blocked:
         raise HTTPException(status_code=409, detail={
             "message": (
                 "Variable is referenced by %d equation(s); "
                 "structural field(s) locked: %s"
-                % (len(refs), ", ".join(changed))
+                % (len(refs), ", ".join(blocked))
             ),
-            "locked_fields": changed,
+            "locked_fields": blocked,
             "references": refs,
         })
 
@@ -679,7 +687,7 @@ def update_variable(
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Variable not found")
 
-    _guard_structural_edit(store, graph, iri, record)
+    _guard_structural_edit(store, graph, iri, record, graph_iri)
     _remove_variable(graph, subject)
     record.iri = iri
     protos = _instantiate_protos(record)

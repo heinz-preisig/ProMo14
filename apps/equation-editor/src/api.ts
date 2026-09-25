@@ -24,7 +24,17 @@ export async function checkExpression(req: CheckRequest): Promise<CheckResponse>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
   })
-  return res.json() as Promise<CheckResponse>
+  const body = await res.json()
+  if (!res.ok) {
+    const detail = body?.detail
+    const error = Array.isArray(detail)
+      ? detail.map((item) => item?.msg ?? String(item)).join('; ')
+      : typeof detail === 'string'
+        ? detail
+        : body?.error ?? `Check failed: HTTP ${res.status}`
+    return { ok: false, error_kind: 'Request validation', error }
+  }
+  return body as CheckResponse
 }
 
 export async function loadContext(): Promise<ContextResponse> {
@@ -136,8 +146,9 @@ export interface VariableReferences {
   references: { equation: string; graph: string; via: string }[]
 }
 
-/** Equations referencing a variable — drives the mutability lock (§18):
- *  structural fields are editable only while ``used`` is false. */
+/** Equations referencing a variable — drives the mutability policy (§18):
+ *  units/indices stay locked while used; roles remain editable; domain is
+ *  editable only when references are the variable's own defining equations. */
 export async function getVariableReferences(iri: string): Promise<VariableReferences> {
   const res = await apiFetch(`/api/equation/variables/${encodeURIComponent(iri)}/references`)
   if (!res.ok) throw await apiError(res, `Failed to load references: ${res.status}`)

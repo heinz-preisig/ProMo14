@@ -49,6 +49,13 @@ export function indexShortLabel(idx: Index | undefined): string {
 // '_' inside _{...} is a KaTeX/LaTeX double-subscript error.
 const texEscape = (name: string): string => name.replace(/_/g, '\\_')
 
+// Verbatim latex aliases often arrive in label form ("F_conv",
+// "\\hat{m}_conv") where '_' is meant to subscript the whole tail — but
+// a bare '_' consumes only ONE token, so "F_conv" renders F_c + "onv".
+// Brace unbraced runs: "_conv" → "_{conv}"; "_{...}" and "\_" pass through.
+const braceSubscripts = (alias: string): string =>
+  alias.replace(/(?<!\\)_([A-Za-z0-9]+)/g, '_{$1}')
+
 function indexSubscripts(indexIris: string[], ctx?: LatexContext): string {
   const idxs = ctx?.indices ?? []
   const parts = indexIris.map((iri) => {
@@ -66,9 +73,12 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
     case 'Var': {
       const name = String(node.name)
       const v = resolveVariable(name, ctx)
-      // A latex alias is raw LaTeX (e.g. "\\rho", "0") — render verbatim;
-      // otherwise fall back to the surface token the user typed.
-      const base = v?.aliases?.latex ?? texEscape(name.replace(/!/g, '\\!'))
+      // A latex alias is raw LaTeX (e.g. "\\rho", "0") — render verbatim
+      // (with subscript runs braced); otherwise fall back to the
+      // surface token the user typed.
+      const base = v?.aliases?.latex
+        ? braceSubscripts(v.aliases.latex)
+        : texEscape(name.replace(/!/g, '\\!'))
       if (v?.index_structures && v.index_structures.length > 0) {
         // Brace the base: a verbatim alias may itself carry a subscript
         // ("r_z") — "{r_z}_{N}" compiles, "r_z_{N}" is a double subscript.
@@ -119,8 +129,23 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
       return `\\sum_{${astToLatex(node.index as AstNode, ctx)}} ${wrap(node.body as AstNode, ctx)}`
     case 'UFunc': {
       const name = String(node.name)
-      if (['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'exp', 'log', 'ln', 'sqrt', 'abs'].includes(name)) {
-        return `\\${name}\\left( ${astToLatex(node.arg as AstNode, ctx)} \\right)`
+      const arg = astToLatex(node.arg as AstNode, ctx)
+      // Explicit macros only — \abs, \asin, \acos, \atan are NOT
+      // defined commands (KaTeX parse error); inverse trig is
+      // \arcsin &c., abs renders as |x|.
+      const TEX_FN: Record<string, string> = {
+        sin: '\\sin', cos: '\\cos', tan: '\\tan',
+        asin: '\\arcsin', acos: '\\arccos', atan: '\\arctan',
+        exp: '\\exp', ln: '\\ln', log: '\\log',
+      }
+      if (name in TEX_FN) {
+        return `${TEX_FN[name]}\\left( ${arg} \\right)`
+      }
+      if (name === 'sqrt') {
+        return `\\sqrt{${arg}}`
+      }
+      if (name === 'abs') {
+        return `\\left| ${arg} \\right|`
       }
       if (name === 'neg') {
         return `- ${wrap(node.arg as AstNode, ctx)}`
@@ -129,9 +154,9 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
         return `${wrap(node.arg as AstNode, ctx, true)}^{-1}`
       }
       if (name === 'sign') {
-        return `\\text{sign}\\left( ${astToLatex(node.arg as AstNode, ctx)} \\right)`
+        return `\\text{sign}\\left( ${arg} \\right)`
       }
-      return `\\text{${name}}\\left( ${astToLatex(node.arg as AstNode, ctx)} \\right)`
+      return `\\text{${name}}\\left( ${arg} \\right)`
     }
     case 'Call':
       return `\\text{${astToLatex(node.name as AstNode, ctx)}}\\left( ${(node.args as AstNode[]).map((n) => astToLatex(n as AstNode, ctx)).join(', ')} \\right)`

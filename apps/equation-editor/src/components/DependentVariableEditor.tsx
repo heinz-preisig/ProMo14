@@ -203,11 +203,12 @@ export default function DependentVariableEditor({
    *  the draft replaces the stored record when editing, appends when
    *  creating. */
   const contextVariables = useCallback((): Variable[] => {
+    if (!nameValid) return variables
     const draft = draftVariable()
     return editing
       ? variables.map((x) => (x.iri === editing.iri ? draft : x))
       : [...variables, draft]
-  }, [variables, editing, draftVariable])
+  }, [variables, editing, draftVariable, nameValid])
 
   /** The check request for the current inputs — shared by /check and
    *  /generate so both see the same draft LHS variable. */
@@ -241,6 +242,18 @@ export default function DependentVariableEditor({
       setGenLoading(false)
     }
   }, [buildRequest, genTarget])
+
+  /** Why Accept is disabled — surfaced inline next to the button,
+   *  because title tooltips don't reliably fire on disabled elements. */
+  const acceptBlockReason = !nameValid
+    ? `Invalid or missing name — ${VARIABLE_NAME_HINT}`
+    : !domain
+      ? 'Select a domain in the tree'
+      : !effectiveClass
+        ? 'Pick a class via the axis selections'
+        : !checkResult?.ok
+          ? 'Run Check on the expression first'
+          : null
 
   const handleAccept = () => {
     const lhs = name.trim()
@@ -307,23 +320,18 @@ export default function DependentVariableEditor({
             <h3 style={{ margin: 0 }}>
               {editing ? `Add equation — ${editing.label}` : 'New dependent variable'}
             </h3>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+              {acceptBlockReason && (
+                <span style={{ fontSize: 11, color: '#b8860b' }}>{acceptBlockReason}</span>
+              )}
               <button type="button" onClick={onClose}>
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleAccept}
-                disabled={!nameValid || !domain || !effectiveClass || !checkResult?.ok}
-                title={
-                  !nameValid
-                    ? `Invalid name — ${VARIABLE_NAME_HINT}`
-                    : !domain || !effectiveClass
-                      ? 'Domain and class are required'
-                      : !checkResult?.ok
-                        ? 'Run Check on the RHS first'
-                        : undefined
-                }
+                disabled={!!acceptBlockReason}
+                title={acceptBlockReason ?? undefined}
               >
                 {editing ? 'Add equation' : 'Accept'}
               </button>
@@ -444,6 +452,7 @@ export default function DependentVariableEditor({
             <VariablePalette
               variables={variables}
               expressionNetwork={domain}
+              networkTree={networkTree}
               onInsert={insertText}
             />
           </div>

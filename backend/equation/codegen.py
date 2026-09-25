@@ -58,6 +58,7 @@ _UFUNC_ML: Dict[str, str] = {
 }
 _UFUNC_TEX: Dict[str, str] = {
     "sin": r"\sin", "cos": r"\cos", "tan": r"\tan",
+    "asin": r"\arcsin", "acos": r"\arccos", "atan": r"\arctan",
     "exp": r"\exp", "ln": r"\ln", "log": r"\log",
 }
 # Julia: same surface names as Matlab mostly; emitted broadcast (``f.(x)``).
@@ -71,6 +72,17 @@ _UFUNC_JL: Dict[str, str] = {
 def _san(name: str) -> str:
     """Sanitise a surface name into a code-legal identifier."""
     return re.sub(r"\W", "_", name)
+
+
+def tex_brace_subscripts(alias: str) -> str:
+    """Brace unbraced subscript runs in a verbatim ``latex`` alias.
+
+    Aliases often arrive in label form (``F_conv``, ``\\hat{m}_conv``)
+    where ``_`` is meant to subscript the whole tail — a bare ``_``
+    consumes only ONE token, so ``F_conv`` renders as ``F_c`` + stray
+    ``onv``.  ``_conv`` → ``_{conv}``; ``_{...}`` and ``\\_`` pass
+    through unchanged."""
+    return re.sub(r"(?<!\\)_([A-Za-z0-9]+)", r"_{\1}", alias)
 
 
 def tex_escape(name: str) -> str:
@@ -111,10 +123,11 @@ class Renderer:
                 for iri in sorted(var.index_structures)
             ]
             # A latex alias is raw LaTeX (e.g. "\rho", "\dot{m}") — render
-            # verbatim; otherwise fall back to the italicised label.
+            # verbatim (subscript runs braced); otherwise fall back to
+            # the italicised label.
             alias = var.aliases.get("latex")
             if alias:
-                base = alias
+                base = tex_brace_subscripts(alias)
             else:
                 label = var.label or node.name
                 base = r"\mathit{%s}" % tex_escape(label)
@@ -326,6 +339,8 @@ class Renderer:
                 return r"{%s}^{-1}" % arg
             if node.name == "sqrt":
                 return r"\sqrt{%s}" % arg
+            if node.name == "abs":
+                return r"\left| %s \right|" % arg
             return r"\mathrm{%s}\left( %s \right)" % (node.name, arg)
 
         if isinstance(node, Call):

@@ -93,6 +93,15 @@ export default function PortVariableEditor({
   const nameValid = isValidVariableName(name)
   const collision = findNameCollision(variables, name)
   const canAccept = nameValid && !!domain && !!variableClass
+  /** Why Add is disabled — surfaced inline, since title tooltips
+   *  don't reliably fire on disabled buttons. */
+  const blockReason = !nameValid
+    ? `Invalid or missing name — ${VARIABLE_NAME_HINT}`
+    : !domain
+      ? 'Select a domain in the tree'
+      : !variableClass
+        ? 'Pick a class via the axis selections'
+        : null
 
   const handleAccept = () => {
     if (!canAccept) return
@@ -157,11 +166,19 @@ export default function PortVariableEditor({
           {/* Row 1: title + actions */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
             <h3 style={{ margin: 0 }}>New port variable</h3>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+              {blockReason && (
+                <span style={{ fontSize: 11, color: '#b8860b' }}>{blockReason}</span>
+              )}
               <button type="button" onClick={onClose}>
                 Cancel
               </button>
-              <button type="button" onClick={handleAccept} disabled={!canAccept}>
+              <button
+                type="button"
+                onClick={handleAccept}
+                disabled={!canAccept}
+                title={blockReason ?? undefined}
+              >
                 Add variable
               </button>
             </div>

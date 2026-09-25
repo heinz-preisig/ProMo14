@@ -26,7 +26,7 @@ from typing import Any, Dict, List
 import jinja2
 
 from .checker import check
-from .codegen import Renderer, tex_escape
+from .codegen import Renderer, tex_brace_subscripts, tex_escape
 from .compile_space import CompileSpace
 from .parser import parse
 from .syntax import Instantiate, Var
@@ -66,7 +66,7 @@ def _var_symbol(var: Any, space: CompileSpace) -> str:
     ]
     alias = (_get(var, "aliases", {}) or {}).get("latex")
     if alias:
-        base = alias
+        base = tex_brace_subscripts(alias)
     else:
         label = tex_escape(var.label or var.iri)
         base = r"\mathit{%s}" % label

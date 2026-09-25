@@ -1,9 +1,32 @@
 import { useMemo, useState } from 'react'
-import type { Variable } from '../types'
+import type { NetworkTree, Variable } from '../types'
+
+/** Map of network → steps above ``from`` in the domain tree
+ *  (0 = ``from`` itself).  Networks not on the ancestor chain are
+ *  absent — they sort last.  Mirrors the distance measure in the
+ *  checker's ``CompileSpace._nearest_accessible``. */
+function ancestorDistances(tree: NetworkTree, from: string): Map<string, number> {
+  const parentOf = new Map<string, string>()
+  for (const [parent, kids] of Object.entries(tree)) {
+    for (const k of kids) if (!parentOf.has(k)) parentOf.set(k, parent)
+  }
+  const out = new Map<string, number>()
+  let cur = from
+  let d = 0
+  while (cur && !out.has(cur)) {
+    out.set(cur, d)
+    const parent = parentOf.get(cur)
+    if (parent === undefined) break
+    cur = parent
+    d++
+  }
+  return out
+}
 
 export interface VariablePaletteProps {
   variables: Variable[]
   expressionNetwork?: string
+  networkTree?: NetworkTree
   onInsert?: (label: string) => void
   onDelete?: (v: Variable) => void
   onSelect?: (v: Variable) => void
@@ -12,6 +35,7 @@ export interface VariablePaletteProps {
 export default function VariablePalette({
   variables,
   expressionNetwork = '',
+  networkTree = {},
   onInsert,
   onDelete,
   onSelect,
@@ -30,6 +54,7 @@ export default function VariablePalette({
         !v.label.toLowerCase().includes(q) &&
         !(v.doc ?? '').toLowerCase().includes(q) &&
         !(v.type ?? '').toLowerCase().includes(q) &&
+        !(v.network ?? '').toLowerCase().includes(q) &&
         !v.iri.toLowerCase().includes(q)
       ) {
         continue
@@ -46,6 +71,13 @@ export default function VariablePalette({
   const shown = Object.values(grouped).reduce((n, vars) => n + vars.length, 0)
   const activeNetwork = expressionNetwork || ''
   const interactive = !!onInsert
+  // Groups ordered by relevance: expression domain first, then its
+  // ancestors (nearest first), then everything else alphabetically —
+  // the variables likeliest to be referenced land on top.
+  const distances = useMemo(
+    () => ancestorDistances(networkTree, activeNetwork),
+    [networkTree, activeNetwork],
+  )
 
   const toggleGroup = (net: string) => {
     setCollapsed((prev) => {
@@ -99,7 +131,11 @@ export default function VariablePalette({
           </div>
         ) : (
           Object.entries(grouped)
-            .sort(([a], [b]) => a.localeCompare(b))
+            .sort(([a], [b]) => {
+              const da = distances.get(a) ?? Infinity
+              const db = distances.get(b) ?? Infinity
+              return da !== db ? da - db : a.localeCompare(b)
+            })
             .map(([network, vars]) => {
               const isCollapsed = collapsed.has(network) && !filtering
               return (
@@ -117,20 +153,31 @@ export default function VariablePalette({
                 }}
               >
                 {isCollapsed ? '▶' : '▼'} {network} ({vars.length})
+                {network === activeNetwork && (
+                  <span style={{ color: '#1565c0' }} title="expression domain"> ●</span>
+                )}
               </div>
               {!isCollapsed && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {vars.map((v) => {
-                  const label =
-                    activeNetwork && v.network !== activeNetwork
-                      ? `${v.network}!${v.label}`
-                      : v.label
+                  // Chips sit under their network group header — show
+                  // the bare label.  Insert pins the source: the
+                  // palette knows each chip's network, so foreign
+                  // variables are qualified — the stored text cannot
+                  // rebind if a nearer same-label variable appears
+                  // later.  Local names stay bare: labels are unique
+                  // within a domain and the local match always wins.
+                  const label = v.label
+                  const insert =
+                    activeNetwork && v.network === activeNetwork
+                      ? v.label
+                      : `${v.network ?? 'root'}!${v.label}`
                   // Pre-bound value (universal constants, ADR-008): show
                   // the value badge and never offer delete — they are
                   // permanent fixtures of the ontology.
                   const bound = v.value != null && v.value !== ''
                   const display = bound ? `${label}=${v.value}` : label
-                  const title = `${v.iri}${v.type ? ' — class: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}`
+                  const title = `${v.iri}${v.type ? ' — class: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}${insert !== label ? ' — inserts as ' + insert : ''}`
                   const style = {
                     fontSize: 12,
                     padding: '3px 6px',
@@ -147,7 +194,7 @@ export default function VariablePalette({
                     <button
                       key={v.iri}
                       type="button"
-                      onClick={() => onInsert?.(label)}
+                      onClick={() => onInsert?.(insert)}
                       title={title}
                       style={style as React.CSSProperties}
                     >

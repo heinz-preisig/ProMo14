@@ -134,9 +134,10 @@ def test_underscores_escaped_in_math_and_titles():
 
 def test_latex_alias_with_own_subscript_braced():
     tex = build_document(_ctx())
-    # Verbatim alias ``r_z`` + index subscript: ``{r_z}_{N}`` compiles,
+    # Verbatim alias ``r_z`` + index subscript: the base is braced and
+    # its own subscript normalised — ``{r_{z}}_{N}`` compiles, while
     # ``r_z_{N}`` is a LaTeX double-subscript error.
-    assert r"{r_z}_{N}" in tex
+    assert r"{r_{z}}_{N}" in tex
 
 
 def test_variable_row_lists_equation_links():
