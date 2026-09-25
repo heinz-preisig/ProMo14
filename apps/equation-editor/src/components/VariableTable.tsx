@@ -78,13 +78,22 @@ export default function VariableTable({ variables, indices, onSelect, onSave }: 
         key={autoFocusKey}
         autoFocus
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          setEditErr('')
+        }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === 'Enter') void commitEdit()
           if (e.key === 'Escape') setEditCell(null)
         }}
-        onBlur={() => void commitEdit()}
+        // After a failed commit the cell re-opens with editErr — a
+        // second blur must cancel, not re-run the same doomed save
+        // (blur→409→reopen loops forever otherwise; Enter still retries).
+        onBlur={() => {
+          if (editErr) setEditCell(null)
+          else void commitEdit()
+        }}
         style={{ width: '90%', fontSize: 12 }}
       />
       {editErr && <div style={{ color: '#c62828', fontSize: 11 }}>{editErr}</div>}
