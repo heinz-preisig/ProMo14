@@ -4,10 +4,11 @@ State of the ProMo14 workspace at end of session.  Branch `main`,
 remote `heinz-preisig/ProMo14`.  Supersedes
 `session-handoff-2026-09-24.md`.
 
-**On the other machine:** `git pull && uv sync && npm install &&
-./dev.sh start`.  `npm install` is required — a new workspace package
-(`packages/ui`) must be linked.  Do **not** `wipe-restart` — `data/`
-is the sync channel.
+**On the other machine:** `./dev.sh sync` — `git pull --ff-only` +
+`uv sync` + `npm install` + `start all` (sources nvm itself, so a
+cold shell works).  `npm install` matters this time — a new
+workspace package (`packages/ui`) must be linked.  Do **not**
+`wipe-restart` — `data/` is the sync channel.
 
 ## What landed today
 

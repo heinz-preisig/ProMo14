@@ -9,6 +9,7 @@
 #   ./dev.sh wipe                 — delete all data files (ontology.trig etc.)
 #   ./dev.sh wipe-restart         — wipe data, reseed (seed + HAP ext), restart backend
 #   ./dev.sh save                 — persist the in-memory store (one .trig per artefact line)
+#   ./dev.sh sync                 — pick up the other machine: git pull + uv sync + npm install + start all
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
 # Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)
@@ -347,6 +348,29 @@ cmd_save() {
     echo ""
 }
 
+cmd_sync() {
+    # Machine-to-machine pickup: pull what the other machine pushed,
+    # re-sync both dependency sets, restart every service with fresh
+    # code.  --ff-only fails loudly on divergence instead of merging.
+    cd "$REPO"
+    echo "Pulling..."
+    git pull --ff-only || {
+        echo "  git pull failed — local commits or dirty tracked files;"
+        echo "  resolve manually (./dev.sh save + commit, or stash)."
+        exit 1
+    }
+    echo "Syncing Python deps..."
+    uv sync
+    # node/npm live behind nvm and are not on PATH in a cold shell.
+    if [ -f "$HOME/.nvm/nvm.sh" ]; then
+        # shellcheck disable=SC1090
+        . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
+    fi
+    echo "Installing node deps..."
+    npm install --no-audit --no-fund
+    cmd_start all
+}
+
 cmd_logs() {
     local service="${1:-backend}"
     case "$service" in
@@ -374,6 +398,7 @@ cmd_help() {
     echo "  wipe-restart        — wipe data + reseed (seed + HAP ext) + restart backend"
     echo "                        (bare seed: ./dev.sh wipe && ./dev.sh start backend)"
     echo "  save                — persist in-memory store (one .trig per artefact line)"
+    echo "  sync                — pick up the other machine: pull + deps + start all"
     echo "  logs    [service]   — tail log for a service"
     echo ""
     echo "Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)"
@@ -405,6 +430,7 @@ case "$COMMAND" in
     wipe)          cmd_wipe ;;
     wipe-restart)  cmd_wipe_restart ;;
     save)          cmd_save ;;
+    sync)          cmd_sync ;;
     logs)          cmd_logs "$SERVICE" ;;
     help|--help|-h) cmd_help ;;
     *) echo "Unknown command: $COMMAND"; cmd_help; exit 1 ;;

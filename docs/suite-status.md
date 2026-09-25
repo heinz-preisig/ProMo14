@@ -279,6 +279,7 @@ cd /home/heinz/1_Gits/CAM14/ProMo14
 ./dev.sh start all        # backend :8000 + all app dev servers
 ./dev.sh start ontology   # one app — ensures backend, fresh-starts the app
 ./dev.sh status           # ports, PIDs, hub URL
+./dev.sh sync             # other-machine pickup: git pull + uv sync + npm install + start all
 ./dev.sh stop backend     # warns if the ontology store is dirty
 ```
 `start` always kills whatever holds the port first (fresh code);
