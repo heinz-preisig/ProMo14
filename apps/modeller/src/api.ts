@@ -6,28 +6,19 @@ import type {
   TokenRecord,
 } from '@promo/semantic'
 import type { ModelDocument } from './modelPersistence'
+import { apiFetch, sessionParam, withParams } from '@promo/ui'
 
-/** The artefact graph this session edits — from the hub's ?graph= link.
- *  Undefined means the default working ontology. */
-export const GRAPH_IRI =
-  new URLSearchParams(window.location.search).get('graph') || undefined
+export {
+  GRAPH_IRI,
+  apiFetch,
+  withParams as q,
+  saveStore as saveOntology,
+} from '@promo/ui'
 
 /** The species artefact override — the ``?species=`` param (§20).
  *  When absent the model's promo:usesSpecies pin supplies the IRI
  *  (resolved in App after loadModel).  Undefined = no override. */
-export const SPECIES_IRI =
-  new URLSearchParams(window.location.search).get('species') || undefined
-
-/** Append the session's graph param to an API path. */
-export function q(path: string): string {
-  if (!GRAPH_IRI) return path
-  const sep = path.includes('?') ? '&' : '?'
-  return `${path}${sep}graph=${encodeURIComponent(GRAPH_IRI)}`
-}
-
-export function apiFetch(path: string, init?: RequestInit) {
-  return fetch(q(path), init)
-}
+export const SPECIES_IRI = sessionParam('species')
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await apiFetch(path)
@@ -57,12 +48,6 @@ export async function saveModel(doc: ModelDocument): Promise<void> {
     body: JSON.stringify(doc),
   })
   if (!res.ok) throw new Error(`Failed to save model: ${res.status}`)
-}
-
-/** Persist the RDF store to its TriG file (clears the dirty flag). */
-export async function saveOntology(): Promise<void> {
-  const res = await apiFetch('/api/ontology/save', { method: 'POST' })
-  if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`)
 }
 
 // --- §20 species artefact (vocabulary for the capability-gated gestures) ---
@@ -113,11 +98,8 @@ export interface SpeciesDistribution {
 export async function fetchSpeciesDistribution(
   speciesIri: string | undefined,
 ): Promise<SpeciesDistribution | null> {
-  let path = '/api/instantiate/species-distribution'
-  path = q(path)
-  if (speciesIri) {
-    path += `${path.includes('?') ? '&' : '?'}species=${encodeURIComponent(speciesIri)}`
-  }
+  const path = withParams('/api/instantiate/species-distribution',
+                          { species: speciesIri })
   const res = await fetch(path)
   if (!res.ok) return null
   return res.json()

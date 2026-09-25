@@ -496,3 +496,12 @@ class RdfContext(EquationContext):
                 "description": doc,
             })
         return rules
+
+
+def scoped_context(store: RdfStore,
+                   graph_iri: Optional[str]) -> RdfContext:
+    """Build the resolution context: the artefact plus its transitive
+    ``usesOntology`` pin set when ``graph_iri`` is given (R4), legacy
+    dataset-wide scope otherwise."""
+    return RdfContext(store) if graph_iri is None \
+        else RdfContext(store, graph_iris=store.resolution_scope(graph_iri))

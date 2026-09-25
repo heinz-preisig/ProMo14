@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from rdflib import RDF, RDFS, Literal, URIRef
 
 from backend.core.graph_store import PROMO, get_store
-from backend.ontology.service import editable_param, graph_param, resolve_graph
+from backend.core.deps import editable_param, graph_param, resolve_graph
 
 from . import router
 

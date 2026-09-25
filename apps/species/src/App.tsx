@@ -5,7 +5,7 @@ import {
   saveSpecies,
   saveStore,
 } from './api'
-import { useStoreDirty } from './useStoreDirty'
+import { useStoreDirty } from '@promo/ui'
 import type {
   AllocationDoc,
   ComponentDoc,
@@ -95,7 +95,7 @@ function CheckList({
 
 export default function App() {
   const graph = graphParam()
-  const dirty = useStoreDirty()
+  const { dirty } = useStoreDirty()
   const [doc, setDoc] = useState<SpeciesDocument>({
     components: [], allocations: [], reactions: [],
   })

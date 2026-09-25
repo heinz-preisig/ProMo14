@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { deleteVariable, documentUrl, loadContext, saveOntology, saveVariable } from './api'
-import { useStoreDirty } from './useStoreDirty'
+import { useStoreDirty } from '@promo/ui'
 import type { ClassificationAxis, Domain, Index, NetworkTree, SavedEquation, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'

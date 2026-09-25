@@ -1,21 +1,13 @@
 import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, SavedEquation, Variable } from './types'
 import { nextEquationId } from './variableUtils'
+import { apiFetch, withParams } from '@promo/ui'
 
-/** The artefact graph this session edits — from the hub's ?graph= link.
- *  Undefined means the default working ontology. */
-export const GRAPH_IRI =
-  new URLSearchParams(window.location.search).get('graph') || undefined
-
-/** Append the session's graph param to an API path. */
-function q(path: string): string {
-  if (!GRAPH_IRI) return path
-  const sep = path.includes('?') ? '&' : '?'
-  return `${path}${sep}graph=${encodeURIComponent(GRAPH_IRI)}`
-}
-
-function apiFetch(path: string, init?: RequestInit) {
-  return fetch(q(path), init)
-}
+export {
+  GRAPH_IRI,
+  getStoreStatus,
+  saveStore as saveOntology,
+} from '@promo/ui'
+export type { StoreStatus } from '@promo/ui'
 
 export async function parseExpression(text: string): Promise<ParseResponse> {
   const res = await apiFetch('/api/equation/parse', {
@@ -128,7 +120,7 @@ export async function generateExpression(req: GenerateRequest): Promise<Generate
  *  side and opens in the browser's PDF viewer; ``tex`` is the raw
  *  compilable source. */
 export function documentUrl(format: 'pdf' | 'tex' = 'pdf'): string {
-  return q(`/api/equation/document?format=${format}`)
+  return withParams(`/api/equation/document?format=${format}`)
 }
 
 export async function deleteVariable(iri: string): Promise<void> {
@@ -152,27 +144,6 @@ export async function getVariableReferences(iri: string): Promise<VariableRefere
   return res.json()
 }
 
-export interface StoreStatus {
-  dirty: boolean
-  last_saved: string | null
-}
-
-export async function getStoreStatus(): Promise<StoreStatus> {
-  const res = await apiFetch('/api/ontology/status')
-  if (!res.ok) throw new Error(`Failed to load store status: ${res.status}`)
-  return res.json()
-}
-
-/** Persist the dataset — one .trig per artefact line under PROMO_DATA_DIR. */
-export async function saveOntology(): Promise<{ saved: string }> {
-  const res = await apiFetch('/api/ontology/save', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  })
-  if (!res.ok) throw new Error(`Failed to save: ${res.status}`)
-  return res.json()
-}
 
 export function nodeToString(node: AstNode): string {
   switch (node.type) {

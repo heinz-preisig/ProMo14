@@ -11,22 +11,14 @@ import type {
   ScaleValueRecord,
   TokenRecord,
 } from './types'
+import { apiFetch, withParams } from '@promo/ui'
 
-/** The artefact graph this session edits — from the hub's ?graph= link.
- *  Undefined means the default working ontology. */
-export const GRAPH_IRI =
-  new URLSearchParams(window.location.search).get('graph') || undefined
-
-/** Append the session's graph param to an API path. */
-function q(path: string): string {
-  if (!GRAPH_IRI) return path
-  const sep = path.includes('?') ? '&' : '?'
-  return `${path}${sep}graph=${encodeURIComponent(GRAPH_IRI)}`
-}
-
-function apiFetch(path: string, init?: RequestInit) {
-  return fetch(q(path), init)
-}
+export {
+  GRAPH_IRI,
+  getStoreStatus,
+  saveStore as saveOntology,
+} from '@promo/ui'
+export type { StoreStatus } from '@promo/ui'
 
 export async function loadOntologyContext(): Promise<OntologyContext> {
   const res = await apiFetch('/api/ontology/context')
@@ -286,26 +278,6 @@ export async function deleteConnectionRule(iri: string): Promise<{ deleted: stri
   return res.json()
 }
 
-export async function saveOntology(): Promise<{ saved: string }> {
-  const res = await apiFetch('/api/ontology/save', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  })
-  if (!res.ok) throw new Error(`Failed to save ontology: ${res.status}`)
-  return res.json()
-}
-
-export interface StoreStatus {
-  dirty: boolean
-  last_saved: string | null
-}
-
-export async function getStoreStatus(): Promise<StoreStatus> {
-  const res = await apiFetch('/api/ontology/status')
-  if (!res.ok) throw new Error(`Failed to load store status: ${res.status}`)
-  return res.json()
-}
 
 export interface OntologyVersion {
   iri: string
@@ -334,7 +306,7 @@ export async function publishOntology(version: string): Promise<{ version_iri: s
 
 /** Download the ontology as Turtle (a frozen version, or the working draft). */
 export function exportOntology(version?: string): void {
-  const url = q(version
+  const url = withParams(version
     ? `/api/ontology/export?version=${encodeURIComponent(version)}`
     : '/api/ontology/export')
   const a = document.createElement('a')

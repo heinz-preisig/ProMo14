@@ -4,22 +4,9 @@ import type {
   EvaluateReport,
   Selection,
 } from './types'
+import { apiFetch } from '@promo/ui'
 
-/** The artefact graph this session edits — from the hub's ?graph= link.
- *  Undefined means the default working ontology. */
-export const GRAPH_IRI =
-  new URLSearchParams(window.location.search).get('graph') || undefined
-
-/** Append the session's graph param to an API path. */
-function q(path: string): string {
-  if (!GRAPH_IRI) return path
-  const sep = path.includes('?') ? '&' : '?'
-  return `${path}${sep}graph=${encodeURIComponent(GRAPH_IRI)}`
-}
-
-function apiFetch(path: string, init?: RequestInit) {
-  return fetch(q(path), init)
-}
+export { GRAPH_IRI, getStoreStatus, saveStore } from '@promo/ui'
 
 export async function loadContext(): Promise<BehaviourContext> {
   const res = await apiFetch('/api/behaviour/context')
@@ -65,14 +52,4 @@ export async function deleteAssignment(entityType: string): Promise<void> {
     `/api/behaviour/assignment?entity_type=${encodeURIComponent(entityType)}`,
     { method: 'DELETE' },
   )
-}
-
-export async function getStoreStatus(): Promise<{ dirty: boolean }> {
-  const res = await apiFetch('/api/ontology/status')
-  return res.json() as Promise<{ dirty: boolean }>
-}
-
-export async function saveStore(): Promise<void> {
-  const res = await apiFetch('/api/ontology/save', { method: 'POST' })
-  if (!res.ok) throw new Error(`save: ${res.status} ${await res.text()}`)
 }

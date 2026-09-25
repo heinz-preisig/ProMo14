@@ -16,7 +16,7 @@ import type {
   Equation,
   EvaluateReport,
 } from './types'
-import { useStoreDirty } from './useStoreDirty'
+import { useStoreDirty } from '@promo/ui'
 
 /** Short display form of an IRI: fragment after # or last /. */
 function frag(iri: string): string {

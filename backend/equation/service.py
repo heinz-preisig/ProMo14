@@ -27,13 +27,8 @@ from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, get_store
 from backend.ontology.models import VariableRecord
-from backend.ontology.rdf_context import RdfContext
-from backend.ontology.service import (
-    editable_param,
-    graph_param,
-    resolve_graph,
-    scoped_context,
-)
+from backend.core.deps import editable_param, graph_param, resolve_graph
+from backend.ontology.rdf_context import RdfContext, scoped_context
 
 from .checker import INSTANTIATE_CLASSES, check
 from .codegen import TARGETS, render

@@ -27,7 +27,7 @@ import {
   exportOntology,
   GRAPH_IRI,
 } from './api'
-import { useStoreDirty } from './useStoreDirty'
+import { useStoreDirty } from '@promo/ui'
 import type {
   AxisTermRecord,
   ClassificationAxisRecord,

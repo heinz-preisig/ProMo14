@@ -1,4 +1,7 @@
 import type { SpeciesDocument } from './types'
+import { sessionParam } from '@promo/ui'
+
+export { saveStore } from '@promo/ui'
 
 const qs = (params: Record<string, string | undefined>) => {
   const q = new URLSearchParams()
@@ -7,8 +10,7 @@ const qs = (params: Record<string, string | undefined>) => {
   return s ? `?${s}` : ''
 }
 
-export const graphParam = () =>
-  new URLSearchParams(window.location.search).get('graph') ?? undefined
+export const graphParam = () => sessionParam('graph')
 
 export async function fetchSpecies(graph?: string): Promise<SpeciesDocument> {
   const r = await fetch(`/api/species/species${qs({ graph })}`)
@@ -27,15 +29,4 @@ export async function saveSpecies(
   })
   if (!r.ok) throw new Error(await r.text())
   return r.json()
-}
-
-export async function storeStatus(): Promise<{ dirty: boolean }> {
-  const r = await fetch('/api/ontology/status')
-  if (!r.ok) return { dirty: false }
-  return r.json()
-}
-
-export async function saveStore(): Promise<void> {
-  const r = await fetch('/api/ontology/save', { method: 'POST' })
-  if (!r.ok) throw new Error(`save: ${r.status} ${await r.text()}`)
 }

@@ -11,7 +11,7 @@ import type {
   EntityInstantiation,
   InstantiationReport,
 } from './types'
-import { useStoreDirty } from './useStoreDirty'
+import { useStoreDirty } from '@promo/ui'
 
 const TARGETS = ['python', 'julia', 'matlab'] as const
 type Target = (typeof TARGETS)[number]

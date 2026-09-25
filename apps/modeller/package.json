@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@promo/semantic": "*",
+    "@promo/ui": "*",
     "konva": "^9.3.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

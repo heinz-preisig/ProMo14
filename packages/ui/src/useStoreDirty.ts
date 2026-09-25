@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getStoreStatus } from './api'
+import { getStoreStatus } from './store'
 
 /** Poll the backend's dirty flag and warn on tab close while changes are
  *  unsaved.  The flag is store-global: mutations from any editor (or the

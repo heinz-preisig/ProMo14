@@ -35,11 +35,8 @@ from backend.core.graph_store import PROMO, get_store
 from backend.equation.checker import INSTANTIATE_CLASSES
 from backend.equation.compile_space import CompileSpace
 from backend.equation.document import _rhs_latex, _var_symbol
-from backend.ontology.service import (
-    editable_param,
-    graph_param,
-    scoped_context,
-)
+from backend.core.deps import editable_param, graph_param
+from backend.ontology.rdf_context import scoped_context
 
 from .closure import EquationInfo, Selection, evaluate
 

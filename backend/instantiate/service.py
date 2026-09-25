@@ -33,12 +33,8 @@ from backend.behaviour.service import (
     _read_assignment,
 )
 from backend.core.graph_store import PROMO, get_store
-from backend.ontology.service import (
-    editable_param,
-    graph_param,
-    resolve_graph,
-    scoped_context,
-)
+from backend.core.deps import editable_param, graph_param, resolve_graph
+from backend.ontology.rdf_context import scoped_context
 
 from backend.equation.compile_space import CompileSpace
 from backend.equation.errors import VarError

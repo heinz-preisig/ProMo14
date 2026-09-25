@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-23
+**Last updated:** 2026-09-25
 
 ## Summary
 
@@ -13,10 +13,11 @@
 | Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures |
 | Species | `GET`/`PUT /api/species/species` | `/species` SPA (:3005) | covered by service tests | Named reaction schemes: components, allocations, reactions |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
-| Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope, value cells), catalogue, full ontology CRUD | — | — | Legacy loader archived to `archive/loader.py` |
+| Shared (`packages/ui`) | — | `GRAPH_IRI`/`sessionParam`, `withParams`/`apiFetch`, `useStoreDirty`, store status/save fetchers | `tsc` clean | Single source for session plumbing — apps re-export from `./api` (2026-09-25) |
+| Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope, value cells), catalogue, full ontology CRUD, `deps.py` graph-selection helpers | — | — | `graph_store` split into `vocab`/`persistence`/`seed` mixins (2026-09-25); legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
 | Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values` | scaffold app (:3006) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end |
-| Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code` | — | emitter tests in `test_builder.py` | Derivative function emitted for all three targets |
+| Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code` | — | emitter tests in `test_builder.py` | Derivative function emitted for all three targets; emitters share the `emit_common` dialect walker (2026-09-25) |
 
 ## Versioning & graph selection (2026-09-17)
 
@@ -37,9 +38,10 @@ Implemented per `docs/versioning-and-session-design.md` (commits
 - **Graph selection** — `?graph=` on all ontology + equation endpoints;
   `editable_param` rejects frozen graphs with 403.  Resolution context
   = artefact + transitive `usesOntology` closure
-  (`RdfStore.resolution_scope`, R4).  Shared helpers
-  `graph_param`/`editable_param`/`resolve_graph`/`scoped_context` live in
-  `backend/ontology/service.py`.
+  (`RdfStore.resolution_scope`, R4).  Shared helpers live in
+  `backend/core/deps.py` (`graph_param`/`editable_param`/
+  `resolve_graph`) and `backend/ontology/rdf_context.py`
+  (`scoped_context`) — moved out of `ontology/service.py` 2026-09-25.
 - **w3id live** — `https://w3id.org/promo` redirects to the ProMo
   Ontologies landing page (perma-id/w3id.org#6700 merged).
 
@@ -58,10 +60,10 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   entity types from CWA 17960, 5 connection rules, transport system
   as node (not arc), event dynamics fits existing taxonomy.
 - **Backend:** All v1 steps implemented and verified:
-  - `backend/core/graph_store.py` — PROMO vocabulary for Domain,
-    ClassificationAxis, AxisTerm, EntityType, ConnectionRule,
-    EquationClass. CRUD methods for all. `seed_default_ontology()`
-    bootstraps two-branch tree, 7 tokens, classification axes
+  - `backend/core/vocab.py` — PROMO vocabulary + constants (was
+    `graph_store.py` until the 2026-09-25 split). `RdfStore` CRUD
+    methods for all. `seed_default_ontology()` (now
+    `core/seed.py::SeedMixin`) bootstraps two-branch tree, 7 tokens, classification axes
     (determination/function on physical, role on information),
     entity types, 5
     connection rules, 5 equation classes, indices (species/node/arc +
@@ -103,8 +105,8 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `carrier` → `arcTypeIri = promo:ArcType/<carrier>` (arcs are typed
   token-flow or reference; the rule name is the kind, not the arc type).
 - **Namespace:** `https://w3id.org/promo#` throughout
-  (`backend/core/graph_store.py`: `PROMO`, `PROMOLG`,
-  `ONTOLOGY_GRAPH_IRI`).  Publishing pipeline live end-to-end: exported
+  (`backend/core/vocab.py`: `PROMO`, `PROMOLG`; re-exported from
+  `graph_store`, which holds `ONTOLOGY_GRAPH_IRI`).  Publishing pipeline live end-to-end: exported
   `ontology.ttl` → `heinz-preisig/ProMo-ontologies` (GitHub Pages) →
   w3id redirect **verified live** (PR #6700 merged).  See
   `publish/README.md`.
@@ -200,7 +202,9 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   incidence `F[N,A]`), `distribute.py` (§20 species fixpoint → `S`
   and `Q` element sets), `builder.py` (per-entity-type variable
   bindings: local/parameter/constant/port/incidence), `scheduler.py`
-  (levels + algebraic loops), `plan.py` + `emit_python|julia|matlab`.
+  (levels + algebraic loops), `plan.py` + `emit_common.py` (the
+  shared `Dialect` walker) + `emit_python|julia|matlab` (thin
+  per-language dialects, 2026-09-25).
 - **Endpoints:** `GET /api/instantiate/model` (the §19 report),
   `/code?target=python|julia|matlab`, `/species-distribution`,
   `/arc-indices`, `/incidence`; `PUT`/`GET /api/instantiate/values`
@@ -256,9 +260,16 @@ Implemented per `docs/versioning-and-session-design.md` (commits
 - **`backend/core`:** `RdfStore` and legacy v8 loader implemented; full
   ontology CRUD (domains, axes, entity types, connection rules, tokens);
   shared IRI minting; seed data bootstrap; `set_value_cells`/
-  `value_cells` (§20 ν tables).
-- **`backend/main.py`:** FastAPI app mounting per-tool routers; server
-  starts and `/api/health` returns `{"status":"ok"}`.
+  `value_cells` (§20 ν tables).  Module layout (2026-09-25):
+  `vocab.py` constants, `persistence.py` TriG load/save + migrations,
+  `seed.py` ontology seeding — the last two composed as
+  `RdfStore` mixins; `deps.py` the `?graph=` FastAPI helpers.
+- **`packages/ui`:** session plumbing shared by all SPAs (2026-09-25)
+  — `GRAPH_IRI`/`sessionParam`, `withParams`/`apiFetch`,
+  `getStoreStatus`/`saveStore`, `useStoreDirty`.
+- **`backend/main.py`:** FastAPI app mounting per-tool routers; SPA
+  mounts table-driven (`_SPAS`, 2026-09-25); server starts and
+  `/api/health` returns `{"status":"ok"}`.
 
 ## How to run
 

@@ -66,7 +66,7 @@ def health() -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Static frontend (built equation editor)
+# Static frontends (built SPAs)
 # ---------------------------------------------------------------------------
 
 def _mount_assets(prefix: str, assets_dir: Path, name: str) -> None:
@@ -78,20 +78,6 @@ def _mount_assets(prefix: str, assets_dir: Path, name: str) -> None:
     app.mount(prefix,
               StaticFiles(directory=str(assets_dir), check_dir=False),
               name=name)
-
-
-STATIC_DIR = Path(os.environ.get("STATIC_DIR", "apps/equation-editor/dist")).resolve()
-ASSETS_DIR = STATIC_DIR / "assets"
-
-_mount_assets("/assets", ASSETS_DIR, "assets")
-
-
-ONTOLOGY_STATIC_DIR = Path(
-    os.environ.get("ONTOLOGY_STATIC_DIR", "apps/ontology-editor/dist")
-).resolve()
-ONTOLOGY_ASSETS_DIR = ONTOLOGY_STATIC_DIR / "assets"
-
-_mount_assets("/ontology/assets", ONTOLOGY_ASSETS_DIR, "ontology-assets")
 
 
 def _spa_index(static_dir: Path, name: str) -> Response:
@@ -110,85 +96,34 @@ def _spa_index(static_dir: Path, name: str) -> Response:
     )
 
 
-@app.get("/ontology", include_in_schema=False)
-@app.get("/ontology/", include_in_schema=False)
-@app.get("/ontology/{full_path:path}", include_in_schema=False)
-def serve_ontology_spa(full_path: str = "") -> Response:
-    """Serve the ontology editor SPA for every /ontology/* route."""
-    return _spa_index(ONTOLOGY_STATIC_DIR, "Ontology editor")
+#: (route prefix, STATIC_DIR env var, dist dir, display name) per SPA.
+#: The equation editor sits at the root assets path for historical
+#: reasons; every other app is namespaced under ``/<route>/assets``.
+_SPAS = [
+    ("equation",      "STATIC_DIR",             "apps/equation-editor/dist",   "Equation editor"),
+    ("ontology",      "ONTOLOGY_STATIC_DIR",    "apps/ontology-editor/dist",   "Ontology editor"),
+    ("modeller",      "MODELLER_STATIC_DIR",    "apps/modeller/dist",          "Modeller"),
+    ("behaviour",     "BEHAVIOUR_STATIC_DIR",   "apps/behaviour-linker/dist",  "Behaviour linker"),
+    ("instantiation", "INSTANTIATION_STATIC_DIR", "apps/instantiation/dist",   "Instantiation"),
+    ("species",       "SPECIES_STATIC_DIR",     "apps/species/dist",           "Species"),
+]
 
 
-@app.get("/equation", include_in_schema=False)
-@app.get("/equation/", include_in_schema=False)
-@app.get("/equation/{full_path:path}", include_in_schema=False)
-def serve_equation_spa(full_path: str = "") -> Response:
-    """Serve the equation editor SPA for every /equation/* route."""
-    return _spa_index(STATIC_DIR, "Equation editor")
+def _register_spa(route: str, env_var: str, dist: str, label: str) -> None:
+    """Mount one SPA's assets and register its catch-all index route."""
+    static_dir = Path(os.environ.get(env_var, dist)).resolve()
+    assets_prefix = "/assets" if route == "equation" else f"/{route}/assets"
+    _mount_assets(assets_prefix, static_dir / "assets", f"{route}-assets")
+
+    def serve(full_path: str = "") -> Response:
+        return _spa_index(static_dir, label)
+
+    for path in (f"/{route}", f"/{route}/", f"/{route}/{{full_path:path}}"):
+        app.get(path, include_in_schema=False)(serve)
 
 
-MODELLER_STATIC_DIR = Path(
-    os.environ.get("MODELLER_STATIC_DIR", "apps/modeller/dist")
-).resolve()
-MODELLER_ASSETS_DIR = MODELLER_STATIC_DIR / "assets"
-
-_mount_assets("/modeller/assets", MODELLER_ASSETS_DIR, "modeller-assets")
-
-
-@app.get("/modeller", include_in_schema=False)
-@app.get("/modeller/", include_in_schema=False)
-@app.get("/modeller/{full_path:path}", include_in_schema=False)
-def serve_modeller_spa(full_path: str = "") -> Response:
-    """Serve the modeller SPA for every /modeller/* route."""
-    return _spa_index(MODELLER_STATIC_DIR, "Modeller")
-
-
-BEHAVIOUR_STATIC_DIR = Path(
-    os.environ.get("BEHAVIOUR_STATIC_DIR", "apps/behaviour-linker/dist")
-).resolve()
-BEHAVIOUR_ASSETS_DIR = BEHAVIOUR_STATIC_DIR / "assets"
-
-_mount_assets("/behaviour/assets", BEHAVIOUR_ASSETS_DIR, "behaviour-assets")
-
-
-@app.get("/behaviour", include_in_schema=False)
-@app.get("/behaviour/", include_in_schema=False)
-@app.get("/behaviour/{full_path:path}", include_in_schema=False)
-def serve_behaviour_spa(full_path: str = "") -> Response:
-    """Serve the behaviour linker SPA for every /behaviour/* route."""
-    return _spa_index(BEHAVIOUR_STATIC_DIR, "Behaviour linker")
-
-
-INSTANTIATION_STATIC_DIR = Path(
-    os.environ.get("INSTANTIATION_STATIC_DIR", "apps/instantiation/dist")
-).resolve()
-INSTANTIATION_ASSETS_DIR = INSTANTIATION_STATIC_DIR / "assets"
-
-_mount_assets("/instantiation/assets", INSTANTIATION_ASSETS_DIR,
-              "instantiation-assets")
-
-
-@app.get("/instantiation", include_in_schema=False)
-@app.get("/instantiation/", include_in_schema=False)
-@app.get("/instantiation/{full_path:path}", include_in_schema=False)
-def serve_instantiation_spa(full_path: str = "") -> Response:
-    """Serve the instantiation SPA for every /instantiation/* route."""
-    return _spa_index(INSTANTIATION_STATIC_DIR, "Instantiation")
-
-
-SPECIES_STATIC_DIR = Path(
-    os.environ.get("SPECIES_STATIC_DIR", "apps/species/dist")
-).resolve()
-SPECIES_ASSETS_DIR = SPECIES_STATIC_DIR / "assets"
-
-_mount_assets("/species/assets", SPECIES_ASSETS_DIR, "species-assets")
-
-
-@app.get("/species", include_in_schema=False)
-@app.get("/species/", include_in_schema=False)
-@app.get("/species/{full_path:path}", include_in_schema=False)
-def serve_species_spa(full_path: str = "") -> Response:
-    """Serve the species/reaction SPA for every /species/* route."""
-    return _spa_index(SPECIES_STATIC_DIR, "Species")
+for _route, _env, _dist, _label in _SPAS:
+    _register_spa(_route, _env, _dist, _label)
 
 
 HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"

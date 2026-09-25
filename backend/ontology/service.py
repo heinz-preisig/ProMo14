@@ -15,10 +15,11 @@ from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
+from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.core.graph_store import (
     PROMO, PROMOLG, QUDT, SEED_FLOOR, get_store,
 )
-from backend.ontology.rdf_context import RdfContext
+from backend.ontology.rdf_context import scoped_context
 
 from .models import (
     AxisTermRecord,
@@ -39,63 +40,8 @@ from .models import (
 router = APIRouter()
 
 
-# ---------------------------------------------------------------------------
-# Graph selection (docs/versioning-and-session-design.md R4/R5)
-# ---------------------------------------------------------------------------
-
-
-def graph_param(graph: Optional[str] = None) -> Optional[str]:
-    """FastAPI dependency: the ``?graph=`` query param (a graph IRI)."""
-    return graph
-
-
-def editable_param(graph: Optional[str] = None) -> Optional[str]:
-    """Like ``graph_param`` but rejects frozen version graphs (R5) and
-    graphs that were never created — and is *required* on writes.
-
-    Writes must name their artefact explicitly (hub ticket #1): the
-    legacy "no graph means the working ontology" default let writes
-    silently land in the core graph.  Reads keep the legacy default
-    via ``graph_param``; only mutating endpoints use this guard.
-
-    A write must not materialize an artefact: creation goes through
-    ``/api/catalogue/new`` or ``/fork`` so the type marker and
-    ``usesOntology`` pins are born with it (hub ticket #3).  A properly
-    created artefact is never empty — the marker triple is always
-    stamped — so ``len(g) == 0`` means the IRI names nothing."""
-    if graph is None:
-        raise HTTPException(
-            status_code=400,
-            detail="?graph= is required on writes — open the artefact "
-                   "from the hub so the session carries its graph IRI")
-    store = get_store()
-    g = store.graph(graph)
-    if not len(g):
-        raise HTTPException(
-            status_code=404,
-            detail=f"no such artefact: {graph} — create it via the hub "
-                   "(/api/catalogue/new) so its pins are born")
-    try:
-        store.assert_editable(g)
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail=str(exc))
-    return graph
-
-
-def resolve_graph(store, graph_iri: Optional[str]):
-    """Resolve an optional graph IRI to a dataset graph (default: the
-    working ontology)."""
-    return store.ontology_graph if graph_iri is None \
-        else store.dataset.graph(URIRef(graph_iri))
-
-
-def scoped_context(store, graph_iri: Optional[str]) -> RdfContext:
-    """Build the resolution context: the artefact plus its transitive
-    ``usesOntology`` pin set when ``graph_iri`` is given (R4), legacy
-    dataset-wide scope otherwise."""
-    return RdfContext(store) if graph_iri is None \
-        else RdfContext(store, graph_iris=store.resolution_scope(graph_iri))
-
+# Graph selection helpers (R4/R5) live in ``backend.core.deps``;
+# ``scoped_context`` lives in ``rdf_context``.
 
 # Predicates that define containment: deleting the object also deletes the
 # subject (e.g. deleting an axis deletes its terms, deleting a domain deletes

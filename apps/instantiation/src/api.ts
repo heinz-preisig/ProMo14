@@ -1,29 +1,13 @@
 import type { CodeOut, InstantiationReport } from './types'
+import { createApiFetch, sessionParam } from '@promo/ui'
 
-/** The model artefact to instantiate — from the hub's ?graph= link.
- *  Undefined means the default working ontology's model graph. */
-export const GRAPH_IRI =
-  new URLSearchParams(window.location.search).get('graph') || undefined
+export { GRAPH_IRI, getStoreStatus, saveStore } from '@promo/ui'
 
 /** The var/expr artefact supplying variables, equations and the
  *  assignment graph — ?vars= (default: dataset-wide scope). */
-export const VARS_IRI =
-  new URLSearchParams(window.location.search).get('vars') || undefined
+export const VARS_IRI = sessionParam('vars')
 
-/** Append the session's graph/vars params to an API path. */
-function q(path: string): string {
-  const params = new URLSearchParams()
-  if (GRAPH_IRI) params.set('graph', GRAPH_IRI)
-  if (VARS_IRI) params.set('vars', VARS_IRI)
-  const s = params.toString()
-  if (!s) return path
-  const sep = path.includes('?') ? '&' : '?'
-  return `${path}${sep}${s}`
-}
-
-function apiFetch(path: string, init?: RequestInit) {
-  return fetch(q(path), init)
-}
+const apiFetch = createApiFetch('vars')
 
 export async function loadReport(): Promise<InstantiationReport> {
   const res = await apiFetch('/api/instantiate/model')
@@ -37,14 +21,4 @@ export async function generateCode(target: string): Promise<CodeOut> {
   )
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<CodeOut>
-}
-
-export async function getStoreStatus(): Promise<{ dirty: boolean }> {
-  const res = await apiFetch('/api/ontology/status')
-  return res.json() as Promise<{ dirty: boolean }>
-}
-
-export async function saveStore(): Promise<void> {
-  const res = await apiFetch('/api/ontology/save', { method: 'POST' })
-  if (!res.ok) throw new Error(`save: ${res.status} ${await res.text()}`)
 }
