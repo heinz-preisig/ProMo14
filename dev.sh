@@ -9,7 +9,8 @@
 #   ./dev.sh wipe                 — delete all data files (ontology.trig etc.)
 #   ./dev.sh wipe-restart         — wipe data, reseed (seed + HAP ext), restart backend
 #   ./dev.sh save                 — persist the in-memory store (one .trig per artefact line)
-#   ./dev.sh sync                 — pick up the other machine: git pull + uv sync + npm install + start all
+#   ./dev.sh sync                 — pick up the other machine: git pull + uv sync + npm install + build + start all
+#   ./dev.sh build [service]      — rebuild the backend-served dist bundle(s) (dist/ is gitignored)
 #   ./dev.sh logs [service]       — tail the log file for a service
 #
 # Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)
@@ -348,10 +349,38 @@ cmd_save() {
     echo ""
 }
 
+_need_npm() {
+    # node/npm live behind nvm and are not on PATH in a cold shell.
+    if [ -f "$HOME/.nvm/nvm.sh" ]; then
+        # shellcheck disable=SC1090
+        . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
+    fi
+}
+
+cmd_build() {
+    # Rebuild the backend-served dist bundle(s).  dist/ is gitignored
+    # build output — required whenever app source changes and the app
+    # is viewed via the hub/backend rather than a Vite dev server.
+    local service="${1:-all}"
+    _need_npm
+    cd "$REPO"
+    case "$service" in
+        backend)       echo "  backend is Python — nothing to build." ;;
+        ontology)      npm run build -w @promo/ontology-editor ;;
+        equation)      npm run build -w @promo/equation-editor ;;
+        behaviour)     npm run build -w @promo/behaviour-linker ;;
+        modeller)      npm run build -w @promo/modeller ;;
+        species)       npm run build -w @promo/species ;;
+        instantiation) npm run build -w @promo/instantiation ;;
+        all)           npm run build --workspaces --if-present ;;
+        *) echo "Unknown service: $service"; exit 1 ;;
+    esac
+}
+
 cmd_sync() {
     # Machine-to-machine pickup: pull what the other machine pushed,
-    # re-sync both dependency sets, restart every service with fresh
-    # code.  --ff-only fails loudly on divergence instead of merging.
+    # re-sync both dependency sets, rebuild dist bundles, restart every
+    # service with fresh code.  --ff-only fails loudly on divergence.
     cd "$REPO"
     echo "Pulling..."
     git pull --ff-only || {
@@ -361,13 +390,10 @@ cmd_sync() {
     }
     echo "Syncing Python deps..."
     uv sync
-    # node/npm live behind nvm and are not on PATH in a cold shell.
-    if [ -f "$HOME/.nvm/nvm.sh" ]; then
-        # shellcheck disable=SC1090
-        . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
-    fi
+    _need_npm
     echo "Installing node deps..."
     npm install --no-audit --no-fund
+    cmd_build all
     cmd_start all
 }
 
@@ -398,7 +424,8 @@ cmd_help() {
     echo "  wipe-restart        — wipe data + reseed (seed + HAP ext) + restart backend"
     echo "                        (bare seed: ./dev.sh wipe && ./dev.sh start backend)"
     echo "  save                — persist in-memory store (one .trig per artefact line)"
-    echo "  sync                — pick up the other machine: pull + deps + start all"
+    echo "  sync                — pick up the other machine: pull + deps + build + start all"
+    echo "  build   [service]   — rebuild backend-served dist bundle(s)"
     echo "  logs    [service]   — tail log for a service"
     echo ""
     echo "Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)"
@@ -431,6 +458,7 @@ case "$COMMAND" in
     wipe-restart)  cmd_wipe_restart ;;
     save)          cmd_save ;;
     sync)          cmd_sync ;;
+    build)         cmd_build "$SERVICE" ;;
     logs)          cmd_logs "$SERVICE" ;;
     help|--help|-h) cmd_help ;;
     *) echo "Unknown command: $COMMAND"; cmd_help; exit 1 ;;

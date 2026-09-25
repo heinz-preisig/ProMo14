@@ -5,8 +5,9 @@ remote `heinz-preisig/ProMo14`.  Supersedes
 `session-handoff-2026-09-24.md`.
 
 **On the other machine:** `./dev.sh sync` — `git pull --ff-only` +
-`uv sync` + `npm install` + `start all` (sources nvm itself, so a
-cold shell works).  `npm install` matters this time — a new
+`uv sync` + `npm install` + `build all` + `start all` (sources nvm
+itself, so a cold shell works; the build step matters — hub-served
+`dist/` bundles are gitignored and need rebuilding).  `npm install` matters this time — a new
 workspace package (`packages/ui`) must be linked.  Do **not**
 `wipe-restart` — `data/` is the sync channel.
 
@@ -77,6 +78,9 @@ landed, 313 backend tests green throughout.
   VariableDetailDialog).
 - `variable_class` still written alongside `classifications` — the
   checker/builder read it; the bridge is the transition mechanism.
+- `./dev.sh build [app]` rebuilds a backend-served dist bundle —
+  needed after any `apps/*/src` edit when viewing via the hub
+  (`:8000`); Vite dev servers hot-reload on their own.
 - Next functional work is unchanged: ν→codegen wiring (value cells
   into `plan()`/emitters' par lookups), value-cell editor UI,
   reaction-domain equations, SHACL at publish boundary,
