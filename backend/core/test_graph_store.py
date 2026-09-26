@@ -104,6 +104,33 @@ def test_migrate_equation_iris_noop_when_conforming(tmp_path):
                for s in g.subjects(RDF.type, PROMO["Equation"]))
 
 
+def test_migrate_domain_membership_uses_universe_iri(tmp_path):
+    store = RdfStore(tmp_path)
+    graph = store.ontology_graph
+    root = store.mint_iri(graph.identifier, "domain_root")
+    physical = store.mint_iri(graph.identifier, "domain_physical")
+    variable = store.mint_iri(graph.identifier, "V_1")
+    graph.add((root, RDF.type, PROMO["Domain"]))
+    graph.add((root, PROMO["name"], Literal("root")))
+    graph.add((physical, RDF.type, PROMO["Domain"]))
+    graph.add((physical, PROMO["name"], Literal("physical")))
+    graph.add((physical, PROMO["parent"], root))
+    graph.add((variable, RDF.type, PROMO["Variable"]))
+    graph.add((variable, PROMO["network"], Literal("physical")))
+
+    store._migrate_domain_membership()
+
+    universe = store.mint_iri(graph.identifier, "domain_universe")
+    assert (universe, RDF.type, PROMO["Domain"]) in graph
+    assert graph.value(universe, PROMO["name"]) == Literal("universe")
+    assert graph.value(physical, PROMO["parent"]) == universe
+    assert graph.value(variable, PROMO["inDomain"]) == physical
+
+    store.dirty = False
+    store._migrate_domain_membership()
+    assert not store.dirty
+
+
 def test_save_fans_out_per_artefact_line(tmp_path):
     """Hub #4: save() writes one .trig per artefact line — the draft
     plus its frozen versions — named by the line IRI's last segment."""

@@ -122,8 +122,10 @@ FastAPI router scaffold.  The provider is functional and tested.
 
 1. ~~Wire equation editor to `RdfContext`~~ **Done (2026-09-15):**
    `RdfContext` reads all named graphs (ProMo14 vocabulary only) and
-   builds the domain tree from `promo:Domain`/`promo:parent` with a
-   synthetic `root`; verified end-to-end via `/api/equation/context` +
+   builds the domain tree from `promo:Domain`/`promo:parent` with the
+   authoritative `universe` root (`domain_universe`).  Variables, equations
+   and indices use `promo:inDomain` IRI links while readable network names
+   remain compatibility qualifiers; verified end-to-end via `/api/equation/context` +
    `/check`.  Legacy v8 loader archived to `archive/loader.py`.
 2. ~~Wire modeller `ConnectionRuleResolver` to
    `GET /api/ontology/resolve-connection`~~ **Done (2026-09-18):**

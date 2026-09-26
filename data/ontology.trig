@@ -129,8 +129,9 @@
         promo:aliases "{\"global_ID\": \"V_3\", \"latex\": \"\\\\frac{1}{2}\"}" ;
         promo:doc "Universal constant" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_3" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0.5" ;
         promo:variableClass "constant" .
@@ -140,8 +141,9 @@
         promo:aliases "{\"global_ID\": \"V_2\", \"latex\": \"1\"}" ;
         promo:doc "Universal constant" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_2" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:value "1" ;
         promo:variableClass "constant" .
@@ -151,8 +153,9 @@
         promo:aliases "{\"global_ID\": \"V_1\", \"latex\": \"0\"}" ;
         promo:doc "Universal constant" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_1" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0" ;
         promo:variableClass "constant" .
@@ -175,11 +178,6 @@
     <https://w3id.org/promo/ontology#domain_properties> a promo:Domain ;
         promo:branch "physical" ;
         promo:name "properties" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
-
-    <https://w3id.org/promo/ontology#domain_reactions> a promo:Domain ;
-        promo:branch "physical" ;
-        promo:name "reactions" ;
         promo:parent <https://w3id.org/promo/ontology#domain_physical> .
 
     <https://w3id.org/promo/ontology#domain_transport> a promo:Domain ;
@@ -265,6 +263,7 @@
     <https://w3id.org/promo/ontology#idx_arc_convection> a promo:Index ;
         rdfs:label "convection arc" ;
         promo:aliases "{\"global_ID\": \"I_7\", \"internal_code\": \"A_conv\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_7" ;
         promo:network "physical" ;
@@ -275,6 +274,7 @@
     <https://w3id.org/promo/ontology#idx_arc_diffusion> a promo:Index ;
         rdfs:label "diffusion arc" ;
         promo:aliases "{\"global_ID\": \"I_6\", \"internal_code\": \"A_diff\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_6" ;
         promo:network "physical" ;
@@ -285,6 +285,7 @@
     <https://w3id.org/promo/ontology#idx_arc_energy> a promo:Index ;
         rdfs:label "energy arc" ;
         promo:aliases "{\"global_ID\": \"I_5\", \"internal_code\": \"A_energy\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_5" ;
         promo:network "physical" ;
@@ -295,6 +296,7 @@
     <https://w3id.org/promo/ontology#idx_arc_heat> a promo:Index ;
         rdfs:label "heat arc" ;
         promo:aliases "{\"global_ID\": \"I_8\", \"internal_code\": \"A_heat\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_8" ;
         promo:network "physical" ;
@@ -305,6 +307,7 @@
     <https://w3id.org/promo/ontology#idx_arc_mass> a promo:Index ;
         rdfs:label "mass arc" ;
         promo:aliases "{\"global_ID\": \"I_4\", \"internal_code\": \"A_mass\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_4" ;
         promo:network "physical" ;
@@ -315,6 +318,7 @@
     <https://w3id.org/promo/ontology#idx_arc_radiation> a promo:Index ;
         rdfs:label "radiation arc" ;
         promo:aliases "{\"global_ID\": \"I_9\", \"internal_code\": \"A_rad\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_9" ;
         promo:network "physical" ;
@@ -325,6 +329,7 @@
     <https://w3id.org/promo/ontology#idx_arc_work> a promo:Index ;
         rdfs:label "work arc" ;
         promo:aliases "{\"global_ID\": \"I_10\", \"internal_code\": \"A_work\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_10" ;
         promo:network "physical" ;
@@ -335,6 +340,7 @@
     <https://w3id.org/promo/ontology#idx_node> a promo:Index ;
         rdfs:label "node" ;
         promo:aliases "{\"global_ID\": \"I_2\", \"internal_code\": \"N\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "node" ;
         promo:internalID "I_2" ;
         promo:network "physical" ;
@@ -344,6 +350,7 @@
         rdfs:label "reaction" ;
         promo:aliases "{\"global_ID\": \"I_11\", \"internal_code\": \"q\"}" ;
         promo:doc "Reaction index (conversion source), reactions domain" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_reactions> ;
         promo:indexClass "conversion" ;
         promo:internalID "I_11" ;
         promo:network "reactions" ;
@@ -352,6 +359,7 @@
     <https://w3id.org/promo/ontology#idx_species> a promo:Index ;
         rdfs:label "species" ;
         promo:aliases "{\"global_ID\": \"I_1\", \"internal_code\": \"S\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "index" ;
         promo:internalID "I_1" ;
         promo:network "physical" ;
@@ -574,6 +582,11 @@
 
     <https://w3id.org/promo/ontology> a promo:Ontology .
 
+    <https://w3id.org/promo/ontology#domain_reactions> a promo:Domain ;
+        promo:branch "physical" ;
+        promo:name "reactions" ;
+        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
     <https://w3id.org/promo/ontology#etype_convection_transport> a promo:EntityType ;
         rdfs:label "Convection Transport" ;
         promo:branch "physical" ;
@@ -745,10 +758,6 @@
         rdfs:label "Momentum" ;
         promo:tokenKind "conserved" .
 
-    <https://w3id.org/promo/ontology#domain_root> a promo:Domain ;
-        promo:hasToken <https://w3id.org/promo/ontology#token_signal> ;
-        promo:name "root" .
-
     <https://w3id.org/promo/ontology#etype_mass_transport> a promo:EntityType ;
         rdfs:label "Mass Transport" ;
         promo:branch "physical" ;
@@ -820,7 +829,11 @@
     <https://w3id.org/promo/ontology#domain_information> a promo:Domain ;
         promo:branch "information" ;
         promo:name "information" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_root> .
+        promo:parent <https://w3id.org/promo/ontology#domain_universe> .
+
+    <https://w3id.org/promo/ontology#domain_universe> a promo:Domain ;
+        promo:hasToken <https://w3id.org/promo/ontology#token_signal> ;
+        promo:name "universe" .
 
     <https://w3id.org/promo/ontology#sval_length_microscopic_distributed> a promo:ScaleValue ;
         rdfs:label "distributed" ;
@@ -830,6 +843,7 @@
     <https://w3id.org/promo/ontology#idx_arc> a promo:Index ;
         rdfs:label "arc" ;
         promo:aliases "{\"global_ID\": \"I_3\", \"internal_code\": \"A\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_3" ;
         promo:network "physical" ;
@@ -844,6 +858,16 @@
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:name "role" .
 
+    <https://w3id.org/promo/ontology#scale_length> a promo:ScaleDimension ;
+        promo:dimensionKind "structural" ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "length" .
+
+    <https://w3id.org/promo/ontology#scale_time> a promo:ScaleDimension ;
+        promo:dimensionKind "structural" ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:name "time" .
+
     <https://w3id.org/promo/ontology#domain_physical> a promo:Domain ;
         promo:branch "physical" ;
         promo:hasToken <https://w3id.org/promo/ontology#token_charge>,
@@ -853,17 +877,7 @@
             <https://w3id.org/promo/ontology#token_mass>,
             <https://w3id.org/promo/ontology#token_momentum> ;
         promo:name "physical" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_root> .
-
-    <https://w3id.org/promo/ontology#scale_length> a promo:ScaleDimension ;
-        promo:dimensionKind "structural" ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "length" .
-
-    <https://w3id.org/promo/ontology#scale_time> a promo:ScaleDimension ;
-        promo:dimensionKind "structural" ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_root> ;
-        promo:name "time" .
+        promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 }
 
 <https://w3id.org/promo/ontology> {
@@ -959,6 +973,7 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
         promo:doc "incidence matrix for convective flow" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
         promo:internalID "V_4" ;
         promo:latex "F" ;
@@ -971,6 +986,7 @@
         rdfs:label "Mm" ;
         promo:doc "molecular mass" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_species> ;
         promo:internalID "V_12" ;
         promo:latex "\\lambda" ;
@@ -983,6 +999,7 @@
         rdfs:label "S" ;
         promo:doc "Entropy" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_7" ;
         promo:latex "S" ;
@@ -995,6 +1012,7 @@
         rdfs:label "U" ;
         promo:doc "Internal energy" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_5" ;
         promo:latex "U" ;
@@ -1007,6 +1025,7 @@
         rdfs:label "V" ;
         promo:doc "volume" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:internalID "V_8" ;
         promo:latex "V" ;
         promo:network "physical" ;
@@ -1018,6 +1037,7 @@
         rdfs:label "k_conv" ;
         promo:doc "convective conductivity" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_13" ;
         promo:latex "k" ;
@@ -1031,6 +1051,7 @@
         promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
         promo:doc "species in mole" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
         promo:internalID "V_6" ;
@@ -1045,6 +1066,7 @@
         promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"promo:r_x\"}" ;
         promo:doc "x-coordinate" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_14" ;
         promo:latex "{r_x}" ;
@@ -1058,6 +1080,7 @@
         promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"promo:r_y\"}" ;
         promo:doc "y-coordinate" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_15" ;
         promo:latex "{r_y}" ;
@@ -1070,6 +1093,7 @@
         rdfs:label "r_z" ;
         promo:doc "z-coordinate" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_16" ;
         promo:latex "r_z" ;
@@ -1158,6 +1182,7 @@
         promo:created "2026-09-21T11:30:15.213Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:S\", \"promo:U\"]" ;
         promo:internalID "E_1" ;
         promo:lhs <promo:T> ;
@@ -1169,6 +1194,7 @@
         promo:created "2026-09-21T11:31:22.783Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:U\", \"promo:V\"]" ;
         promo:internalID "E_2" ;
         promo:lhs <promo:P> ;
@@ -1180,6 +1206,7 @@
         promo:created "2026-09-21T12:53:55.689Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_geometry> ;
         promo:incidenceList "[\"promo:r_x\", \"promo:r_y\"]" ;
         promo:internalID "E_3" ;
         promo:lhs <promo:Axy> ;
@@ -1191,6 +1218,7 @@
         promo:created "2026-09-21T13:17:05.082Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:P\", \"promo:k_conv\"]" ;
         promo:internalID "E_4" ;
         promo:lhs <promo:fm_conv> ;
@@ -1202,6 +1230,7 @@
         promo:created "2026-09-21T13:20:29.434Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:Mm\", \"promo:n\"]" ;
         promo:internalID "E_5" ;
         promo:lhs <promo:m> ;
@@ -1213,6 +1242,7 @@
         promo:created "2026-09-21T13:21:34.696Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:m\", \"promo:t\"]" ;
         promo:internalID "E_6" ;
         promo:lhs <promo:dmdt> ;
@@ -1224,26 +1254,29 @@
         promo:created "2026-09-21T13:24:09.462Z" ;
         promo:doc "" ;
         promo:equationClass "instantiate" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "E_7" ;
         promo:lhs <promo:to> ;
         promo:modified "2026-09-21T13:24:09.462Z" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:rhs "Instantiate(t)" .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
         promo:created "2026-09-21T13:24:54.739Z" ;
         promo:doc "" ;
         promo:equationClass "instantiate" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "E_8" ;
         promo:lhs <promo:te> ;
         promo:modified "2026-09-21T13:24:54.739Z" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:rhs "Instantiate(t)" .
 
     <https://w3id.org/promo/ontology#E_9> a promo:Equation ;
         promo:created "2026-09-21T16:43:26.574Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:dmdt\", \"promo:t\", \"promo:te\", \"promo:to\"]" ;
         promo:internalID "E_9" ;
         promo:lhs <promo:m> ;
@@ -1264,8 +1297,9 @@
         promo:aliases "{\"global_ID\": \"V_3\", \"latex\": \"\\\\frac{1}{2}\"}" ;
         promo:doc "Universal constant" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_3" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0.5" ;
         promo:variableClass "constant" .
@@ -1275,8 +1309,9 @@
         promo:aliases "{\"global_ID\": \"V_2\", \"latex\": \"1\"}" ;
         promo:doc "Universal constant" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_2" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:value "1" ;
         promo:variableClass "constant" .
@@ -1286,8 +1321,9 @@
         promo:aliases "{\"global_ID\": \"V_1\", \"latex\": \"0\"}" ;
         promo:doc "Universal constant" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_1" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0" ;
         promo:variableClass "constant" .
@@ -1296,26 +1332,6 @@
         promo:branch "information" ;
         promo:name "control" ;
         promo:parent <https://w3id.org/promo/ontology#domain_information> .
-
-    <https://w3id.org/promo/ontology#domain_geometry> a promo:Domain ;
-        promo:branch "physical" ;
-        promo:name "geometry" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
-
-    <https://w3id.org/promo/ontology#domain_macroscopic> a promo:Domain ;
-        promo:branch "physical" ;
-        promo:name "macroscopic" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
-
-    <https://w3id.org/promo/ontology#domain_properties> a promo:Domain ;
-        promo:branch "physical" ;
-        promo:name "properties" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
-
-    <https://w3id.org/promo/ontology#domain_reactions> a promo:Domain ;
-        promo:branch "physical" ;
-        promo:name "reactions" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
 
     <https://w3id.org/promo/ontology#domain_transport> a promo:Domain ;
         promo:branch "physical" ;
@@ -1404,6 +1420,7 @@
     <https://w3id.org/promo/ontology#idx_arc_diffusion> a promo:Index ;
         rdfs:label "diffusion arc" ;
         promo:aliases "{\"global_ID\": \"I_6\", \"internal_code\": \"A_diff\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_6" ;
         promo:network "physical" ;
@@ -1414,6 +1431,7 @@
     <https://w3id.org/promo/ontology#idx_arc_energy> a promo:Index ;
         rdfs:label "energy arc" ;
         promo:aliases "{\"global_ID\": \"I_5\", \"internal_code\": \"A_energy\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_5" ;
         promo:network "physical" ;
@@ -1424,6 +1442,7 @@
     <https://w3id.org/promo/ontology#idx_arc_heat> a promo:Index ;
         rdfs:label "heat arc" ;
         promo:aliases "{\"global_ID\": \"I_8\", \"internal_code\": \"A_heat\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_8" ;
         promo:network "physical" ;
@@ -1434,6 +1453,7 @@
     <https://w3id.org/promo/ontology#idx_arc_mass> a promo:Index ;
         rdfs:label "mass arc" ;
         promo:aliases "{\"global_ID\": \"I_4\", \"internal_code\": \"A_mass\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_4" ;
         promo:network "physical" ;
@@ -1444,6 +1464,7 @@
     <https://w3id.org/promo/ontology#idx_arc_radiation> a promo:Index ;
         rdfs:label "radiation arc" ;
         promo:aliases "{\"global_ID\": \"I_9\", \"internal_code\": \"A_rad\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_9" ;
         promo:network "physical" ;
@@ -1454,6 +1475,7 @@
     <https://w3id.org/promo/ontology#idx_arc_work> a promo:Index ;
         rdfs:label "work arc" ;
         promo:aliases "{\"global_ID\": \"I_10\", \"internal_code\": \"A_work\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_10" ;
         promo:network "physical" ;
@@ -1465,6 +1487,7 @@
         rdfs:label "reaction" ;
         promo:aliases "{\"global_ID\": \"I_11\", \"internal_code\": \"q\"}" ;
         promo:doc "Reaction index (conversion source), reactions domain" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_reactions> ;
         promo:indexClass "conversion" ;
         promo:internalID "I_11" ;
         promo:network "reactions" ;
@@ -1645,6 +1668,7 @@
         promo:doc "contact area in x-y plane" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_3> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_geometry> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_17" ;
         promo:latex "Axy" ;
@@ -1659,6 +1683,7 @@
         promo:doc "Thermodynamic pressure" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_10" ;
         promo:latex "P" ;
@@ -1672,6 +1697,7 @@
         promo:doc "Temperature" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_1> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_9" ;
         promo:latex "T" ;
@@ -1685,6 +1711,7 @@
         promo:doc "mass accumulation" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_6> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_20" ;
         promo:latex "\\dot{m}" ;
@@ -1698,6 +1725,7 @@
         promo:doc "convective mass flow" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_4> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_18" ;
@@ -1712,10 +1740,11 @@
         promo:doc "end time" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_8> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:instanceOf <promo:t> ;
         promo:internalID "V_22" ;
         promo:latex "t^e" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "parameter" .
@@ -1725,10 +1754,11 @@
         promo:doc "initial time" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_7> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:instanceOf <promo:t> ;
         promo:internalID "V_21" ;
         promo:latex "t^o" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "parameter" .
@@ -1755,6 +1785,7 @@
         promo:hasEquation <https://w3id.org/promo/ontology#E_5>,
             <https://w3id.org/promo/ontology#E_9> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_19" ;
         promo:latex "m" ;
@@ -1768,9 +1799,10 @@
         promo:aliases "{\"latex\": \"t\", \"global_ID\": \"promo:t\"}" ;
         promo:doc "time" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
         promo:internalID "V_11" ;
         promo:latex "t" ;
-        promo:network "root" ;
+        promo:network "universe" ;
         promo:portVariable true ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
@@ -1778,6 +1810,26 @@
     <https://w3id.org/promo/ontology#cap_reaction_host> a promo:Capability ;
         rdfs:label "reaction host" ;
         promo:doc "Reaction Host — may host reactions" .
+
+    <https://w3id.org/promo/ontology#domain_geometry> a promo:Domain ;
+        promo:branch "physical" ;
+        promo:name "geometry" ;
+        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
+    <https://w3id.org/promo/ontology#domain_macroscopic> a promo:Domain ;
+        promo:branch "physical" ;
+        promo:name "macroscopic" ;
+        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
+    <https://w3id.org/promo/ontology#domain_properties> a promo:Domain ;
+        promo:branch "physical" ;
+        promo:name "properties" ;
+        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
+    <https://w3id.org/promo/ontology#domain_reactions> a promo:Domain ;
+        promo:branch "physical" ;
+        promo:name "reactions" ;
+        promo:parent <https://w3id.org/promo/ontology#domain_physical> .
 
     <https://w3id.org/promo/ontology#etype_convection_transport> a promo:EntityType ;
         rdfs:label "Convection Transport" ;
@@ -1837,6 +1889,7 @@
     <https://w3id.org/promo/ontology#idx_arc_convection> a promo:Index ;
         rdfs:label "convection arc" ;
         promo:aliases "{\"global_ID\": \"I_7\", \"internal_code\": \"A_conv\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_7" ;
         promo:network "physical" ;
@@ -1847,6 +1900,7 @@
     <https://w3id.org/promo/ontology#idx_species> a promo:Index ;
         rdfs:label "species" ;
         promo:aliases "{\"global_ID\": \"I_1\", \"internal_code\": \"S\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "index" ;
         promo:internalID "I_1" ;
         promo:network "physical" ;
@@ -1961,10 +2015,6 @@
         rdfs:label "Momentum" ;
         promo:tokenKind "conserved" .
 
-    <https://w3id.org/promo/ontology#domain_root> a promo:Domain ;
-        promo:hasToken <https://w3id.org/promo/ontology#token_signal> ;
-        promo:name "root" .
-
     <https://w3id.org/promo/ontology#etype_mass_transport> a promo:EntityType ;
         rdfs:label "Mass Transport" ;
         promo:branch "physical" ;
@@ -2041,7 +2091,7 @@
     <https://w3id.org/promo/ontology#domain_information> a promo:Domain ;
         promo:branch "information" ;
         promo:name "information" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_root> .
+        promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
     <https://w3id.org/promo/ontology#sval_length_microscopic_distributed> a promo:ScaleValue ;
         rdfs:label "distributed" ;
@@ -2051,6 +2101,7 @@
     <https://w3id.org/promo/ontology#idx_node> a promo:Index ;
         rdfs:label "node" ;
         promo:aliases "{\"global_ID\": \"I_2\", \"internal_code\": \"N\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "node" ;
         promo:internalID "I_2" ;
         promo:network "physical" ;
@@ -2059,6 +2110,7 @@
     <https://w3id.org/promo/ontology#idx_arc> a promo:Index ;
         rdfs:label "arc" ;
         promo:aliases "{\"global_ID\": \"I_3\", \"internal_code\": \"A\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexClass "arc" ;
         promo:internalID "I_3" ;
         promo:network "physical" ;
@@ -2069,6 +2121,20 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
         promo:parent <https://w3id.org/promo/ontology#sval_time_macro> .
 
+    <https://w3id.org/promo/ontology#domain_universe> a promo:Domain ;
+        promo:hasToken <https://w3id.org/promo/ontology#token_signal> ;
+        promo:name "universe" .
+
+    <https://w3id.org/promo/ontology#scale_length> a promo:ScaleDimension ;
+        promo:dimensionKind "structural" ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "length" .
+
+    <https://w3id.org/promo/ontology#scale_time> a promo:ScaleDimension ;
+        promo:dimensionKind "structural" ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:name "time" .
+
     <https://w3id.org/promo/ontology#domain_physical> a promo:Domain ;
         promo:branch "physical" ;
         promo:hasToken <https://w3id.org/promo/ontology#token_charge>,
@@ -2078,16 +2144,6 @@
             <https://w3id.org/promo/ontology#token_mass>,
             <https://w3id.org/promo/ontology#token_momentum> ;
         promo:name "physical" ;
-        promo:parent <https://w3id.org/promo/ontology#domain_root> .
-
-    <https://w3id.org/promo/ontology#scale_length> a promo:ScaleDimension ;
-        promo:dimensionKind "structural" ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "length" .
-
-    <https://w3id.org/promo/ontology#scale_time> a promo:ScaleDimension ;
-        promo:dimensionKind "structural" ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_root> ;
-        promo:name "time" .
+        promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 }
 

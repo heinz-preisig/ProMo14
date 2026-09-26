@@ -33,11 +33,11 @@ class SeedMixin:
         # instances mint under the owning graph's namespace.
         base = str(self.ONTOLOGY_GRAPH_IRI)
 
-        # --- Domain tree: root + two branches ---
-        # The root domain is the global scope: tokens and scale
+        # --- Domain tree: universe + two branches ---
+        # The universe domain is the global scope: tokens and scale
         # dimensions bound to it are inherited by every branch.
-        root_iri = self.mint_iri(base, "domain_root")
-        self.add_domain(g, "root", iri=root_iri)
+        root_iri = self.mint_iri(base, "domain_universe")
+        self.add_domain(g, "universe", iri=root_iri)
 
         phys_iri = self.mint_iri(base, "domain_physical")
         self.add_domain(g, "physical", iri=phys_iri, parent=root_iri,

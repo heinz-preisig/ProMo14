@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
-import { indexShortLabel } from '../latex'
+import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
 import { VARIABLE_CLASSES } from '../validation'
 import AxisClassifications, { applicableAxes, deriveType } from '../axisClassifications'
@@ -50,9 +50,9 @@ export default function VariableDetailDialog({
     new Set(variable.index_structures ?? []),
   )
   const [msg, setMsg] = useState('')
-  // §18 usage lock — distinguish own defining equations from equations
-  // belonging to other variables.  Role edits never alter reference
-  // resolution; domain edits are safe only without foreign references.
+  // §18 usage lock — units and index structures remain locked while used;
+  // domain moves are planned atomically by the backend and may qualify
+  // editable references to preserve their variable IRI bindings.
   const { count: refCount, references } = useVariableLock(variable.iri)
 
   // Reinitialise + refresh the usage lock whenever another variable is shown.
@@ -70,8 +70,9 @@ export default function VariableDetailDialog({
 
   const locked = (refCount ?? 0) > 0
   const foreignRefCount = references.filter((ref) => ref.via !== 'lhs').length
-  const networkLocked = foreignRefCount > 0
-  const canSave = label.trim() && network && variableClass
+  const latexSuggestion = label.trim() ? suggestLatexAlias(label) : ''
+  const latexError = validateLatexAlias(latexSym)
+  const canSave = label.trim() && network && variableClass && !latexError
 
   const toggleIndex = (iri: string) => {
     setSelectedIndices((prev) => {
@@ -82,6 +83,8 @@ export default function VariableDetailDialog({
     })
   }
 
+  const selectedDomainIri = domains.find((item) => item.name === network)?.iri ?? null
+
   /** The variable as currently edited — shared by Save, the equation
    *  check and Add equation so all see the same record. */
   const draftVariable = (): Variable => {
@@ -91,13 +94,16 @@ export default function VariableDetailDialog({
     const equations = Object.fromEntries(
       Object.entries(variable.equations ?? {}).map(([key, equation]) => [
         key,
-        network !== variable.network ? { ...equation, network } : equation,
+        network !== variable.network
+          ? { ...equation, network, domain_iri: selectedDomainIri }
+          : equation,
       ]),
     )
     return {
       ...variable,
       label: label.trim(),
       network,
+      domain_iri: selectedDomainIri,
       type: variableClass,
       classifications,
       units: [...units],
@@ -124,9 +130,6 @@ export default function VariableDetailDialog({
   // Units and index structures remain locked while referenced.  Domain
   // has its own narrower lock; role/classification remains editable.
   const lockStyle: React.CSSProperties = locked
-    ? { pointerEvents: 'none', opacity: 0.55 }
-    : {}
-  const networkLockStyle: React.CSSProperties = networkLocked
     ? { pointerEvents: 'none', opacity: 0.55 }
     : {}
 
@@ -174,11 +177,8 @@ export default function VariableDetailDialog({
               padding: '6px 8px',
             }}
           >
-            Referenced by {refCount} equation(s) — role remains editable.
-            {networkLocked
-              ? ` Domain is locked because ${foreignRefCount} other equation(s) reference this variable.`
-              : ' Domain remains editable because references are only its own defining equations.'}
-            {' '}Units and index structures remain locked.
+            Referenced by {refCount} equation(s) — role and domain remain editable.
+            {' '}A domain move qualifies editable references when safe. Units and index structures remain locked.
           </div>
         )}
 
@@ -199,7 +199,14 @@ export default function VariableDetailDialog({
               value={latexSym}
               onChange={(e) => setLatexSym(e.target.value)}
               placeholder="e.g. \\rho — defaults to the name"
+              style={{ borderColor: latexError ? '#c62828' : undefined }}
             />
+            {latexSuggestion && latexSym.trim() !== latexSuggestion && (
+              <button type="button" onClick={() => setLatexSym(latexSuggestion)} style={{ alignSelf: 'flex-start' }}>
+                Use {latexSuggestion}
+              </button>
+            )}
+            {latexError && <span style={{ color: '#c62828', fontSize: 11 }}>{latexError}</span>}
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -212,10 +219,19 @@ export default function VariableDetailDialog({
             />
           </label>
 
-          <div style={networkLockStyle}>
+          <div>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               Domain / network <span style={{ color: '#c62828' }}>*</span>
-              <NetworkTreeSelect tree={networkTree} selected={network} onSelect={setNetwork} />
+              <NetworkTreeSelect
+                selected={network}
+                tree={networkTree}
+                onSelect={setNetwork}
+              />
+              {foreignRefCount > 0 && network !== variable.network && (
+                <span style={{ color: '#8a5a00', fontSize: 11 }}>
+                  {foreignRefCount} referencing equation{foreignRefCount === 1 ? '' : 's'} will be qualified automatically when safe.
+                </span>
+              )}
             </label>
           </div>
 

@@ -21,12 +21,12 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import jinja2
 
 from .checker import check
-from .codegen import Renderer, tex_brace_subscripts, tex_escape
+from .codegen import Renderer, tex_append_subscripts, tex_brace_subscripts, tex_escape, tex_suggest_alias
 from .compile_space import CompileSpace
 from .parser import parse
 from .syntax import Instantiate, Var
@@ -68,11 +68,11 @@ def _var_symbol(var: Any, space: CompileSpace) -> str:
     if alias:
         base = tex_brace_subscripts(alias)
     else:
-        label = tex_escape(var.label or var.iri)
-        base = r"\mathit{%s}" % label
+        label = tex_suggest_alias(var.label or var.iri)
+        base = label
     # Brace the base: a verbatim alias may itself carry a subscript
     # (``r_z``) — ``{r_z}_{N}`` compiles, ``r_z_{N}`` is a double subscript.
-    return "{%s}_{%s}" % (base, ",".join(subs)) if subs else base
+    return tex_append_subscripts(base, subs)
 
 
 def _rhs_latex(eq: Any, var: Any, ctx: Any) -> str:
@@ -121,6 +121,45 @@ def _inline_resources(tex: str) -> str:
                     name, path.read_text()),
             )
     return tex
+
+
+def validate_latex_alias(alias: str) -> Optional[str]:
+    base = tex_brace_subscripts(alias.strip())
+    symbol = tex_append_subscripts(base, [r"A\_validation", "N", "S"])
+    depth = 0
+    escaped = False
+    for char in symbol:
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth < 0:
+                return "unexpected closing brace"
+    if escaped:
+        return "incomplete command at end of alias"
+    if depth:
+        return "unclosed brace"
+    if not pdf_available():
+        return None
+    source = (
+        r"\documentclass{article}" "\n"
+        r"\begin{document}" "\n"
+        r"$%s$" "\n"
+        r"\end{document}" "\n"
+    ) % symbol
+    try:
+        compile_pdf(source)
+    except PdfCompileError as exc:
+        for line in str(exc).splitlines():
+            if line.startswith("!"):
+                return line[1:].strip()
+        return str(exc).splitlines()[0]
+    return None
 
 
 class PdfCompileError(Exception):

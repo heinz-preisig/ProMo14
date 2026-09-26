@@ -3,7 +3,7 @@
 import pytest
 
 from .checker import check
-from .codegen import render
+from .codegen import render, tex_suggest_alias
 from .compile_space import CompileSpace, Index, Variable
 from .parser import parse
 from .syntax import Call, Var
@@ -142,7 +142,7 @@ def test_python_call():
     checked = check(node, space)
     assert render(checked, space, "python") == "userFunc(V_3, V_8)"
     assert render(checked, space, "latex") == \
-        r"\mathrm{userFunc}\left( \mathit{M}, \mathit{one} \right)"
+        r"\mathrm{userFunc}\left( M, one \right)"
 
 
 # -- matlab -----------------------------------------------------------------
@@ -186,8 +186,8 @@ def test_matlab_root():
 # -- latex ------------------------------------------------------------------
 
 def test_latex_var_label_with_index_subscripts():
-    assert gen("rho", "latex") == r"{\mathit{rho}}_{N}"
-    assert gen("M", "latex") == r"\mathit{M}"
+    assert gen("rho", "latex") == r"{\rho}_{N}"
+    assert gen("M", "latex") == r"M"
 
 
 def _underscore_space():
@@ -207,9 +207,9 @@ def _underscore_space():
 def test_latex_underscore_index_alias_escaped():
     # A raw ``_`` inside ``_{...}`` is a LaTeX double-subscript error.
     space = _underscore_space()
-    assert gen("J", "latex", space) == r"{\mathit{J}}_{A\_heat}"
+    assert gen("J", "latex", space) == r"{J}_{A\_heat}"
     assert gen("reduceSum(J, A_heat)", "latex", space) == \
-        r"\sum_{A\_heat} {\mathit{J}}_{A\_heat}"
+        r"\sum_{A\_heat} {J}_{A\_heat}"
 
 
 def test_matlab_underscore_index_alias_stays_raw():
@@ -221,46 +221,46 @@ def test_matlab_underscore_index_alias_stays_raw():
 
 def test_latex_group():
     assert gen("( rho + rho )", "latex") == \
-        r"\left( {\mathit{rho}}_{N} + {\mathit{rho}}_{N} \right)"
+        r"\left( {\rho}_{N} + {\rho}_{N} \right)"
 
 
 def test_latex_hadamard():
-    assert gen("rho . v", "latex") == r"{\mathit{rho}}_{N} \circ {\mathit{v}}_{N}"
+    assert gen("rho . v", "latex") == r"{\rho}_{N} \circ {v}_{N}"
 
 
 def test_latex_expand():
     assert gen("rho : rhoT", "latex") == \
-        r"{\mathit{rho}}_{N} \otimes {\mathit{rhoT}}_{t}"
+        r"{\rho}_{N} \otimes {rhoT}_{t}"
 
 
 def test_latex_reduce_sums_shared_index():
     assert gen("rho * v", "latex") == \
-        r"\sum_{N} {\mathit{rho}}_{N} \, {\mathit{v}}_{N}"
+        r"\sum_{N} {\rho}_{N} \, {v}_{N}"
 
 
 def test_latex_power():
-    assert gen("one ^ one", "latex") == r"{\mathit{one}}^{\mathit{one}}"
+    assert gen("one ^ one", "latex") == r"{one}^{one}"
 
 
 def test_latex_ufunc():
-    assert gen("sin(one)", "latex") == r"\sin\left( \mathit{one} \right)"
-    assert gen("inv(M)", "latex") == r"{\mathit{M}}^{-1}"
-    assert gen("sqrt(one)", "latex") == r"\sqrt{\mathit{one}}"
+    assert gen("sin(one)", "latex") == r"\sin\left( one \right)"
+    assert gen("inv(M)", "latex") == r"{M}^{-1}"
+    assert gen("sqrt(one)", "latex") == r"\sqrt{one}"
 
 
 def test_latex_integral():
     assert gen("Integral(M :: M in [one, one])", "latex") == \
-        r"\int_{\mathit{one}}^{\mathit{one}} \mathit{M} \, d\mathit{M}"
+        r"\int_{one}^{one} M \, dM"
 
 
 def test_latex_root():
     assert gen("Root(M + M)", "latex", lhs="M") == \
-        r"\mathit{M} + \mathit{M} = 0"
+        r"M + M = 0"
 
 
 def test_latex_pardiff():
     assert gen("ParDiff(x, x)", "latex") == \
-        r"\frac{\partial {\mathit{x}}_{t}}{\partial {\mathit{x}}_{t}}"
+        r"\frac{\partial {x}_{t}}{\partial {x}_{t}}"
 
 
 def test_latex_alias_with_own_subscript_braced():
@@ -280,7 +280,7 @@ def test_latex_alias_with_own_subscript_braced():
     # Unbraced subscript runs are braced — a bare ``_`` consumes one
     # token, so ``r_z`` alone renders ``r_z`` anyway but ``F_conv``
     # would render ``F_c`` + stray ``onv``.
-    assert gen("rz", "latex", space) == r"{r_{z}}_{N}"
+    assert gen("rz", "latex", space) == r"r_{z,N}"
 
 
 def test_latex_alias_multi_char_subscript_braced():
@@ -297,12 +297,49 @@ def test_latex_alias_multi_char_subscript_braced():
         variable_definition_network="thermo",
         expression_definition_network="thermo",
     )
-    assert gen("F_conv", "latex", space) == r"{F_{conv}}_{N}"
+    assert gen("F_conv", "latex", space) == r"F_{conv,N}"
+
+
+def test_latex_accented_alias_with_own_subscript_and_indices():
+    n_idx = Index(iri=N, label="species", network="thermo",
+                  aliases={"internal_code": "N"})
+    flow = Variable(iri="http://promo.example/var/flow", internal_id="V_32",
+                    label="flow", network="thermo", type="state",
+                    units=Units(), index_structures=[N],
+                    aliases={"latex": r"\hat{n}_conv"})
+    space = CompileSpace(
+        {flow.iri: flow}, {n_idx.iri: n_idx},
+        variable_definition_network="thermo",
+        expression_definition_network="thermo",
+    )
+    assert gen("flow", "latex", space) == r"\hat{n}_{conv,N}"
+
+
+def test_latex_alias_with_outer_groups_and_own_subscript():
+    n_idx = Index(iri=N, label="species", network="thermo",
+                  aliases={"internal_code": "N"})
+    flow = Variable(iri="http://promo.example/var/flow", internal_id="V_33",
+                    label="flow", network="thermo", type="state",
+                    units=Units(), index_structures=[N],
+                    aliases={"latex": r"{{\tilde{n}_{conv}}}"})
+    space = CompileSpace(
+        {flow.iri: flow}, {n_idx.iri: n_idx},
+        variable_definition_network="thermo",
+        expression_definition_network="thermo",
+    )
+    assert gen("flow", "latex", space) == r"\tilde{n}_{conv,N}"
 
 
 def test_latex_instantiate():
     assert gen("Instantiate(M)", "latex", lhs="one") == \
-        r"\mathit{one} := \mathrm{inst}\left( \mathit{M} \right)"
+        r"one := \mathrm{inst}\left( M \right)"
+
+
+def test_latex_alias_suggestion():
+    assert tex_suggest_alias("rho") == r"\rho"
+    assert tex_suggest_alias("rho_gas") == r"\rho_{gas}"
+    assert tex_suggest_alias("T_wall") == r"T_{wall}"
+    assert tex_suggest_alias("mass_flow") == r"mass_{flow}"
 
 
 # -- imported variables -------------------------------------------------------
@@ -316,7 +353,7 @@ def test_imported_var_gets_network_prefix_in_code():
     )
     assert gen("upstream!ext", "python", space) == "upstream_V_9"
     # LaTeX keeps the human label (network qualifier is a code concern).
-    assert gen("upstream!ext", "latex", space) == r"\mathit{ext}"
+    assert gen("upstream!ext", "latex", space) == r"ext"
 
 
 def test_unknown_target_rejected():

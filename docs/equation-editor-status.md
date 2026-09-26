@@ -1,6 +1,6 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-26
 
 ## Current state
 
@@ -133,14 +133,37 @@ Implemented as a React + TypeScript + Vite app in
   `\hat{m}_conv` → `\hat{m}_{conv}`) consistently in preview, codegen,
   and the printable variable table; already braced `_{…}` and escaped
   `\_` remain unchanged.
-- **Focused domain/role correction (2026-09-25):** the existing-variable
-  dialog keeps role classifications editable even when equations reference
-  the variable.  Domain remains editable when references are only its own
-  defining LHS equations (which move with it), but is locked when foreign
-  equations reference it.  Units and index structures remain usage-locked.
-  The backend enforces the same field-level policy.  Legacy variables with
-  an empty `classifications` map show an explicit warning and editable blank
-  role selectors; roles are not guessed from the lossy legacy class.
+- **Focused domain/role correction (updated 2026-09-26):** role
+  classifications remain editable while referenced.  Domain membership now
+  uses the safe refactor plan below rather than locking whenever a foreign
+  equation exists.  Units and index structures remain usage-locked.  Legacy
+  variables with an empty `classifications` map show an explicit warning and
+  editable blank role selectors; roles are not guessed from the lossy legacy
+  class.
+- **Derived LaTeX aliases (2026-09-26):** all live variable editors offer a
+  non-destructive `Use …` suggestion derived from the variable label
+  (`rho` → `\rho`, `rho_gas` → `\rho_{gas}`, `T_wall` → `T_{wall}`).
+  Explicit aliases remain user-owned; when no alias is stored, frontend
+  preview, backend codegen and printable documentation derive the same
+  unstored default.
+- **IRI-backed domain membership (2026-09-26):** variables, equations and
+  indices carry authoritative `domain_iri` / `promo:inDomain` links.  The
+  legacy `network` string remains as the readable domain name and equation
+  qualifier.  Reads prefer the IRI link; writes validate the IRI/name pair.
+  The root domain is now `universe` (`domain_universe`).  An idempotent load
+  migration converts `domain_root`, `promo:name "root"`, legacy root network
+  values, and network-only records; tracked ontology/library data are
+  migrated.
+- **Safe domain refactoring (2026-09-26):** a referenced variable's domain
+  can be changed when the backend can preserve bindings atomically.  Its
+  colocated defining equations move with it; editable foreign references are
+  rewritten to `destination!label`, parsed and checked in a simulated
+  destination context, and their incidence/LaTeX caches are regenerated.
+  Moves are rejected with `409` before mutation when a reference is in
+  another/read-only graph, cannot be qualified, changes another binding, or
+  makes a defining equation invalid.  Units and index structures remain
+  usage-locked.  The detail dialog reports the number of references that may
+  be qualified.
 
 ## Pending items
 
@@ -149,7 +172,7 @@ Implemented as a React + TypeScript + Vite app in
   (ontology graph + var/expr graphs) using the ProMo14 vocabulary
   (`promo:Variable`/`promo:Index`, `promo:hasEquation`,
   `promo:unitVector`).  The network tree is built from
-  `promo:Domain`/`promo:parent` with a synthetic `root` and cycle
+  `promo:Domain`/`promo:parent` with `universe` as the real root and cycle
   breaking.  Ontology `indexClass` source kinds (node/arc/...) map to
   the checker's `index`/`block_index`.  The legacy v8 loader
   (`backend/core/loader.py`) and all legacy vocabulary handling were
@@ -268,7 +291,7 @@ Implemented as a React + TypeScript + Vite app in
   latex alias.  Saving writes `promo:instanceOf` → prototype IRI and
   auto-classifies `equation_class = "instantiate"`.
 - **Universal constants (ADR-008):** `zero`, `one`, `half` seeded in
-  the ontology (network `root`, class `constant`) with pre-bound
+  the ontology (domain `universe`, class `constant`) with pre-bound
   `promo:value` (`0`/`1`/`0.5`) and latex aliases — permanent,
   non-deletable in the palette (shown with a `=value` badge).
   `RdfStore._seed_constants` is idempotent and also runs from `load()`

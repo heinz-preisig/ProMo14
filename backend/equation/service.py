@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, field_validator
-from rdflib import URIRef
+from rdflib import URIRef, Literal
 from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, get_store
@@ -39,12 +39,15 @@ from .document import (
     build_document,
     compile_pdf,
     pdf_available,
+    validate_latex_alias,
 )
 
 from .errors import VarError
 from .parser import ParseError, parse
 from .syntax import Instantiate, Node, Var
 from .units import Units
+
+import copy
 
 router = APIRouter()
 
@@ -93,6 +96,7 @@ class EquationIn(BaseModel):
     rhs_latex: Optional[str] = None
     equation_class: Optional[str] = None
     network: Optional[str] = None
+    domain_iri: Optional[str] = None
     incidence_list: List[str] = Field(default_factory=list)
     doc: str = ""
     created: Optional[str] = None
@@ -110,6 +114,7 @@ class VariableIn(BaseModel):
     iri: str
     label: str
     network: str
+    domain_iri: Optional[str] = None
     type: str = "state"
     units: List[int] = Field(default_factory=lambda: [0] * 8)
     index_structures: List[str] = Field(default_factory=list)
@@ -138,6 +143,7 @@ class IndexIn(BaseModel):
     iri: str
     label: str
     network: str = "root"
+    domain_iri: Optional[str] = None
     index_class: str = "index"
     aliases: Dict[str, str] = Field(default_factory=dict)
     token: Optional[str] = None
@@ -151,7 +157,9 @@ class CheckRequest(BaseModel):
     variables: List[VariableIn] = Field(default_factory=list)
     indices: List[IndexIn] = Field(default_factory=list)
     variable_definition_network: str = "root"
+    variable_definition_domain_iri: Optional[str] = None
     expression_definition_network: str = "root"
+    expression_definition_domain_iri: Optional[str] = None
     lhs: Optional[str] = None  # LHS variable label, needed for Root()
     # parent -> children domain tree; used to compute accessible networks
     network_tree: Dict[str, List[str]] = Field(default_factory=dict)
@@ -189,7 +197,7 @@ class ContextResponse(BaseModel):
     # dropdowns in the variable editors.  Domains are included so the
     # UI can map a variable's network (a domain name) to axis ancestry.
     axes: List[Dict[str, Any]] = Field(default_factory=list)
-    domains: List[Dict[str, Any]] = Field(default_factory=list)
+    domains: List[Dict[str, Any]] = Field(default_factory=dict)
     # Host capabilities the UI adapts to — e.g. {"pdf": false} when no
     # TeX toolchain is installed (default Docker image).
     capabilities: Dict[str, bool] = Field(default_factory=dict)
@@ -218,6 +226,7 @@ def context_endpoint(
                 iri=v.iri,
                 label=v.label,
                 network=v.network,
+                domain_iri=v.domain_iri,
                 type=v.type,
                 units=v.units.as_list(),
                 index_structures=v.index_structures,
@@ -242,6 +251,7 @@ def context_endpoint(
                 iri=i.iri,
                 label=i.label,
                 network=i.network,
+                domain_iri=i.domain_iri,
                 index_class=i.index_class,
                 aliases=i.aliases,
                 token=i.token,
@@ -277,6 +287,7 @@ def _build_space(req: CheckRequest) -> CompileSpace:
             iri=v.iri,
             label=v.label,
             network=v.network,
+            domain_iri=v.domain_iri,
             type=v.type,
             units=Units.from_list(v.units),
             index_structures=v.index_structures,
@@ -294,6 +305,7 @@ def _build_space(req: CheckRequest) -> CompileSpace:
             iri=i.iri,
             label=i.label,
             network=i.network,
+            domain_iri=i.domain_iri,
             index_class=i.index_class,
             aliases=i.aliases,
             token=i.token,
@@ -307,10 +319,11 @@ def _build_space(req: CheckRequest) -> CompileSpace:
         ctx.variables(),
         ctx.indices(),
         variable_definition_network=req.variable_definition_network,
+        variable_definition_domain_iri=req.variable_definition_domain_iri,
         expression_definition_network=req.expression_definition_network,
-        accessible_networks=ctx.accessible_networks(
-            req.expression_definition_network
-        ),
+        expression_definition_domain_iri=req.expression_definition_domain_iri,
+        accessible_networks=ctx.accessible_networks(req.expression_definition_network),
+        network_tree=ctx.tree(),
     )
 
 
@@ -478,6 +491,28 @@ def _class_from_classifications(graph, classifications) -> Optional[str]:
     return "state"
 
 
+def _resolve_record_domains(store, graph_iri: Optional[str], record: VariableRecord) -> None:
+    domains = scoped_context(store, graph_iri).domains()
+    by_iri = {domain["iri"]: domain for domain in domains}
+    by_name = {domain["name"]: domain for domain in domains}
+
+    def resolve(name: Optional[str], iri: Optional[str]) -> "tuple[str, str]":
+        domain = by_iri.get(iri) if iri else by_name.get("universe" if name == "root" else name)
+        if domain is None:
+            raise HTTPException(
+                status_code=422,
+                detail={"field": "domain_iri", "message": "Unknown domain"},
+            )
+        return domain["name"], domain["iri"]
+
+    record.network, record.domain_iri = resolve(record.network, record.domain_iri)
+    for equation in record.equations.values():
+        equation.network, equation.domain_iri = resolve(
+            equation.network or record.network,
+            equation.domain_iri or (record.domain_iri if equation.network == record.network else None),
+        )
+
+
 @router.post("/variables", response_model=VariableRecord)
 def create_variable(
     record: VariableRecord,
@@ -485,8 +520,11 @@ def create_variable(
 ) -> VariableRecord:
     """Create a new variable (with nested equations) in the selected
     artefact graph (default: the working ontology)."""
+    _validate_variable_latex(record)
     store = get_store()
+    _resolve_record_domains(store, graph_iri, record)
     graph = resolve_graph(store, graph_iri)
+
     if not record.iri:
         record.iri = str(store.mint_iri(graph.identifier, record.internal_id or store.next_internal_id("V")))
     if not record.internal_id:
@@ -495,7 +533,9 @@ def create_variable(
     # POST doubles as the editor's update path (the frontend never PUTs):
     # enforce the mutability guard and replace — not merge — when the
     # variable already exists.
-    _guard_structural_edit(store, graph, record.iri, record, graph_iri)
+    move_plan = _plan_domain_move(store, graph, record.iri, record, graph_iri)
+    _guard_structural_edit(store, graph, record.iri, record, graph_iri,
+                           domain_move_planned=bool(move_plan))
     _remove_variable(graph, URIRef(record.iri))
 
     protos = _instantiate_protos(record)
@@ -513,6 +553,39 @@ def create_variable(
         var["type"] = var["variable_class"]
     var_iri = store.add_variable_dict(graph, var)
     _link_instances(graph, var_iri, protos, record.network)
+    _apply_domain_move(graph, move_plan)
+    return record
+
+
+@router.put("/variables/{iri:path}", response_model=VariableRecord)
+def update_variable(
+    iri: str,
+    record: VariableRecord,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> VariableRecord:
+    """Replace a variable in the selected artefact graph.
+
+    Structural fields are locked while the variable is referenced by an
+    equation — changing them then returns 409 with the referencers.
+    """
+    _validate_variable_latex(record)
+    store = get_store()
+    _resolve_record_domains(store, graph_iri, record)
+    graph = resolve_graph(store, graph_iri)
+
+    subject = URIRef(iri)
+    if (subject, None, None) not in graph:
+        raise HTTPException(status_code=404, detail="Variable not found")
+
+    move_plan = _plan_domain_move(store, graph, iri, record, graph_iri)
+    _guard_structural_edit(store, graph, iri, record, graph_iri,
+                           domain_move_planned=bool(move_plan))
+    _remove_variable(graph, subject)
+    record.iri = iri
+    protos = _instantiate_protos(record)
+    var_iri = store.add_variable_dict(graph, record.model_dump())
+    _link_instances(graph, var_iri, protos, record.network)
+    _apply_domain_move(graph, move_plan)
     return record
 
 
@@ -582,6 +655,184 @@ def _variable_references(store, iri: str) -> List[Dict[str, str]]:
     return refs
 
 
+def _rewrite_reference(rhs: str, old, destination: str) -> str:
+    """Qualify occurrences that can denote ``old`` with its destination."""
+    qualified = f"{destination}!{old.label}"
+    candidates = [f"{old.network}!{old.label}", old.label]
+    candidates.extend(_reference_tokens(old))
+    rewritten = rhs
+    for token in sorted(set(candidates), key=len, reverse=True):
+        if token and token != qualified:
+            rewritten = re.sub(
+                r"(?<![A-Za-z0-9_!])" + re.escape(token)
+                + r"(?![A-Za-z0-9_])",
+                qualified,
+                rewritten,
+            )
+    return rewritten
+
+
+def _plan_domain_move(store, graph, iri: str, record: VariableRecord,
+                      graph_iri: Optional[str]) -> List["tuple[URIRef, str, List[str], str]"]:
+    """Return validated equation rewrites needed to preserve a moved variable."""
+    if (URIRef(iri), None, None) not in graph:
+        return []
+    old = scoped_context(store, graph_iri).variables().get(iri)
+    if old is None or (old.domain_iri == record.domain_iri
+                       and old.network == record.network):
+        return []
+
+    context = scoped_context(store, graph_iri)
+    variables = dict(context.variables())
+    moved = copy.copy(old)
+    moved.network = record.network
+    moved.domain_iri = record.domain_iri
+    variables[iri] = moved
+    blocked: List[Dict[str, str]] = []
+    for equation in record.equations.values():
+        if equation.network == old.network:
+            equation.network = record.network
+            equation.domain_iri = record.domain_iri
+        equation_network = equation.network or record.network
+        space = CompileSpace(
+            variables,
+            context.indices(),
+            variable_definition_network=record.network,
+            expression_definition_network=equation_network,
+            accessible_networks=context.accessible_networks(equation_network),
+            network_tree=context.tree(),
+        )
+        try:
+            checked = check(parse(equation.rhs), space, Var(record.label))
+        except (ParseError, VarError) as exc:
+            blocked.append({
+                "equation": equation.iri,
+                "graph": str(graph.identifier),
+                "via": "lhs",
+                "error": str(exc),
+            })
+            continue
+        before = set(equation.incidence_list)
+        if before and before != set(checked.incidence):
+            blocked.append({
+                "equation": equation.iri,
+                "graph": str(graph.identifier),
+                "via": "lhs",
+                "error": "moving the defining equation would change an input binding",
+            })
+            continue
+        equation.incidence_list = sorted(checked.incidence)
+        equation.rhs_latex = render(checked, space, "latex")
+
+    plan: List["tuple[URIRef, str, List[str], str]"] = []
+    for ref in _variable_references(store, iri):
+        if ref["via"] == "lhs":
+            continue
+        if ref["graph"] != str(graph.identifier):
+            blocked.append(ref)
+            continue
+        equation = URIRef(ref["equation"])
+        rhs = str(graph.value(equation, PROMO["rhs"]) or "")
+        rewritten = _rewrite_reference(rhs, old, record.network)
+        if rewritten == rhs:
+            blocked.append(ref)
+        else:
+            equation_network = str(graph.value(equation, PROMO["network"])
+                                   or "universe")
+            space = CompileSpace(
+                variables,
+                context.indices(),
+                variable_definition_network=equation_network,
+                expression_definition_network=equation_network,
+                accessible_networks=context.accessible_networks(equation_network),
+                network_tree=context.tree(),
+            )
+            try:
+                checked = check(parse(rewritten), space)
+            except (ParseError, VarError) as exc:
+                blocked.append({**ref, "error": str(exc)})
+                continue
+            if iri not in checked.incidence:
+                blocked.append({**ref, "error": "rewritten reference changed binding"})
+                continue
+            stored_incidence = graph.value(equation, PROMO["incidenceList"])
+            if stored_incidence is not None:
+                try:
+                    before = set(json.loads(str(stored_incidence)))
+                except (TypeError, ValueError):
+                    before = set()
+                if before and before != set(checked.incidence):
+                    blocked.append({**ref, "error": "other variable bindings would change"})
+                    continue
+            latex = render(checked, space, "latex")
+            plan.append((equation, rewritten, sorted(checked.incidence), latex))
+    if blocked:
+        raise HTTPException(status_code=409, detail={
+            "message": (
+                "Domain move cannot preserve %d reference(s); they are "
+                "outside the editable graph or cannot be qualified"
+                % len(blocked)
+            ),
+            "locked_fields": ["network", "domain_iri"],
+            "references": blocked,
+        })
+    return plan
+
+
+def _apply_domain_move(
+    graph, plan: List["tuple[URIRef, str, List[str], str]"],
+) -> None:
+    for equation, rhs, incidence, latex in plan:
+        graph.set((equation, PROMO["rhs"], Literal(rhs)))
+        graph.set((equation, PROMO["incidenceList"], Literal(json.dumps(incidence))))
+        graph.set((equation, PROMO["rhsLatex"], Literal(latex)))
+
+
+def _remove_variable(graph, subject: URIRef) -> None:
+    """Remove a variable *and* its equation nodes — equations are nested
+    records; dropping only the variable's triples would orphan rhs
+    references that still mention other variables."""
+    for eq in list(graph.objects(subject, PROMO["hasEquation"])):
+        graph.remove((eq, None, None))
+    graph.remove((subject, None, None))
+
+
+def _guard_structural_edit(store, graph, iri: str,
+                           record: VariableRecord,
+                           graph_iri: Optional[str] = None,
+                           domain_move_planned: bool = False) -> None:
+    """409 when ``record`` changes structural fields of a variable that
+    equations reference.  No-op when the variable does not exist in
+    ``graph`` (plain create).
+
+    ``old`` is resolved in the write-graph's own scope — the same view
+    the editor fetched and submitted — not dataset-wide: a shadow copy
+    in an artefact graph would otherwise diff against the ontology
+    copy and produce phantom locked-field 409s."""
+    subject = URIRef(iri)
+    if (subject, None, None) not in graph:
+        return
+    old = scoped_context(store, graph_iri).variables().get(iri)
+    changed = _structural_changes(old, record) if old is not None else []
+    refs = _variable_references(store, iri)
+    foreign_refs = [ref for ref in refs if ref["via"] != "lhs"]
+    allowed = {"classifications", "variable_class"}
+    if not foreign_refs or domain_move_planned:
+        allowed.add("network")
+        allowed.add("domain_iri")
+    blocked = [field for field in changed if field not in allowed]
+    if refs and blocked:
+        raise HTTPException(status_code=409, detail={
+            "message": (
+                "Variable is referenced by %d equation(s); "
+                "structural field(s) locked: %s"
+                % (len(refs), ", ".join(blocked))
+            ),
+            "locked_fields": blocked,
+            "references": refs,
+        })
+
+
 def _structural_changes(old, record: VariableRecord) -> List[str]:
     """Structural fields differing between the stored variable and the
     incoming record.  ``global_ID`` falls back to the IRI fragment (the
@@ -605,6 +856,7 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
         ("port_variable", bool(getattr(old, "port_variable", False)),
          bool(record.port_variable)),
         ("network", getattr(old, "network", None), record.network),
+        ("domain_iri", getattr(old, "domain_iri", None), record.domain_iri),
         ("internal_id", getattr(old, "internal_id", None),
          record.internal_id),
         ("alias:global_ID",
@@ -617,49 +869,6 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
     return [name for name, before, after in pairs if before != after]
 
 
-def _remove_variable(graph, subject: URIRef) -> None:
-    """Remove a variable *and* its equation nodes — equations are nested
-    records; dropping only the variable's triples would orphan rhs
-    references that still mention other variables."""
-    for eq in list(graph.objects(subject, PROMO["hasEquation"])):
-        graph.remove((eq, None, None))
-    graph.remove((subject, None, None))
-
-
-def _guard_structural_edit(store, graph, iri: str,
-                           record: VariableRecord,
-                           graph_iri: Optional[str] = None) -> None:
-    """409 when ``record`` changes structural fields of a variable that
-    equations reference.  No-op when the variable does not exist in
-    ``graph`` (plain create).
-
-    ``old`` is resolved in the write-graph's own scope — the same view
-    the editor fetched and submitted — not dataset-wide: a shadow copy
-    in an artefact graph would otherwise diff against the ontology
-    copy and produce phantom locked-field 409s."""
-    subject = URIRef(iri)
-    if (subject, None, None) not in graph:
-        return
-    old = scoped_context(store, graph_iri).variables().get(iri)
-    changed = _structural_changes(old, record) if old is not None else []
-    refs = _variable_references(store, iri)
-    foreign_refs = [ref for ref in refs if ref["via"] != "lhs"]
-    allowed = {"classifications", "variable_class"}
-    if not foreign_refs:
-        allowed.add("network")
-    blocked = [field for field in changed if field not in allowed]
-    if refs and blocked:
-        raise HTTPException(status_code=409, detail={
-            "message": (
-                "Variable is referenced by %d equation(s); "
-                "structural field(s) locked: %s"
-                % (len(refs), ", ".join(blocked))
-            ),
-            "locked_fields": blocked,
-            "references": refs,
-        })
-
-
 @router.get("/variables/{iri:path}/references")
 def variable_references(iri: str) -> Dict[str, Any]:
     """Equations referencing the variable — lets the editor lock
@@ -667,33 +876,6 @@ def variable_references(iri: str) -> Dict[str, Any]:
     store = get_store()
     refs = _variable_references(store, iri)
     return {"iri": iri, "used": bool(refs), "references": refs}
-
-
-@router.put("/variables/{iri:path}", response_model=VariableRecord)
-def update_variable(
-    iri: str,
-    record: VariableRecord,
-    graph_iri: Optional[str] = Depends(editable_param),
-) -> VariableRecord:
-    """Replace a variable in the selected artefact graph.
-
-    Structural fields are locked while the variable is referenced by an
-    equation — changing them then returns 409 with the referencers.
-    """
-    store = get_store()
-    graph = resolve_graph(store, graph_iri)
-
-    subject = URIRef(iri)
-    if (subject, None, None) not in graph:
-        raise HTTPException(status_code=404, detail="Variable not found")
-
-    _guard_structural_edit(store, graph, iri, record, graph_iri)
-    _remove_variable(graph, subject)
-    record.iri = iri
-    protos = _instantiate_protos(record)
-    var_iri = store.add_variable_dict(graph, record.model_dump())
-    _link_instances(graph, var_iri, protos, record.network)
-    return record
 
 
 @router.delete("/variables/{iri:path}")
@@ -722,3 +904,15 @@ def delete_variable(
         })
     _remove_variable(graph, subject)
     return {"deleted": iri}
+
+
+def _validate_variable_latex(record: VariableRecord) -> None:
+    alias = (record.aliases or {}).get("latex", "").strip()
+    if not alias:
+        return
+    error = validate_latex_alias(alias)
+    if error:
+        raise HTTPException(
+            status_code=422,
+            detail={"field": "aliases.latex", "message": error},
+        )

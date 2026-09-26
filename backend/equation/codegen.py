@@ -68,6 +68,23 @@ _UFUNC_JL: Dict[str, str] = {
     "diffSpace": "gradient",
 }
 
+_GREEK_NAMES = {
+    "alpha", "beta", "gamma", "delta", "epsilon", "varepsilon", "zeta",
+    "eta", "theta", "vartheta", "iota", "kappa", "lambda", "mu", "nu",
+    "xi", "pi", "varpi", "rho", "varrho", "sigma", "varsigma", "tau",
+    "upsilon", "phi", "varphi", "chi", "psi", "omega",
+    "Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma", "Upsilon",
+    "Phi", "Psi", "Omega",
+}
+
+
+def tex_suggest_alias(name: str) -> str:
+    base, separator, qualifier = name.partition("_")
+    symbol = "\\" + base if base in _GREEK_NAMES else tex_escape(base)
+    if separator and qualifier:
+        return "%s_{%s}" % (symbol, tex_escape(qualifier))
+    return symbol
+
 
 def _san(name: str) -> str:
     """Sanitise a surface name into a code-legal identifier."""
@@ -92,6 +109,38 @@ def tex_escape(name: str) -> str:
     not math: a raw ``_`` inside ``_{...}`` is a double-subscript error.
     """
     return name.replace("_", r"\_")
+
+
+def tex_append_subscripts(base: str, subs: List[str]) -> str:
+    if not subs:
+        return base
+    while base.startswith("{") and base.endswith("}"):
+        depth = 0
+        encloses_all = True
+        for pos, char in enumerate(base):
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0 and pos != len(base) - 1:
+                    encloses_all = False
+                    break
+        if not encloses_all or depth != 0:
+            break
+        base = base[1:-1]
+    suffix = ",".join(subs)
+    if base.endswith("}"):
+        depth = 0
+        for pos in range(len(base) - 1, -1, -1):
+            if base[pos] == "}":
+                depth += 1
+            elif base[pos] == "{":
+                depth -= 1
+                if depth == 0:
+                    if pos > 0 and base[pos - 1] == "_":
+                        return "%s_{%s,%s}" % (base[:pos - 1], base[pos + 1:-1], suffix)
+                    break
+    return "{%s}_{%s}" % (base, suffix)
 
 
 class Renderer:
@@ -130,10 +179,10 @@ class Renderer:
                 base = tex_brace_subscripts(alias)
             else:
                 label = var.label or node.name
-                base = r"\mathit{%s}" % tex_escape(label)
+                base = tex_suggest_alias(label)
             # Brace the base: a verbatim alias may itself carry a subscript
             # (``r_z``) — ``{r_z}_{N}`` compiles, ``r_z_{N}`` does not.
-            return "{%s}_{%s}" % (base, ",".join(subs)) if subs else base
+            return tex_append_subscripts(base, subs) if subs else base
         name = _san(var.internal_id or var.label or node.name)
         if resolved.imported and var.network:
             return "%s_%s" % (_san(var.network), name)

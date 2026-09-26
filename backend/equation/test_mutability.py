@@ -135,27 +135,31 @@ def test_own_equation_allows_role_change(client):
     assert r.status_code == 200, r.text
 
 
-def test_network_edit_allowed_with_own_equation_only(client):
-    """Moving a variable and its own definition together is safe."""
-    _post(client, _var("V_1", equations={
-        "root": _eq("E_1", f"{BASE}#V_1", "2"),
-    }))
-
-    moved = _var("V_1", network="physical", equations={
-        "root": {
-            **_eq("E_1", f"{BASE}#V_1", "2"),
-            "network": "physical",
-        },
-    })
-    r = _put(client, moved)
-    assert r.status_code == 200, r.text
-
-
-def test_network_edit_blocked_with_foreign_reference(client):
-    """A domain move could invalidate qualified references elsewhere."""
+def test_network_edit_qualifies_foreign_reference(client):
+    """A domain move preserves editable references with qualification."""
     _post(client, _var("V_1"))
     _post(client, _var("V_2", equations={
-        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 + V_1"),
+    }))
+
+    r = _put(client, _var("V_1", network="physical"))
+    assert r.status_code == 200, r.text
+    context = client.get("/api/equation/context").json()
+    equations = [
+        equation
+        for owner in context["variables"]
+        if owner["internal_id"] == "V_2"
+        for equation in owner["equations"].values()
+    ]
+    assert equations
+    assert equations[0]["rhs"] == "physical!V_1 + physical!V_1"
+
+
+def test_network_edit_blocks_cross_graph_reference(client):
+    """A domain move blocks references from other graphs."""
+    _post(client, _var("V_1"))
+    _post(client, _var("V_2", equations={
+        "other": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
     }))
 
     r = _put(client, _var("V_1", network="physical"))
@@ -191,6 +195,24 @@ def test_token_boundary_no_false_positive(client):
 
     r = _put(client, _var("V_12", units=[1, 0, 0, 0, 0, 0, 0, 0]))
     assert r.status_code == 200, r.text
+
+
+def test_invalid_latex_alias_rejected_before_save(client):
+    variable = _var("V_1", aliases={"latex": r"\hat{n}_{conv"})
+    response = client.post("/api/equation/variables", json=variable)
+    assert response.status_code == 422
+    assert response.json()["detail"]["field"] == "aliases.latex"
+    context = client.get("/api/equation/context").json()
+    assert all(item["iri"] != variable["iri"] for item in context["variables"])
+
+
+def test_supported_latex_alias_forms_accepted(client):
+    response = client.post("/api/equation/variables", json=_var(
+        "V_1",
+        aliases={"latex": r"{{\tilde{n}_conv}}"},
+        index_structures=[],
+    ))
+    assert response.status_code == 200, response.text
 
 
 # ---------------------------------------------------------------------------

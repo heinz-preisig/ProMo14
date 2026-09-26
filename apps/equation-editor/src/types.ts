@@ -6,6 +6,7 @@ export interface EquationRecord {
   rhs_latex?: string | null
   equation_class?: string | null
   network?: string | null
+  domain_iri?: string | null
   incidence_list?: string[]
   doc?: string
   created?: string | null
@@ -16,6 +17,7 @@ export interface Variable {
   iri: string
   label: string
   network: string
+  domain_iri?: string | null
   type?: string
   units?: number[]
   index_structures?: string[]
@@ -38,6 +40,7 @@ export interface Index {
   label: string
   short_name?: string
   network?: string
+  domain_iri?: string | null
   index_class?: string
   aliases?: Record<string, string>
   token?: string | null
@@ -87,7 +90,9 @@ export interface CheckRequest {
   variables: Variable[]
   indices: Index[]
   variable_definition_network: string
+  variable_definition_domain_iri?: string | null
   expression_definition_network: string
+  expression_definition_domain_iri?: string | null
   lhs?: string | null
   network_tree: NetworkTree
 }

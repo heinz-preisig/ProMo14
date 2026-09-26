@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-26
 
 ## Summary
 
@@ -141,10 +141,11 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   Einstein library, vendored at `runtime/matlab/@MultiDimVar`), and
   LaTeX; `GET /api/equation/document` renders a printable landscape
   article (Jinja2, variables + equations tables by network).
-- **LaTeX symbols (2026-09-18):** per-variable `promo:latex` alias —
-  editable in every variable-definition GUI (port + dependent editors,
-  detail modal); preview + codegen + document render it verbatim.
-  Index short names capitalised (S/N/A/Q) in seed + persisted data.
+- **LaTeX symbols (updated 2026-09-26):** optional per-variable
+  `promo:latex` aliases remain editable in every variable GUI.  Editors now
+  suggest deterministic aliases from names, while preview, codegen and the
+  printable document derive the same unstored default when no explicit alias
+  exists.
 - **`Instantiate` redesigned (2026-09-19, ADR-008):**
   `Instantiate(proto)` — single `Var` argument, whole-RHS declaration
   only; the LHS variable becomes a new *instance* of the prototype
@@ -153,11 +154,18 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `zero`/`one`/`half` seeded with pre-bound `promo:value`;
   `promo:instanceOf` provenance + `equation_class="instantiate"`
   written at save.
-- **Mutability guard (2026-09-21, §18):** `POST /variables` rejects
-  structural edits on equation-referenced variables with 409
-  (`_guard_structural_edit`); `GET /variables/{iri}/references` scans
-  the dataset (lhs / incidence / rhs whole-token match); frontend
-  `useVariableLock` disables locked fields.  `test_mutability.py`.
+- **Domain identity/refactoring (2026-09-26):** variables, equations and
+  indices persist authoritative `promo:inDomain` IRI links; `network` remains
+  the readable compatibility name/qualifier.  The real root is `universe`
+  (`domain_universe`), with an idempotent migration for legacy root and
+  network-only data.  Referenced variables can move domains through an atomic
+  backend plan: own equations move, editable references become
+  `destination!label`, bindings are rechecked, and incidence/LaTeX caches are
+  refreshed.  Cross-graph or binding-changing moves return `409` unchanged.
+- **Mutability guard (updated 2026-09-26):** structural edits on referenced
+  variables remain guarded.  Domain membership is the deliberate exception
+  when `_plan_domain_move` proves an atomic binding-preserving refactor;
+  units, indices, tokens and reference-key names remain locked.
 - **Editor UI rework (2026-09-21):** `VariableDetailDialog` (view/edit
   + equation list) replaces `VariableEditor`, `VariableChoiceDialog`,
   `DependentVariableDialog`; `?` operator-help modal

@@ -45,13 +45,14 @@
 
     <promo:F_conv> a promo:Variable ;
         rdfs:label "F_conv" ;
-        promo:aliases "{\"latex\": \"F_conv\", \"global_ID\": \"promo:F_conv\"}" ;
+        promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
         promo:doc "incidence matrix for convective flows" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_25" ;
-        promo:latex "F_conv" ;
+        promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable true ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
@@ -64,6 +65,7 @@
             <https://w3id.org/promo/ontology#term_function_secondary_state> ;
         promo:doc "volum" ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_23" ;
         promo:latex "V" ;
@@ -76,6 +78,7 @@
         promo:created "2026-09-24T16:30:26.792Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:V\", \"promo:n\"]" ;
         promo:internalID "E_10" ;
         promo:lhs <promo:c> ;
@@ -87,6 +90,7 @@
         promo:created "2026-09-25T13:03:39.862Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:F_conv\", \"promo:P\"]" ;
         promo:internalID "E_11" ;
         promo:lhs <promo:d> ;
@@ -98,6 +102,7 @@
         promo:created "2026-09-25T13:04:54.369Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"https://w3id.org/promo/ontology#const_half\", \"promo:F_conv\", \"promo:c\", \"promo:d\"]" ;
         promo:internalID "E_12" ;
         promo:lhs <promo:c_conv> ;
@@ -109,6 +114,7 @@
         promo:created "2026-09-25T13:08:00.485Z" ;
         promo:doc "" ;
         promo:equationClass "instantiate" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:internalID "E_13" ;
         promo:lhs <promo:no> ;
         promo:modified "2026-09-25T13:08:00.485Z" ;
@@ -119,6 +125,7 @@
         promo:created "2026-09-25T13:14:09.137Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
         promo:incidenceList "[\"promo:V\", \"promo:m\"]" ;
         promo:internalID "E_14" ;
         promo:lhs <promo:rho> ;
@@ -130,6 +137,7 @@
         promo:created "2026-09-25T13:29:43.746Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:P\", \"promo:k_conv\", \"promo:rho\"]" ;
         promo:internalID "E_15" ;
         promo:lhs <promo:fV> ;
@@ -141,6 +149,7 @@
         promo:created "2026-09-25T13:54:34.813Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:c_conv\", \"promo:fV\"]" ;
         promo:internalID "E_16" ;
         promo:lhs <promo:fn_conv> ;
@@ -152,6 +161,7 @@
         promo:created "2026-09-25T13:57:16.547Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:F_conv\", \"promo:fn_conv\"]" ;
         promo:internalID "E_17" ;
         promo:lhs <promo:an_conv> ;
@@ -163,12 +173,40 @@
         promo:created "2026-09-25T13:59:19.007Z" ;
         promo:doc "" ;
         promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"promo:an_conv\"]" ;
         promo:internalID "E_18" ;
         promo:lhs <promo:dndt> ;
         promo:modified "2026-09-25T13:59:19.007Z" ;
         promo:network "macroscopic" ;
         promo:rhs "an_conv" .
+
+    <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
+        promo:created "2026-09-21T11:31:22.783Z" ;
+        promo:doc "" ;
+        promo:equationClass "generic" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:incidenceList "[\"promo:U\", \"promo:V\"]" ;
+        promo:internalID "E_2" ;
+        promo:lhs <promo:P> ;
+        promo:modified "2026-09-21T11:31:22.783Z" ;
+        promo:network "physical" ;
+        promo:rhs "ParDiff(U,V)" .
+
+    <promo:P> a promo:Variable ;
+        rdfs:label "p" ;
+        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:P\"}" ;
+        promo:doc "Thermodynamic pressure" ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_10" ;
+        promo:latex "p" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "effort" .
 
     <promo:an_conv> a promo:Variable ;
         rdfs:label "an_conv" ;
@@ -177,6 +215,7 @@
         promo:doc "accumulation due to convective species mass flow" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_17> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
@@ -195,6 +234,7 @@
         promo:doc "molar concentration" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_10> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
         promo:internalID "V_24" ;
@@ -210,6 +250,7 @@
         promo:doc "concentration in a convective flow" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_12> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_species> ;
         promo:internalID "V_27" ;
@@ -225,6 +266,7 @@
         promo:doc "convective flow direction relative to the reference coordinate" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_11> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
         promo:internalID "V_26" ;
         promo:latex "d" ;
@@ -241,6 +283,7 @@
         promo:doc "accumulation of species mass" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_18> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
@@ -259,6 +302,7 @@
         promo:doc "convective volumetric flow" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_15> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_30" ;
@@ -274,6 +318,7 @@
         promo:doc "convective species mass flow" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_16> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
             <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
@@ -292,6 +337,7 @@
         promo:doc "initial condition for species molar mass" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_13> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
         promo:internalID "V_28" ;
@@ -309,6 +355,7 @@
         promo:doc "density" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_14> ;
         promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_29" ;
         promo:latex "\\rho" ;

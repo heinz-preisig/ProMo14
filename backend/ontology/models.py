@@ -74,7 +74,8 @@ class EquationRecord(BaseModel):
     rhs: str = ""  # token stream (global_ID form)
     rhs_latex: Optional[str] = None  # generated LaTeX, cached (nullable)
     equation_class: str = "generic"  # IRI of EquationClass node (hierarchical)
-    network: str = "root"  # expression definition network
+    network: str = "universe"  # legacy/display domain name
+    domain_iri: Optional[str] = None  # authoritative promo:inDomain target
     incidence_list: List[str] = Field(default_factory=list)  # derived, cached
     doc: str = ""
     created: Optional[str] = None
@@ -90,7 +91,8 @@ class VariableRecord(BaseModel):
     # extensible: internal_code, latex, matlab, python, modelica, ...
 
     # Domain / location
-    network: str = "root"
+    network: str = "universe"  # legacy/display domain name
+    domain_iri: Optional[str] = None  # authoritative promo:inDomain target
     classifications: Dict[str, str] = Field(default_factory=dict)
     # Replaces variable_class: map of axis IRI -> axis term IRI
     variable_class: Optional[str] = None  # legacy, kept for backward compat
@@ -129,7 +131,8 @@ class IndexRecord(BaseModel):
     iri: str
     label: str
     short_name: Optional[str] = None
-    network: str = "root"
+    network: str = "universe"
+    domain_iri: Optional[str] = None
     index_class: str = "index"
     internal_id: Optional[str] = None
     aliases: Dict[str, str] = Field(default_factory=dict)

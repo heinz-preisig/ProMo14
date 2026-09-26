@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { indexShortLabel } from '../latex'
+import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
@@ -92,7 +92,9 @@ export default function PortVariableEditor({
   // scalar — both are legitimate values, so they don't gate accept.
   const nameValid = isValidVariableName(name)
   const collision = findNameCollision(variables, name)
-  const canAccept = nameValid && !!domain && !!variableClass
+  const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
+  const latexError = validateLatexAlias(latexSym)
+  const canAccept = nameValid && !!domain && !!variableClass && !latexError
   /** Why Add is disabled — surfaced inline, since title tooltips
    *  don't reliably fire on disabled buttons. */
   const blockReason = !nameValid
@@ -101,17 +103,21 @@ export default function PortVariableEditor({
       ? 'Select a domain in the tree'
       : !variableClass
         ? 'Pick a class via the axis selections'
-        : null
+        : latexError
+          ? `Invalid LaTeX symbol — ${latexError}`
+          : null
 
   const handleAccept = () => {
     if (!canAccept) return
     const trimmed = name.trim()
+    const selectedDomainIri = domains.find((item) => item.name === domain)?.iri ?? null
     const v: Variable = {
       // Case-sensitive IRI: the language treats `rho` and `Rho` as
       // distinct identifiers, so the IRI must preserve case too.
       iri: `promo:${trimmed}`,
       label: trimmed,
       network: domain,
+      domain_iri: selectedDomainIri,
       type: variableClass,
       units: [...units],
       index_structures: Array.from(selectedIndices),
@@ -232,8 +238,16 @@ export default function PortVariableEditor({
                   value={latexSym}
                   onChange={(e) => setLatexSym(e.target.value)}
                   placeholder="e.g. \\rho — defaults to name"
-                  style={{ width: 140 }}
+                  style={{ width: 140, borderColor: latexError ? '#c62828' : undefined }}
                 />
+                {latexSuggestion && latexSym.trim() !== latexSuggestion && (
+                  <button type="button" onClick={() => setLatexSym(latexSuggestion)}>
+                    Use {latexSuggestion}
+                  </button>
+                )}
+                {latexError && (
+                  <span style={{ fontSize: 11, color: '#c62828' }}>{latexError}</span>
+                )}
               </label>
 
               {applicableAxes(axes, domain, domains).length ? (

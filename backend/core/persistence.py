@@ -85,6 +85,7 @@ class PersistenceMixin:
         # …and equation IRIs minted under the promo# vocabulary
         # namespace are rehomed into their graph's own namespace.
         self._migrate_equation_iris()
+        self._migrate_domain_membership()
 
         if legacy_layout:
             # Split the legacy single-file store into per-line files
@@ -164,6 +165,60 @@ class PersistenceMixin:
                     g.remove((s, p, o))
                     g.add((s, p, new))
         self.mark_dirty()
+
+    def _migrate_domain_membership(self) -> None:
+        """Use domain IRIs as identity while retaining legacy network labels."""
+        old_root = self.mint_iri(self.ONTOLOGY_GRAPH_IRI, "domain_root")
+        universe = self.mint_iri(self.ONTOLOGY_GRAPH_IRI, "domain_universe")
+        changed = False
+
+        for graph in self.dataset.graphs():
+            if (old_root, RDF.type, PROMO["Domain"]) in graph:
+                for _s, predicate, obj in list(graph.triples((old_root, None, None))):
+                    graph.remove((old_root, predicate, obj))
+                    graph.add((universe, predicate, obj))
+                changed = True
+            for subject, predicate, obj in list(graph.triples((None, None, old_root))):
+                graph.remove((subject, predicate, obj))
+                graph.add((subject, predicate, universe))
+                changed = True
+            if (universe, RDF.type, PROMO["Domain"]) in graph \
+                    and str(graph.value(universe, PROMO["name"]) or "") != "universe":
+                graph.set((universe, PROMO["name"], Literal("universe")))
+                changed = True
+            for subject in graph.subjects(PROMO["network"], Literal("root")):
+                graph.set((subject, PROMO["network"], Literal("universe")))
+                changed = True
+
+        ontology = self.ontology_graph
+        if (universe, RDF.type, PROMO["Domain"]) not in ontology:
+            ontology.add((universe, RDF.type, PROMO["Domain"]))
+            changed = True
+        if str(ontology.value(universe, PROMO["name"]) or "") != "universe":
+            ontology.set((universe, PROMO["name"], Literal("universe")))
+            changed = True
+
+        domains_by_name: Dict[str, URIRef] = {}
+        for graph in self.dataset.graphs():
+            for domain in graph.subjects(RDF.type, PROMO["Domain"]):
+                name = graph.value(domain, PROMO["name"])
+                if name is not None:
+                    domains_by_name[str(name)] = domain
+        domains_by_name["root"] = universe
+        domains_by_name["universe"] = universe
+
+        for graph in self.dataset.graphs():
+            for rdf_type in (PROMO["Variable"], PROMO["Equation"], PROMO["Index"]):
+                for subject in graph.subjects(RDF.type, rdf_type):
+                    if graph.value(subject, PROMO["inDomain"]) is not None:
+                        continue
+                    name = graph.value(subject, PROMO["network"])
+                    domain = domains_by_name.get(str(name or "universe"))
+                    if domain is not None:
+                        graph.set((subject, PROMO["inDomain"], domain))
+                        changed = True
+        if changed:
+            self.mark_dirty()
 
     def _line_key(self, g: Graph) -> URIRef:
         """The artefact line a graph belongs to: itself, or its

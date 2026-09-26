@@ -67,6 +67,41 @@ function indexSubscripts(indexIris: string[], ctx?: LatexContext): string {
   return `_{${parts.map((p) => `\\mathrm{${texEscape(p)}}`).join(',')}}`
 }
 
+function appendIndexSubscripts(base: string, indexIris: string[], ctx?: LatexContext): string {
+  const generated = indexSubscripts(indexIris, ctx)
+  while (base.startsWith('{') && base.endsWith('}')) {
+    let depth = 0
+    let enclosesAll = true
+    for (let pos = 0; pos < base.length; pos += 1) {
+      if (base[pos] === '{') depth += 1
+      else if (base[pos] === '}') {
+        depth -= 1
+        if (depth === 0 && pos !== base.length - 1) {
+          enclosesAll = false
+          break
+        }
+      }
+    }
+    if (!enclosesAll || depth !== 0) break
+    base = base.slice(1, -1)
+  }
+  if (!base.endsWith('}')) return `{${base}}${generated}`
+  let depth = 0
+  for (let pos = base.length - 1; pos >= 0; pos -= 1) {
+    if (base[pos] === '}') depth += 1
+    else if (base[pos] === '{') {
+      depth -= 1
+      if (depth === 0) {
+        if (pos > 0 && base[pos - 1] === '_') {
+          return `${base.slice(0, pos - 1)}_{${base.slice(pos + 1, -1)},${generated.slice(2, -1)}}`
+        }
+        break
+      }
+    }
+  }
+  return `{${base}}${generated}`
+}
+
 export function astToLatex(node: AstNode, ctx?: LatexContext): string {
   if (!node) return ''
   switch (node.type) {
@@ -78,11 +113,11 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
       // surface token the user typed.
       const base = v?.aliases?.latex
         ? braceSubscripts(v.aliases.latex)
-        : texEscape(name.replace(/!/g, '\\!'))
+        : suggestLatexAlias(v?.label ?? name.replace(/!/g, '\\!'))
       if (v?.index_structures && v.index_structures.length > 0) {
         // Brace the base: a verbatim alias may itself carry a subscript
         // ("r_z") — "{r_z}_{N}" compiles, "r_z_{N}" is a double subscript.
-        return `{${base}}${indexSubscripts(v.index_structures, ctx)}`
+        return appendIndexSubscripts(base, v.index_structures, ctx)
       }
       return base
     }
@@ -162,6 +197,37 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
       return `\\text{${astToLatex(node.name as AstNode, ctx)}}\\left( ${(node.args as AstNode[]).map((n) => astToLatex(n as AstNode, ctx)).join(', ')} \\right)`
     default:
       return `\\text{${JSON.stringify(node).slice(0, 80)}}`
+  }
+}
+
+const GREEK_NAMES = new Set([
+  'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'varepsilon', 'zeta',
+  'eta', 'theta', 'vartheta', 'iota', 'kappa', 'lambda', 'mu', 'nu',
+  'xi', 'pi', 'varpi', 'rho', 'varrho', 'sigma', 'varsigma', 'tau',
+  'upsilon', 'phi', 'varphi', 'chi', 'psi', 'omega',
+  'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Upsilon',
+  'Phi', 'Psi', 'Omega',
+])
+
+export function suggestLatexAlias(name: string): string {
+  const [base, ...qualifierParts] = name.trim().split('_')
+  const symbol = GREEK_NAMES.has(base) ? `\\${base}` : texEscape(base)
+  return qualifierParts.length
+    ? `${symbol}_{${texEscape(qualifierParts.join('_'))}}`
+    : symbol
+}
+
+export function validateLatexAlias(alias: string): string | null {
+  const value = alias.trim()
+  if (!value) return null
+  const latex = appendIndexSubscripts(braceSubscripts(value), ['validation'], {
+    indices: [{ iri: 'validation', label: 'N', network: '', aliases: { internal_code: 'N' } }],
+  })
+  try {
+    renderToString(latex, { throwOnError: true })
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message.replace(/^KaTeX parse error:\s*/, '') : String(error)
   }
 }
 

@@ -49,6 +49,7 @@ class Index:
     iri: str
     label: str
     network: str
+    domain_iri: Optional[str] = None
     index_class: str = "index"  # "index" | "block_index"
     aliases: Dict[str, str] = field(default_factory=dict)
     token: Optional[str] = None  # IRI of the token type this index carries
@@ -75,6 +76,7 @@ class Variable:
     label: str
     network: str
     type: str
+    domain_iri: Optional[str] = None
     units: Units = field(default_factory=Units)
     index_structures: List[str] = field(default_factory=list)  # index IRIs
     doc: str = ""

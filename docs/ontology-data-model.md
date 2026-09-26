@@ -24,6 +24,7 @@ stable key.  Grouped by purpose, the fields are:
     "internal_id": "V_1",
     "aliases": {"internal_code": "V_1", "latex": "V_1"},
 
+    "domain_iri": "domain_iri_V1",
     "network": "macroscopic",
     "variable_class": "state",
     "port_variable": false,
@@ -39,6 +40,7 @@ stable key.  Grouped by purpose, the fields are:
         "lhs": "iri_V1",
         "rhs": {"global_ID": " O_1 D_0 V_2 D_7 V_3", "latex": ""},
         "equation_class": "generic",
+        "domain_iri": "domain_iri_E1",
         "network": "macroscopic",
         "incidence_list": [],
         "doc": "",
@@ -78,23 +80,20 @@ parse time (label → IRI resolution).
 - `IRI` — stable graph key.
 - `label` — user-facing surface name.
 - `internal_id` — code/token name (`V_1`).
-- `aliases` — language-specific surface names.  This is an **extensible
-  map** from a target-language name to the string used in that language.
-  Well-known keys are:
-  - `internal_code` — short code used in the expression language and
-    generated code (e.g. index `N`).
-  - `latex` — the LaTeX *symbol* for the variable/index (e.g. `\rho`).
-    **Generated when the variable is defined** — the variable editor
-    auto-derives it from the label (Greek letters, subscripts, …) and the
-    user may override it.  The equation editor only *reads* it to assemble
-    full equation LaTeX and generate pictures.
-  - other keys (e.g. `matlab`, `python`, `modelica`) can be added by
-    user-defined templates or external compilers.
+- `aliases` — language-specific surface names, e.g.
+  `{"internal_code": "V_1", "latex": "V_1"}`.  The `internal_code` alias is the
+  index's short code name in the token stream.
 
 #### Domain / location
-- `network` — the **variable definition network**.  The user must first
-  select a domain from the ontology's domain tree; the variable is then
-  defined in that network.  It is not a free-form string.
+- `domain_iri` — the authoritative domain identity, persisted as
+  `promo:inDomain` pointing to a `promo:Domain` resource.  Variables,
+  equations and indices all use this relationship.  Domain membership
+  survives domain renames because it is IRI-based.
+- `network` — the compatibility/display name of `domain_iri`, used in the
+  expression qualifier syntax (`thermal!temperature`).  It is resolved and
+  validated against the domain resource, not treated as a free-form foreign
+  key.  The domain-tree root is `universe` with IRI fragment
+  `domain_universe`.
 - `variable_class` — variable class chosen from those valid for the
   selected domain (`state`, `effort`, `transport`, `frame`, `network`, ...).
   In the old JSON this field is called `type`; in the Python dataclass it is
@@ -147,7 +146,10 @@ parse time (label → IRI resolution).
     is called `type`.  `empirical` / `user_function` equations are external
     implementations (equations of state, correlations) — the ontology
     editor registers their signature but does not parse their body.
-  - `network` — expression definition network.
+  - `domain_iri` — authoritative expression-definition domain IRI;
+    `promo:inDomain` in RDF.
+  - `network` — readable expression-definition domain name used by
+    `CompileSpace` and qualified source tokens.
   - `incidence_list` — list of variables used in the RHS, **derived by
     walking the AST** and cached for the `Root` deep-incidence check.
     Safe to omit and recompute.
@@ -184,7 +186,15 @@ Grouped by purpose, a typical index carries:
   index's short code name in the token stream.
 
 #### Domain
-- `network` — single network or list of networks where the index is valid.
+- `domain_iri` — the authoritative domain identity, persisted as
+  `promo:inDomain` pointing to a `promo:Domain` resource.  Variables,
+  equations and indices all use this relationship.  Domain membership
+  survives domain renames because it is IRI-based.
+- `network` — the compatibility/display name of `domain_iri`, used in the
+  expression qualifier syntax (`thermal!temperature`).  It is resolved and
+  validated against the domain resource, not treated as a free-form foreign
+  key.  The domain-tree root is `universe` with IRI fragment
+  `domain_universe`.
 - `index_class` — `"index"` or `"block_index"`.  In the old JSON this field
   is called `type`; renamed for consistency with `variable_class` /
   `equation_class`.
@@ -201,7 +211,8 @@ Example index records:
     "label": "species",
     "short_name": "S",
     "aliases": {"internal_code": "N", "latex": "N"},
-    "network": ["physical", "macroscopic"],
+    "domain_iri": "domain_iri_I1",
+    "network": "macroscopic",
     "index_class": "index",
     "token": "promo:species"
   },
@@ -209,7 +220,8 @@ Example index records:
     "IRI": "iri_Idx",
     "label": "differential_space",
     "aliases": {"internal_code": "dx", "latex": "d"},
-    "network": "physical",
+    "domain_iri": "domain_iri_Idx",
+    "network": "macroscopic",
     "index_class": "index",
     "token": "promo:differential_space"
   }
@@ -439,7 +451,8 @@ Grouped by purpose, mirroring the ``Variable`` dataclass.
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:network` | xsd:string | `Variable.network` |
+| `promo:inDomain` | `promo:Domain` IRI | `Variable.domain_iri` (authoritative) |
+| `promo:network` | xsd:string | `Variable.network` (compatibility/display name) |
 | `promo:variableClass` | xsd:string | `Variable.type` (Python field name; values: `state`, `effort`, ...) |
 | `promo:axisValue` | `promo:AxisTerm` (IRI, multiple) | multi-axis classification terms |
 | `promo:portVariable` | xsd:boolean | `Variable.port_variable` |
@@ -496,7 +509,8 @@ persisted.
 
 | Predicate | Type | Maps to `EquationContext` |
 |---|---|---|
-| `promo:network` | xsd:string | `Index.network` |
+| `promo:inDomain` | `promo:Domain` IRI | `Index.domain_iri` (authoritative) |
+| `promo:network` | xsd:string | `Index.network` (compatibility/display name) |
 | `promo:indexClass` | xsd:string | `Index.index_class` (`index` / `block_index`) |
 | `promo:doc` | xsd:string | `Index.doc` |
 
@@ -540,7 +554,8 @@ Indices are typed as `promo:Index` (not bare IRIs).
 
 | Predicate | Type | Purpose |
 |---|---|---|
-| `promo:network` | xsd:string | **expression definition network** |
+| `promo:inDomain` | `promo:Domain` IRI | authoritative expression-definition domain IRI |
+| `promo:network` | xsd:string | readable expression-definition domain name used by `CompileSpace` and qualified source tokens |
 | `promo:equationClass` | xsd:string | `generic` / `instantiate` / `balance` / ... |
 
 #### Content

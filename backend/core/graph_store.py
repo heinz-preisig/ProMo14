@@ -497,6 +497,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self._set_literal(graph, iri, RDFS.label, var.get("label"))
         self._set_literal(graph, iri, PROMO["internalID"], var.get("internal_id"))
         self._set_literal(graph, iri, PROMO["network"], var.get("network"))
+        if var.get("domain_iri"):
+            graph.set((iri, PROMO["inDomain"], URIRef(var["domain_iri"])))
         self._set_literal(graph, iri, PROMO["doc"], var.get("doc"))
         self._set_literal(
             graph, iri, PROMO["portVariable"], var.get("port_variable", False)
@@ -554,6 +556,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self._set_literal(graph, iri, PROMO["internalID"], idx.get("internal_id"))
         self._set_literal(graph, iri, PROMO["shortName"], idx.get("short_name"))
         self._set_literal(graph, iri, PROMO["network"], idx.get("network"))
+        if idx.get("domain_iri"):
+            graph.set((iri, PROMO["inDomain"], URIRef(idx["domain_iri"])))
         self._set_literal(graph, iri, PROMO["indexClass"], idx.get("index_class"))
         self._set_literal(graph, iri, PROMO["doc"], idx.get("doc"))
 
@@ -866,6 +870,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self._set_literal(graph, eq_iri, PROMO["rhsLatex"], eq.get("rhs_latex"))
         self._set_literal(graph, eq_iri, PROMO["equationClass"], eq.get("equation_class"))
         self._set_literal(graph, eq_iri, PROMO["network"], eq.get("network"))
+        if eq.get("domain_iri"):
+            graph.set((eq_iri, PROMO["inDomain"], URIRef(eq["domain_iri"])))
         self._set_literal(graph, eq_iri, PROMO["doc"], eq.get("doc"))
         if eq.get("incidence_list"):
             graph.set((eq_iri, PROMO["incidenceList"], _as_literal(eq["incidence_list"])))

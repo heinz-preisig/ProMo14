@@ -29,8 +29,17 @@ def _str(value) -> str:
 
 
 def _network(raw: str) -> str:
-    """Return the network name, defaulting to ``"root"``."""
-    return raw or "root"
+    """Return the legacy/display domain name, defaulting to ``universe``."""
+    return "universe" if not raw or raw == "root" else raw
+
+
+def _domain_membership(graph, subject) -> "tuple[str, Optional[str]]":
+    domain = graph.value(subject, PROMO["inDomain"])
+    if domain is not None:
+        name = _one_literal(graph, domain, PROMO["name"])
+        if name:
+            return _network(name), str(domain)
+    return _network(_one_literal(graph, subject, PROMO["network"])), None
 
 
 def _literal_list(graph, subject, predicate) -> List[str]:
@@ -62,8 +71,6 @@ def _one_unit_list(graph, subject, predicate) -> List[int]:
     except (json.JSONDecodeError, ValueError):
         pass
     return [0] * 8
-
-
 
 
 def _aliases(graph, subject) -> Dict[str, str]:
@@ -205,7 +212,8 @@ class RdfContext(EquationContext):
         for graph in self._all_graphs():
             for s in graph.subjects(RDF.type, PROMO["Variable"]):
                 iri = str(s)
-                var = self._build_variable(graph, s, iri)
+                network, domain_iri = _domain_membership(graph, s)
+                var = self._build_variable(graph, s, iri, network, domain_iri)
                 existing = variables.get(iri)
                 if existing is None:
                     variables[iri] = var
@@ -217,7 +225,7 @@ class RdfContext(EquationContext):
                     )
         return variables
 
-    def _build_variable(self, graph, s, iri: str) -> Variable:
+    def _build_variable(self, graph, s, iri: str, network: str, domain_iri: str) -> Variable:
         aliases = _aliases(graph, s)
         fragment = iri.split("#")[-1].split("/")[-1]
         if fragment and "global_ID" not in aliases:
@@ -233,7 +241,8 @@ class RdfContext(EquationContext):
         var = Variable(
             iri=iri,
             label=_one_literal(graph, s, RDFS.label) or iri,
-            network=_network(_one_literal(graph, s, PROMO["network"], "root")),
+            network=network,
+            domain_iri=domain_iri,
             type=_one_literal(graph, s, PROMO["variableClass"], "state"),
             units=Units.from_list(
                 _one_unit_list(graph, s, PROMO["unitVector"])
@@ -273,6 +282,7 @@ class RdfContext(EquationContext):
                         eq_incidence = [str(x) for x in parsed]
                 except (json.JSONDecodeError, ValueError):
                     pass
+            network, domain_iri = _domain_membership(graph, eq_s)
             eq_key = eq_internal_id or eq_iri
             equations[eq_key] = {
                 "iri": eq_iri,
@@ -283,7 +293,8 @@ class RdfContext(EquationContext):
                 or None,
                 "equation_class": _one_literal(graph, eq_s, PROMO["equationClass"])
                 or None,
-                "network": _one_literal(graph, eq_s, PROMO["network"]) or None,
+                "network": network,
+                "domain_iri": domain_iri,
                 "incidence_list": eq_incidence,
                 "doc": _one_literal(graph, eq_s, PROMO["doc"]) or "",
                 "created": _one_literal(graph, eq_s, PROMO["created"]) or None,
@@ -298,11 +309,12 @@ class RdfContext(EquationContext):
                 iri = str(s)
                 if iri in indices:
                     continue
-                indices[iri] = self._build_index(graph, s, iri)
+                network, domain_iri = _domain_membership(graph, s)
+                indices[iri] = self._build_index(graph, s, iri, network, domain_iri)
         return indices
 
     @staticmethod
-    def _build_index(graph, s, iri: str) -> Index:
+    def _build_index(graph, s, iri: str, network: str, domain_iri: str) -> Index:
         aliases = _aliases(graph, s)
         fragment = iri.split("#")[-1].split("/")[-1]
         if fragment and "global_ID" not in aliases:
@@ -313,8 +325,6 @@ class RdfContext(EquationContext):
         short = _one_literal(graph, s, PROMO["shortName"]) or label
         if "internal_code" not in aliases:
             aliases["internal_code"] = short
-
-        network = _network(_one_literal(graph, s, PROMO["network"], "root"))
 
         # The ontology's indexClass names the index *source* (node, arc,
         # token, conversion, signal); the checker's index_class only knows
@@ -329,6 +339,7 @@ class RdfContext(EquationContext):
             iri=iri,
             label=label,
             network=network,
+            domain_iri=domain_iri,
             index_class=index_class,
             aliases=aliases,
             token=_one_literal(graph, s, PROMO["token"]) or None,
@@ -345,7 +356,7 @@ class RdfContext(EquationContext):
         Built from ``promo:Domain`` nodes linked by ``promo:parent``.
         Network names referenced by variables are included as well so a
         variable can never live in an invisible network.  Parentless
-        top-level entries are attached under ``"root"`` so the frontend's
+        top-level entries are attached under ``"universe"`` so the frontend's
         tree select always has a single root.
         """
         names: Set[str] = set()
@@ -364,39 +375,36 @@ class RdfContext(EquationContext):
                         parent_of[name] = parent_name
                         names.add(parent_name)
 
-            # Register network names referenced by variables.
+            # Register domain names referenced by variables.
             for s in graph.subjects(RDF.type, PROMO["Variable"]):
-                names.add(
-                    _network(_one_literal(graph, s, PROMO["network"], "root"))
-                )
+                names.add(_domain_membership(graph, s)[0])
 
-        # Every parentless network hangs under "root" so the global scope
-        # is reachable from everywhere.
+        # Every parentless domain hangs under "universe".
         for name in names:
-            if name != "root":
-                parent_of.setdefault(name, "root")
+            if name != "universe":
+                parent_of.setdefault(name, "universe")
 
         # Break cycles: if walking up from a node revisits a node, reattach
-        # the starting node directly under "root".
+        # the starting node directly under "universe".
         for name in list(names):
             seen = {name}
             current = name
             while current in parent_of:
                 current = parent_of[current]
                 if current in seen:
-                    parent_of[name] = "root"
+                    parent_of[name] = "universe"
                     break
                 seen.add(current)
 
         # Invert into a parent -> children display tree; parentless names go
-        # under "root" so the frontend always has a single root.
+        # under "universe" so the frontend always has a single root.
         tree: Dict[str, List[str]] = {}
         for name in sorted(names):
-            parent = parent_of.get(name, "root")
-            if name == "root":
+            parent = parent_of.get(name, "universe")
+            if name == "universe":
                 continue
             tree.setdefault(parent, []).append(name)
-        for name in names | {"root"}:
+        for name in names | {"universe"}:
             tree.setdefault(name, [])
 
         return tree, parent_of

@@ -20,6 +20,7 @@ import {
   VARIABLE_CLASSES,
   VARIABLE_NAME_HINT,
 } from '../validation'
+import { suggestLatexAlias, validateLatexAlias } from '../latex'
 
 /** Classes allowed on the LHS of ``Instantiate(proto)`` — an instance is
  *  a bound-value slot, not a computed quantity (ADR-008). */
@@ -62,6 +63,7 @@ export default function DependentVariableEditor({
   const [variableClass, setVariableClass] = useState('')
   const [name, setName] = useState('')
   const [latexSym, setLatexSym] = useState('')
+  const [latexError, setLatexError] = useState<string | null>(null)
 
   const [text, setText] = useState('')
   const [ast, setAst] = useState<AstNode | null>(null)
@@ -103,6 +105,10 @@ export default function DependentVariableEditor({
     setError(null)
     setGenCode(null)
   }, [name, domain, variableClass, text, latexSym])
+
+  useEffect(() => {
+    setLatexError(validateLatexAlias(latexSym))
+  }, [latexSym])
 
   // Report the current domain/classifications so the app can offer
   // them as defaults next time either variable editor is opened.
@@ -181,6 +187,7 @@ export default function DependentVariableEditor({
     const aliases = { ...(editing?.aliases ?? {}) }
     if (latexSym.trim()) aliases.latex = latexSym.trim()
     else delete aliases.latex
+    const selectedDomainIri = domains.find((item) => item.name === domain)?.iri ?? null
     return {
       ...(editing ?? {}),
       // Case-sensitive IRI: the language treats `rho` and `Rho` as
@@ -188,6 +195,7 @@ export default function DependentVariableEditor({
       iri: editing?.iri ?? `promo:${lhs}`,
       label: lhs,
       network: domain,
+      domain_iri: selectedDomainIri,
       type: effectiveClass,
       units: checkResult?.units ?? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
       index_structures: checkResult?.indices ?? editing?.index_structures ?? [],
@@ -214,12 +222,15 @@ export default function DependentVariableEditor({
    *  /generate so both see the same draft LHS variable. */
   const buildRequest = useCallback((): CheckRequest => {
     const lhs = name.trim()
+    const selectedDomainIri = domains.find((item) => item.name === domain)?.iri ?? null
     return {
       text,
       variables: contextVariables(),
       indices,
       variable_definition_network: domain,
+      variable_definition_domain_iri: selectedDomainIri,
       expression_definition_network: domain,
+      expression_definition_domain_iri: selectedDomainIri,
       lhs: lhs || null,
       network_tree: networkTree,
     }
@@ -251,13 +262,15 @@ export default function DependentVariableEditor({
       ? 'Select a domain in the tree'
       : !effectiveClass
         ? 'Pick a class via the axis selections'
-        : !checkResult?.ok
-          ? 'Run Check on the expression first'
-          : null
+        : latexError
+          ? `Invalid LaTeX symbol — ${latexError}`
+          : !checkResult?.ok
+            ? 'Run Check on the expression first'
+            : null
 
   const handleAccept = () => {
     const lhs = name.trim()
-    if (!lhs || !domain || !effectiveClass || !checkResult?.ok) return
+    if (!lhs || !domain || !effectiveClass || latexError || !checkResult?.ok) return
 
     const draft = draftVariable()
 
@@ -276,6 +289,8 @@ export default function DependentVariableEditor({
   const insertText = useCallback((token: string) => {
     setText((prev) => prev + token)
   }, [])
+
+  const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
 
   if (!open) return null
 
@@ -397,8 +412,16 @@ export default function DependentVariableEditor({
                   value={latexSym}
                   onChange={(e) => setLatexSym(e.target.value)}
                   placeholder="e.g. \\rho — defaults to name"
-                  style={{ width: 140 }}
+                  style={{ width: 140, borderColor: latexError ? '#c62828' : undefined }}
                 />
+                {latexSuggestion && latexSym.trim() !== latexSuggestion && (
+                  <button type="button" onClick={() => setLatexSym(latexSuggestion)}>
+                    Use {latexSuggestion}
+                  </button>
+                )}
+                {latexError && (
+                  <span style={{ fontSize: 11, color: '#c62828' }}>{latexError}</span>
+                )}
               </label>
 
               {applicableAxes(axes, domain, domains).length ? (
