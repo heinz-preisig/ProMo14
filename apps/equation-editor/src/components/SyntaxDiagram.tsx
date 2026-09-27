@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import rr from 'railroad-diagrams'
 import 'railroad-diagrams/railroad-diagrams.css'
 
-const { Diagram, Sequence, Choice, Optional, ZeroOrMore, Terminal: T, NonTerminal: NT } = rr
+const { Diagram, Sequence, Choice, ZeroOrMore, Terminal: T, NonTerminal: NT } = rr
 
 /** Railway diagrams for the expression grammar — must match
  *  backend/equation/parser.py. */
@@ -17,7 +17,7 @@ const equationRule = () =>
     ),
   ).toString()
 
-// Expression -> Factor ( INFIX Factor )*   — '*' may carry an index: a * i b
+// Expression -> Factor ( INFIX Factor )*
 const expressionRule = () =>
   Diagram(
     Sequence(
@@ -28,7 +28,7 @@ const expressionRule = () =>
             0,
             T('+'),
             T('-'),
-            Sequence(T('*'), Optional(NT('index'))),
+            T('*'),
             T(':'),
             T('.'),
             T('^'),
@@ -85,7 +85,6 @@ p.note { font-size: 12px; color: #666; max-width: 560px; }
 `
 
 const FOOTNOTE =
-  '<code>*</code> may carry an index: <code>a * i b</code> reduces over i. ' +
   'Identifiers are <code>label</code> or <code>network!label</code>; no ' +
   'numeric literals. <code>Instantiate</code> is only valid as the whole ' +
   'right-hand side.'

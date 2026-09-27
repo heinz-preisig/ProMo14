@@ -215,6 +215,16 @@ def test_supported_latex_alias_forms_accepted(client):
     assert response.status_code == 200, response.text
 
 
+def test_duplicate_variable_indices_rejected(client):
+    index = "https://w3id.org/promo#index_N"
+    response = client.post(
+        "/api/equation/variables",
+        json=_var("V_dup", port_variable=True, index_structures=[index, index]),
+    )
+    assert response.status_code == 422
+    assert "must not repeat" in response.text
+
+
 # ---------------------------------------------------------------------------
 # Delete
 # ---------------------------------------------------------------------------

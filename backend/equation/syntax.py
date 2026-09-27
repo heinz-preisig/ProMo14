@@ -47,10 +47,9 @@ class IndexPreservingProduct:
 
 @dataclass(frozen=True)
 class Reduce:
-    """Reduce product ``left * right``, optionally ``left * index right``."""
+    """Reduce product ``left * right`` over their one common index."""
     left: "Node"
     right: "Node"
-    index: Optional[Var] = None
 
 
 @dataclass(frozen=True)

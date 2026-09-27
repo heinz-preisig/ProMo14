@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +109,13 @@ class VariableRecord(BaseModel):
 
     # Index structure
     index_structures: List[str] = Field(default_factory=list)
+
+    @field_validator("index_structures")
+    @classmethod
+    def _indices_are_unique(cls, value: List[str]) -> List[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("index structure must not repeat an index")
+        return value
 
     # Equations (nested, one per expression network)
     equations: Dict[str, EquationRecord] = Field(default_factory=dict)

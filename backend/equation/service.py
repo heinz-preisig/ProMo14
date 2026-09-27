@@ -138,6 +138,12 @@ class VariableIn(BaseModel):
             )
         return v
 
+    @field_validator("index_structures")
+    @classmethod
+    def _indices_are_unique(cls, value: List[str]) -> List[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("index structure must not repeat an index")
+        return value
 
 class IndexIn(BaseModel):
     iri: str

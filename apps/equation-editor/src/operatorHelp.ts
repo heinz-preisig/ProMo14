@@ -12,7 +12,7 @@ export interface OperatorHelpEntry {
 export const OPERATOR_HELP: OperatorHelpEntry[] = [
   { label: '+', syntax: 'a + b', description: 'add' },
   { label: '-', syntax: 'a - b', description: 'subtract' },
-  { label: '*', syntax: 'a * b', description: 'product — a * i b reduces over index i' },
+  { label: '*', syntax: 'a * b', description: 'reduce product — operands must have exactly one common index' },
   { label: ':', syntax: 'a : b', description: 'expand (outer) product' },
   { label: '.', syntax: 'a . b', description: 'index-preserving product — retains common indices and may expand the index set' },
   { label: '^', syntax: 'a ^ b', description: 'power — right-associative' },

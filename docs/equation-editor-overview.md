@@ -133,7 +133,7 @@ incidence and construct-specific semantic checks:
 | Operator | Checks |
 |----------|--------|
 | `Add` | Units equal; index structures equal |
-| `ReduceProduct` | Exactly one common index, or an explicit selected reduction index when several are common; selected index is removed |
+| `ReduceProduct` | Operands share exactly one index; that index is removed |
 | `ExpandProduct` | Index sets disjoint; result = ordered union |
 | `IndexPreservingProduct` | Units multiply; result = ordered union without eliminating common indices |
 | `Power` | Basis and exponent dimensionless |
@@ -145,7 +145,9 @@ incidence and construct-specific semantic checks:
 | `inv` | Argument has no indices; units are inverted |
 
 Units are 8-exponent SI vectors (`time, length, amount, mass,
-temperature, current, light, nil`).
+temperature, current, light, nil`). Index structures are ordered sequences of
+unique index IRIs; duplicate indices are rejected for declared variables and
+checked expression results.
 
 ## Architecture
 

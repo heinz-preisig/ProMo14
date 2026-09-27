@@ -170,6 +170,19 @@ Implemented as a React + TypeScript + Vite app in
   index concept; `inv` is checked/rendered as scalar reciprocal; and `sqrt`
   accepts dimensioned arguments only when every SI exponent is even. Parser,
   checker, codegen and frontend terminology are aligned, with regression tests.
+- **Canonical expression prototype (2026-09-27):** checked trees can now be
+  converted in memory to immutable operation-IRI expressions with ordered
+  arguments and IRI-bound variable/index references. Canonical expressions
+  regenerate ProMo source using current names and pass semantic round-trip
+  tests across core operators and functions. Grouping is source-only and is
+  omitted from the semantic tree. RDF serialization, persisted canonical trees
+  and migration of existing textual equations remain pending.
+- **Index uniqueness and binary reduction (2026-09-27):** every persisted or
+  ad-hoc variable input must have an ordered index structure with no repeated
+  IRI, and the checker retains the same invariant for all expression results.
+  `ReduceProduct` is strictly binary again: its operands must share exactly one
+  index, which is removed. Explicit reduction-index syntax is not part of the
+  language.
 
 ## Pending items
 

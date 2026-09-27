@@ -133,9 +133,6 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
     case 'Reduce': {
       const left = wrap(node.left as AstNode, ctx)
       const right = wrap(node.right as AstNode, ctx)
-      if (node.index) {
-        return `${left} \\cdot_{${astToLatex(node.index as AstNode, ctx)}} ${right}`
-      }
       return `${left} \\cdot ${right}`
     }
     case 'Power':

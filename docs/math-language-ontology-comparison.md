@@ -171,7 +171,7 @@ binding.
 | `power` | `Power` | retained |
 | `expandProduct` | `Expand` | retained |
 | `Hadamard` | `IndexPreservingProduct` | retained with corrected semantic name |
-| `reduceProduct` | `Reduce` | retained, now optional explicit reduction index |
+| `reduceProduct` | `Reduce` | retained; operands must share exactly one index |
 | `reducteSum` | `ReduceSum` | retained; historical spelling should not be canonical |
 | `Product` | `Product` | retained |
 | `Integral` | `Integral` | retained |
@@ -544,10 +544,12 @@ list. Argument roles and cardinalities are declared by the operation definition
 in the language ontology. This keeps the expression schema small and stable;
 operation-specific predicates are not required.
 
-References in the argument list are IRIs. For example, `ReduceProduct` has
-left operand, right operand and an optional reduction-index reference in that
-order. The optional reduction index is a generic property of `*`: it is required
-whenever the two operands have more than one common index.
+An in-memory prototype now implements this shape with immutable expression,
+variable-reference and index-reference values. It converts a checked tree to
+operation IRIs and ordered arguments, discards source-only grouping, and
+regenerates ProMo source from current variable and index names. Semantic
+round-trip tests cover the core operation set. RDF serialization and equation
+persistence remain deliberately unimplemented until this contract is stable.
 
 ### 11.2 Entered source
 
@@ -568,7 +570,7 @@ The approved core identities are:
 | `^` | `Power` |
 | `:` | `ExpandProduct` |
 | `.` | `IndexPreservingProduct` |
-| `*` | `ReduceProduct` |
+| `*` | `Reduce` | operands must share exactly one index |
 | `Product(expr, i)` | `ProductOverIndex` |
 | `reduceSum(expr, i)` | `SumOverIndex` |
 | `Integral(...)` | `DefiniteIntegral` |
@@ -618,6 +620,16 @@ The names describe the effect on index structure: `ExpandProduct` expands it,
 `IndexPreservingProduct` does not eliminate common indices, and `ReduceProduct`
 reduces it by contracting one common index. `ReduceProduct` is therefore an
 intentional counterpart to `ExpandProduct`, not merely an implementation term.
+
+References in the argument list are IRIs. `ReduceProduct` has exactly two
+ordered operand arguments. Its operands must share exactly one index, which is
+removed from the result.
+
+Every declared variable and every checked expression result has an ordered
+index structure containing unique index IRIs. Duplicate indices are rejected at
+variable input boundaries and by the checker; they are never normalized away.
+This invariant keeps `ReduceProduct` binary and removes the need for an explicit
+reduction-index selector.
 
 ## 12. Remaining questions
 

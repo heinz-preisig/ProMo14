@@ -253,26 +253,15 @@ class Parser:
                 return left
             self._advance()
 
-            # REDUCE may carry an optional index:  a * N b
-            index: Optional[Var] = None
-            if info.factory == "reduce":
-                if (
-                    self._current.kind == "var"
-                    and self._at_factor_start(self._peek(1))
-                ):
-                    index = Var(self._advance().value)
-
             next_min = info.precedence if info.right_assoc else info.precedence + 1
             right = self._expression(next_min)
-            left = self._make_infix(info, left, right, index)
+            left = self._make_infix(info, left, right)
 
-    def _make_infix(
-        self, info, left: Node, right: Node, index: Optional[Var] = None
-    ) -> Node:
+    def _make_infix(self, info, left: Node, right: Node) -> Node:
         """Build the AST node for an infix operator.
 
         New infix operators at existing precedence levels need a table entry
-        in ``symbols.py`` plus a case here.
+        in ``symbols.py`` plus a factory case here.
         """
         f = info.factory
         if f == "add":
@@ -282,7 +271,7 @@ class Parser:
         if f == "index_preserving_product":
             return IndexPreservingProduct(left, right)
         if f == "reduce":
-            return Reduce(left, right, index)
+            return Reduce(left, right)
         if f == "power":
             return Power(left, right)
         raise ParseError(f"No AST factory for infix operator {info.symbol!r}")

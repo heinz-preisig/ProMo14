@@ -169,9 +169,6 @@ export function nodeToString(node: AstNode): string {
     case 'IndexPreservingProduct':
       return `${nodeToString(node.left as AstNode)} . ${nodeToString(node.right as AstNode)}`
     case 'Reduce':
-      if (node.index) {
-        return `${nodeToString(node.left as AstNode)} * ${nodeToString(node.index as AstNode)} ${nodeToString(node.right as AstNode)}`
-      }
       return `${nodeToString(node.left as AstNode)} * ${nodeToString(node.right as AstNode)}`
     case 'Power':
       return `${nodeToString(node.base as AstNode)} ^ ${nodeToString(node.exponent as AstNode)}`

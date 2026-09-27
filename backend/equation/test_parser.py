@@ -48,8 +48,9 @@ def test_reduce():
     assert parse("a * b") == Reduce(Var("a"), Var("b"))
 
 
-def test_reduce_with_index():
-    assert parse("a * N b") == Reduce(Var("a"), Var("b"), Var("N"))
+def test_reduce_with_index_is_rejected():
+    with pytest.raises(ParseError):
+        parse("a * N b")
 
 
 def test_term_left_associative():

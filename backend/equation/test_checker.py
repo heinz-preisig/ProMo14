@@ -161,13 +161,15 @@ def test_reduce():
     assert c.indices == []
 
 
-def test_reduce_with_index():
+def test_reduce_rejects_multiple_common_indices():
     space = _space()
-    # explicit reduce over N: (rho[N], v[N]) removes the species index
-    node = parse("rho * N v")
-    c = check(node, space)
-    assert c.units == Units(mass=1, length=-2, time=-1)
-    assert c.indices == []
+    _add_var(space, "w1", Units(), [N, T])
+    _add_var(space, "w2", Units(), [N, T])
+    try:
+        check(parse("w1 * w2"), space)
+    except IndexStructureError:
+        return
+    raise AssertionError("expected IndexStructureError")
 
 
 def test_index_preserving_product():

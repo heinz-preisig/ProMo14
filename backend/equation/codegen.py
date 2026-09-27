@@ -408,27 +408,20 @@ class Renderer:
         l_src, r_src = self.render(left), self.render(right)
 
         common = left.index_set() & right.index_set()
-        if node.index:
-            reduced_iri = self.space.get_index(node.index.name)
-        else:
-            reduced_iri = next(iter(common)) if len(common) == 1 else None
+        reduced_iri = next(iter(common))
 
         if self.target == "latex":
-            if reduced_iri:
-                return r"\sum_{%s} %s \, %s" % (
-                    self._tex_index(reduced_iri), l_src, r_src)
-            return r"%s \, %s" % (l_src, r_src)
+            return r"\sum_{%s} %s \, %s" % (
+                self._tex_index(reduced_iri), l_src, r_src)
 
         # Contraction over the shared index: axis = its position inside each
         # operand's (sorted) index list.
-        if reduced_iri is None:
-            raise VarError("codegen: reduce has no resolvable index")
+        li = self._index_axis(left, reduced_iri)
+        ri = self._index_axis(right, reduced_iri)
         if self.target == "matlab":
             # Label-based contraction: einsum(op1, op2, {'N'}).
             return "einsum(%s, %s, %s)" % (
                 l_src, r_src, self._ml_labels([reduced_iri]))
-        li = self._index_axis(left, reduced_iri)
-        ri = self._index_axis(right, reduced_iri)
         if self.target == "julia":
             # The matrix·vector pattern (2-D · 1-D over the shared
             # trailing/leading axis) is plain ``*``; anything else

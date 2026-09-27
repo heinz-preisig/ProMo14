@@ -79,6 +79,12 @@ class Checked:
     incidence: FrozenSet[str] = field(default_factory=frozenset)
     children: List["Checked"] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        if len(self.indices) != len(set(self.indices)):
+            raise IndexStructureError(
+                "checked expression repeats an index; index structures must be unique"
+            )
+
     def index_set(self) -> Set[str]:
         return set(self.indices)
 
@@ -177,20 +183,9 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         left = check(node.left, space, lhs)
         right = check(node.right, space, lhs)
         common = left.index_set() & right.index_set()
-        n_common = len(common)
-
-        reduce_iri: Optional[str] = None
-        if node.index:
-            reduce_iri = space.get_index(node.index.name)
-            if reduce_iri is None:
-                raise VarError(
-                    "no such index %s defined" % node.index.name
-                )
-
-        if n_common == 0:
+        if len(common) != 1:
             raise IndexStructureError(
-                "ReduceProduct -- there must be exactly one common index "
-                "over which one reduces"
+                "ReduceProduct -- the operands must have exactly one common index"
                 "\n first argument indices : %s"
                 "\n second argument indices: %s"
                 % (
@@ -198,28 +193,9 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                     space.pretty_index_list(right.indices),
                 )
             )
-
-        if n_common == 1:
-            # Exactly one common index; reduce over it.
-            reduced_iri = list(common)[0]
-        else:
-            # More than one common index — an explicit reduce index is required
-            # so the rule is unambiguous.
-            if reduce_iri is None:
-                raise IndexStructureError(
-                    "ReduceProduct -- there are more than one common index; "
-                    "use an explicit reduce index"
-                    "\n first argument indices : %s"
-                    "\n second argument indices: %s"
-                    % (
-                        space.pretty_index_list(left.indices),
-                        space.pretty_index_list(right.indices),
-                    )
-                )
-            reduced_iri = reduce_iri
+        reduced_iri = next(iter(common))
         result_indices = _without(
             _union(left.indices, right.indices), reduced_iri)
-
         return Checked(
             node=node,
             units=left.units * right.units,
@@ -287,13 +263,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                     "-",
                 )
             units = arg.units
-        elif rule == "inverse":
-            if arg.indices:
-                raise IndexStructureError(
-                    "inv requires a scalar argument; got indices %s"
-                    % space.pretty_index_list(arg.indices)
-                )
-            units = arg.units.inverse()
         elif rule == "scalar_inverse":
             if arg.indices:
                 raise IndexStructureError(

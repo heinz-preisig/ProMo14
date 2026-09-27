@@ -138,7 +138,7 @@ export type AstNode =
   | { type: 'Group'; body: AstNode }
   | { type: 'Add'; op: '+' | '-'; left: AstNode; right: AstNode }
   | { type: 'Expand'; left: AstNode; right: AstNode }
-  | { type: 'Reduce'; left: AstNode; right: AstNode; index?: AstNode | null }
+  | { type: 'Reduce'; left: AstNode; right: AstNode }
   | { type: 'Power'; base: AstNode; exponent: AstNode }
   | { type: 'Instantiate'; var: AstNode }
   | { type: 'Integral'; body: AstNode; var: AstNode; lower: AstNode; upper: AstNode }

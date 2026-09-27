@@ -79,7 +79,7 @@ and made right-associative (`a^b^c = a^(b^c)`):
 Expression -> Term ( SUM Term )*
 Term       -> Power ( EXPAND Power
                     | HADAMARD Power
-                    | REDUCE [Index] Power )*
+                    | REDUCE Power )*
 Power      -> Factor ( POWER Power )?
 Index      -> Variable
 Identifier -> Variable
@@ -111,7 +111,7 @@ of TPG.
 | Operator | Checks performed |
 |----------|------------------|
 | `Add` | Units equal; index structures equal |
-| `ReduceProduct` | Exactly one common index (or explicit `*i`); result indices = symmetric difference |
+| `ReduceProduct` | Exactly one common index; result removes that index |
 | `ExpandProduct` | Index sets disjoint; result indices = union |
 | `Hadamard` | Index structures equal; units multiply |
 | `Power` | Basis and exponent dimensionless; result indices = basis indices |
