@@ -44,12 +44,14 @@ from the bottom up.
 
 ## Produces
 
-- **Var/expr knowledge graph** (JSON-LD named graph) containing:
-  variable resources, equation resources (LHS variable IRI + RHS token
-  sequence as `rdf:List` + incidence list), index and token definitions.
-- **Checked expressions** — each carries inferred units, index
-  structures, and a variable incidence list.  Stored as token sequences
-  of IRIs, not AST trees.
+- **Var/expr knowledge graph** containing variable and equation resources.
+  Current equations store the LHS variable IRI, textual RHS, incidence IRIs and
+  derived caches. A design investigation proposes replacing the authoritative
+  textual RHS with an ordered, IRI-bound semantic expression while retaining
+  entered source non-authoritatively; this is not yet implemented.
+- **Checked expressions** — each carries inferred units, ordered index
+  structures, and a variable incidence list. The checked tree is currently
+  transient; persisted equations retain source and derived metadata.
 
 ## Language
 
@@ -65,11 +67,14 @@ index-structured tensor operations.  Key characteristics:
   be class `constant` or `parameter` (ADR-008).
 - Function-call syntax only (`Integral(...)`, `Product(...)`, etc.).
 - No unary minus (negation is `neg(...)`).
-- Operators: `+`/`-` (sum), `*` (Einstein reduce product), `:` (expand
-  product), `.` (Hadamard), `^` (power, right-associative).
-- Functions: `exp`, `log`, `ln`, `sqrt`, `sin`, `cos`, ... (dimensionless
-  input); `abs`, `neg`, `diffSpace`, `left`, `right` (index-structure
-  retaining); `inv`, `sign`.
+- Operators: `+`/`-` (sum), `*` (reduce product), `:` (expand product),
+  `.` (index-preserving product; historically called Hadamard), `^` (power,
+  right-associative).
+- Functions: `exp`, `log`, `ln`, `sqrt`, `sin`, `cos`, ... (currently require
+  dimensionless input); `abs`, `neg`, `left`, `right`, `inv`, `sign`.
+  `diffSpace(expr)` is still accepted by the current implementation but is a
+  historical modelling error: differential space is an index concept, not a
+  function, and the function is scheduled for removal in the language audit.
 - Higher-order: `Integral`, `Product`, `Root` (implicit solve),
   `TotalDiff`, `ParDiff`, `reduceSum`, `MaxMin`.
 - Variable qualification: `network!label` for cross-network references.
@@ -122,14 +127,15 @@ case-only difference is flagged since names are case-sensitive).
 
 ## Semantic checks
 
-The checker runs during AST construction (not as a separate pass):
+The parser builds a syntax tree, then the checker performs units, ordered-index,
+incidence and construct-specific semantic checks:
 
 | Operator | Checks |
 |----------|--------|
 | `Add` | Units equal; index structures equal |
-| `ReduceProduct` | Exactly one common index; result = symmetric difference |
-| `ExpandProduct` | Index sets disjoint; result = union |
-| `Hadamard` | Index structures equal; units multiply |
+| `ReduceProduct` | Exactly one common index, or an explicit selected reduction index when several are common; selected index is removed |
+| `ExpandProduct` | Index sets disjoint; result = ordered union |
+| `IndexPreservingProduct` | Units multiply; result = ordered union without eliminating common indices |
 | `Power` | Basis and exponent dimensionless |
 | `Integral` | Integration variable and limits share index structure |
 | `TotalDiff` / `ParDiff` | Units = dx − dy; indices = union |
@@ -182,11 +188,13 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 |----------|-----------|---------|
 | Replace TPG with hand-written parser | ADR-005 | TPG is overkill for a small LL-friendly grammar. |
 | JSON-LD as working format | ADR-005 | Replaces `variables_v8.json`; same graph is edited, saved, and published. |
-| Token sequences, not AST trees | ADR-005 | Expressions stored as `rdf:List` of IRIs; external compilers re-parse. |
+| Historical token-list proposal | ADR-005 | Superseded before implementation; the current store uses textual RHS, and the new design direction is an ordered semantic expression rather than a lexical token list. |
 | Publish–consume contract | ADR-005 | Checked = trusted; no downstream validation. |
 | `EquationContext` protocol | `equation-context-contract.md` | Ontology seam; checker unchanged when provider changes. |
 | Network hierarchy resolution | `equation-context-contract.md` | Local-first, then accessible ancestors, then global unique fallback. |
 | Units: both SI vector and QUDT IRI | `ontology-data-model.md` | Vector for checking; IRI for semantic identity. |
+| Textual RHS persistence | Current implementation | Equations currently store source text plus incidence/caches. |
+| Ordered IRI semantic expression | `math-language-ontology-comparison.md` | Agreed design direction; operation IRI + ordered arguments, entered source retained non-authoritatively; not yet implemented. |
 
 ## Interaction with other modules
 
@@ -204,3 +212,6 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
   `CompileSpace` resolution rules.
 - `docs/ontology-data-model.md` — RDF schema for variables, indices,
   equations, tokens; loader contract.
+- `docs/math-language-ontology-comparison.md` — historical comparison and the
+  agreed requirements for compact language semantics and canonical IRI-bound
+  expression storage.

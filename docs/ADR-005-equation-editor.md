@@ -5,6 +5,14 @@
 Implemented — recursive-descent parser, Python operator checker, and
 React + TypeScript + Vite frontend are in place.
 
+This ADR records the implemented parser port and the historical source-language
+terminology. The later design investigation in
+`docs/math-language-ontology-comparison.md` governs the proposed canonical
+IRI-bound expression representation and semantic naming audit. In particular,
+the historical `HADAMARD` name is now understood as index-preserving product,
+and `diffSpace(expr)` is an implementation artefact rather than a canonical
+language operation. Those design changes are not yet implemented.
+
 ## Context
 
 The Equation Editor defines the mathematical behaviour of base entities. In the
