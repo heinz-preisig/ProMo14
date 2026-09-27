@@ -1,5 +1,7 @@
 """Tests for ``backend/core/graph_store.py``."""
 
+import json
+
 from rdflib import Dataset, Literal, URIRef
 from rdflib.namespace import RDF
 
@@ -128,6 +130,81 @@ def test_migrate_domain_membership_uses_universe_iri(tmp_path):
 
     store.dirty = False
     store._migrate_domain_membership()
+    assert not store.dirty
+
+
+def _store_with_legacy_equation(tmp_path, rhs="rho + rho"):
+    """Build a saved artefact containing a literal-only, checkable RHS."""
+    store = RdfStore(tmp_path)
+    store.load()
+    store.create_artefact_graph(
+        ARTEFACT,
+        "Library",
+        uses=[str(store.ONTOLOGY_GRAPH_IRI)],
+    )
+    graph = store.graph(ARTEFACT)
+    store.add_variable_dict(graph, {
+        "iri": f"{ARTEFACT}#V_rho",
+        "label": "rho",
+        "internal_id": "V_1",
+        "network": "universe",
+        "units": [0] * 8,
+    })
+    store.add_variable_dict(graph, {
+        "iri": f"{ARTEFACT}#V_result",
+        "label": "result",
+        "internal_id": "V_2",
+        "network": "universe",
+        "units": [0] * 8,
+        "equations": {
+            "E_1": {
+                "iri": f"{ARTEFACT}#E_1",
+                "internal_id": "E_1",
+                "rhs": rhs,
+                "network": "universe",
+            },
+        },
+    })
+    store.save()
+    return URIRef(f"{ARTEFACT}#E_1")
+
+
+def test_load_migrates_literal_rhs_to_canonical_expression(tmp_path):
+    equation = _store_with_legacy_equation(tmp_path)
+
+    store = RdfStore(tmp_path)
+    store.load()
+
+    graph = store.graph(ARTEFACT)
+    canonical = graph.value(equation, PROMO["rhsExpression"])
+    assert canonical is not None
+    assert graph.value(equation, PROMO["rhs"]) == Literal("( rho + rho )")
+    incidence = graph.value(equation, PROMO["incidenceList"])
+    assert json.loads(str(incidence)) == [f"{ARTEFACT}#V_rho"]
+    assert store.dirty
+
+
+def test_canonical_rhs_migration_leaves_uncheckable_legacy_rhs(tmp_path):
+    equation = _store_with_legacy_equation(tmp_path, rhs="missing + rho")
+
+    store = RdfStore(tmp_path)
+    store.load()
+
+    graph = store.graph(ARTEFACT)
+    assert graph.value(equation, PROMO["rhsExpression"]) is None
+    assert graph.value(equation, PROMO["rhs"]) == Literal("missing + rho")
+
+
+def test_canonical_rhs_migration_is_idempotent(tmp_path):
+    equation = _store_with_legacy_equation(tmp_path)
+    store = RdfStore(tmp_path)
+    store.load()
+    canonical = store.graph(ARTEFACT).value(equation, PROMO["rhsExpression"])
+
+    store.dirty = False
+    store._migrate_canonical_rhs()
+
+    assert store.graph(ARTEFACT).value(equation, PROMO["rhsExpression"]) == canonical
     assert not store.dirty
 
 

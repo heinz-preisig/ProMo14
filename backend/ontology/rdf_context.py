@@ -19,8 +19,11 @@ from rdflib import Graph, URIRef
 from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, RdfStore
-from backend.equation.compile_space import Index, Variable
+from backend.equation.canonical import to_source
+from backend.equation.canonical_rdf import read_rhs_expression
+from backend.equation.compile_space import CompileSpace, Index, Variable
 from backend.equation.context import EquationContext
+from backend.equation.errors import VarError
 from backend.equation.units import Units
 
 
@@ -129,6 +132,7 @@ class RdfContext(EquationContext):
         self._variables = self._load_variables()
         self._indices = self._load_indices()
         self._tree, self._parent_of = self._load_network_tree()
+        self._apply_canonical_rhs()
         self._domains = self._load_domains()
         self._axes = self._load_axes()
         self._entity_types = self._load_entity_types()
@@ -284,11 +288,16 @@ class RdfContext(EquationContext):
                     pass
             network, domain_iri = _domain_membership(graph, eq_s)
             eq_key = eq_internal_id or eq_iri
+            try:
+                canonical_rhs = read_rhs_expression(graph, eq_s)
+            except VarError:
+                canonical_rhs = None
             equations[eq_key] = {
                 "iri": eq_iri,
                 "internal_id": eq_internal_id or None,
                 "lhs": var_iri,
                 "rhs": _one_literal(graph, eq_s, PROMO["rhs"]),
+                "_canonical_rhs": canonical_rhs,
                 "rhs_latex": _one_literal(graph, eq_s, PROMO["rhsLatex"])
                 or None,
                 "equation_class": _one_literal(graph, eq_s, PROMO["equationClass"])
@@ -301,6 +310,32 @@ class RdfContext(EquationContext):
                 "modified": _one_literal(graph, eq_s, PROMO["modified"]) or None,
             }
         return equations
+
+    def _apply_canonical_rhs(self) -> None:
+        """Prefer stored canonical RHS trees and regenerate their source cache.
+
+        ``promo:rhs`` remains a compatibility cache.  When a canonical tree is
+        present, it is authoritative; malformed trees fall back to the literal.
+        """
+        for variable in self._variables.values():
+            equations = getattr(variable, "equations", {})
+            for equation in equations.values():
+                canonical = equation.pop("_canonical_rhs", None)
+                if canonical is None:
+                    continue
+                network = equation.get("network") or variable.network
+                space = CompileSpace(
+                    self._variables,
+                    self._indices,
+                    variable_definition_network=variable.network,
+                    expression_definition_network=network,
+                    accessible_networks=self.accessible_networks(network),
+                    network_tree=self._tree,
+                )
+                try:
+                    equation["rhs"] = to_source(canonical, space)
+                except VarError:
+                    pass
 
     def _load_indices(self) -> Dict[str, Index]:
         indices: Dict[str, Index] = {}

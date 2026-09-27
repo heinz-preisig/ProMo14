@@ -17,7 +17,10 @@ from urllib.parse import quote
 import pytest
 from fastapi.testclient import TestClient
 
+from rdflib import Literal, URIRef
+
 from backend.core import graph_store
+from backend.core.graph_store import PROMO
 from backend.main import app
 from backend.testing import GraphClient
 
@@ -152,7 +155,30 @@ def test_network_edit_qualifies_foreign_reference(client):
         for equation in owner["equations"].values()
     ]
     assert equations
-    assert equations[0]["rhs"] == "physical!V_1 + physical!V_1"
+    assert equations[0]["rhs"] == "( physical!V_1 + physical!V_1 )"
+
+
+def test_canonical_rhs_is_persisted_and_authoritative(client):
+    """A checked RHS stores its semantic tree; stale literal text is ignored."""
+    _post(client, _var("V_1"))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 + V_1"),
+    }))
+
+    graph = graph_store.get_store().ontology_graph
+    equation = URIRef(f"{BASE}#E_1")
+    canonical = graph.value(equation, PROMO["rhsExpression"])
+    assert canonical is not None
+
+    graph.set((equation, PROMO["rhs"], Literal("stale source")))
+    context = client.get("/api/equation/context").json()
+    equations = [
+        item
+        for owner in context["variables"]
+        if owner["internal_id"] == "V_2"
+        for item in owner["equations"].values()
+    ]
+    assert equations[0]["rhs"] == "( V_1 + V_1 )"
 
 
 def test_network_edit_blocks_cross_graph_reference(client):

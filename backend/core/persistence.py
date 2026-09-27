@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -86,6 +87,7 @@ class PersistenceMixin:
         # namespace are rehomed into their graph's own namespace.
         self._migrate_equation_iris()
         self._migrate_domain_membership()
+        self._migrate_canonical_rhs()
 
         if legacy_layout:
             # Split the legacy single-file store into per-line files
@@ -217,6 +219,90 @@ class PersistenceMixin:
                     if domain is not None:
                         graph.set((subject, PROMO["inDomain"], domain))
                         changed = True
+        if changed:
+            self.mark_dirty()
+
+    def _migrate_canonical_rhs(self) -> None:
+        """Persist semantic RHS trees for equations that only have source text.
+
+        Migration is deliberately best-effort: an equation that cannot be
+        checked in its graph's resolution scope keeps its literal ``promo:rhs``
+        untouched and can be migrated later once its context is valid.
+        """
+        from backend.equation.canonical import from_checked, to_source
+        from backend.equation.canonical_rdf import (
+            RHS_EXPRESSION,
+            attach_rhs_expression,
+        )
+        from backend.equation.checker import check
+        from backend.equation.codegen import render
+        from backend.equation.compile_space import CompileSpace
+        from backend.equation.errors import VarError
+        from backend.equation.parser import ParseError, parse
+        from backend.equation.syntax import Var
+        from backend.ontology.rdf_context import RdfContext
+
+        changed = False
+        for graph in self.dataset.graphs():
+            equations = [
+                equation
+                for equation in graph.subjects(RDF.type, PROMO["Equation"])
+                if graph.value(equation, PROMO["rhs"]) is not None
+                and graph.value(equation, RHS_EXPRESSION) is None
+            ]
+            if not equations:
+                continue
+
+            context = RdfContext(
+                self,
+                graph_iris=self.resolution_scope(graph.identifier),
+            )
+            for equation in equations:
+                owner = graph.value(None, PROMO["hasEquation"], equation)
+                variable = (
+                    context.variables().get(str(owner))
+                    if owner is not None else None
+                )
+                if variable is None:
+                    continue
+                network = str(
+                    graph.value(equation, PROMO["network"])
+                    or variable.network
+                )
+                space = CompileSpace(
+                    context.variables(),
+                    context.indices(),
+                    variable_definition_network=variable.network,
+                    expression_definition_network=network,
+                    accessible_networks=context.accessible_networks(network),
+                    network_tree=context.tree(),
+                )
+                try:
+                    checked = check(
+                        parse(str(graph.value(equation, PROMO["rhs"]))),
+                        space,
+                        Var(variable.label),
+                    )
+                    canonical = from_checked(checked, space)
+                    latex = render(checked, space, "latex")
+                    source = to_source(canonical, space)
+                except (ParseError, VarError):
+                    continue
+
+                attach_rhs_expression(
+                    graph,
+                    equation,
+                    canonical,
+                    URIRef("%s/expression" % equation),
+                )
+                graph.set((equation, PROMO["rhs"], Literal(source)))
+                graph.set((
+                    equation,
+                    PROMO["incidenceList"],
+                    Literal(json.dumps(sorted(checked.incidence))),
+                ))
+                graph.set((equation, PROMO["rhsLatex"], Literal(latex)))
+                changed = True
         if changed:
             self.mark_dirty()
 

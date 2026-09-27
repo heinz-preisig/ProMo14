@@ -50,7 +50,7 @@ applies and writes go to the working ontology.
 | `test_codegen.py` | Codegen: python/matlab/latex targets | ✅ Passing |
 | `test_document.py` | LaTeX document rendering | ✅ Passing |
 
-119 tests pass in `backend/equation` (2026-09-18).
+190 tests pass in `backend/equation` (2026-09-27).
 
 The ProMo13 corpus replay (73 expressions, 70/73 passing) has been
 archived to `archive/test_corpus.py`.  The new regression baseline will
@@ -170,13 +170,20 @@ Implemented as a React + TypeScript + Vite app in
   index concept; `inv` is checked/rendered as scalar reciprocal; and `sqrt`
   accepts dimensioned arguments only when every SI exponent is even. Parser,
   checker, codegen and frontend terminology are aligned, with regression tests.
-- **Canonical expression prototype (2026-09-27):** checked trees can now be
-  converted in memory to immutable operation-IRI expressions with ordered
-  arguments and IRI-bound variable/index references. Canonical expressions
-  regenerate ProMo source using current names and pass semantic round-trip
-  tests across core operators and functions. Grouping is source-only and is
-  omitted from the semantic tree. RDF serialization, persisted canonical trees
-  and migration of existing textual equations remain pending.
+- **Canonical expression persistence (2026-09-27):** checked trees convert to
+  immutable operation-IRI expressions with ordered arguments and IRI-bound
+  variable/index references. Checked equations are stored with
+  `promo:rhsExpression` → `promo:Expression` / `promo:hasOperation` /
+  `promo:hasArguments` (an RDF list) beside the `promo:rhs` source cache.
+  Reads treat the canonical tree as authoritative and regenerate source with
+  current labels; malformed or absent trees fall back to legacy `promo:rhs`.
+  Domain moves and replacement/removal update or clear canonical subgraphs.
+  `RdfStore.load()` migrates each checkable literal-only RHS in its graph's
+  resolution scope and refreshes source/incidence/LaTeX caches. Grouping is
+  source-only and is omitted from the semantic tree. The tracked data save
+  migrated all 9 ontology equations and 5/10 library equations; five legacy
+  library equations remain literal-only until indexed `inv`, stale `root!`
+  qualifiers, and the `Instantiate` LHS class are resolved.
 - **Index uniqueness and binary reduction (2026-09-27):** every persisted or
   ad-hoc variable input must have an ordered index structure with no repeated
   IRI, and the checker retains the same invariant for all expression results.
@@ -186,6 +193,10 @@ Implemented as a React + TypeScript + Vite app in
 
 ## Pending items
 
+- **Indexed `inv` decision (next):** decide whether `inv` remains scalar-only
+  or becomes index-preserving/elementwise (`inv(x[N]) -> [N]`), then migrate
+  `inv(V[N])`/`inv(rho[N])` equations accordingly. Also rewrite stale
+  `root!` source qualifiers to `universe!` (or define `root` as an alias).
 - ~~`RdfContext` reads only the seeded `ontology_graph`.~~ **Done
   (2026-09-15):** `RdfContext` reads all named graphs in the dataset
   (ontology graph + var/expr graphs) using the ProMo14 vocabulary

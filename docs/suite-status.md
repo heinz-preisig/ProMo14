@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-26
+**Last updated:** 2026-09-27
 
 ## Summary
 
@@ -8,7 +8,7 @@
 |--------|---------|----------|-------|--------|
 | Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork` | `backend/static/hub.html` at `/` | covered by service tests | **Working** — artefact lines, pins, fork, open-in-app |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
-| Equation Editor | Parser + checker + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 8 test files; 206 backend tests total | Backend and frontend functional; `?graph=` wired |
+| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 361 backend tests total | Backend and frontend functional; canonical RHS migrated where checkable |
 | Behaviour Linker | `PUT`/`GET /api/behaviour/assignment` (closure-evaluated) | Scaffold | covered by service tests | Assignment artefact + closure live; UI scaffold |
 | Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures |
 | Species | `GET`/`PUT /api/species/species` | `/species` SPA (:3005) | covered by service tests | Named reaction schemes: components, allocations, reactions |

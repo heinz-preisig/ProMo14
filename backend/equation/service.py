@@ -30,6 +30,12 @@ from backend.ontology.models import VariableRecord
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.ontology.rdf_context import RdfContext, scoped_context
 
+from .canonical import Argument, from_checked
+from .canonical_rdf import (
+    RHS_EXPRESSION,
+    attach_rhs_expression,
+    clear_expression,
+)
 from .checker import INSTANTIATE_CLASSES, check
 from .codegen import TARGETS, render
 from .compile_space import CompileSpace, Index, Variable
@@ -519,6 +525,73 @@ def _resolve_record_domains(store, graph_iri: Optional[str], record: VariableRec
         )
 
 
+def _canonicalise_equations(
+    store,
+    graph,
+    graph_iri: Optional[str],
+    record: VariableRecord,
+    effective_type: Optional[str],
+) -> Dict[str, Argument]:
+    """Return canonical RHS forms keyed by equation IRI.
+
+    Legacy or otherwise uncheckable RHS text remains literal-only for now; a
+    checked RHS is persisted as the authoritative semantic tree and also gets
+    refreshed incidence/LaTeX caches.
+    """
+    context = scoped_context(store, graph_iri)
+    variables = dict(context.variables())
+    variables[record.iri] = Variable(
+        iri=record.iri,
+        label=record.label,
+        network=record.network,
+        domain_iri=record.domain_iri,
+        type=effective_type or record.variable_class or "state",
+        units=Units.from_list(record.units),
+        index_structures=list(record.index_structures),
+        doc=record.doc,
+        port_variable=record.port_variable,
+        internal_id=record.internal_id,
+        aliases=dict(record.aliases),
+        tokens=list(record.tokens),
+        value=record.value,
+    )
+
+    canonical: Dict[str, Argument] = {}
+    for key, equation in record.equations.items():
+        if not equation.iri:
+            equation.iri = str(store.mint_iri(graph.identifier, key))
+        equation_network = equation.network or record.network
+        space = CompileSpace(
+            variables,
+            context.indices(),
+            variable_definition_network=record.network,
+            expression_definition_network=equation_network,
+            accessible_networks=context.accessible_networks(equation_network),
+            network_tree=context.tree(),
+        )
+        try:
+            checked = check(parse(equation.rhs), space, Var(record.label))
+            expression = from_checked(checked, space)
+            latex = render(checked, space, "latex")
+        except (ParseError, VarError):
+            continue
+        equation.incidence_list = sorted(checked.incidence)
+        equation.rhs_latex = latex
+        canonical[equation.iri] = expression
+    return canonical
+
+
+def _attach_canonical_equations(graph, canonical: Dict[str, Argument]) -> None:
+    for equation_iri, expression in canonical.items():
+        equation = URIRef(equation_iri)
+        attach_rhs_expression(
+            graph,
+            equation,
+            expression,
+            URIRef("%s/expression" % equation_iri),
+        )
+
+
 @router.post("/variables", response_model=VariableRecord)
 def create_variable(
     record: VariableRecord,
@@ -542,22 +615,27 @@ def create_variable(
     move_plan = _plan_domain_move(store, graph, record.iri, record, graph_iri)
     _guard_structural_edit(store, graph, record.iri, record, graph_iri,
                            domain_move_planned=bool(move_plan))
-    _remove_variable(graph, URIRef(record.iri))
 
     protos = _instantiate_protos(record)
-    var = record.model_dump()
     # Bridge: the legacy variableClass literal is what checker/builder
     # read (INSTANTIATE_CLASSES).  Derive it from the classifications —
     # a term labelled constant|parameter on any axis wins; classified
     # but neither means a solved variable ("state").  Unclassified
     # variables keep the explicit variable_class.
     derived_class = _class_from_classifications(graph, record.classifications)
+    canonical = _canonicalise_equations(
+        store, graph, graph_iri, record,
+        derived_class or record.variable_class,
+    )
+    var = record.model_dump()
     if derived_class is not None:
         var["variable_class"] = derived_class
         var["type"] = derived_class
     elif var.get("variable_class"):
         var["type"] = var["variable_class"]
+    _remove_variable(graph, URIRef(record.iri))
     var_iri = store.add_variable_dict(graph, var)
+    _attach_canonical_equations(graph, canonical)
     _link_instances(graph, var_iri, protos, record.network)
     _apply_domain_move(graph, move_plan)
     return record
@@ -586,10 +664,19 @@ def update_variable(
     move_plan = _plan_domain_move(store, graph, iri, record, graph_iri)
     _guard_structural_edit(store, graph, iri, record, graph_iri,
                            domain_move_planned=bool(move_plan))
-    _remove_variable(graph, subject)
     record.iri = iri
     protos = _instantiate_protos(record)
+    canonical = _canonicalise_equations(
+        store,
+        graph,
+        graph_iri,
+        record,
+        _class_from_classifications(graph, record.classifications)
+        or record.variable_class,
+    )
+    _remove_variable(graph, subject)
     var_iri = store.add_variable_dict(graph, record.model_dump())
+    _attach_canonical_equations(graph, canonical)
     _link_instances(graph, var_iri, protos, record.network)
     _apply_domain_move(graph, move_plan)
     return record
@@ -679,7 +766,7 @@ def _rewrite_reference(rhs: str, old, destination: str) -> str:
 
 
 def _plan_domain_move(store, graph, iri: str, record: VariableRecord,
-                      graph_iri: Optional[str]) -> List["tuple[URIRef, str, List[str], str]"]:
+                      graph_iri: Optional[str]) -> List["tuple[URIRef, str, List[str], str, Argument]"]:
     """Return validated equation rewrites needed to preserve a moved variable."""
     if (URIRef(iri), None, None) not in graph:
         return []
@@ -771,7 +858,13 @@ def _plan_domain_move(store, graph, iri: str, record: VariableRecord,
                     blocked.append({**ref, "error": "other variable bindings would change"})
                     continue
             latex = render(checked, space, "latex")
-            plan.append((equation, rewritten, sorted(checked.incidence), latex))
+            plan.append((
+                equation,
+                rewritten,
+                sorted(checked.incidence),
+                latex,
+                from_checked(checked, space),
+            ))
     if blocked:
         raise HTTPException(status_code=409, detail={
             "message": (
@@ -786,12 +879,19 @@ def _plan_domain_move(store, graph, iri: str, record: VariableRecord,
 
 
 def _apply_domain_move(
-    graph, plan: List["tuple[URIRef, str, List[str], str]"],
+    graph,
+    plan: List["tuple[URIRef, str, List[str], str, Argument]"],
 ) -> None:
-    for equation, rhs, incidence, latex in plan:
+    for equation, rhs, incidence, latex, canonical in plan:
         graph.set((equation, PROMO["rhs"], Literal(rhs)))
         graph.set((equation, PROMO["incidenceList"], Literal(json.dumps(incidence))))
         graph.set((equation, PROMO["rhsLatex"], Literal(latex)))
+        attach_rhs_expression(
+            graph,
+            equation,
+            canonical,
+            URIRef("%s/expression" % equation),
+        )
 
 
 def _remove_variable(graph, subject: URIRef) -> None:
@@ -799,6 +899,9 @@ def _remove_variable(graph, subject: URIRef) -> None:
     records; dropping only the variable's triples would orphan rhs
     references that still mention other variables."""
     for eq in list(graph.objects(subject, PROMO["hasEquation"])):
+        rhs_expression = graph.value(eq, RHS_EXPRESSION)
+        if rhs_expression is not None:
+            clear_expression(graph, rhs_expression)
         graph.remove((eq, None, None))
     graph.remove((subject, None, None))
 

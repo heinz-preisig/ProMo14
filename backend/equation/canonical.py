@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, Union
+from typing import Literal, Tuple, Union
 
 from backend.core.vocab import PROMOLG
 
@@ -51,6 +51,72 @@ TOTAL_DERIVATIVE = _operation("TotalDerivative")
 PARTIAL_DERIVATIVE = _operation("PartialDerivative")
 SOLVE_ROOT = _operation("SolveRoot")
 INSTANTIATE = _operation("Instantiate")
+
+ArgumentKind = Literal["expression", "variable", "index"]
+
+_OPERATION_ARGUMENTS: dict[str, Tuple[ArgumentKind, ...]] = {
+    ADD: ("expression", "expression"),
+    SUBTRACT: ("expression", "expression"),
+    POWER: ("expression", "expression"),
+    EXPAND_PRODUCT: ("expression", "expression"),
+    INDEX_PRESERVING_PRODUCT: ("expression", "expression"),
+    REDUCE_PRODUCT: ("expression", "expression"),
+    PRODUCT_OVER_INDEX: ("expression", "index"),
+    SUM_OVER_INDEX: ("expression", "index"),
+    DEFINITE_INTEGRAL: (
+        "expression", "variable", "variable", "variable"
+    ),
+    TOTAL_DERIVATIVE: ("expression", "expression"),
+    PARTIAL_DERIVATIVE: ("expression", "expression"),
+    SOLVE_ROOT: ("expression",),
+    INSTANTIATE: ("variable",),
+}
+
+
+def operation_arguments(operation_iri: str) -> Tuple[ArgumentKind, ...]:
+    """Return the declared canonical argument kinds for ``operation_iri``."""
+    signature = _OPERATION_ARGUMENTS.get(operation_iri)
+    if signature is not None:
+        return signature
+
+    name = _operation_name(operation_iri)
+    # Registered unary and binary functions share the same canonical shape as
+    # named operations. Generic Call nodes are deliberately excluded.
+    from .symbols import DEFAULT_TABLE
+
+    if name in DEFAULT_TABLE.ufuncs:
+        return ("expression",)
+    if name in DEFAULT_TABLE.maxmin:
+        return ("expression", "expression")
+    raise VarError(
+        "canonical expression: unknown operation IRI %s" % operation_iri
+    )
+
+
+def validate_expression(argument: Argument) -> Argument:
+    """Validate canonical argument types recursively and return ``argument``."""
+    if isinstance(argument, (VariableReference, IndexReference)):
+        return argument
+    signature = operation_arguments(argument.operation_iri)
+    if len(argument.arguments) != len(signature):
+        raise VarError(
+            "%s requires %d arguments"
+            % (_operation_name(argument.operation_iri), len(signature))
+        )
+    expected_type = {
+        "expression": (Expression, VariableReference),
+        "variable": (VariableReference,),
+        "index": (IndexReference,),
+    }
+    for value, kind in zip(argument.arguments, signature):
+        if not isinstance(value, expected_type[kind]):
+            raise VarError(
+                "%s argument must be %s, got %s"
+                % (_operation_name(argument.operation_iri), kind,
+                   type(value).__name__)
+            )
+        validate_expression(value)
+    return argument
 
 
 def from_checked(checked: Checked, space: CompileSpace) -> Argument:

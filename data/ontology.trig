@@ -1,4 +1,5 @@
 @prefix promo: <https://w3id.org/promo#> .
+@prefix promolg: <https://w3id.org/promo/language#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -968,127 +969,6 @@
         promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> ;
         promo:parent <https://w3id.org/promo/ontology#term_info_role_state> .
 
-    <promo:F_conv> a promo:Variable ;
-        rdfs:label "F_conv" ;
-        promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
-        promo:doc "incidence matrix for convective flow" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
-        promo:internalID "V_4" ;
-        promo:latex "F" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "network" .
-
-    <promo:Mm> a promo:Variable ;
-        rdfs:label "Mm" ;
-        promo:doc "molecular mass" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_12" ;
-        promo:latex "\\lambda" ;
-        promo:network "properties" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 0, -1, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "parameter" .
-
-    <promo:S> a promo:Variable ;
-        rdfs:label "S" ;
-        promo:doc "Entropy" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_7" ;
-        promo:latex "S" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[-2, 2, 0, 1, -1, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:U> a promo:Variable ;
-        rdfs:label "U" ;
-        promo:doc "Internal energy" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_5" ;
-        promo:latex "U" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[-2, 2, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:V> a promo:Variable ;
-        rdfs:label "V" ;
-        promo:doc "volume" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:internalID "V_8" ;
-        promo:latex "V" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:k_conv> a promo:Variable ;
-        rdfs:label "k_conv" ;
-        promo:doc "convective conductivity" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_13" ;
-        promo:latex "k" ;
-        promo:network "properties" ;
-        promo:portVariable true ;
-        promo:unitVector "[1, -1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "transport" .
-
-    <promo:n> a promo:Variable ;
-        rdfs:label "n" ;
-        promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
-        promo:doc "species in mole" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_6" ;
-        promo:latex "n" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:r_x> a promo:Variable ;
-        rdfs:label "r_x" ;
-        promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"promo:r_x\"}" ;
-        promo:doc "x-coordinate" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_14" ;
-        promo:latex "{r_x}" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
-
-    <promo:r_y> a promo:Variable ;
-        rdfs:label "r_y" ;
-        promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"promo:r_y\"}" ;
-        promo:doc "y-coordinate" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_15" ;
-        promo:latex "{r_y}" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
-
     <promo:r_z> a promo:Variable ;
         rdfs:label "r_z" ;
         promo:doc "z-coordinate" ;
@@ -1188,7 +1068,13 @@
         promo:lhs <promo:T> ;
         promo:modified "2026-09-21T11:30:15.213Z" ;
         promo:network "physical" ;
-        promo:rhs "ParDiff(U,S)" .
+        promo:rhs "ParDiff( U, S )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_1/expression> ;
+        promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
+
+    <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
+        promo:hasArguments _:N3996ab468e81417fbcd6b6eb10de46b4 ;
+        promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
         promo:created "2026-09-21T11:31:22.783Z" ;
@@ -1200,7 +1086,13 @@
         promo:lhs <promo:P> ;
         promo:modified "2026-09-21T11:31:22.783Z" ;
         promo:network "physical" ;
-        promo:rhs "ParDiff(U,V)" .
+        promo:rhs "ParDiff( U, V )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_2/expression> ;
+        promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial V}" .
+
+    <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
+        promo:hasArguments _:N840568e297e14d5286457518e9446c2f ;
+        promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
         promo:created "2026-09-21T12:53:55.689Z" ;
@@ -1212,7 +1104,13 @@
         promo:lhs <promo:Axy> ;
         promo:modified "2026-09-21T12:53:55.689Z" ;
         promo:network "geometry" ;
-        promo:rhs "r_x . r_y" .
+        promo:rhs "( physical!r_x . physical!r_y )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_3/expression> ;
+        promo:rhsLatex "r_{x,N} \\circ r_{y,N}" .
+
+    <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
+        promo:hasArguments _:Nb610713945cc4531b0b036edd24c112a ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_4> a promo:Equation ;
         promo:created "2026-09-21T13:17:05.082Z" ;
@@ -1224,7 +1122,13 @@
         promo:lhs <promo:fm_conv> ;
         promo:modified "2026-09-21T13:17:05.082Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "Axy * properties!k_conv  . physical!F_conv . p" .
+        promo:rhs "( ( ( geometry!Axy * properties!k_conv ) . physical!F_conv ) . physical!p )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_4/expression> ;
+        promo:rhsLatex "\\sum_{N} {Axy}_{N} \\, {k}_{N} \\circ {F}_{A\\_conv} \\circ {P}_{N}" .
+
+    <https://w3id.org/promo/ontology#E_4/expression> a promo:Expression ;
+        promo:hasArguments _:Nc858356d6ed24cfdb885563ac02fb38c ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_5> a promo:Equation ;
         promo:created "2026-09-21T13:20:29.434Z" ;
@@ -1236,7 +1140,13 @@
         promo:lhs <promo:m> ;
         promo:modified "2026-09-21T13:20:29.434Z" ;
         promo:network "physical" ;
-        promo:rhs "Mm * n" .
+        promo:rhs "( properties!Mm * n )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_5/expression> ;
+        promo:rhsLatex "\\sum_{S} {\\lambda}_{S} \\, {n}_{N,S}" .
+
+    <https://w3id.org/promo/ontology#E_5/expression> a promo:Expression ;
+        promo:hasArguments _:N38a6cc954de643d6b54297f676cf9b6b ;
+        promo:hasOperation promolg:ReduceProduct .
 
     <https://w3id.org/promo/ontology#E_6> a promo:Equation ;
         promo:created "2026-09-21T13:21:34.696Z" ;
@@ -1248,29 +1158,49 @@
         promo:lhs <promo:dmdt> ;
         promo:modified "2026-09-21T13:21:34.696Z" ;
         promo:network "physical" ;
-        promo:rhs "TotalDiff(m,t)" .
+        promo:rhs "TotalDiff( m, universe!t )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_6/expression> ;
+        promo:rhsLatex "\\frac{\\mathrm{d} {m}_{N}}{\\mathrm{d} t}" .
+
+    <https://w3id.org/promo/ontology#E_6/expression> a promo:Expression ;
+        promo:hasArguments _:N90c5eb24eb3c4bd1a50a6ed9de1e0abd ;
+        promo:hasOperation promolg:TotalDerivative .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
         promo:created "2026-09-21T13:24:09.462Z" ;
         promo:doc "" ;
         promo:equationClass "instantiate" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:incidenceList "[]" ;
         promo:internalID "E_7" ;
         promo:lhs <promo:to> ;
         promo:modified "2026-09-21T13:24:09.462Z" ;
         promo:network "universe" ;
-        promo:rhs "Instantiate(t)" .
+        promo:rhs "Instantiate( t )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_7/expression> ;
+        promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
+
+    <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
+        promo:hasArguments _:Nde9b713ebc0a4d0eb08f5c6adaecfa61 ;
+        promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
         promo:created "2026-09-21T13:24:54.739Z" ;
         promo:doc "" ;
         promo:equationClass "instantiate" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:incidenceList "[]" ;
         promo:internalID "E_8" ;
         promo:lhs <promo:te> ;
         promo:modified "2026-09-21T13:24:54.739Z" ;
         promo:network "universe" ;
-        promo:rhs "Instantiate(t)" .
+        promo:rhs "Instantiate( t )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_8/expression> ;
+        promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
+
+    <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
+        promo:hasArguments _:Naaa8cb3b2ef24542a910133b7d42ee17 ;
+        promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_9> a promo:Equation ;
         promo:created "2026-09-21T16:43:26.574Z" ;
@@ -1282,7 +1212,13 @@
         promo:lhs <promo:m> ;
         promo:modified "2026-09-21T16:43:26.574Z" ;
         promo:network "physical" ;
-        promo:rhs "Integral(dmdt :: t in [to,te])" .
+        promo:rhs "Integral( dmdt :: universe!t in [ universe!to, universe!te ] )" ;
+        promo:rhsExpression <https://w3id.org/promo/ontology#E_9/expression> ;
+        promo:rhsLatex "\\int_{t^o}^{t^e} {\\dot{m}}_{N} \\, dt" .
+
+    <https://w3id.org/promo/ontology#E_9/expression> a promo:Expression ;
+        promo:hasArguments _:N423538e737f24ae99adcef1b58307874 ;
+        promo:hasOperation promolg:DefiniteIntegral .
 
     <https://w3id.org/promo/ontology#cap_species_source> a promo:Capability ;
         rdfs:label "species source" ;
@@ -1663,6 +1599,158 @@
 
     <https://w3id.org/promo/ontology#versionOf> a rdf:Property .
 
+    <promo:F_conv> a promo:Variable ;
+        rdfs:label "F_conv" ;
+        promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
+        promo:doc "incidence matrix for convective flow" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
+        promo:internalID "V_4" ;
+        promo:latex "F" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "network" .
+
+    <promo:Mm> a promo:Variable ;
+        rdfs:label "Mm" ;
+        promo:doc "molecular mass" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_12" ;
+        promo:latex "\\lambda" ;
+        promo:network "properties" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, -1, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "parameter" .
+
+    <promo:S> a promo:Variable ;
+        rdfs:label "S" ;
+        promo:doc "Entropy" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_7" ;
+        promo:latex "S" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[-2, 2, 0, 1, -1, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:T> a promo:Variable ;
+        rdfs:label "T" ;
+        promo:doc "Temperature" ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_1> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_9" ;
+        promo:latex "T" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 0, 1, 0, 0, 0]" ;
+        promo:variableClass "effort" .
+
+    <promo:V> a promo:Variable ;
+        rdfs:label "V" ;
+        promo:doc "volume" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:internalID "V_8" ;
+        promo:latex "V" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:fm_conv> a promo:Variable ;
+        rdfs:label "fm_conv" ;
+        promo:doc "convective mass flow" ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_4> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_18" ;
+        promo:latex "\\hat{m}_conv" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
+        promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "transport" .
+
+    <promo:k_conv> a promo:Variable ;
+        rdfs:label "k_conv" ;
+        promo:doc "convective conductivity" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_13" ;
+        promo:latex "k" ;
+        promo:network "properties" ;
+        promo:portVariable true ;
+        promo:unitVector "[1, -1, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "transport" .
+
+    <promo:n> a promo:Variable ;
+        rdfs:label "n" ;
+        promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
+        promo:doc "species in mole" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_6" ;
+        promo:latex "n" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:r_x> a promo:Variable ;
+        rdfs:label "r_x" ;
+        promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"promo:r_x\"}" ;
+        promo:doc "x-coordinate" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_14" ;
+        promo:latex "{r_x}" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "frame" .
+
+    <promo:r_y> a promo:Variable ;
+        rdfs:label "r_y" ;
+        promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"promo:r_y\"}" ;
+        promo:doc "y-coordinate" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_15" ;
+        promo:latex "{r_y}" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "frame" .
+
+    <https://w3id.org/promo/ontology> a promo:Ontology ;
+        promo:seedFloor "2026-09" .
+
+    <https://w3id.org/promo/ontology#axis_determination_physical> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "determination" .
+
+    <https://w3id.org/promo/ontology#term_function_state> a promo:AxisTerm ;
+        rdfs:label "state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
+    <https://w3id.org/promo/ontology#term_info_role_state> a promo:AxisTerm ;
+        rdfs:label "state" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> .
+
     <promo:Axy> a promo:Variable ;
         rdfs:label "Axy" ;
         promo:doc "contact area in x-y plane" ;
@@ -1692,19 +1780,18 @@
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
         promo:variableClass "effort" .
 
-    <promo:T> a promo:Variable ;
-        rdfs:label "T" ;
-        promo:doc "Temperature" ;
-        promo:hasEquation <https://w3id.org/promo/ontology#E_1> ;
+    <promo:U> a promo:Variable ;
+        rdfs:label "U" ;
+        promo:doc "Internal energy" ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_9" ;
-        promo:latex "T" ;
+        promo:internalID "V_5" ;
+        promo:latex "U" ;
         promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, 0, 0, 1, 0, 0, 0]" ;
-        promo:variableClass "effort" .
+        promo:portVariable true ;
+        promo:unitVector "[-2, 2, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
 
     <promo:dmdt> a promo:Variable ;
         rdfs:label "dmdt" ;
@@ -1719,21 +1806,6 @@
         promo:portVariable false ;
         promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
-
-    <promo:fm_conv> a promo:Variable ;
-        rdfs:label "fm_conv" ;
-        promo:doc "convective mass flow" ;
-        promo:hasEquation <https://w3id.org/promo/ontology#E_4> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
-            <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_18" ;
-        promo:latex "\\hat{m}_conv" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "transport" .
 
     <promo:te> a promo:Variable ;
         rdfs:label "te" ;
@@ -1762,50 +1834,6 @@
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "parameter" .
-
-    <https://w3id.org/promo/ontology> a promo:Ontology ;
-        promo:seedFloor "2026-09" .
-
-    <https://w3id.org/promo/ontology#axis_determination_physical> a promo:ClassificationAxis ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "determination" .
-
-    <https://w3id.org/promo/ontology#term_function_state> a promo:AxisTerm ;
-        rdfs:label "state" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
-
-    <https://w3id.org/promo/ontology#term_info_role_state> a promo:AxisTerm ;
-        rdfs:label "state" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_role_information> .
-
-    <promo:m> a promo:Variable ;
-        rdfs:label "m" ;
-        promo:aliases "{\"latex\": \"m\", \"global_ID\": \"promo:m\"}" ;
-        promo:doc "mass" ;
-        promo:hasEquation <https://w3id.org/promo/ontology#E_5>,
-            <https://w3id.org/promo/ontology#E_9> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_19" ;
-        promo:latex "m" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:t> a promo:Variable ;
-        rdfs:label "t" ;
-        promo:aliases "{\"latex\": \"t\", \"global_ID\": \"promo:t\"}" ;
-        promo:doc "time" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
-        promo:internalID "V_11" ;
-        promo:latex "t" ;
-        promo:network "universe" ;
-        promo:portVariable true ;
-        promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
 
     <https://w3id.org/promo/ontology#cap_reaction_host> a promo:Capability ;
         rdfs:label "reaction host" ;
@@ -1950,6 +1978,22 @@
         promo:parent <https://w3id.org/promo/ontology#token_signal> ;
         promo:tokenKind "reference" .
 
+    <promo:m> a promo:Variable ;
+        rdfs:label "m" ;
+        promo:aliases "{\"latex\": \"m\", \"global_ID\": \"promo:m\"}" ;
+        promo:doc "mass" ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_5>,
+            <https://w3id.org/promo/ontology#E_9> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_19" ;
+        promo:latex "m" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
     <https://w3id.org/promo/ontology#axis_extensity> a promo:ClassificationAxis ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:name "Extensity" .
@@ -2014,6 +2058,19 @@
     <https://w3id.org/promo/ontology#token_momentum> a promo:Token ;
         rdfs:label "Momentum" ;
         promo:tokenKind "conserved" .
+
+    <promo:t> a promo:Variable ;
+        rdfs:label "t" ;
+        promo:aliases "{\"latex\": \"t\", \"global_ID\": \"promo:t\"}" ;
+        promo:doc "time" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:internalID "V_11" ;
+        promo:latex "t" ;
+        promo:network "universe" ;
+        promo:portVariable true ;
+        promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "frame" .
 
     <https://w3id.org/promo/ontology#etype_mass_transport> a promo:EntityType ;
         rdfs:label "Mass Transport" ;
@@ -2145,5 +2202,79 @@
             <https://w3id.org/promo/ontology#token_momentum> ;
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
+
+    _:N0550e142345849cfb053476aac5b25f6 rdf:first <promo:te> ;
+        rdf:rest () .
+
+    _:N0669cdca96f44468a22c56606f45c46b rdf:first <promo:F_conv> ;
+        rdf:rest () .
+
+    _:N0dfde1f8f8f5441c9bcd83ddd8892077 rdf:first <promo:Axy> ;
+        rdf:rest _:N3e9df2cc24ed447ca2f7c2fbb0336595 .
+
+    _:N22ed1f2f201b44ca9f3b6c46e585e9a7 rdf:first <promo:t> ;
+        rdf:rest _:N82983108702f49498fba7be2077e283a .
+
+    _:N38a6cc954de643d6b54297f676cf9b6b rdf:first <promo:Mm> ;
+        rdf:rest _:Nb9694b5fa9ec429eb5f8eb103fb1fce4 .
+
+    _:N3996ab468e81417fbcd6b6eb10de46b4 rdf:first <promo:U> ;
+        rdf:rest _:N5bd9250b101d4cb8ad7d672d1de16314 .
+
+    _:N3e9df2cc24ed447ca2f7c2fbb0336595 rdf:first <promo:k_conv> ;
+        rdf:rest () .
+
+    _:N423538e737f24ae99adcef1b58307874 rdf:first <promo:dmdt> ;
+        rdf:rest _:N22ed1f2f201b44ca9f3b6c46e585e9a7 .
+
+    _:N5bd9250b101d4cb8ad7d672d1de16314 rdf:first <promo:S> ;
+        rdf:rest () .
+
+    _:N5f03593e8456467285e6a261e6314c6a a promo:Expression ;
+        promo:hasArguments _:Nd23f12f931f54bc183449dc2947eabf2 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N82983108702f49498fba7be2077e283a rdf:first <promo:to> ;
+        rdf:rest _:N0550e142345849cfb053476aac5b25f6 .
+
+    _:N840568e297e14d5286457518e9446c2f rdf:first <promo:U> ;
+        rdf:rest _:Nb781fad7e19246749017b9813a213da9 .
+
+    _:N8e40a8c269ea452daa89fa2fd2078fd7 rdf:first <promo:t> ;
+        rdf:rest () .
+
+    _:N90c5eb24eb3c4bd1a50a6ed9de1e0abd rdf:first <promo:m> ;
+        rdf:rest _:N8e40a8c269ea452daa89fa2fd2078fd7 .
+
+    _:Naaa8cb3b2ef24542a910133b7d42ee17 rdf:first <promo:t> ;
+        rdf:rest () .
+
+    _:Nb610713945cc4531b0b036edd24c112a rdf:first <promo:r_x> ;
+        rdf:rest _:Nfb1d09343ec7443ab47ba7e975a22d31 .
+
+    _:Nb781fad7e19246749017b9813a213da9 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:Nb9694b5fa9ec429eb5f8eb103fb1fce4 rdf:first <promo:n> ;
+        rdf:rest () .
+
+    _:Nc858356d6ed24cfdb885563ac02fb38c rdf:first _:N5f03593e8456467285e6a261e6314c6a ;
+        rdf:rest _:Ndcbcc146f51144528846f3c113ec9d45 .
+
+    _:Nd23f12f931f54bc183449dc2947eabf2 rdf:first _:Ndd169cec077d4e82b6dec453cd2cd4b8 ;
+        rdf:rest _:N0669cdca96f44468a22c56606f45c46b .
+
+    _:Ndcbcc146f51144528846f3c113ec9d45 rdf:first <promo:P> ;
+        rdf:rest () .
+
+    _:Ndd169cec077d4e82b6dec453cd2cd4b8 a promo:Expression ;
+        promo:hasArguments _:N0dfde1f8f8f5441c9bcd83ddd8892077 ;
+        promo:hasOperation promolg:ReduceProduct .
+
+    _:Nde9b713ebc0a4d0eb08f5c6adaecfa61 rdf:first <promo:t> ;
+        rdf:rest () .
+
+    _:Nfb1d09343ec7443ab47ba7e975a22d31 rdf:first <promo:r_y> ;
+        rdf:rest () .
 }
 
