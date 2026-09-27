@@ -117,7 +117,8 @@ The current syntax tree distinguishes:
 - `Group` — explicit source parentheses retained for round-tripping;
 - `Add` — plus or minus;
 - `Expand` — disjoint-index expansion, source `:`;
-- `Hadamard` — element-wise product, source `.`;
+- `IndexPreservingProduct` — retains common indices and may expand to the
+  ordered union, source `.`;
 - `Reduce` — indexed contraction, source `*`, optionally with explicit index;
 - `Power`;
 - `Instantiate` — whole-RHS declaration `Instantiate(proto)`;
@@ -169,7 +170,7 @@ binding.
 | `minus` | `Add("-")` | retained |
 | `power` | `Power` | retained |
 | `expandProduct` | `Expand` | retained |
-| `Hadamard` | `Hadamard` | retained |
+| `Hadamard` | `IndexPreservingProduct` | retained with corrected semantic name |
 | `reduceProduct` | `Reduce` | retained, now optional explicit reduction index |
 | `reducteSum` | `ReduceSum` | retained; historical spelling should not be canonical |
 | `Product` | `Product` | retained |
@@ -607,9 +608,9 @@ the declared index IRIs normally; it does not transform an expression from one
 space to another.
 
 The current parser/checker registration of `diffSpace(expr)` as a unary function
-and its code-generation mapping to `gradient` do not represent this design.
-They are implementation/historical artefacts to remove or migrate during the
-language audit, not capabilities to reproduce in the canonical ontology.
+and its code-generation mapping to `gradient` have been removed. They were
+historical implementation artefacts, not capabilities to reproduce in the
+canonical ontology.
 
 ### 11.6 ReduceProduct, ExpandProduct and IndexPreservingProduct
 
@@ -634,3 +635,8 @@ implementation details to resolve during the non-persisting prototype:
    external producer or interface-generation use case is concrete.
 
 None of these requires expanding the core mathematical language.
+
+The former parser/checker registration of `diffSpace(expr)` as a unary function
+and its code-generation mapping to `gradient` have been removed. They were
+historical implementation artefacts, not capabilities to reproduce in the
+canonical ontology.

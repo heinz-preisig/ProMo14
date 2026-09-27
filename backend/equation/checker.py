@@ -20,8 +20,7 @@ a plain recursive dispatch on ``syntax.Node``.
 
 Differences / fixes:
 
-- No side effects: the ontology is read-only (ADR-006); ``diffSpace`` no
-  longer mints indices, it looks them up and errors if missing.
+- No side effects: the ontology is read-only (ADR-006).
 - Rendering state removed: no ``language`` attribute, no ``__str__``.
 - ``Product`` and ``ReduceSum`` raise ``IndexStructureError`` if the index
   is not present in the argument, instead of the old silent ``ValueError``.
@@ -29,9 +28,8 @@ Differences / fixes:
   in the RHS). The old code also searched dependent equations through the
   bipartite graph; that remains a future enhancement once the full var/expr
   graph is available.
-- ``Hadamard`` no longer silently discards empty-index errors — the old code
-  constructed ``IndexStructureError`` without ``raise``. We keep the rule
-  permissive: scalars are allowed; the result is the union of index sets.
+- ``IndexPreservingProduct`` retains common indices and takes the ordered union
+  of both index structures.
 """
 
 from __future__ import annotations
@@ -42,8 +40,9 @@ from typing import FrozenSet, List, Optional, Set
 from .compile_space import CompileSpace
 from .errors import IndexStructureError, UnitError, VarError
 from .syntax import (
-    Add, Call, Expand, Group, Hadamard, Instantiate, Integral, MaxMin, Node,
-    ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
+    Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
+    MaxMin, Node, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff,
+    UFunc, Var,
 )
 from .units import Units
 
@@ -162,7 +161,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             children=[left, right],
         )
 
-    if isinstance(node, Hadamard):
+    if isinstance(node, IndexPreservingProduct):
         left = check(node.left, space, lhs)
         right = check(node.right, space, lhs)
         return Checked(
@@ -289,7 +288,21 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                 )
             units = arg.units
         elif rule == "inverse":
+            if arg.indices:
+                raise IndexStructureError(
+                    "inv requires a scalar argument; got indices %s"
+                    % space.pretty_index_list(arg.indices)
+                )
             units = arg.units.inverse()
+        elif rule == "scalar_inverse":
+            if arg.indices:
+                raise IndexStructureError(
+                    "inv requires a scalar argument; got indices %s"
+                    % space.pretty_index_list(arg.indices)
+                )
+            units = arg.units.inverse()
+        elif rule == "sqrt":
+            units = arg.units.square_root()
         elif rule == "loose":
             units = Units()
         else:
@@ -298,15 +311,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             )
 
         indices = list(arg.indices)
-        if node.name == "diffSpace":
-            diff_label = "d%s" % arg.label
-            diff_iri = space.get_index(diff_label)
-            if diff_iri is None:
-                raise VarError(
-                    "differential index %s not declared in ontology "
-                    "(diffSpace requires a pre-declared index)" % diff_label
-                )
-            indices = _union(indices, [diff_iri])
 
         return Checked(
             node=node,

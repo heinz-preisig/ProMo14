@@ -11,8 +11,8 @@ Targets:
   ``internal_id`` (ADR-005: internal IDs are the code-generation name).
 - ``matlab`` — MATLAB code targeting the ``MultiDimVar`` library
   (``@MultiDimVar``, Einstein-notation operators): ``einsum`` for
-  Hadamard/expand/contraction, ``reducesum``/``reducemult`` for index
-  reductions — all keyed by index *labels* (the ``internal_code``
+  index-preserving/expand/reduce products, ``reducesum``/``reducemult`` for
+  index reductions — all keyed by index *labels* (the ``internal_code``
   aliases), not axis positions.
 - ``julia`` — Julia code: broadcast dots for element-wise ops, ``*``
   for the matrix·vector contraction pattern, ``dropdims(sum/prod(
@@ -36,8 +36,9 @@ from .checker import Checked
 from .compile_space import CompileSpace
 from .errors import VarError
 from .syntax import (
-    Add, Call, Expand, Group, Hadamard, Instantiate, Integral, MaxMin,
-    ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
+    Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
+    MaxMin, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc,
+    Var,
 )
 
 TARGETS = ("python", "matlab", "julia", "latex")
@@ -48,13 +49,11 @@ _UFUNC_PY: Dict[str, str] = {
     "sin": "np.sin", "cos": "np.cos", "tan": "np.tan",
     "exp": "np.exp", "ln": "np.log", "log": "np.log10",
     "sqrt": "np.sqrt", "abs": "np.abs",
-    "inv": "np.linalg.inv", "trans": "np.transpose",
-    "diffSpace": "np.gradient",
+    "trans": "np.transpose",
 }
 _UFUNC_ML: Dict[str, str] = {
     "ln": "log", "log": "log10",
-    "inv": "inv", "trans": "transpose",
-    "diffSpace": "gradient",
+    "trans": "transpose",
 }
 _UFUNC_TEX: Dict[str, str] = {
     "sin": r"\sin", "cos": r"\cos", "tan": r"\tan",
@@ -64,8 +63,7 @@ _UFUNC_TEX: Dict[str, str] = {
 # Julia: same surface names as Matlab mostly; emitted broadcast (``f.(x)``).
 _UFUNC_JL: Dict[str, str] = {
     "ln": "log", "log": "log10",
-    "inv": "inv", "trans": "transpose",
-    "diffSpace": "gradient",
+    "trans": "transpose",
 }
 
 _GREEK_NAMES = {
@@ -248,7 +246,7 @@ class Renderer:
                 return "%s * transpose(%s)" % (left, right)
             return r"%s \otimes %s" % (left, right)
 
-        if isinstance(node, Hadamard):
+        if isinstance(node, IndexPreservingProduct):
             left, right = self.render(ch[0]), self.render(ch[1])
             if self.target == "python":
                 return "%s * %s" % (left, right)
@@ -375,6 +373,10 @@ class Renderer:
 
         if isinstance(node, UFunc):
             arg = self.render(ch[0])
+            if node.name == "inv":
+                if self.target == "latex":
+                    return r"{%s}^{-1}" % arg
+                return "1 / %s" % arg
             if self.target == "python":
                 return "%s(%s)" % (_UFUNC_PY.get(node.name, "np." + node.name), arg)
             if self.target == "matlab":
@@ -384,8 +386,6 @@ class Renderer:
             tex = _UFUNC_TEX.get(node.name)
             if tex:
                 return r"%s\left( %s \right)" % (tex, arg)
-            if node.name == "inv":
-                return r"{%s}^{-1}" % arg
             if node.name == "sqrt":
                 return r"\sqrt{%s}" % arg
             if node.name == "abs":

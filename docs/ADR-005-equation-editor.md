@@ -8,10 +8,11 @@ React + TypeScript + Vite frontend are in place.
 This ADR records the implemented parser port and the historical source-language
 terminology. The later design investigation in
 `docs/math-language-ontology-comparison.md` governs the proposed canonical
-IRI-bound expression representation and semantic naming audit. In particular,
-the historical `HADAMARD` name is now understood as index-preserving product,
-and `diffSpace(expr)` is an implementation artefact rather than a canonical
-language operation. Those design changes are not yet implemented.
+IRI-bound expression representation. The semantic naming audit is now reflected
+in the implementation: the historical `HADAMARD` AST name is
+`IndexPreservingProduct`, `diffSpace(expr)` has been removed because differential
+space is an index concept, `inv` is scalar reciprocal, and `sqrt` accepts only
+even unit exponents. Canonical IRI-bound persistence is not yet implemented.
 
 ## Context
 

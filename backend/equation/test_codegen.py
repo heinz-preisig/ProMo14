@@ -70,8 +70,12 @@ def test_python_group():
     assert gen("( rho + rho )", "python") == "( V_1 + V_1 )"
 
 
-def test_python_hadamard():
+def test_python_index_preserving_product():
     assert gen("rho . v", "python") == "V_1 * V_2"
+
+
+def test_python_scalar_inverse():
+    assert gen("inv(M)", "python") == "1 / V_3"
 
 
 def test_python_expand():
@@ -147,9 +151,13 @@ def test_python_call():
 
 # -- matlab -----------------------------------------------------------------
 
-def test_matlab_hadamard_einsum_no_reduce():
+def test_matlab_index_preserving_product_einsum_no_reduce():
     # Shared indices become element-wise "pages" when nothing is reduced.
     assert gen("rho . v", "matlab") == "einsum(V_1, V_2)"
+
+
+def test_matlab_scalar_inverse():
+    assert gen("inv(M)", "matlab") == "1 / V_3"
 
 
 def test_matlab_expand_einsum_outer():
@@ -224,8 +232,12 @@ def test_latex_group():
         r"\left( {\rho}_{N} + {\rho}_{N} \right)"
 
 
-def test_latex_hadamard():
+def test_latex_index_preserving_product():
     assert gen("rho . v", "latex") == r"{\rho}_{N} \circ {v}_{N}"
+
+
+def test_latex_scalar_inverse():
+    assert gen("inv(M)", "latex") == r"{M}^{-1}"
 
 
 def test_latex_expand():

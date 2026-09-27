@@ -101,11 +101,13 @@ DEFAULT_TABLE = SymbolTable(
     },
     ufuncs={
         # retain
-        "abs", "neg", "diffSpace", "left", "right",
+        "abs", "neg", "left", "right",
         # none
-        "exp", "log", "ln", "sqrt", "sin", "cos", "tan",
+        "exp", "log", "ln", "sin", "cos", "tan",
         "asin", "acos", "atan",
-        # inverse
+        # square root
+        "sqrt",
+        # scalar inverse
         "inv",
         # loose
         "sign",
@@ -115,16 +117,15 @@ DEFAULT_TABLE = SymbolTable(
         "min",
     },
     ufunc_units={
-        # retain — abs, neg, diffSpace, left, right
+        # retain — abs, neg, left, right
         **{f: "retain" for f in
-           ("abs", "neg", "diffSpace", "left", "right")},
+           ("abs", "neg", "left", "right")},
         # none — dimensionless argument required
         **{f: "none" for f in
-           ("exp", "log", "ln", "sqrt", "sin", "cos", "tan",
+           ("exp", "log", "ln", "sin", "cos", "tan",
             "asin", "acos", "atan")},
-        # inverse
-        "inv": "inverse",
-        # loose
+        "sqrt": "sqrt",
+        "inv": "scalar_inverse",
         "sign": "loose",
     },
     functions=set(),
@@ -132,7 +133,10 @@ DEFAULT_TABLE = SymbolTable(
         "+": InfixEntry("+", precedence=1, right_assoc=False, factory="add"),
         "-": InfixEntry("-", precedence=1, right_assoc=False, factory="add"),
         ":": InfixEntry(":", precedence=2, right_assoc=False, factory="expand"),
-        ".": InfixEntry(".", precedence=2, right_assoc=False, factory="hadamard"),
+        ".": InfixEntry(
+            ".", precedence=2, right_assoc=False,
+            factory="index_preserving_product",
+        ),
         "*": InfixEntry("*", precedence=2, right_assoc=False, factory="reduce"),
         "^": InfixEntry("^", precedence=3, right_assoc=True, factory="power"),
     },

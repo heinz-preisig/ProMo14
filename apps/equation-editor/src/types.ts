@@ -138,7 +138,6 @@ export type AstNode =
   | { type: 'Group'; body: AstNode }
   | { type: 'Add'; op: '+' | '-'; left: AstNode; right: AstNode }
   | { type: 'Expand'; left: AstNode; right: AstNode }
-  | { type: 'Hadamard'; left: AstNode; right: AstNode }
   | { type: 'Reduce'; left: AstNode; right: AstNode; index?: AstNode | null }
   | { type: 'Power'; base: AstNode; exponent: AstNode }
   | { type: 'Instantiate'; var: AstNode }
@@ -151,6 +150,7 @@ export type AstNode =
   | { type: 'ReduceSum'; body: AstNode; index: AstNode }
   | { type: 'UFunc'; name: string; arg: AstNode }
   | { type: 'Call'; name: AstNode; args: AstNode[] }
+  | { type: 'IndexPreservingProduct'; left: AstNode; right: AstNode }
   | { type: string; [key: string]: unknown }
 
 /** A checked equation kept in the session list and attached to a

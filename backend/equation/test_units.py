@@ -77,6 +77,19 @@ def test_scale():
     assert u.scale(3) == Units(mass=3, length=6)
 
 
+def test_square_root_halves_even_exponents():
+    assert Units(length=2, time=-4).square_root() == Units(length=1, time=-2)
+
+
+def test_square_root_rejects_odd_exponents():
+    try:
+        Units(mass=1).square_root()
+    except UnitError as exc:
+        assert "mass=1" in str(exc)
+        return
+    raise AssertionError("expected UnitError")
+
+
 def test_pretty():
     assert Units().pretty() == "1"
     assert Units(mass=1, length=1, time=-2).pretty() == "kg m s^-2"

@@ -166,7 +166,7 @@ export function nodeToString(node: AstNode): string {
       return `${nodeToString(node.left as AstNode)} ${node.op} ${nodeToString(node.right as AstNode)}`
     case 'Expand':
       return `${nodeToString(node.left as AstNode)} : ${nodeToString(node.right as AstNode)}`
-    case 'Hadamard':
+    case 'IndexPreservingProduct':
       return `${nodeToString(node.left as AstNode)} . ${nodeToString(node.right as AstNode)}`
     case 'Reduce':
       if (node.index) {

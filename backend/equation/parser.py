@@ -44,8 +44,9 @@ from typing import List, Optional
 
 from .symbols import DEFAULT_TABLE, SymbolTable
 from .syntax import (
-    Add, Call, Expand, Group, Hadamard, Instantiate, Integral, MaxMin, Node,
-    ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
+    Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
+    MaxMin, Node, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff,
+    UFunc, Var,
 )
 
 
@@ -278,8 +279,8 @@ class Parser:
             return Add(info.symbol, left, right)
         if f == "expand":
             return Expand(left, right)
-        if f == "hadamard":
-            return Hadamard(left, right)
+        if f == "index_preserving_product":
+            return IndexPreservingProduct(left, right)
         if f == "reduce":
             return Reduce(left, right, index)
         if f == "power":

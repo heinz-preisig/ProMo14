@@ -39,8 +39,8 @@ class Expand:
 
 
 @dataclass(frozen=True)
-class Hadamard:
-    """Hadamard (element-wise) product ``left . right``."""
+class IndexPreservingProduct:
+    """Product ``left . right`` retaining common indices."""
     left: "Node"
     right: "Node"
 
@@ -140,6 +140,6 @@ class Call:
 
 
 Node = Union[
-    Var, Group, Add, Expand, Hadamard, Reduce, Power, Instantiate,
+    Var, Group, Add, Expand, IndexPreservingProduct, Reduce, Power, Instantiate,
     Integral, Product, Root, MaxMin, TotalDiff, ParDiff, ReduceSum, UFunc, Call,
 ]

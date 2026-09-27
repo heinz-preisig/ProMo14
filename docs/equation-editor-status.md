@@ -1,6 +1,6 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-26
+**Last updated:** 2026-09-27
 
 ## Current state
 
@@ -164,6 +164,12 @@ Implemented as a React + TypeScript + Vite app in
   makes a defining equation invalid.  Units and index structures remain
   usage-locked.  The detail dialog reports the number of references that may
   be qualified.
+- **Math-language semantic audit (2026-09-27):** the `.` AST/checker/UI name is
+  now `IndexPreservingProduct`; the historical `diffSpace(expr)` function and
+  gradient renderings are removed because differential space is an ontology
+  index concept; `inv` is checked/rendered as scalar reciprocal; and `sqrt`
+  accepts dimensioned arguments only when every SI exponent is even. Parser,
+  checker, codegen and frontend terminology are aligned, with regression tests.
 
 ## Pending items
 
@@ -200,8 +206,9 @@ Implemented as a React + TypeScript + Vite app in
   `DependentVariableEditor` after a successful check.  37 tests in
   `test_codegen.py`.
   - **Matlab** targets the `MultiDimVar` library (Einstein notation):
-    `einsum(a,b)` for Hadamard/expand, `einsum(a,b,{'N'})` for
-    contraction, `reducesum`/`reducemult` for index reductions — all
+    `einsum(a,b)` for index-preserving/expand products,
+    `einsum(a,b,{'N'})` for contraction,
+    `reducesum`/`reducemult` for index reductions — all
     keyed by index `internal_code` labels.  The library is vendored at
     `runtime/matlab/@MultiDimVar` (from CAM13 `static_assets`; see
     `runtime/matlab/README.md`).

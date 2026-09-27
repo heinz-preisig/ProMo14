@@ -14,7 +14,7 @@ export const OPERATOR_HELP: OperatorHelpEntry[] = [
   { label: '-', syntax: 'a - b', description: 'subtract' },
   { label: '*', syntax: 'a * b', description: 'product — a * i b reduces over index i' },
   { label: ':', syntax: 'a : b', description: 'expand (outer) product' },
-  { label: '.', syntax: 'a . b', description: 'Hadamard — element-wise product' },
+  { label: '.', syntax: 'a . b', description: 'index-preserving product — retains common indices and may expand the index set' },
   { label: '^', syntax: 'a ^ b', description: 'power — right-associative' },
   {
     label: 'Integral',
@@ -58,9 +58,19 @@ export const OPERATOR_HELP: OperatorHelpEntry[] = [
     description: 'maximum or minimum of two expressions',
   },
   {
-    label: 'sin cos exp log sqrt abs neg inv sign',
+    label: 'sin cos exp log abs neg sign',
     syntax: 'f(x)',
     description: 'unary functions',
+  },
+  {
+    label: 'sqrt',
+    syntax: 'sqrt(x)',
+    description: 'square root — every unit exponent must be even',
+  },
+  {
+    label: 'inv',
+    syntax: 'inv(x)',
+    description: 'scalar reciprocal',
   },
   {
     label: 'f(…)',

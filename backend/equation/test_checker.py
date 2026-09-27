@@ -170,13 +170,20 @@ def test_reduce_with_index():
     assert c.indices == []
 
 
-def test_hadamard():
+def test_index_preserving_product():
     space = _space()
-    # rho . N -> density per species (keeps N)
     node = parse("rho . N")
     c = check(node, space)
     assert c.units == Units(mass=1, length=-3)
     assert c.indices == ["http://promo.example/index/N"]
+
+
+def test_index_preserving_product_expands_index_set():
+    c = check(parse("rho . x"), _space())
+    assert c.indices == [
+        "http://promo.example/index/N",
+        "http://promo.example/index/T",
+    ]
 
 
 def test_expand_requires_disjoint_indices():
@@ -213,6 +220,24 @@ def test_power_rejects_dimensioned_exponent():
     raise AssertionError("expected UnitError")
 
 
+def test_sqrt_accepts_even_unit_exponents():
+    space = _space()
+    _add_var(space, "area", Units(length=2, time=-4), [])
+    c = check(parse("sqrt(area)"), space)
+    assert c.units == Units(length=1, time=-2)
+
+
+def test_sqrt_rejects_odd_unit_exponents():
+    space = _space()
+    try:
+        check(parse("sqrt(M)"), space)
+    except UnitError as exc:
+        assert "even" in str(exc)
+        assert "mass" in str(exc)
+        return
+    raise AssertionError("expected UnitError")
+
+
 def test_ufunc_retain():
     space = _space()
     node = parse("abs(rho)")
@@ -232,10 +257,18 @@ def test_ufunc_none_requires_dimensionless():
 
 def test_ufunc_inverse():
     space = _space()
-    # inv(rho) has inverse density units
-    node = parse("inv(rho)")
-    c = check(node, space)
-    assert c.units == Units(mass=-1, length=3)
+    c = check(parse("inv(M)"), space)
+    assert c.units == Units(mass=-1)
+    assert c.indices == []
+
+
+def test_inverse_rejects_indexed_argument():
+    space = _space()
+    try:
+        check(parse("inv(rho)"), space)
+    except IndexStructureError:
+        return
+    raise AssertionError("expected IndexStructureError")
 
 
 def test_ufunc_loose():

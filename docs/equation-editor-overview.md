@@ -70,11 +70,11 @@ index-structured tensor operations.  Key characteristics:
 - Operators: `+`/`-` (sum), `*` (reduce product), `:` (expand product),
   `.` (index-preserving product; historically called Hadamard), `^` (power,
   right-associative).
-- Functions: `exp`, `log`, `ln`, `sqrt`, `sin`, `cos`, ... (currently require
-  dimensionless input); `abs`, `neg`, `left`, `right`, `inv`, `sign`.
-  `diffSpace(expr)` is still accepted by the current implementation but is a
-  historical modelling error: differential space is an index concept, not a
-  function, and the function is scheduled for removal in the language audit.
+- Functions: `exp`, `log`, `ln`, `sin`, `cos`, ... require dimensionless
+  input; `sqrt` accepts units only when every exponent is even; `abs`, `neg`,
+  `left`, `right`, `sign`, and scalar reciprocal `inv` are also available.
+  Differential space is represented by ontology indices, not an expression
+  function; the historical `diffSpace(expr)` function has been removed.
 - Higher-order: `Integral`, `Product`, `Root` (implicit solve),
   `TotalDiff`, `ParDiff`, `reduceSum`, `MaxMin`.
 - Variable qualification: `network!label` for cross-network references.
@@ -141,6 +141,8 @@ incidence and construct-specific semantic checks:
 | `TotalDiff` / `ParDiff` | Units = dx − dy; indices = union |
 | `Root` | Target variable must appear in dependency set |
 | `Instantiate` | Argument is a single `Var`; instance inherits the prototype's units and index structure; incidence empty; LHS class must be `constant`/`parameter` |
+| `sqrt` | Every unit exponent even; result exponents are halved |
+| `inv` | Argument has no indices; units are inverted |
 
 Units are 8-exponent SI vectors (`time, length, amount, mass,
 temperature, current, light, nil`).

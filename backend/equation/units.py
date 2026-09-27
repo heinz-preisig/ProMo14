@@ -130,6 +130,21 @@ class Units:
         """Unit of the reciprocal: negated exponents (``inv`` ufunc)."""
         return Units.from_list([-e for e in self.as_list()])
 
+    def square_root(self) -> "Units":
+        odd = [
+            "%s=%s" % (field, getattr(self, field))
+            for field in FIELDS
+            if getattr(self, field) % 2
+        ]
+        if odd:
+            raise UnitError(
+                "sqrt requires every unit exponent to be even; odd exponents: %s"
+                % ", ".join(odd),
+                self.pretty(),
+                "-",
+            )
+        return Units.from_list([exponent // 2 for exponent in self.as_list()])
+
     def scale(self, factor: int) -> "Units":
         """Multiply every exponent by ``factor`` (old ``product``)."""
         return Units.from_list([factor * e for e in self.as_list()])

@@ -4,8 +4,8 @@ import pytest
 
 from .parser import ParseError, parse
 from .syntax import (
-    Add, Expand, Group, Hadamard, Instantiate, Integral, MaxMin, ParDiff,
-    Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
+    Add, Expand, Group, IndexPreservingProduct, Instantiate, Integral, MaxMin,
+    ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
 )
 
 
@@ -40,8 +40,8 @@ def test_expand():
     assert parse("a : b") == Expand(Var("a"), Var("b"))
 
 
-def test_hadamard():
-    assert parse("a . b") == Hadamard(Var("a"), Var("b"))
+def test_index_preserving_product():
+    assert parse("a . b") == IndexPreservingProduct(Var("a"), Var("b"))
 
 
 def test_reduce():
@@ -55,7 +55,7 @@ def test_reduce_with_index():
 def test_term_left_associative():
     # a . b * c -> (a . b) * c
     assert parse("a . b * c") == Reduce(
-        Hadamard(Var("a"), Var("b")), Var("c")
+        IndexPreservingProduct(Var("a"), Var("b")), Var("c")
     )
 
 
@@ -165,7 +165,7 @@ def test_complex_expression():
     assert isinstance(node, Add)
     assert node.op == "-"
     assert node.left == Var("U")
-    assert isinstance(node.right, Hadamard)
+    assert isinstance(node.right, IndexPreservingProduct)
     assert node.right.left == Var("p")
     assert node.right.right == Var("V")
 
@@ -208,6 +208,11 @@ def test_no_numbers():
     except ParseError:
         return
     raise AssertionError("expected ParseError for numeric literal")
+
+
+def test_diff_space_is_not_a_function():
+    with pytest.raises(ParseError):
+        parse("diffSpace(x)")
 
 
 if __name__ == "__main__":
