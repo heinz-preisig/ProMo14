@@ -952,37 +952,52 @@ def test_plan_guess_flag():
 
 
 def test_emit_python_initial():
-    """``initial`` on the shared fixture: m pinned via ``par`` (no IC
-    supplied), u = [algebraic lhs, dV_1], residuals are rhs - lhs with
-    the balance targeting its d-slot; ``steady_state`` appends der=0."""
+    """``initial`` on the shared fixture: every state is a ``u``
+    unknown; non-steady appends the ``par["ic0_…"]`` pin residual,
+    ``steady_state`` swaps it for der=0 — the system stays square."""
     src = emit_python(_plan(_build()), _emit_space())
     assert "def initial(par, steady_state=False):" in src
-    assert 'V_1 = par["ic0_V_1"]  # supplied IC' in src
     assert 'V_5 = par["V_5"]' in src
     assert "def _t0(u):  # t=0 residual system" in src
-    assert "V_2 = u[0:2]" in src                  # algebraic unknown
-    assert "V_3_diffusion_transport = u[2:4]" in src
-    assert "dV_1 = u[4:6]" in src                 # der(m) slot
+    assert "V_1 = u[0:2]" in src                  # state — always unknown
+    assert "V_2 = u[2:4]" in src                  # algebraic unknown
+    assert "V_3_diffusion_transport = u[4:6]" in src
+    assert "dV_1 = u[6:8]" in src                 # der(m) slot
     assert "V_6 = V_2[[0, 1]]  # port gather" in src
     assert "_r0 = (V_1) - V_2" in src             # prop at t0
     assert "_r1 = (V_5 * V_6) - V_3_diffusion_transport" in src
     assert ("_r2 = (np.tensordot(V_4, V_3_lumped_capacity, "
             "axes=([1], [0]))) - dV_1" in src)
     assert "total_diff = lambda x, y: np.zeros_like(x)" in src
-    assert "_rs += [np.atleast_1d(dV_1)]" in src
-    assert "_u = fsolve(_t0, np.zeros(6))" in src
+    assert "_rs += [np.atleast_1d(dV_1)]  # der = 0" in src
+    assert '_e0 = (par["ic0_V_1"]) - V_1  # IC pin' in src
+    assert "_u = fsolve(_t0, np.zeros(8))" in src
     assert "return np.concatenate([np.atleast_1d(V_1)])" in src
 
 
+def test_emit_python_initial_steady_square():
+    """``steady_state=True`` keeps the residual count square: the pin
+    residuals live in the ``else`` branch so ``u``'s layout never
+    changes between modes."""
+    src = emit_python(_plan(_build()), _emit_space())
+    assert "if steady_state:" in src
+    assert "else:" in src
+    # non-steady pins are guarded — steady mode never reads par.ic0_*
+    pin = src.index('_e0 = (par["ic0_V_1"]) - V_1')
+    assert src.rindex("else:", 0, pin) > src.index("if steady_state:")
+    assert "_u = fsolve(_t0, np.zeros(8))" in src  # 6 runtime + 2 pin
+
+
 def test_emit_python_initial_cells():
-    """Cell-supplied IC: x0 pins as an array literal, m stays out of
-    the unknown vector."""
+    """Cell-supplied IC: the cells literal becomes the state's pin
+    residual in the non-steady branch; m is still a ``u`` unknown."""
     src = emit_python(
         _plan(_build(), values={_var("m"): {"c1": 1.0, "c2": 2.0}}),
         _emit_space())
-    assert "V_1 = np.array([1.0, 2.0])  # IC value cells" in src
+    assert "_e0 = (np.array([1.0, 2.0])) - V_1  # IC pin" in src
     assert 'par["ic0_V_1"]' not in src
-    assert " V_1 = u[" not in src           # pinned, not unknown
+    assert "V_1 = u[0:2]" in src            # state — always unknown
+    assert "V_1 = _u[0:2]" in src
     assert "return np.concatenate([np.atleast_1d(V_1)])" in src
 
 
@@ -995,7 +1010,8 @@ def test_emit_python_initial_equation():
     assert "V_1 = u[0:2]" in src            # x0 solved, not pinned
     assert "V_2 = u[2:4]" in src
     assert "dV_1 = u[6:8]" in src
-    assert "_r0 = (V_2) - V_1" in src       # initialise residual first
+    assert "_e0 = (V_2) - V_1" in src       # initialise residual first
+    assert 'par["ic0_V_1"]' not in src     # init-covered — no par pin
     assert "_u = fsolve(_t0, np.zeros(8))" in src
     assert "V_1 = _u[0:2]" in src           # y0 pulls the solved slice
 
@@ -1011,19 +1027,43 @@ def test_emit_python_initial_guess():
             "# root! guess" in src)
 
 
+def test_emit_python_executes():
+    """The emitted module actually runs: ``initial`` fsolves the t=0
+    system (pin residual honoured, ``steady_state`` releases it and
+    solves der = 0), ``derivative`` feeds ``solve_ivp``.  Skips without
+    numpy/scipy — the backend venv doesn't carry them; emitted code
+    runs standalone."""
+    np = pytest.importorskip("numpy")
+    sivp = pytest.importorskip("scipy.integrate")
+    pytest.importorskip("scipy.optimize")
+    mod = {}
+    exec(emit_python(_plan(_build()), _emit_space()), mod)
+    par = {"V_5": 0.1, "ic0_V_1": np.array([1.0, 0.0])}
+    y0 = mod["initial"](par)
+    np.testing.assert_allclose(y0, [1.0, 0.0])
+    dy = mod["derivative"](0.0, y0, par)
+    np.testing.assert_allclose(dy, [-0.1, 0.0])   # dm1 = -k*m1 outflow
+    sol = sivp.solve_ivp(lambda t, y: mod["derivative"](t, y, par),
+                         (0, 10), y0)
+    assert sol.success
+    ys = mod["initial"]({"V_5": 0.1}, steady_state=True)
+    np.testing.assert_allclose(ys, [0.0, 0.0], atol=1e-8)
+
+
 def test_emit_julia_initial():
     """The Julia t0 block: keyword flag, 1-based slices, ``. -``
     residuals, out-of-place nlsolve, ``;``-concat y0."""
     src = emit_julia(_plan(_build()), _emit_space())
     assert "function initial(par; steady_state=false)" in src
-    assert "V_1 = par.ic0_V_1  # supplied IC" in src
-    assert "V_2 = u[1:2]" in src
-    assert "dV_1 = u[5:6]" in src
+    assert "V_1 = u[1:2]" in src            # state — always unknown
+    assert "V_2 = u[3:4]" in src
+    assert "dV_1 = u[7:8]" in src
     assert "_r0 = (V_1) .- V_2" in src
     assert ("_r2 = (V_4 * V_3_lumped_capacity) .- dV_1" in src)
     assert "total_diff = (x, y) -> x .* 0" in src
-    assert "append!(_rs, Any[dV_1])" in src
-    assert "_u = nlsolve(_t0, zeros(6)).zero" in src
+    assert "append!(_rs, Any[dV_1])  # der = 0" in src
+    assert "_e0 = (par.ic0_V_1) .- V_1  # IC pin" in src
+    assert "_u = nlsolve(_t0, zeros(8)).zero" in src
     assert "return [V_1]" in src
 
 
@@ -1032,15 +1072,16 @@ def test_emit_matlab_initial():
     wraps inside the nested _t0, .value residuals, fsolve."""
     src = emit_matlab(_plan(_build()), _emit_space())
     assert "function y0 = initial(par, steady_state)" in src
-    assert ("V_1 = MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1);"
-            "  % supplied IC" in src)
-    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, u(1:2));" in src)
-    assert ("dV_1 = MultiDimVar({'N'}, 2, {'N'}, u(5:6));" in src)
+    assert ("V_1 = MultiDimVar({'N'}, 2, {'N'}, u(1:2));" in src)
+    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, u(3:4));" in src)
+    assert ("dV_1 = MultiDimVar({'N'}, 2, {'N'}, u(7:8));" in src)
     assert "_r0 = (V_1) - V_2;" in src
     assert "r = [_r0.value; _r1.value; _r2.value];" in src
     assert "totalDiff = @(x, y) x .* 0;" in src
-    assert "r = [r; dV_1.value];" in src
-    assert "_u = fsolve(@_t0, zeros(6, 1));" in src
+    assert "r = [r; dV_1.value];  % der = 0" in src
+    assert ("_e0 = (MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1)) - V_1;"
+            "  % IC pin" in src)
+    assert "_u = fsolve(@_t0, zeros(8, 1));" in src
     assert "y0 = [V_1.value(:)];" in src
 
 

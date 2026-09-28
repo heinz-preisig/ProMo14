@@ -151,24 +151,26 @@ class _Python(Dialect):
     def fn_close(self) -> List[str]:
         return ["    return dy", ""]
 
+    def pin_term(self, st, space: CompileSpace) -> str:
+        """The IC pin expression — a cells literal or a ``par`` lookup,
+        used as the residual's rhs term in a non-steady solve."""
+        nm = st.name or inst_name(st.instance)
+        if st.ic_source == "cells":
+            return self._array_lit(st.ic_values or [],
+                                   bound_dims(st.indices))
+        return 'par["ic0_%s"]' % nm
+
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
                 space: CompileSpace) -> None:
-        """``initial(par, steady_state=False)`` → ``y0``: pinned ICs,
-        then one ``fsolve`` whose unknowns are init-covered states,
-        algebraic lhs vars and ``d<state>`` slots — every runtime and
-        ``initialise`` block contributes an ``rhs - lhs`` residual.
-        ``steady_state`` zeroes ``total_diff`` and appends ``der = 0``
-        residuals (the system stays square/over-determined)."""
+        """``initial(par, steady_state=False)`` → ``y0``: one ``fsolve``
+        whose unknowns are the states, the algebraic lhs vars and the
+        ``d<state>`` slots — every runtime block contributes an
+        ``rhs - lhs`` residual.  Non-steady appends one pin residual
+        per state (``initialise`` block, value-cell literal or
+        ``par["ic0_<name>"]``); ``steady_state`` zeroes ``total_diff``
+        and swaps the pins for ``der = 0`` — the states are then the
+        solved-for unknowns, which keeps the system square."""
         out.append("def initial(par, steady_state=False):")
-        for st in spec.pins:
-            nm = st.name or inst_name(st.instance)
-            if st.ic_source == "cells":
-                out.append("    %s = %s  # IC value cells" % (
-                    nm, self._array_lit(st.ic_values or [],
-                                        bound_dims(st.indices))))
-            else:
-                out.append('    %s = par["ic0_%s"]  # supplied IC'
-                           % (nm, nm))
         for p in cp.params + cp.inputs:
             if p.kind == "constant" and p.value is not None:
                 continue
@@ -176,10 +178,6 @@ class _Python(Dialect):
         y0 = "np.concatenate([%s])" % ", ".join(
             "np.atleast_1d(%s)" % (s.name or inst_name(s.instance))
             for s in cp.states)
-        if not spec.unknowns:
-            out.append("    return %s" % y0)
-            out.append("")
-            return
         out.append("    def _t0(u):  # t=0 residual system")
         off = 0
         for nm, sz, _idx in spec.unknowns:
@@ -201,10 +199,24 @@ class _Python(Dialect):
         out.append("        _rs = [%s]" % ", ".join(
             "np.atleast_1d(_r%d)" % i
             for i in range(len(spec.residuals))))
-        if spec.dx:
-            out.append("        if steady_state:")
-            out.append("            _rs += [%s]" % ", ".join(
-                "np.atleast_1d(%s)" % n for n in spec.dx))
+        out.append("        if steady_state:")
+        out.append("            _rs += [%s]  # der = 0" % ", ".join(
+            "np.atleast_1d(%s)" % n for n in spec.dx))
+        out.append("        else:")
+        ne = 0
+        for b, term in spec.initials:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            out.append("            _e%d = (%s) - %s  # initialise"
+                       % (ne, rhs, term))
+            ne += 1
+        for st in spec.pins:
+            nm = st.name or inst_name(st.instance)
+            out.append("            _e%d = (%s) - %s  # IC pin"
+                       % (ne, self.pin_term(st, space), nm))
+            ne += 1
+        out.append("            _rs += [%s]" % ", ".join(
+            "np.atleast_1d(_e%d)" % i for i in range(ne)))
         out.append("        return np.concatenate(_rs) "
                    "if _rs else np.zeros_like(u)")
         out.append("    _u = fsolve(_t0, np.zeros(%d))"

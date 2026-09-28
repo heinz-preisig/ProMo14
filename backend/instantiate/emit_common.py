@@ -52,19 +52,28 @@ class T0Layout:
     """The t=0 solve layout shared by the dialects.
 
     ``unknowns`` — (emitted name, flat size, bound index map) slices of
-    the solver vector ``u``: init-covered x0 states first, then the
-    algebraic (non-state, non-pin) lhs vars in schedule order, then one
-    ``d<state>`` derivative slot per state.
+    the solver vector ``u``: *every* state first, then the algebraic
+    (non-state, non-pin) lhs vars in schedule order, then one
+    ``d<state>`` derivative slot per state.  All states are unknowns
+    unconditionally so the ``u`` layout is identical in both modes —
+    only the residual set switches.
 
-    ``residuals`` — (block, lhs-term) pairs in order: the ``initialise``
-    blocks first, then every runtime block (state lhs → its ``d`` slot,
-    parameter/port lhs skipped, rhs-less blocks skipped).
+    ``residuals`` — (block, lhs-term) pairs for every runtime block
+    (state lhs → its ``d`` slot, parameter/port lhs skipped, rhs-less
+    blocks skipped); emitted in both modes.
+
+    ``initials`` — the ``initialise`` blocks as (block, lhs-term) pairs;
+    emitted only when ``not steady_state`` (steady state replaces the
+    pin with ``der = 0``).
 
     ``dx`` — the ``d<state>`` names in ``cp.states`` order; a
     steady-state solve appends them as ``der = 0`` residuals.
 
     ``pins`` — states whose x0 is fixed, not solved: ``cells`` (literal)
-    or ``par`` (``par["ic0_<name>"]``).
+    or ``par`` (``par["ic0_<name>"]``).  Emitted as ``pin - <state>``
+    residuals when ``not steady_state``; under ``steady_state`` the pin
+    is *released* — the state is solved for — which is what keeps the
+    system square.
 
     ``guesses`` — blocks whose ``SolveRoot`` body seeds the nested
     solve's ``x0`` from the outer iterate."""
@@ -72,6 +81,7 @@ class T0Layout:
     unknowns: List[Tuple[str, int, Dict[str, List[str]]]] = \
         field(default_factory=list)
     residuals: List[Tuple[PlanBlock, str]] = field(default_factory=list)
+    initials: List[Tuple[PlanBlock, str]] = field(default_factory=list)
     dx: List[str] = field(default_factory=list)
     pins: List[StateSlot] = field(default_factory=list)
     guesses: List[PlanBlock] = field(default_factory=list)
@@ -80,12 +90,13 @@ class T0Layout:
 def t0_layout(cp: CodePlan) -> T0Layout:
     """Compute the emitted ``initial`` solve's unknowns and residuals.
 
-    States with value cells or an ``initialise`` pin are treated as
-    pins/unknowns per ``StateSlot.ic_source``; every other bound lhs
-    becomes an algebraic unknown.  The system is square-ish by
-    construction — ``fsolve`` tolerates extra residuals (a supplied IC
-    on an init-covered state is an over-determination the values must
-    satisfy consistently)."""
+    Every state is a ``u`` unknown; ``StateSlot.ic_source`` decides
+    which residual pins it in a non-steady solve — an ``initialise``
+    block, a value-cell literal or ``par["ic0_<name>"]``.  Every other
+    bound lhs becomes an algebraic unknown.  Non-steady the system is
+    square by construction (one pin/init residual per state, one
+    runtime residual per block); ``steady_state`` drops the pin/init
+    residuals and appends ``der = 0`` instead — again one per state."""
     spec = T0Layout()
     state_lhs = {(s.entity_type, s.var): s for s in cp.states}
     pinned = {p.name or inst_name(p.instance)
@@ -94,12 +105,11 @@ def t0_layout(cp: CodePlan) -> T0Layout:
 
     seen = set()
     for st in cp.states:
-        if st.ic_source != "initialise":
-            spec.pins.append(st)
-            continue
         nm = st.name or inst_name(st.instance)
         spec.unknowns.append((nm, st.size, st.indices))
         seen.add(nm)
+        if st.ic_source != "initialise":
+            spec.pins.append(st)
     for lvl in cp.levels:
         for b in lvl:
             if not b.rhs or (b.entity_type, b.lhs) in state_lhs:
@@ -117,7 +127,7 @@ def t0_layout(cp: CodePlan) -> T0Layout:
         spec.unknowns.append((nm, st.size, st.indices))
 
     for b in cp.initials:
-        spec.residuals.append(
+        spec.initials.append(
             (b, b.lhs_name or inst_name(b.lhs_instance)))
     for lvl in cp.levels:
         for b in lvl:

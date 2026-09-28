@@ -238,38 +238,36 @@ class _Matlab(Dialect):
     def fn_close(self) -> List[str]:
         return ["end", ""]
 
+    def pin_term(self, st, space: CompileSpace) -> str:
+        """The IC pin expression — a cells literal or a ``par`` lookup,
+        MultiDimVar-wrapped; the residual's rhs term in a non-steady
+        solve."""
+        nm = st.name or inst_name(st.instance)
+        if st.ic_source == "cells":
+            return self._mdv(st.indices, space,
+                             self._array_lit(st.ic_values or [],
+                                             bound_dims(st.indices)))
+        return self._mdv(st.indices, space, "par.ic0_%s" % nm)
+
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
                 space: CompileSpace) -> None:
         """``y0 = initial(par, steady_state)`` — the t=0 solve as a
-        nested ``_t0`` function (shares the parent workspace); unknowns
+        nested ``_t0`` function (shares the parent workspace); all
+        states, the algebraic lhs vars and the ``d<state>`` slots
         unpack as MultiDimVars, residuals unwrap via ``.value``.
+        Non-steady appends one pin residual per state (``initialise``
+        block, value-cell literal or ``par.ic0_<name>``);
+        ``steady_state`` swaps the pins for ``der = 0`` — the states
+        are then the solved-for unknowns, keeping the system square.
         Matlab has no default arguments — callers pass ``false``."""
         out.append("function y0 = initial(par, steady_state)")
-        for st in spec.pins:
-            nm = st.name or inst_name(st.instance)
-            if st.ic_source == "cells":
-                lit = self._array_lit(st.ic_values or [],
-                                      bound_dims(st.indices))
-                out.append("  %s = %s;  %% IC value cells" % (
-                    nm, self._mdv(st.indices, space, lit)))
-            else:
-                out.append("  %s = %s;  %% supplied IC" % (
-                    nm, self._mdv(st.indices, space,
-                                  "par.ic0_%s" % nm)))
         for p in cp.params + cp.inputs:
             if p.kind == "constant" and p.value is not None:
                 continue
             out.append(self.param(p, space))
         y_names = {s.name or inst_name(s.instance) for s in cp.states}
         y0 = ["%s.value(:)" % (s.name or inst_name(s.instance))
-              if s.ic_source != "initialise"
-              else (s.name or inst_name(s.instance))
               for s in cp.states]
-        if not spec.unknowns:
-            out.append("  y0 = [%s];" % "; ".join(y0))
-            out.append("end")
-            out.append("")
-            return
         out.append("  function r = _t0(u)  %% t=0 residual system")
         off = 0
         for nm, sz, idx in spec.unknowns:
@@ -295,11 +293,25 @@ class _Matlab(Dialect):
                 for i in range(len(spec.residuals))))
         else:
             out.append("    r = zeros(length(u), 1);")
-        if spec.dx:
-            out.append("    if steady_state")
-            out.append("      r = [r; %s];" % "; ".join(
-                "%s.value" % n for n in spec.dx))
-            out.append("    end")
+        out.append("    if steady_state")
+        out.append("      r = [r; %s];  %% der = 0" % "; ".join(
+            "%s.value" % n for n in spec.dx))
+        out.append("    else")
+        ne = 0
+        for b, term in spec.initials:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            out.append("      _e%d = (%s) - %s;  %% initialise"
+                       % (ne, rhs, term))
+            ne += 1
+        for st in spec.pins:
+            nm = st.name or inst_name(st.instance)
+            out.append("      _e%d = (%s) - %s;  %% IC pin"
+                       % (ne, self.pin_term(st, space), nm))
+            ne += 1
+        out.append("      r = [r; %s];" % "; ".join(
+            "_e%d.value" % i for i in range(ne)))
+        out.append("    end")
         out.append("  end")
         out.append("  _u = fsolve(@_t0, zeros(%d, 1));"
                    % sum(sz for _, sz, _ in spec.unknowns))
