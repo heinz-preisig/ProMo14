@@ -4,12 +4,12 @@ State of the ProMo14 workspace at end of day.  Branch `main`, remote
 `heinz-preisig/ProMo14`.  Supersedes `session-handoff-2026-09-27.md`
 (morning section below; afternoon section added EOD).
 
-**Before switching machines:** work is committed but **6 commits are
-unpushed** — run `git push`.  `git status` is clean, `dist/` for the
+**Before switching machines:** all work committed and pushed
+(`4ca2ba3` → `origin/main`).  `git status` is clean, `dist/` for the
 instantiation app is built, store was clean at last check (run
-`./dev.sh save` if unsure).  On the home machine: `git pull && uv sync
-&& npm install && ./dev.sh start`.  Do **not** `wipe-restart` —
-`data/` is the sync channel.
+`./dev.sh save` if unsure).  On the home machine: `./dev.sh sync`
+(pull + `uv sync` + `npm install` + build all + start all).  Do **not**
+`wipe-restart` — `data/` is the sync channel.
 
 ## What landed — afternoon session
 
