@@ -36,6 +36,8 @@ from backend.core.graph_store import PROMO, get_store
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.ontology.rdf_context import scoped_context
 
+from backend.equation.canonical import Argument, ic_targets
+from backend.equation.canonical_rdf import read_rhs_expression
 from backend.equation.compile_space import CompileSpace
 from backend.equation.errors import VarError
 from backend.equation.parser import ParseError
@@ -48,6 +50,7 @@ from .builder import (
     Problem,
     VarInfo,
     _frag,
+    is_initialise_class,
 )
 from .builder import build as build_model
 from .emit_julia import emit_julia
@@ -134,6 +137,11 @@ class EntityInstantiationOut(BaseModel):
     state_variable: Optional[str] = None
     variables: List[VarBindingOut] = Field(default_factory=list)
     equations: List[EqBindingOut] = Field(default_factory=list)
+    # ``initialise``-class equations on this type's bound variables —
+    # the t=0 layer.  Never in ``equations`` (the runtime sequence is
+    # assignment-driven); gathered here by class so clients can assemble
+    # the initial system.
+    initial_equations: List[EqBindingOut] = Field(default_factory=list)
 
 
 class PortBindingOut(BaseModel):
@@ -197,6 +205,26 @@ class ValueCellsOut(BaseModel):
     values: Dict[str, Any] = Field(default_factory=dict)
 
 
+class IcNeedOut(BaseModel):
+    """One t=0 requirement of the instantiated equation set.
+
+    ``kind`` is ``ic`` (initial condition — the inducing equation's RHS
+    differentiates or accumulates on a state) or ``guess`` (initial
+    guess for an implicit ``SolveRoot`` solve).  ``status`` stays
+    ``needed`` until ``supplied_by`` names a coverage source: an
+    ``initialise``-class equation on the same variable or bound value
+    cells on the model artefact.
+    """
+
+    var: str
+    entity_type: str
+    kind: str                            # ic | guess
+    equation: str                        # inducing equation IRI
+    instance: str = ""                   # matches VarBindingOut.instance
+    supplied_by: Optional[str] = None    # initialise | cells
+    status: str = "needed"               # needed | supplied
+
+
 class InstantiationReportOut(BaseModel):
     """The assembled model equation-set report (§19)."""
 
@@ -208,6 +236,7 @@ class InstantiationReportOut(BaseModel):
     incidence: IncidenceReportOut
     schedule: ScheduleOut = Field(default_factory=ScheduleOut)
     problems: List[ProblemOut] = Field(default_factory=list)
+    ic_needs: List[IcNeedOut] = Field(default_factory=list)
     labels: Dict[str, str] = Field(default_factory=dict)
 
 
@@ -538,6 +567,7 @@ def _vars_collect(store, vars_graph: Optional[str]):
                 inputs=list(eq.get("incidence_list") or []),
                 internal_id=eq.get("internal_id"),
                 rhs=eq.get("rhs") or "",
+                equation_class=eq.get("equation_class"),
             )
     indices: Dict[str, IndexInfo] = {}
     for iri, idx in ctx.indices().items():
@@ -548,7 +578,53 @@ def _vars_collect(store, vars_graph: Optional[str]):
             short_name=idx.aliases.get("internal_code", ""),
         )
         labels[iri] = idx.aliases.get("internal_code", idx.label)
-    return variables, equations, indices, labels
+    # Canonical RHS trees for IC-need derivation.  rdf_context drops
+    # them after regenerating ``promo:rhs`` (non-JSON payload), so the
+    # trees are re-read here straight off the equation resources.
+    canonicals: Dict[str, Argument] = {}
+    for eq_iri in equations:
+        eq_node = URIRef(eq_iri)
+        for g in store.dataset.graphs():
+            if (eq_node, PROMO["rhsExpression"], None) in g:
+                try:
+                    canonicals[eq_iri] = read_rhs_expression(g, eq_node)
+                except VarError:
+                    pass
+    return variables, equations, indices, labels, canonicals
+
+
+def _ic_needs(report, canonicals: Dict[str, Argument],
+              initialise_lhs: set, has_cells) -> List[IcNeedOut]:
+    """The instantiated set's t=0 requirements, in assignment order.
+
+    Each need is deduplicated per ``(var, kind, entity_type)`` and
+    marked ``supplied`` once a coverage source exists — an
+    ``initialise``-class equation on the variable or bound value cells
+    on the model artefact.
+    """
+    needs: List[IcNeedOut] = []
+    seen = set()
+    for e in report.entity_types:
+        bound = {v.var: v for v in e.variables}
+        for q in e.equations:
+            arg = canonicals.get(q.equation)
+            if arg is None:
+                continue
+            for var, kind in ic_targets(arg, q.lhs):
+                key = (var, kind, e.entity_type)
+                if key in seen:
+                    continue
+                seen.add(key)
+                b = bound.get(var)
+                supplied_by = ("initialise" if var in initialise_lhs
+                               else "cells" if has_cells(var) else None)
+                needs.append(IcNeedOut(
+                    var=var, entity_type=e.entity_type, kind=kind,
+                    equation=q.equation,
+                    instance=b.instance if b else "",
+                    supplied_by=supplied_by,
+                    status="supplied" if supplied_by else "needed"))
+    return needs
 
 
 def _assignments_collect(store, vars_graph: Optional[str],
@@ -633,7 +709,8 @@ def model_instantiation(
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
 
-    variables, equations, indices, var_labels = _vars_collect(store, vars)
+    variables, equations, indices, var_labels, canonicals = \
+        _vars_collect(store, vars)
     labels.update(var_labels)
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, vars, labels)
@@ -699,7 +776,10 @@ def model_instantiation(
                 for v in e.variables],
             equations=[EqBindingOut(
                 equation=q.equation, lhs=q.lhs, inputs=q.inputs)
-                for q in e.equations])
+                for q in e.equations],
+            initial_equations=[EqBindingOut(
+                equation=q.equation, lhs=q.lhs, inputs=q.inputs)
+                for q in e.initial_equations])
             for e in report.entity_types],
         ports=[PortBindingOut(
             node=p.node, var=p.var, status=p.status,
@@ -718,6 +798,11 @@ def model_instantiation(
             kind=p.kind, message=p.message,
             node=p.node, entity_type=p.entity_type)
             for p in report.problems],
+        ic_needs=_ic_needs(
+            report, canonicals,
+            {q.lhs for q in equations.values()
+             if is_initialise_class(q.equation_class)},
+            lambda v: bool(store.value_cells(model_graph, v))),
         labels=labels,
     )
 
@@ -767,8 +852,8 @@ def model_code(
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
 
-    variables, equations, indices, var_labels = _vars_collect(
-        store, vars)
+    variables, equations, indices, var_labels, canonicals = \
+        _vars_collect(store, vars)
     labels.update(var_labels)
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, vars, labels)
@@ -794,7 +879,8 @@ def model_code(
     # element sets; emitters render them as literals.
     values = {v.var: store.value_cells(model_graph, v.var)
               for e in report.entity_types for v in e.variables}
-    cp = plan(report, sched, inc, equations, indices, values=values)
+    cp = plan(report, sched, inc, equations, indices, values=values,
+              canonicals=canonicals)
     try:
         source = _EMITTERS[target](cp, _code_space(store, vars))
     except (ParseError, VarError) as e:

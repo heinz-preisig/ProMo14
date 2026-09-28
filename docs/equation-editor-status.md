@@ -209,10 +209,18 @@ Implemented as a React + TypeScript + Vite app in
   start = zero all `TotalDiff` terms, no equations needed. IC *need* is
   derivable from canonical ops (`TotalDerivative`/`DefiniteIntegral`
   states, `SolveRoot` LHS vars); coverage = need vs supplied
-  (cells + initialise equations). Same story for root-solver initial
-  guesses. Limitation: a *computed* IC needs an `initialise` equation
+  (cells + initialise equations). **Landed 2026-09-28:**
+  `canonical.ic_targets` walks each bound equation's canonical RHS and
+  `/api/instantiate/model` emits `ic_needs` — per `(var, kind,
+  entity_type)` with `instance`, the inducing `equation`, and `status`
+  `needed|supplied` (`supplied_by`: `initialise` equation on the var or
+  bound value `cells`). An `initialise` equation may share a variable's
+  LHS with `generic` ones — `hasEquation` is plural, the assignment
+  sequence picks which run (`test_initialise_equation_may_share_lhs`).
+  Same story for root-solver initial guesses. Limitation: a *computed*
+  IC needs an `initialise` equation
   (value cells carry values only) — or an expression-valued cell later.
-  Instantiation-side work (t0 assembly, guess requests) is pending;
+  Instantiation-side work still pending: t0 assembly, guess requests;
   checker/parser unchanged.  The class picker is done (2026-09-28, below).
 - **Index uniqueness and binary reduction (2026-09-27):** every persisted or
   ad-hoc variable input must have an ordered index structure with no repeated

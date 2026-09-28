@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Tuple, Union
+from typing import List, Literal, Tuple, Union
 
 from backend.core.vocab import PROMOLG
 
@@ -262,3 +262,32 @@ def _arity(expression: Expression, expected: int) -> None:
                 _operation_name(expression.operation_iri), expected,
             )
         )
+
+
+def ic_targets(argument: Argument, lhs: str) -> List[Tuple[str, str]]:
+    """``(variable_iri, kind)`` t=0 requirements induced by a canonical RHS.
+
+    A ``TotalDerivative`` needs an initial condition for the
+    differentiated quantity — the referenced variable when its argument
+    is a bare ``VariableReference``, otherwise the equation's LHS state
+    variable.  A ``DefiniteIntegral`` accumulates on the LHS state, so
+    the IC binds there.  A ``SolveRoot`` LHS variable needs an initial
+    guess.  ``kind`` is ``"ic"`` or ``"guess"``; ``lhs`` is the IRI of
+    the equation's left-hand variable.
+    """
+    out: List[Tuple[str, str]] = []
+    if not isinstance(argument, Expression):
+        return out
+    operation = argument.operation_iri
+    if operation == TOTAL_DERIVATIVE:
+        target = argument.arguments[0]
+        out.append((
+            target.iri if isinstance(target, VariableReference) else lhs,
+            "ic"))
+    elif operation == DEFINITE_INTEGRAL:
+        out.append((lhs, "ic"))
+    elif operation == SOLVE_ROOT:
+        out.append((lhs, "guess"))
+    for child in argument.arguments:
+        out.extend(ic_targets(child, lhs))
+    return out

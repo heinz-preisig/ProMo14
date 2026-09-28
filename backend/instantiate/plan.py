@@ -55,6 +55,12 @@ class StateSlot:
     indices: Dict[str, List[str]] = field(default_factory=dict)
     offset: int = 0
     size: int = 0
+    #: How x0 is supplied at t=0: ``cells`` (literal pin),
+    #: ``initialise`` (an init equation determines it — solver
+    #: unknown) or ``par`` (caller-supplied ``par["ic0_<name>"]``).
+    ic_source: str = "par"
+    #: The expanded value-cell table when ``ic_source == "cells"``.
+    ic_values: Optional[List[Any]] = None
 
 
 @dataclass
@@ -115,6 +121,9 @@ class PlanBlock:
     inputs: List[str] = field(default_factory=list)     # var IRIs
     rhs: str = ""
     loop: int = -1
+    #: The lhs needs an initial guess (a ``SolveRoot`` body in the
+    #: canonical RHS) — emitters seed the nested solve with it.
+    guess: bool = False
 
 
 @dataclass
@@ -128,6 +137,9 @@ class CodePlan:
     inputs: List[ParamSlot] = field(default_factory=list)
     levels: List[List[PlanBlock]] = field(default_factory=list)
     loops: List[List[Tuple[str, str]]] = field(default_factory=list)
+    #: t=0 layer: the ``initialise``-class equation blocks (one
+    #: residual each inside the emitted ``initial`` solve).
+    initials: List[PlanBlock] = field(default_factory=list)
     #: entity_type → var IRI → emitted identifier (the renderer's
     #: name override — per-type instance names, not bare ids).
     names: Dict[str, Dict[str, str]] = field(default_factory=dict)
@@ -137,15 +149,21 @@ def plan(report: Instantiation, sched: Schedule,
          incidence: IncidenceReport,
          equations: Dict[str, EqInfo],
          indices: Dict[str, IndexInfo],
-         values: Optional[Dict[str, Dict[str, Any]]] = None
+         values: Optional[Dict[str, Dict[str, Any]]] = None,
+         canonicals: Optional[Dict[str, Any]] = None
          ) -> CodePlan:
     """Lower an instantiation report + schedule into a CodePlan.
 
     ``values`` maps a variable IRI to its stored value-cell table
     (``{coordinate_key: scalar}`` — the §20 ν channel); parameter and
     input slots carrying a table emit as literals instead of runtime
-    ``par`` lookups."""
+    ``par`` lookups.  ``canonicals`` (eq IRI → canonical Expression)
+    flags ``SolveRoot`` bodies on plan blocks — their lhs needs an
+    initial guess in the emitted ``initial`` solve."""
+    from backend.equation.canonical import ic_targets
+
     out = CodePlan()
+    canonicals = canonicals or {}
 
     bindings: Dict[Tuple[str, str], VarBinding] = {}
     for e in report.entity_types:
@@ -184,11 +202,17 @@ def plan(report: Instantiation, sched: Schedule,
         size = 1
         for els in vb.indices.values():
             size *= max(1, len(els or []))
+        ic_values = _value_table(vb, values or {})
+        init_lhs = {q.lhs for q in e.initial_equations}
+        ic_source = ("cells" if ic_values is not None
+                     else "initialise" if vb.var in init_lhs
+                     else "par")
         out.states.append(StateSlot(
             var=vb.var, instance=vb.instance,
             entity_type=e.entity_type, indices=vb.indices,
             name=names[e.entity_type][vb.var],
-            offset=offset, size=size))
+            offset=offset, size=size,
+            ic_source=ic_source, ic_values=ic_values))
         offset += size
 
     # -- matrices (incidence bindings, restricted to bound elements) --------
@@ -277,6 +301,9 @@ def plan(report: Instantiation, sched: Schedule,
         for b in lvl:
             vb = bindings.get((b.entity_type, b.lhs))
             eq = equations.get(b.equation)
+            canon = canonicals.get(b.equation)
+            needs_guess = canon is not None and any(
+                kind == "guess" for _, kind in ic_targets(canon, b.lhs))
             out_lvl.append(PlanBlock(
                 entity_type=b.entity_type,
                 equation=b.equation,
@@ -287,9 +314,26 @@ def plan(report: Instantiation, sched: Schedule,
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else [],
                 rhs=eq.rhs if eq else "",
-                loop=b.loop))
+                loop=b.loop,
+                guess=needs_guess))
         out.levels.append(out_lvl)
     out.loops = sched.loops
+
+    # -- t0 layer: initialise-class equation blocks -------------------------
+    for e in report.entity_types:
+        for q in e.initial_equations:
+            vb = bindings.get((e.entity_type, q.lhs))
+            eq = equations.get(q.equation)
+            out.initials.append(PlanBlock(
+                entity_type=e.entity_type,
+                equation=q.equation,
+                lhs=q.lhs,
+                lhs_instance=vb.instance if vb else q.lhs,
+                lhs_name=(names.get(e.entity_type, {}).get(q.lhs)
+                          or (vb.instance if vb else q.lhs)),
+                lhs_indices=vb.indices if vb else {},
+                inputs=list(eq.inputs) if eq else list(q.inputs),
+                rhs=eq.rhs if eq else ""))
     return out
 
 

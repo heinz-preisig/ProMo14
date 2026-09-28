@@ -38,6 +38,7 @@ from backend.equation.compile_space import CompileSpace
 
 from .emit_common import (
     Dialect,
+    T0Layout,
     bound_dims,
     emit_plan,
     inst_name,
@@ -81,7 +82,10 @@ class _Python(Dialect):
 
     def header(self, cp: CodePlan) -> List[str]:
         out = ["import numpy as np"]
-        if cp.loops:
+        if cp.loops or cp.states:
+            # fsolve: algebraic loops + the t=0 solve; the module import
+            # backs ``scipy.optimize.fsolve`` inside root!() bodies.
+            out.append("import scipy.optimize")
             out.append("from scipy.optimize import fsolve")
         out.append("")
         return out
@@ -146,6 +150,73 @@ class _Python(Dialect):
 
     def fn_close(self) -> List[str]:
         return ["    return dy", ""]
+
+    def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
+                space: CompileSpace) -> None:
+        """``initial(par, steady_state=False)`` → ``y0``: pinned ICs,
+        then one ``fsolve`` whose unknowns are init-covered states,
+        algebraic lhs vars and ``d<state>`` slots — every runtime and
+        ``initialise`` block contributes an ``rhs - lhs`` residual.
+        ``steady_state`` zeroes ``total_diff`` and appends ``der = 0``
+        residuals (the system stays square/over-determined)."""
+        out.append("def initial(par, steady_state=False):")
+        for st in spec.pins:
+            nm = st.name or inst_name(st.instance)
+            if st.ic_source == "cells":
+                out.append("    %s = %s  # IC value cells" % (
+                    nm, self._array_lit(st.ic_values or [],
+                                        bound_dims(st.indices))))
+            else:
+                out.append('    %s = par["ic0_%s"]  # supplied IC'
+                           % (nm, nm))
+        for p in cp.params + cp.inputs:
+            if p.kind == "constant" and p.value is not None:
+                continue
+            out.append(self.param(p, space))
+        y0 = "np.concatenate([%s])" % ", ".join(
+            "np.atleast_1d(%s)" % (s.name or inst_name(s.instance))
+            for s in cp.states)
+        if not spec.unknowns:
+            out.append("    return %s" % y0)
+            out.append("")
+            return
+        out.append("    def _t0(u):  # t=0 residual system")
+        off = 0
+        for nm, sz, _idx in spec.unknowns:
+            out.append("        %s = u[%d:%d]" % (nm, off, off + sz))
+            off += sz
+        out.append("        if steady_state:")
+        out.append("            total_diff = lambda x, y: "
+                   "np.zeros_like(x)  # der = 0")
+        for g in cp.gathers:
+            out.append("    " + self.gather(g, space))
+        for b in spec.guesses:
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("        x0 = np.atleast_1d(%s)  # root! guess"
+                       % nm)
+        for i, (b, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            out.append("        _r%d = (%s) - %s" % (i, rhs, term))
+        out.append("        _rs = [%s]" % ", ".join(
+            "np.atleast_1d(_r%d)" % i
+            for i in range(len(spec.residuals))))
+        if spec.dx:
+            out.append("        if steady_state:")
+            out.append("            _rs += [%s]" % ", ".join(
+                "np.atleast_1d(%s)" % n for n in spec.dx))
+        out.append("        return np.concatenate(_rs) "
+                   "if _rs else np.zeros_like(u)")
+        out.append("    _u = fsolve(_t0, np.zeros(%d))"
+                   % sum(sz for _, sz, _ in spec.unknowns))
+        y_names = {s.name or inst_name(s.instance) for s in cp.states}
+        off = 0
+        for nm, sz, _idx in spec.unknowns:
+            if nm in y_names:
+                out.append("    %s = _u[%d:%d]" % (nm, off, off + sz))
+            off += sz
+        out.append("    return %s" % y0)
+        out.append("")
 
 
 def emit_python(cp: CodePlan, space: CompileSpace) -> str:

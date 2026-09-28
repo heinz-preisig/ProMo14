@@ -97,6 +97,7 @@ class EqInfo:
     inputs: List[str] = field(default_factory=list)  # incidence_list
     internal_id: Optional[str] = None
     rhs: str = ""                         # expression text (codegen)
+    equation_class: Optional[str] = None  # promo:equationClass IRI/label
 
 
 @dataclass
@@ -160,6 +161,10 @@ class EntityInstantiation:
     state_variable: Optional[str] = None
     variables: List[VarBinding] = field(default_factory=list)
     equations: List[EqBinding] = field(default_factory=list)
+    #: ``initialise``-class equations on this type's bound variables —
+    #: the t=0 layer, gathered by class (never via the assignment
+    #: sequence, which is the runtime layer only).
+    initial_equations: List[EqBinding] = field(default_factory=list)
 
 
 @dataclass
@@ -197,6 +202,12 @@ class Instantiation:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def is_initialise_class(cls: Optional[str]) -> bool:
+    """Equation-class check tolerant of IRI and legacy label forms."""
+    return bool(cls) and (
+        cls == "initialise" or cls.endswith("#eqclass_initialise"))
 
 
 def _frag(iri: str) -> str:
@@ -496,6 +507,18 @@ def build(nodes: Dict[str, NodeInfo],
                 matrix=arc_idx if binding == "incidence" else None,
                 value=var.value if binding == "constant" else None,
             ))
+
+        # -- t0 layer ----------------------------------------------------------
+        # ``initialise``-class equations on the bound variables, in
+        # internal-id order — they pin values that hold only at t=0.
+        bound_vars = {v.var for v in inst.variables}
+        inst.initial_equations = [
+            EqBinding(equation=q.iri, lhs=q.lhs, inputs=list(q.inputs))
+            for q in sorted(
+                (q for q in equations.values()
+                 if is_initialise_class(q.equation_class)
+                 and q.lhs in bound_vars),
+                key=lambda q: q.internal_id or q.iri)]
 
         # -- port resolution --------------------------------------------------
         # Arc-indexed ports bind per contact (one PortBinding per

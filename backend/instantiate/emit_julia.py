@@ -45,6 +45,7 @@ from backend.equation.compile_space import CompileSpace
 
 from .emit_common import (
     Dialect,
+    T0Layout,
     bound_dims,
     emit_plan,
     inst_name,
@@ -162,6 +163,76 @@ class _Julia(Dialect):
 
     def fn_close(self) -> List[str]:
         return ["    return nothing", "end", ""]
+
+    def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
+                space: CompileSpace) -> None:
+        """``initial(par; steady_state=false)`` → ``y0``: pinned ICs,
+        then one out-of-place ``nlsolve`` over init-covered states,
+        algebraic lhs vars and ``d<state>`` slots — every runtime and
+        ``initialise`` block contributes an ``rhs .- lhs`` residual.
+        ``steady_state`` zeroes ``total_diff`` and appends ``der = 0``
+        residuals."""
+        out.append("function initial(par; steady_state=false)")
+        for st in spec.pins:
+            nm = st.name or inst_name(st.instance)
+            if st.ic_source == "cells":
+                out.append("    %s = %s  # IC value cells" % (
+                    nm, self._array_lit(st.ic_values or [],
+                                        bound_dims(st.indices))))
+            else:
+                out.append("    %s = par.ic0_%s  # supplied IC"
+                           % (nm, nm))
+        for p in cp.params + cp.inputs:
+            if p.kind == "constant" and p.value is not None:
+                continue
+            out.append(self.param(p, space))
+        y0 = "; ".join(s.name or inst_name(s.instance)
+                      for s in cp.states)
+        if not spec.unknowns:
+            out.append("    return [%s]" % y0)
+            out.append("end")
+            out.append("")
+            return
+        out.append("    function _t0(u)  # t=0 residual system")
+        off = 0
+        for nm, sz, _idx in spec.unknowns:
+            out.append("        %s = u[%d:%d]" % (nm, off + 1, off + sz))
+            off += sz
+        out.append("        if steady_state")
+        out.append("            total_diff = (x, y) -> x .* 0  "
+                   "# der = 0")
+        out.append("        end")
+        for g in cp.gathers:
+            out.append("    " + self.gather(g, space))
+        for b in spec.guesses:
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("        x0 = %s  # root! guess" % nm)
+        for i, (b, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            out.append("        _r%d = (%s) .- %s" % (i, rhs, term))
+        out.append("        _rs = [%s]" % ", ".join(
+            "_r%d" % i for i in range(len(spec.residuals))))
+        if spec.dx:
+            out.append("        if steady_state")
+            out.append("            append!(_rs, Any[%s])"
+                       % ", ".join(spec.dx))
+            out.append("        end")
+        out.append("        return isempty(_rs) ? zeros(length(u)) : "
+                   "vcat(_rs...)")
+        out.append("    end")
+        out.append("    _u = nlsolve(_t0, zeros(%d)).zero"
+                   % sum(sz for _, sz, _ in spec.unknowns))
+        y_names = {s.name or inst_name(s.instance) for s in cp.states}
+        off = 0
+        for nm, sz, _idx in spec.unknowns:
+            if nm in y_names:
+                out.append("    %s = _u[%d:%d]" % (nm, off + 1,
+                                                  off + sz))
+            off += sz
+        out.append("    return [%s]" % y0)
+        out.append("end")
+        out.append("")
 
 
 def emit_julia(cp: CodePlan, space: CompileSpace) -> str:

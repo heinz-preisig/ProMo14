@@ -17,8 +17,12 @@ from backend.core import graph_store
 from backend.core.graph_store import PROMO
 from backend.instantiate.builder import (
     AssignmentInfo,
+    EntityInstantiation,
+    EqBinding,
     EqInfo,
     IndexInfo,
+    Instantiation,
+    VarBinding,
     VarInfo,
     build,
 )
@@ -28,8 +32,19 @@ from backend.instantiate.resolver import (
     SubIndexInfo,
     resolve,
 )
+from backend.equation.canonical import (
+    ADD,
+    DEFINITE_INTEGRAL,
+    SOLVE_ROOT,
+    TOTAL_DERIVATIVE,
+    Expression,
+    VariableReference,
+    ic_targets,
+)
+from backend.equation.canonical_rdf import attach_rhs_expression
 from backend.equation.compile_space import CompileSpace, Index, Variable
 from backend.equation.units import Units
+from backend.instantiate.service import _ic_needs
 from backend.instantiate.emit_julia import emit_julia
 from backend.instantiate.emit_matlab import emit_matlab
 from backend.instantiate.emit_python import emit_python
@@ -580,11 +595,11 @@ def test_schedule_unbound_port_no_edge():
 # Codegen plan
 # ---------------------------------------------------------------------------
 
-def _plan(rep, values=None):
+def _plan(rep, values=None, equations=EQUATIONS, canonicals=None):
     memberships = resolve(NODES, ARCS, SUB_INDICES, PARENTS)
     inc = fbuild(NODES, ARCS, memberships, SUB_INDICES)
-    return plan(rep, schedule(rep), inc, EQUATIONS, INDICES,
-                values=values)
+    return plan(rep, schedule(rep), inc, equations, INDICES,
+                values=values, canonicals=canonicals)
 
 
 def _build_indexed_k():
@@ -869,6 +884,164 @@ def test_emit_matlab_algebraic_loop():
     assert "r = [_r0.value; _r1.value];" in src
     assert "_x0 = fsolve(@_loop0, zeros(4, 1));" in src
     assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, _x0(1:2));" in src)
+
+
+# ---------------------------------------------------------------------------
+# t=0 solve (initial conditions)
+# ---------------------------------------------------------------------------
+
+def _init_equations(ic_rhs="V_2"):
+    """The shared fixture's equations plus an ``initialise`` equation
+    pinning m's x0 to the pressure (computed IC, not a bound value)."""
+    equations = dict(EQUATIONS)
+    equations[_eq("ic_m")] = EqInfo(
+        _eq("ic_m"), _var("m"), [_var("p")], "E_9",
+        rhs=ic_rhs, equation_class=f"{BASE}#eqclass_initialise")
+    return equations
+
+
+def test_builder_initial_equations():
+    """``initialise`` equations land in the entity's t0 layer — gathered
+    by class, never via the assignment sequence (which is runtime)."""
+    rep = _build(equations=_init_equations())
+    cap = _entity(rep, _et("lumped_capacity"))
+    assert [q.equation for q in cap.initial_equations] == [_eq("ic_m")]
+    assert _eq("ic_m") not in [q.equation for q in cap.equations]
+    tr = _entity(rep, _et("diffusion_transport"))
+    assert tr.initial_equations == []
+
+
+def test_plan_ic_sources():
+    """ic_source precedence: value cells > initialise equation > the
+    ``par[\"ic0_<name>\"]`` fallback (caller-supplied IC)."""
+    st = _plan(_build()).states[0]
+    assert st.ic_source == "par" and st.ic_values is None
+
+    st = _plan(_build(), values={
+        _var("m"): {"c1": 1.0, "c2": 2.0}}).states[0]
+    assert st.ic_source == "cells" and st.ic_values == [1.0, 2.0]
+
+    eqs = _init_equations()
+    st = _plan(_build(equations=eqs), equations=eqs).states[0]
+    assert st.ic_source == "initialise" and st.ic_values is None
+
+
+def test_plan_initials():
+    """cp.initials carries the initialise blocks with rendered lhs
+    names and bound element sets, in entity-type order."""
+    eqs = _init_equations()
+    cp = _plan(_build(equations=eqs), equations=eqs)
+    assert len(cp.initials) == 1
+    b = cp.initials[0]
+    assert b.equation == _eq("ic_m") and b.lhs_name == "V_1"
+    assert b.rhs == "V_2"
+    assert b.lhs_indices[_idx("idx_node")] == ["c1", "c2"]
+
+
+def test_plan_guess_flag():
+    """A ``SolveRoot`` canonical flags the block: its lhs needs an
+    initial guess, seeded from the outer t0 iterate."""
+    canon = Expression(SOLVE_ROOT, (VariableReference(_var("p_in")),))
+    cp = _plan(_build(), canonicals={_eq("flow"): canon})
+    flow = next(b for lvl in cp.levels for b in lvl
+                if b.equation == _eq("flow"))
+    assert flow.guess
+    bal = next(b for lvl in cp.levels for b in lvl
+               if b.equation == _eq("bal"))
+    assert not bal.guess
+
+
+def test_emit_python_initial():
+    """``initial`` on the shared fixture: m pinned via ``par`` (no IC
+    supplied), u = [algebraic lhs, dV_1], residuals are rhs - lhs with
+    the balance targeting its d-slot; ``steady_state`` appends der=0."""
+    src = emit_python(_plan(_build()), _emit_space())
+    assert "def initial(par, steady_state=False):" in src
+    assert 'V_1 = par["ic0_V_1"]  # supplied IC' in src
+    assert 'V_5 = par["V_5"]' in src
+    assert "def _t0(u):  # t=0 residual system" in src
+    assert "V_2 = u[0:2]" in src                  # algebraic unknown
+    assert "V_3_diffusion_transport = u[2:4]" in src
+    assert "dV_1 = u[4:6]" in src                 # der(m) slot
+    assert "V_6 = V_2[[0, 1]]  # port gather" in src
+    assert "_r0 = (V_1) - V_2" in src             # prop at t0
+    assert "_r1 = (V_5 * V_6) - V_3_diffusion_transport" in src
+    assert ("_r2 = (np.tensordot(V_4, V_3_lumped_capacity, "
+            "axes=([1], [0]))) - dV_1" in src)
+    assert "total_diff = lambda x, y: np.zeros_like(x)" in src
+    assert "_rs += [np.atleast_1d(dV_1)]" in src
+    assert "_u = fsolve(_t0, np.zeros(6))" in src
+    assert "return np.concatenate([np.atleast_1d(V_1)])" in src
+
+
+def test_emit_python_initial_cells():
+    """Cell-supplied IC: x0 pins as an array literal, m stays out of
+    the unknown vector."""
+    src = emit_python(
+        _plan(_build(), values={_var("m"): {"c1": 1.0, "c2": 2.0}}),
+        _emit_space())
+    assert "V_1 = np.array([1.0, 2.0])  # IC value cells" in src
+    assert 'par["ic0_V_1"]' not in src
+    assert " V_1 = u[" not in src           # pinned, not unknown
+    assert "return np.concatenate([np.atleast_1d(V_1)])" in src
+
+
+def test_emit_python_initial_equation():
+    """Computed IC: the init-covered state is a u unknown and the
+    ``initialise`` block contributes the first residual."""
+    eqs = _init_equations()
+    src = emit_python(
+        _plan(_build(equations=eqs), equations=eqs), _emit_space())
+    assert "V_1 = u[0:2]" in src            # x0 solved, not pinned
+    assert "V_2 = u[2:4]" in src
+    assert "dV_1 = u[6:8]" in src
+    assert "_r0 = (V_2) - V_1" in src       # initialise residual first
+    assert "_u = fsolve(_t0, np.zeros(8))" in src
+    assert "V_1 = _u[0:2]" in src           # y0 pulls the solved slice
+
+
+def test_emit_python_initial_guess():
+    """``root!`` lhs vars seed the nested solve's x0 from the outer
+    iterate."""
+    canon = Expression(SOLVE_ROOT, (VariableReference(_var("p_in")),))
+    src = emit_python(
+        _plan(_build(), canonicals={_eq("flow"): canon}),
+        _emit_space())
+    assert ("x0 = np.atleast_1d(V_3_diffusion_transport)  "
+            "# root! guess" in src)
+
+
+def test_emit_julia_initial():
+    """The Julia t0 block: keyword flag, 1-based slices, ``. -``
+    residuals, out-of-place nlsolve, ``;``-concat y0."""
+    src = emit_julia(_plan(_build()), _emit_space())
+    assert "function initial(par; steady_state=false)" in src
+    assert "V_1 = par.ic0_V_1  # supplied IC" in src
+    assert "V_2 = u[1:2]" in src
+    assert "dV_1 = u[5:6]" in src
+    assert "_r0 = (V_1) .- V_2" in src
+    assert ("_r2 = (V_4 * V_3_lumped_capacity) .- dV_1" in src)
+    assert "total_diff = (x, y) -> x .* 0" in src
+    assert "append!(_rs, Any[dV_1])" in src
+    assert "_u = nlsolve(_t0, zeros(6)).zero" in src
+    assert "return [V_1]" in src
+
+
+def test_emit_matlab_initial():
+    """The Matlab t0 block: explicit flag arg (no defaults), MultiDimVar
+    wraps inside the nested _t0, .value residuals, fsolve."""
+    src = emit_matlab(_plan(_build()), _emit_space())
+    assert "function y0 = initial(par, steady_state)" in src
+    assert ("V_1 = MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1);"
+            "  % supplied IC" in src)
+    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, u(1:2));" in src)
+    assert ("dV_1 = MultiDimVar({'N'}, 2, {'N'}, u(5:6));" in src)
+    assert "_r0 = (V_1) - V_2;" in src
+    assert "r = [_r0.value; _r1.value; _r2.value];" in src
+    assert "totalDiff = @(x, y) x .* 0;" in src
+    assert "r = [r; dV_1.value];" in src
+    assert "_u = fsolve(@_t0, zeros(6, 1));" in src
+    assert "y0 = [V_1.value(:)];" in src
 
 
 def test_emit_python_instantiated_pressure():
@@ -1338,3 +1511,140 @@ def test_code_endpoint_values(client):
     src = r.json()["source"]
     assert "V_5 = 1.5  # value cells" in src
     assert 'par["V_5"]' not in src
+
+
+# ---------------------------------------------------------------------------
+# IC-need derivation — t=0 requirements read off canonical RHS trees
+# ---------------------------------------------------------------------------
+
+def _tdiff(arg_iri: str) -> Expression:
+    """``TotalDiff(arg, t)`` — the independent var as a plain reference."""
+    return Expression(TOTAL_DERIVATIVE, (
+        VariableReference(arg_iri), VariableReference(_var("t"))))
+
+
+def _einst(var_iris, eq_pairs):
+    """An EntityInstantiation with local-bound vars and bare equations."""
+    return EntityInstantiation(
+        entity_type=_et("lumped_capacity"),
+        variables=[VarBinding(v, "state", "local", "inst")
+                   for v in var_iris],
+        equations=[EqBinding(q, lhs) for q, lhs in eq_pairs])
+
+
+def test_ic_targets_totaldiff_bare_var():
+    assert ic_targets(_tdiff(_var("m")), _var("bal_lhs")) == [
+        (_var("m"), "ic")]
+
+
+def test_ic_targets_totaldiff_expression_falls_back_to_lhs():
+    inner = Expression(ADD, (VariableReference(_var("m")),
+                             VariableReference(_var("u"))))
+    rhs = Expression(TOTAL_DERIVATIVE,
+                     (inner, VariableReference(_var("t"))))
+    assert ic_targets(rhs, _var("bal_lhs")) == [(_var("bal_lhs"), "ic")]
+
+
+def test_ic_targets_integral_binds_lhs():
+    rhs = Expression(DEFINITE_INTEGRAL, (
+        VariableReference(_var("j")), VariableReference(_var("t")),
+        VariableReference(_var("t0")), VariableReference(_var("tf"))))
+    assert ic_targets(rhs, _var("m")) == [(_var("m"), "ic")]
+
+
+def test_ic_targets_root_is_a_guess():
+    rhs = Expression(SOLVE_ROOT, (VariableReference(_var("f")),))
+    assert ic_targets(rhs, _var("x")) == [(_var("x"), "guess")]
+
+
+def test_ic_targets_plain_rhs_empty():
+    rhs = Expression(ADD, (VariableReference(_var("a")),
+                           VariableReference(_var("b"))))
+    assert ic_targets(rhs, _var("x")) == []
+
+
+def test_ic_needs_coverage_states():
+    rep = Instantiation(entity_types=[_einst(
+        [_var("m"), _var("p")], [(_eq("bal"), _var("m"))])])
+    canonicals = {_eq("bal"): _tdiff(_var("m"))}
+
+    needs = _ic_needs(rep, canonicals, set(), lambda v: False)
+    assert [(n.var, n.kind, n.status, n.supplied_by) for n in needs] == [
+        (_var("m"), "ic", "needed", None)]
+    assert needs[0].instance == "inst"
+    assert needs[0].entity_type == _et("lumped_capacity")
+
+    # An initialise-class equation on the var supplies the need.
+    needs = _ic_needs(rep, canonicals, {_var("m")}, lambda v: False)
+    assert (needs[0].status, needs[0].supplied_by) == (
+        "supplied", "initialise")
+
+    # Bound value cells supply it too.
+    needs = _ic_needs(rep, canonicals, set(), lambda v: True)
+    assert (needs[0].status, needs[0].supplied_by) == (
+        "supplied", "cells")
+
+
+def test_ic_needs_dedup_per_var_kind_type():
+    # Two equations both differentiating m → one ic need per type.
+    rep = Instantiation(entity_types=[_einst(
+        [_var("m"), _var("x")],
+        [(_eq("bal"), _var("m")), (_eq("aux"), _var("x"))])])
+    canonicals = {q: _tdiff(_var("m")) for q in (_eq("bal"), _eq("aux"))}
+    needs = _ic_needs(rep, canonicals, set(), lambda v: False)
+    assert [(n.var, n.kind, n.equation) for n in needs] == [
+        (_var("m"), "ic", _eq("bal"))]
+
+
+def test_ic_needs_unbound_state_still_listed():
+    rep = Instantiation(entity_types=[_einst(
+        [_var("m")], [(_eq("bal"), _var("m"))])])
+    canonicals = {_eq("bal"): _tdiff(_var("ghost"))}
+    needs = _ic_needs(rep, canonicals, set(), lambda v: False)
+    assert (needs[0].var, needs[0].instance) == (_var("ghost"), "")
+
+
+def test_model_endpoint_ic_needs(client):
+    """A canonical TotalDiff RHS surfaces as an ic need in /model."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+    _seed_assignments(client, ids)
+
+    # Legacy literal-only equations induce no needs.
+    r = client.get("/api/instantiate/model",
+                   params={"graph": graph, "vars": graph})
+    assert r.status_code == 200, r.text
+    assert r.json()["ic_needs"] == []
+
+    # Attach a canonical RHS differentiating m; the IC need appears.
+    g = store.ontology_graph
+    attach_rhs_expression(g, URIRef(ids["e_bal"]), _tdiff(ids["m"]))
+    r = client.get("/api/instantiate/model",
+                   params={"graph": graph, "vars": graph})
+    assert r.status_code == 200, r.text
+    needs = r.json()["ic_needs"]
+    assert [[n["var"], n["kind"], n["status"]] for n in needs] == [
+        [ids["m"], "ic", "needed"]]
+    assert needs[0]["entity_type"] == _et("lumped_capacity")
+
+    # An initialise equation on the state supplies the IC.
+    e_ic = URIRef(_eq("ic0"))
+    g.add((e_ic, RDF.type, PROMO["Equation"]))
+    g.add((e_ic, PROMO["internalID"], Literal("E_9")))
+    g.add((e_ic, PROMO["equationClass"],
+           URIRef(f"{graph}#eqclass_initialise")))
+    g.add((URIRef(ids["m"]), PROMO["hasEquation"], e_ic))
+    r = client.get("/api/instantiate/model",
+                   params={"graph": graph, "vars": graph})
+    needs = r.json()["ic_needs"]
+    assert [[n["var"], n["status"], n["supplied_by"]] for n in needs] == [
+        [ids["m"], "supplied", "initialise"]]
+
+    # The initialise equation surfaces in the type's t0 layer and stays
+    # out of the runtime sequence (it is not in the assignment).
+    cap = [e for e in r.json()["entity_types"]
+           if e["entity_type"] == _et("lumped_capacity")][0]
+    assert [[q["equation"], q["lhs"]] for q in cap["initial_equations"]] == [
+        [str(e_ic), ids["m"]]]
+    assert all(q["equation"] != str(e_ic) for q in cap["equations"])

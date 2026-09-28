@@ -1283,3 +1283,38 @@ def test_add_variable_dict_rejects_duplicate_index(client):
     }
     with pytest.raises(ValueError, match="must not repeat an index"):
         store.add_variable_dict(g, var)
+
+
+def test_initialise_equation_may_share_lhs(client):
+    """An ``initialise`` equation may share its variable with a generic
+    one: ``hasEquation`` is plural and the record keys equations on
+    ``internal_id`` — no uniqueness on the LHS.  The behaviour
+    assignment's sequence picks which equations actually run."""
+    store = graph_store.get_store()
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/icshare", "type": "library",
+        "uses": [onto]})
+    r = client.post(
+        "/api/equation/variables?graph=https://example.org/icshare",
+        json={"iri": "", "label": "T0", "network": "root",
+              "type": "state", "units": [0] * 8, "index_structures": [],
+              "aliases": {}, "doc": "", "port_variable": False,
+              "tokens": [], "equations": {
+                  "E_1": {"iri": "", "internal_id": "E_1", "lhs": "",
+                          "rhs": "T0 . half", "equation_class": "generic",
+                          "network": "root", "incidence_list": [],
+                          "doc": ""},
+                  "E_2": {"iri": "", "internal_id": "E_2", "lhs": "",
+                          "rhs": "T0 . half",
+                          "equation_class": "initialise",
+                          "network": "root", "incidence_list": [],
+                          "doc": ""}}})
+    assert r.status_code == 200, r.text
+    g = store.dataset.graph("https://example.org/icshare")
+    var = g.value(predicate=RDF.type, object=graph_store.PROMO["Variable"])
+    classes = {str(g.value(e, graph_store.PROMO["equationClass"]))
+               for e in g.objects(var, graph_store.PROMO["hasEquation"])}
+    assert len(classes) == 2
+    assert f"{onto}#eqclass_generic" in classes
+    assert f"{onto}#eqclass_initialise" in classes

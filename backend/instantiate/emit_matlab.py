@@ -56,6 +56,7 @@ from backend.equation.compile_space import CompileSpace
 
 from .emit_common import (
     Dialect,
+    T0Layout,
     bound_dims,
     emit_plan,
     inst_name,
@@ -236,6 +237,82 @@ class _Matlab(Dialect):
 
     def fn_close(self) -> List[str]:
         return ["end", ""]
+
+    def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
+                space: CompileSpace) -> None:
+        """``y0 = initial(par, steady_state)`` — the t=0 solve as a
+        nested ``_t0`` function (shares the parent workspace); unknowns
+        unpack as MultiDimVars, residuals unwrap via ``.value``.
+        Matlab has no default arguments — callers pass ``false``."""
+        out.append("function y0 = initial(par, steady_state)")
+        for st in spec.pins:
+            nm = st.name or inst_name(st.instance)
+            if st.ic_source == "cells":
+                lit = self._array_lit(st.ic_values or [],
+                                      bound_dims(st.indices))
+                out.append("  %s = %s;  %% IC value cells" % (
+                    nm, self._mdv(st.indices, space, lit)))
+            else:
+                out.append("  %s = %s;  %% supplied IC" % (
+                    nm, self._mdv(st.indices, space,
+                                  "par.ic0_%s" % nm)))
+        for p in cp.params + cp.inputs:
+            if p.kind == "constant" and p.value is not None:
+                continue
+            out.append(self.param(p, space))
+        y_names = {s.name or inst_name(s.instance) for s in cp.states}
+        y0 = ["%s.value(:)" % (s.name or inst_name(s.instance))
+              if s.ic_source != "initialise"
+              else (s.name or inst_name(s.instance))
+              for s in cp.states]
+        if not spec.unknowns:
+            out.append("  y0 = [%s];" % "; ".join(y0))
+            out.append("end")
+            out.append("")
+            return
+        out.append("  function r = _t0(u)  %% t=0 residual system")
+        off = 0
+        for nm, sz, idx in spec.unknowns:
+            out.append("    %s = %s;" % (
+                nm, self._mdv(idx, space,
+                              "u(%d:%d)" % (off + 1, off + sz))))
+            off += sz
+        out.append("    if steady_state")
+        out.append("      totalDiff = @(x, y) x .* 0;  %% der = 0")
+        out.append("    end")
+        for g in cp.gathers:
+            out.append("  " + self.gather(g, space))
+        for b in spec.guesses:
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("    x0 = %s.value;  %% root! guess" % nm)
+        for i, (b, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            out.append("    _r%d = (%s) - %s;" % (i, rhs, term))
+        if spec.residuals:
+            out.append("    r = [%s];" % "; ".join(
+                "_r%d.value" % i
+                for i in range(len(spec.residuals))))
+        else:
+            out.append("    r = zeros(length(u), 1);")
+        if spec.dx:
+            out.append("    if steady_state")
+            out.append("      r = [r; %s];" % "; ".join(
+                "%s.value" % n for n in spec.dx))
+            out.append("    end")
+        out.append("  end")
+        out.append("  _u = fsolve(@_t0, zeros(%d, 1));"
+                   % sum(sz for _, sz, _ in spec.unknowns))
+        off = 0
+        for nm, sz, idx in spec.unknowns:
+            if nm in y_names:
+                out.append("  %s = %s;" % (
+                    nm, self._mdv(idx, space,
+                                  "_u(%d:%d)" % (off + 1, off + sz))))
+            off += sz
+        out.append("  y0 = [%s];" % "; ".join(y0))
+        out.append("end")
+        out.append("")
 
 
 def emit_matlab(cp: CodePlan, space: CompileSpace) -> str:
