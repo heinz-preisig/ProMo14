@@ -121,7 +121,7 @@ class _Matlab(Dialect):
         to the bound index sizes.  Matlab is column-major: an n-D table
         is reshaped to the reversed dims and permuted back so element
         order matches the C-order coordinate enumeration; a 1-D table
-        emits as a column vector."""
+        emits as a column vector (convention: docs/value-cells.md)."""
         if not dims:
             return cls._num(flat[0]) if flat else "NaN"
         if len(dims) == 1:

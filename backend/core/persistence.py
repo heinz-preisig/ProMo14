@@ -89,6 +89,18 @@ class PersistenceMixin:
         self._migrate_domain_membership()
         self._migrate_canonical_rhs()
 
+        # Idempotent vocabulary migration: every artefact graph is
+        # self-describing (ADR-006).  Besides the declarations,
+        # ``declare_vocabulary`` stamps the ``promo:doc`` convention
+        # notes (VOCAB_DOCS — docs/value-cells.md) wherever the terms
+        # are declared, so artefacts authored before a term existed
+        # pick its doc up on load.  Frozen version graphs are skipped —
+        # their content is fixed at publish time.
+        for g in self.dataset.contexts():
+            if (len(g) and (g.identifier, RDF.type,
+                            PROMO["Version"]) not in g):
+                self.declare_vocabulary(g)
+
         if legacy_layout:
             # Split the legacy single-file store into per-line files
             # now — before any edit lands — so the tracked files match

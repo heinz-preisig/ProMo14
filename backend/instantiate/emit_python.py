@@ -62,7 +62,8 @@ class _Python(Dialect):
     @classmethod
     def _array_lit(cls, flat: List, dims: List[int]) -> str:
         """A flat C-order value table as an ``np.array`` literal shaped
-        to the bound index sizes — the ν channel's codegen form."""
+        to the bound index sizes — the ν channel's codegen form
+        (convention: docs/value-cells.md)."""
         items = ", ".join(cls._num(v) for v in flat)
         if not dims:
             return items or "np.nan"

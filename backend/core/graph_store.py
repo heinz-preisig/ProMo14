@@ -38,6 +38,7 @@ from .vocab import (
     SEED_CONSTANTS,
     SEED_FLOOR,
     UNIT_FIELDS,
+    VOCAB_DOCS,
     XSD,
     _EQUATION_ID_RE,
     _as_literal,
@@ -180,6 +181,13 @@ class RdfStore(PersistenceMixin, SeedMixin):
             if (term, RDF.type, RDFS.Class) not in graph:
                 graph.add((term, RDF.type, RDFS.Class))
                 added += 1
+        # Convention docs on declared terms (docs/value-cells.md) —
+        # ``set`` keeps re-declaration idempotent.
+        for name, doc in VOCAB_DOCS.items():
+            term = PROMO[name]
+            if ((term, RDF.type, RDF.Property) in graph
+                    or (term, RDF.type, RDFS.Class) in graph):
+                graph.set((term, PROMO["doc"], Literal(doc)))
         return added
 
     def freeze_version(
@@ -599,16 +607,16 @@ class RdfStore(PersistenceMixin, SeedMixin):
     ) -> None:
         """Replace a variable's value-cell table in ``graph``.
 
-        ``cells`` maps a coordinate key — ``|``-joined index-element
-        IRIs in the variable's ``indexStructure`` order — to a scalar
-        value.  Each entry becomes a ``promo:ValueCell`` resource under
-        the artefact's IRI space: the variable links to it via
-        ``promo:valueCell``; the cell carries ``promo:value``,
-        ``promo:coordinate`` (the ordered element list as a JSON
-        literal — the authoritative axis order) and one
-        ``promo:atIndexElement`` per element for graph navigation.
-        Existing cells of the variable are wiped first (replace
-        semantics, like ``add_variable_dict`` aliases).
+        Convention: docs/value-cells.md.  ``cells`` maps a coordinate
+        key — ``|``-joined index-element IRIs in the variable's
+        ``indexStructure`` order — to a scalar value.  Each entry
+        becomes a ``promo:ValueCell`` resource under the artefact's IRI
+        space: the variable links to it via ``promo:valueCell``; the
+        cell carries ``promo:value``, ``promo:coordinate`` (the ordered
+        element list as a JSON literal — the authoritative axis order)
+        and one ``promo:atIndexElement`` per element for graph
+        navigation.  Existing cells of the variable are wiped first
+        (replace semantics, like ``add_variable_dict`` aliases).
         """
         var = URIRef(str(variable))
         for cell in list(graph.objects(var, PROMO["valueCell"])):

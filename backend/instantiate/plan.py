@@ -341,9 +341,10 @@ def _value_table(v: VarBinding,
                  values: Dict[str, Dict[str, Any]]
                  ) -> Optional[List[Any]]:
     """A var's stored value cells expanded over its bound element
-    sets — flat in C order (last index varies fastest), ``None`` for
-    missing cells.  ``None`` when the var carries no table or one of
-    its indices is unbound (symbolic extent).
+    sets — flat in C order (last index varies fastest; convention:
+    docs/value-cells.md), ``None`` for missing cells.  ``None`` when
+    the var carries no table or one of its indices is unbound
+    (symbolic extent).
 
     The coordinate key joins element IRIs in ``indexStructure`` order
     — the same order ``v.indices`` is built in — so the product of

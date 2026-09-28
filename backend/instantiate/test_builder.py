@@ -45,9 +45,9 @@ from backend.equation.canonical_rdf import attach_rhs_expression
 from backend.equation.compile_space import CompileSpace, Index, Variable
 from backend.equation.units import Units
 from backend.instantiate.service import _ic_needs
-from backend.instantiate.emit_julia import emit_julia
-from backend.instantiate.emit_matlab import emit_matlab
-from backend.instantiate.emit_python import emit_python
+from backend.instantiate.emit_julia import _Julia, emit_julia
+from backend.instantiate.emit_matlab import _Matlab, emit_matlab
+from backend.instantiate.emit_python import _Python, emit_python
 from backend.instantiate.fbuilder import build as fbuild
 from backend.instantiate.plan import (
     CodePlan,
@@ -807,6 +807,50 @@ def test_emit_values_2d():
             in emit_julia(cp, _emit_space()))
     assert ("permute(reshape([-1.0, -2.0, 1.0, NaN], 2 2), [2 1])"
             in emit_matlab(cp, _emit_space()))
+
+
+def test_value_cell_layout_convention():
+    """Golden layout (docs/value-cells.md): the canonical flat list
+    enumerates the coordinate product last-index-fastest; each
+    emitter's literal must land every value on its coordinate.
+
+    The table is 2x3 — deliberately non-square: a square table keeps
+    its shape under a transpose and cannot detect an ordering bug.
+    ``flat`` is C-order [v(i1,j1), v(i1,j2), v(i1,j3), v(i2,j1), …].
+    """
+    np = pytest.importorskip("numpy")
+
+    flat = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    dims = [2, 3]
+    canonical = np.array(flat).reshape(dims)  # a[i,j] = ν(I_i, J_j)
+
+    # Python — the emitted literal executes verbatim.
+    lit = _Python._array_lit(flat, dims)
+    assert lit == ("np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])"
+                   ".reshape((2, 3))")
+    assert (eval(lit, {"np": np}) == canonical).all()
+
+    # Julia / MATLAB can't exec here — golden the emitted expression
+    # and simulate its column-major semantics (first index fastest ==
+    # numpy order="F") to prove the coordinate→value map survives.
+    lit = _Julia._array_lit(flat, dims)
+    assert lit == ("permutedims(reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "
+                   "3, 2), (2, 1))")
+    col_major = np.array(flat).reshape(dims[::-1], order="F").T
+    assert (col_major == canonical).all()
+
+    lit = _Matlab._array_lit(flat, dims)
+    assert lit == ("permute(reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "
+                   "3 2), [2 1])")
+    # Same reshape+permute idiom as julia — simulation above covers it.
+
+    # 1-D: julia row vector / matlab column vector — order preserved.
+    assert (_Julia._array_lit(flat, [6])
+            == "[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]")
+    assert (_Matlab._array_lit(flat, [6])
+            == "[1.0; 2.0; 3.0; 4.0; 5.0; 6.0]")
+    assert _Python._array_lit(flat, [6]) == \
+        "np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])"
 
 
 def test_emit_python_algebraic_loop():

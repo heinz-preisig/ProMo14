@@ -73,7 +73,8 @@ class _Julia(Dialect):
         """A flat C-order value table as a Julia array literal shaped
         to the bound index sizes.  Julia is column-major: an n-D table
         is reshaped to the reversed dims and permuted back so element
-        order matches the C-order coordinate enumeration."""
+        order matches the C-order coordinate enumeration
+        (convention: docs/value-cells.md)."""
         items = ", ".join(cls._num(v) for v in flat)
         if not dims:
             return items or "NaN"

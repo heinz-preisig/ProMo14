@@ -24,6 +24,37 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 ARTEFACT_TYPES = ("Ontology", "Library", "Assignment", "Model", "Glass",
                   "Species")
 
+# Convention docs on self-describing vocabulary terms, applied by
+# ``RdfStore.declare_vocabulary`` wherever the term is declared so every
+# graph carries the contract inline.  The normative write-up is
+# docs/value-cells.md.
+VOCAB_DOCS = {
+    "ValueCell":
+        "One entry of a variable's value table (§20 ν channel).  The "
+        "variable links it via promo:valueCell; the cell carries "
+        "promo:value (literal scalar), promo:coordinate (JSON list of "
+        "index-element IRIs ordered by the variable's indexStructure) "
+        "and promo:atIndexElement links.  See docs/value-cells.md.",
+    "valueCell":
+        "Variable → promo:ValueCell: the variable's value table — ν "
+        "parameter tables and initial-condition pins.  See "
+        "docs/value-cells.md.",
+    "coordinate":
+        "On a promo:ValueCell: JSON list of index-element IRIs ordered "
+        "by the variable's indexStructure — the authoritative cell "
+        "coordinate.  Flat enumerations of a table walk the coordinate "
+        "product last-index-fastest (C order).  See docs/value-cells.md.",
+    "atIndexElement":
+        "promo:ValueCell → index element IRI, for graph navigation.  "
+        "Unordered — the authoritative element order is the cell's "
+        "promo:coordinate literal.",
+    "value":
+        "Literal scalar payload — a constant's pre-bound value "
+        "(ADR-008) or a promo:ValueCell's value.  Never an expression: "
+        "computed values are promo:Expression trees behind "
+        "promo:rhsExpression or 'initialise'-class equations.",
+}
+
 # Universal constants seeded into every ontology (ADR-008): pre-bound
 # value slots, class ``constant``, network ``root`` — visible from every
 # expression network via ancestor-chain resolution.  ``value`` is the
