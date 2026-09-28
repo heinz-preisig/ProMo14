@@ -15,7 +15,9 @@ from typing import Dict, List, Optional
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
-from .vocab import PROMO, SEED_CONSTANTS, SEED_FLOOR
+from .vocab import (
+    PROMO, SEED_CONSTANTS, SEED_EQUATION_CLASSES, SEED_FLOOR,
+)
 
 
 class SeedMixin:
@@ -348,16 +350,11 @@ class SeedMixin:
 
         # --- Seed floor (migratable subset) ---
         # Universal constants (ADR-008), scale regimes, transport
-        # mechanisms + arc sub-indices (§16), §20 capabilities — the
-        # same ordered sequence load() and apply-seed-floor run, so a
-        # fresh seed and a migrated store carry the same floor.
+        # mechanisms + arc sub-indices (§16), equation classes, §20
+        # capabilities — the same ordered sequence load() and
+        # apply-seed-floor run, so a fresh seed and a migrated store
+        # carry the same floor.
         self.apply_seed_floor(g, base)
-
-        # --- Equation classes (top-level hierarchy) ---
-        eq_classes = ["generic", "instantiate", "balance", "empirical", "user_function"]
-        for ec in eq_classes:
-            ec_iri = self.mint_iri(base, f"eqclass_{ec}")
-            self.add_equation_class(g, ec_iri, ec)
 
         # --- Artefact-type marker (self-description) ------------------
         g.add((g.identifier, RDF.type, PROMO["Ontology"]))
@@ -382,6 +379,7 @@ class SeedMixin:
         self._seed_scale_regimes(g, base)
         self._seed_transport_mechanisms(g, base)
         self._seed_arc_sub_indices(g, base)
+        self._seed_equation_classes(g, base)
         self._seed_capabilities(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
@@ -408,6 +406,21 @@ class SeedMixin:
                 "value": value,
                 "doc": "Universal constant",
             })
+
+    def _seed_equation_classes(self, g: Graph, base: str) -> None:
+        """Add the top-level equation-class hierarchy.
+
+        Idempotent by deterministic IRI — applied via ``load()`` so
+        stores predating a class pick it up on reload.  ``initialise``
+        (added 2026-09-28) marks t=0-only equations that compute or pin
+        initial conditions; the implicit-IC case is solved as a root
+        problem at instantiation.
+        """
+        for ec in SEED_EQUATION_CLASSES:
+            iri = self.mint_iri(base, f"eqclass_{ec}")
+            if (iri, RDF.type, PROMO["EquationClass"]) in g:
+                continue
+            self.add_equation_class(g, iri, ec)
 
     def _seed_transport_mechanisms(self, g: Graph, base: str) -> None:
         """Add transport mechanism entity subtypes, grouped by token.

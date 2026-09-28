@@ -54,7 +54,13 @@
         promo:lhs <promo:c> ;
         promo:modified "2026-09-24T16:30:26.792Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "inv(V) . n" .
+        promo:rhs "( inv( physical!V ) . physical!n )" ;
+        promo:rhsExpression <https://w3id.org/promo/library/#E_10/expression> ;
+        promo:rhsLatex "{{V}_{N}}^{-1} \\circ {n}_{N,S}" .
+
+    <https://w3id.org/promo/library/#E_10/expression> a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b1 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_11> a promo:Equation ;
         promo:created "2026-09-25T13:03:39.862Z" ;
@@ -71,7 +77,7 @@
         promo:rhsLatex "\\mathrm{sign}\\left( \\sum_{N} {F}_{A\\_conv,N} \\, {p}_{N} \\right)" .
 
     <https://w3id.org/promo/library/#E_11/expression> a promo:Expression ;
-        promo:hasArguments _:N3bb4a7263e874a6993cc495f2120c9e6 ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b2 ;
         promo:hasOperation promolg:sign .
 
     <https://w3id.org/promo/library/#E_12> a promo:Equation ;
@@ -84,18 +90,13 @@
         promo:lhs <promo:c_conv> ;
         promo:modified "2026-09-25T13:04:54.369Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "(root!half . (physical!F_conv - d . abs(physical!F_conv))) * c" .
+        promo:rhs "( ( universe!half . ( physical!F_conv - ( d . abs( physical!F_conv ) ) ) ) * c )" ;
+        promo:rhsExpression <https://w3id.org/promo/library/#E_12/expression> ;
+        promo:rhsLatex "\\sum_{N} \\left( \\frac{1}{2} \\circ \\left( {F}_{A\\_conv,N} - {d}_{A\\_conv} \\circ \\left| {F}_{A\\_conv,N} \\right| \\right) \\right) \\, {c}_{N,S}" .
 
-    <https://w3id.org/promo/library/#E_13> a promo:Equation ;
-        promo:created "2026-09-25T13:08:00.485Z" ;
-        promo:doc "" ;
-        promo:equationClass "instantiate" ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:internalID "E_13" ;
-        promo:lhs <promo:no> ;
-        promo:modified "2026-09-25T13:08:00.485Z" ;
-        promo:network "macroscopic" ;
-        promo:rhs "Instantiate(n)" .
+    <https://w3id.org/promo/library/#E_12/expression> a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b3 ;
+        promo:hasOperation promolg:ReduceProduct .
 
     <https://w3id.org/promo/library/#E_14> a promo:Equation ;
         promo:created "2026-09-25T13:14:09.137Z" ;
@@ -107,7 +108,13 @@
         promo:lhs <promo:rho> ;
         promo:modified "2026-09-25T13:14:09.137Z" ;
         promo:network "properties" ;
-        promo:rhs "inv(V) . m" .
+        promo:rhs "( inv( physical!V ) . physical!m )" ;
+        promo:rhsExpression <https://w3id.org/promo/library/#E_14/expression> ;
+        promo:rhsLatex "{{V}_{N}}^{-1} \\circ {m}_{N}" .
+
+    <https://w3id.org/promo/library/#E_14/expression> a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b4 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_15> a promo:Equation ;
         promo:created "2026-09-25T13:29:43.746Z" ;
@@ -119,7 +126,13 @@
         promo:lhs <promo:fV> ;
         promo:modified "2026-09-25T13:29:43.746Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "inv(rho) . k_conv . geometry!Axy . physical!F_conv . p" .
+        promo:rhs "( ( ( ( inv( properties!rho ) . properties!k_conv ) . geometry!Axy ) . physical!F_conv ) . physical!p )" ;
+        promo:rhsExpression <https://w3id.org/promo/library/#E_15/expression> ;
+        promo:rhsLatex "{{\\rho}_{N}}^{-1} \\circ {k}_{N} \\circ {Axy}_{N} \\circ {F}_{A\\_conv,N} \\circ {p}_{N}" .
+
+    <https://w3id.org/promo/library/#E_15/expression> a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b5 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_16> a promo:Equation ;
         promo:created "2026-09-25T13:54:34.813Z" ;
@@ -136,7 +149,7 @@
         promo:rhsLatex "{c}_{A\\_conv,S} \\circ {\\hat{V}}_{A\\_conv,N}" .
 
     <https://w3id.org/promo/library/#E_16/expression> a promo:Expression ;
-        promo:hasArguments _:Nce13a181e9a94e7da3a4d2214fe09d88 ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b6 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_17> a promo:Equation ;
@@ -154,7 +167,7 @@
         promo:rhsLatex "{F}_{A\\_conv,N} \\circ \\hat{n}_{conv,A\\_conv,N,S}" .
 
     <https://w3id.org/promo/library/#E_17/expression> a promo:Expression ;
-        promo:hasArguments _:Nc84fef7de7e641ba80769ecfc9442785 ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b7 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_18> a promo:Equation ;
@@ -186,57 +199,8 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {V}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:Nb876a8d924394c3295947ff03d59e9a2 ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b8 ;
         promo:hasOperation promolg:PartialDerivative .
-
-    <promo:V> a promo:Variable ;
-        rdfs:label "V" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
-        promo:doc "volum" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_23" ;
-        promo:latex "V" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:c> a promo:Variable ;
-        rdfs:label "c" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_intensive>,
-            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
-        promo:doc "molar concentration" ;
-        promo:hasEquation <https://w3id.org/promo/library/#E_10> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_24" ;
-        promo:latex "c" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:d> a promo:Variable ;
-        rdfs:label "d" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
-        promo:doc "convective flow direction relative to the reference coordinate" ;
-        promo:hasEquation <https://w3id.org/promo/library/#E_11> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
-        promo:internalID "V_26" ;
-        promo:latex "d" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
 
     <promo:dndt> a promo:Variable ;
         rdfs:label "dndt" ;
@@ -257,71 +221,6 @@
         promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
-    <promo:no> a promo:Variable ;
-        rdfs:label "no" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:doc "initial condition for species molar mass" ;
-        promo:hasEquation <https://w3id.org/promo/library/#E_13> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_28" ;
-        promo:latex "n^o" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:rho> a promo:Variable ;
-        rdfs:label "rho" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_extensity_intensive>,
-            <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:doc "density" ;
-        promo:hasEquation <https://w3id.org/promo/library/#E_14> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_29" ;
-        promo:latex "\\rho" ;
-        promo:network "properties" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, -3, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:F_conv> a promo:Variable ;
-        rdfs:label "F_conv" ;
-        promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
-        promo:doc "incidence matrix for convective flows" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
-            <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_25" ;
-        promo:latex "F" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
-
-    <promo:P> a promo:Variable ;
-        rdfs:label "p" ;
-        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:P\"}" ;
-        promo:doc "Thermodynamic pressure" ;
-        promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_10" ;
-        promo:latex "p" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "effort" .
-
     <promo:an_conv> a promo:Variable ;
         rdfs:label "an_conv" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
@@ -340,6 +239,24 @@
         promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
+    <promo:c> a promo:Variable ;
+        rdfs:label "c" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_intensive>,
+            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
+        promo:doc "molar concentration" ;
+        promo:hasEquation <https://w3id.org/promo/library/#E_10> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_24" ;
+        promo:latex "c" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
     <promo:c_conv> a promo:Variable ;
         rdfs:label "c_conv" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
@@ -354,6 +271,21 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:d> a promo:Variable ;
+        rdfs:label "d" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
+        promo:doc "convective flow direction relative to the reference coordinate" ;
+        promo:hasEquation <https://w3id.org/promo/library/#E_11> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
+        promo:internalID "V_26" ;
+        promo:latex "d" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
     <promo:fV> a promo:Variable ;
@@ -391,35 +323,210 @@
         promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
-    _:N39ae706067de49c69d4ffbe50ce346d6 rdf:first <promo:fV> ;
+    <promo:rho> a promo:Variable ;
+        rdfs:label "rho" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_extensity_intensive>,
+            <https://w3id.org/promo/ontology#term_function_parameter> ;
+        promo:doc "density" ;
+        promo:hasEquation <https://w3id.org/promo/library/#E_14> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_properties> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_29" ;
+        promo:latex "\\rho" ;
+        promo:network "properties" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, -3, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:P> a promo:Variable ;
+        rdfs:label "p" ;
+        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:P\"}" ;
+        promo:doc "Thermodynamic pressure" ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_10" ;
+        promo:latex "p" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "effort" .
+
+    <promo:V> a promo:Variable ;
+        rdfs:label "V" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
+        promo:doc "volum" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_23" ;
+        promo:latex "V" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:F_conv> a promo:Variable ;
+        rdfs:label "F_conv" ;
+        promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
+        promo:doc "incidence matrix for convective flows" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_25" ;
+        promo:latex "F" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    _:n1276283f21dd4d1a8548f538293b2150b1 rdf:first _:n1276283f21dd4d1a8548f538293b2150b9 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b10 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b10 rdf:first <promo:n> ;
         rdf:rest () .
 
-    _:N3bb4a7263e874a6993cc495f2120c9e6 rdf:first _:N8ea18ad28d874830abca21c74e2c0ca8 ;
+    _:n1276283f21dd4d1a8548f538293b2150b11 rdf:first _:n1276283f21dd4d1a8548f538293b2150b12 ;
         rdf:rest () .
 
-    _:N8ea18ad28d874830abca21c74e2c0ca8 a promo:Expression ;
-        promo:hasArguments _:Nfda308606a734909a8a076b26ed2c427 ;
+    _:n1276283f21dd4d1a8548f538293b2150b12 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b13 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:n1276283f21dd4d1a8548f538293b2150b13 rdf:first <promo:d> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b26 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b14 rdf:first _:n1276283f21dd4d1a8548f538293b2150b15 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b16 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b15 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b17 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:n1276283f21dd4d1a8548f538293b2150b16 rdf:first <promo:Axy> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b17 rdf:first _:n1276283f21dd4d1a8548f538293b2150b18 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b19 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b18 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b20 ;
+        promo:hasOperation promolg:inv .
+
+    _:n1276283f21dd4d1a8548f538293b2150b19 rdf:first <promo:k_conv> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b2 rdf:first _:n1276283f21dd4d1a8548f538293b2150b21 ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b20 rdf:first <promo:rho> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b21 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b40 ;
         promo:hasOperation promolg:ReduceProduct .
 
-    _:Nb876a8d924394c3295947ff03d59e9a2 rdf:first <promo:U> ;
-        rdf:rest _:Ncaaa9a6e61ae40d8be75c6c6b28d57fd .
+    _:n1276283f21dd4d1a8548f538293b2150b22 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b23 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:Nc84fef7de7e641ba80769ecfc9442785 rdf:first <promo:F_conv> ;
-        rdf:rest _:Nf07cb0ed398045d78049531d648b1315 .
+    _:n1276283f21dd4d1a8548f538293b2150b23 rdf:first <https://w3id.org/promo/ontology#const_half> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b31 .
 
-    _:Ncaaa9a6e61ae40d8be75c6c6b28d57fd rdf:first <promo:V> ;
+    _:n1276283f21dd4d1a8548f538293b2150b24 rdf:first <promo:c> ;
         rdf:rest () .
 
-    _:Nce13a181e9a94e7da3a4d2214fe09d88 rdf:first <promo:c_conv> ;
-        rdf:rest _:N39ae706067de49c69d4ffbe50ce346d6 .
+    _:n1276283f21dd4d1a8548f538293b2150b25 rdf:first <promo:F_conv> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b11 .
 
-    _:Ndf9888838a67496eadb162e474626eb3 rdf:first <promo:P> ;
+    _:n1276283f21dd4d1a8548f538293b2150b26 rdf:first _:n1276283f21dd4d1a8548f538293b2150b27 ;
         rdf:rest () .
 
-    _:Nf07cb0ed398045d78049531d648b1315 rdf:first <promo:fn_conv> ;
+    _:n1276283f21dd4d1a8548f538293b2150b27 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b30 ;
+        promo:hasOperation promolg:abs .
+
+    _:n1276283f21dd4d1a8548f538293b2150b28 rdf:first <promo:m> ;
         rdf:rest () .
 
-    _:Nfda308606a734909a8a076b26ed2c427 rdf:first <promo:F_conv> ;
-        rdf:rest _:Ndf9888838a67496eadb162e474626eb3 .
+    _:n1276283f21dd4d1a8548f538293b2150b29 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b3 rdf:first _:n1276283f21dd4d1a8548f538293b2150b22 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b24 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b30 rdf:first <promo:F_conv> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b31 rdf:first _:n1276283f21dd4d1a8548f538293b2150b32 ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b32 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b25 ;
+        promo:hasOperation promolg:Subtract .
+
+    _:n1276283f21dd4d1a8548f538293b2150b33 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b34 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:n1276283f21dd4d1a8548f538293b2150b34 rdf:first _:n1276283f21dd4d1a8548f538293b2150b35 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b36 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b35 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b14 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:n1276283f21dd4d1a8548f538293b2150b36 rdf:first <promo:F_conv> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b37 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b38 rdf:first <promo:P> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b39 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b37 ;
+        promo:hasOperation promolg:inv .
+
+    _:n1276283f21dd4d1a8548f538293b2150b4 rdf:first _:n1276283f21dd4d1a8548f538293b2150b39 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b28 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b40 rdf:first <promo:F_conv> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b41 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b41 rdf:first <promo:P> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b42 rdf:first <promo:fV> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b43 rdf:first <promo:fn_conv> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b44 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:n1276283f21dd4d1a8548f538293b2150b5 rdf:first _:n1276283f21dd4d1a8548f538293b2150b33 ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b38 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b6 rdf:first <promo:c_conv> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b42 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b7 rdf:first <promo:F_conv> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b43 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b8 rdf:first <promo:U> ;
+        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b44 .
+
+    _:n1276283f21dd4d1a8548f538293b2150b9 a promo:Expression ;
+        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b29 ;
+        promo:hasOperation promolg:inv .
 }
 

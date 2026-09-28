@@ -167,9 +167,17 @@ Implemented as a React + TypeScript + Vite app in
 - **Math-language semantic audit (2026-09-27):** the `.` AST/checker/UI name is
   now `IndexPreservingProduct`; the historical `diffSpace(expr)` function and
   gradient renderings are removed because differential space is an ontology
-  index concept; `inv` is checked/rendered as scalar reciprocal; and `sqrt`
-  accepts dimensioned arguments only when every SI exponent is even. Parser,
-  checker, codegen and frontend terminology are aligned, with regression tests.
+  index concept; and `sqrt` accepts dimensioned arguments only when every
+  SI exponent is even. Parser, checker, codegen and frontend terminology
+  are aligned, with regression tests.
+- **Elementwise `inv` (2026-09-28):** `inv` is the index-preserving
+  elementwise reciprocal — `inv(x[N]) -> [N]`, units invert. This matches
+  the MultiDimVar runtime where reciprocal is realised as `1 ./ x`
+  (`rdivide.m`); there is no `inv.m`. Checker rule renamed
+  `scalar_inverse` → `inverse` with the scalar-only rejection dropped.
+  Codegen emits `1 ./ x` for matlab/julia (`/` is mrdivide / matrix
+  inverse in both runtimes), `1 / x` for python, `{x}^{-1}` for LaTeX;
+  frontend help updated. Regression tests cover the indexed case.
 - **Canonical expression persistence (2026-09-27):** checked trees convert to
   immutable operation-IRI expressions with ordered arguments and IRI-bound
   variable/index references. Checked equations are stored with
@@ -181,9 +189,31 @@ Implemented as a React + TypeScript + Vite app in
   `RdfStore.load()` migrates each checkable literal-only RHS in its graph's
   resolution scope and refreshes source/incidence/LaTeX caches. Grouping is
   source-only and is omitted from the semantic tree. The tracked data save
-  migrated all 9 ontology equations and 5/10 library equations; five legacy
-  library equations remain literal-only until indexed `inv`, stale `root!`
-  qualifiers, and the `Instantiate` LHS class are resolved.
+  migrated all 9 ontology equations and (as of 2026-09-28) **all 9 library
+  equations — nothing literal-only remains**. The stale `root!` qualifier
+  in `E_12` was rewritten to `universe!`; `E_13` (`Instantiate(n)`, LHS
+  `no` class `state`) was removed under the initial-condition decision
+  below — ICs are not model algebra.
+- **Initial conditions (2026-09-28):** ICs never appear as equation-level
+  bound slots — the `Instantiate`-as-IC pattern (LHS `parameter`, proto a
+  state) was rejected: it confuses the type relation with the seed role
+  and can't express computed ICs. Three regimes, following Modelica's
+  `initial equation` model: (1) *bound IC* → a `promo:ValueCell` on the
+  state, requested by the instantiator; (2) *computed IC* → an
+  `eqclass_initialise` equation (holds only at t=0; may pin a state
+  directly or secondary vars); (3) *implicit IC* (specifying secondaries
+  that must be back-solved for the fundamental state) → the instantiator
+  assembles the t=0 system — model equations at t0 + bound cells +
+  initialise equations — and solves it numerically as a root problem;
+  guesses are auto-requested (seeds derived, not declared). Steady-state
+  start = zero all `TotalDiff` terms, no equations needed. IC *need* is
+  derivable from canonical ops (`TotalDerivative`/`DefiniteIntegral`
+  states, `SolveRoot` LHS vars); coverage = need vs supplied
+  (cells + initialise equations). Same story for root-solver initial
+  guesses. Limitation: a *computed* IC needs an `initialise` equation
+  (value cells carry values only) — or an expression-valued cell later.
+  Instantiation-side work (t0 assembly, guess requests) is pending;
+  checker/parser unchanged.  The class picker is done (2026-09-28, below).
 - **Index uniqueness and binary reduction (2026-09-27):** every persisted or
   ad-hoc variable input must have an ordered index structure with no repeated
   IRI, and the checker retains the same invariant for all expression results.
@@ -193,10 +223,36 @@ Implemented as a React + TypeScript + Vite app in
 
 ## Pending items
 
-- **Indexed `inv` decision (next):** decide whether `inv` remains scalar-only
-  or becomes index-preserving/elementwise (`inv(x[N]) -> [N]`), then migrate
-  `inv(V[N])`/`inv(rho[N])` equations accordingly. Also rewrite stale
-  `root!` source qualifiers to `universe!` (or define `root` as an alias).
+- ~~**Indexed `inv` decision (next)**~~ **Done (2026-09-28):** `inv` is
+  index-preserving elementwise reciprocal; stale `root!` qualifier in
+  `E_12` rewritten to `universe!`.
+- ~~**`E_13` / initial conditions**~~ **Done (2026-09-28):** decided —
+  initial conditions (and root-solver guesses) are *not* model algebra:
+  see "Initial conditions" below. `no` + `E_13` deleted; `Instantiate`
+  remains a pure typed bound slot; `eqclass_initialise` added to the
+  seed floor (floor-migrated on reload, deterministic IRI;
+  `SEED_FLOOR` → `2026-09-2`).
+- ~~**Equation-class picker**~~ **Done (2026-09-28):**
+  `/api/equation/context` now returns `equation_classes` (the seeded
+  `promo:EquationClass` nodes — iri, label, parent); the dependent-
+  variable editor shows a class select (default `generic`, `instantiate`
+  excluded — it is pinned automatically on an `Instantiate` RHS).
+  **Storage is now IRI links:** `promo:equationClass` was written as a
+  bare literal (`"generic"`); `add_equation` resolves IRIs/`promo:`
+  prefixes/known labels to the class node at the write funnel
+  (`_equation_class_ref`), so existing records upgrade on re-save and
+  `Instantiate` auto-classification lands `eqclass_instantiate`.
+  Display sites map IRI→label via `equationClassLabel`
+  (`variableUtils.ts`); legacy literals pass through unchanged.
+  Tests: `test_equation_class_writes_iri`,
+  `test_context_exposes_equation_classes`.
+- ~~**ν→codegen wiring**~~ **Already wired (verified 2026-09-28):** the
+  ν channel was landed earlier — `/api/instantiate/code` passes
+  `store.value_cells` into `plan()` (`ParamSlot.values`), which expands
+  cells over each binding's element sets; all three dialects render
+  `p.values` as array literals (missing cells → NaN), falling back to
+  `par[...]` lookups only when no table exists.  Indexed-table tests in
+  `test_builder.py`; no gap remained.
 - ~~`RdfContext` reads only the seeded `ontology_graph`.~~ **Done
   (2026-09-15):** `RdfContext` reads all named graphs in the dataset
   (ontology graph + var/expr graphs) using the ProMo14 vocabulary

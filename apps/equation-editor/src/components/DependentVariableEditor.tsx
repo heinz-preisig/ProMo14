@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, Index, NetworkTree, SavedEquation, Variable } from '../types'
+import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, Index, NetworkTree, SavedEquation, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
   deriveType,
@@ -26,6 +26,10 @@ import { suggestLatexAlias, validateLatexAlias } from '../latex'
  *  a bound-value slot, not a computed quantity (ADR-008). */
 const INSTANTIATE_CLASSES = ['constant', 'parameter']
 
+/** Class the backend auto-assigns to ``Instantiate(proto)`` RHS — not a
+ *  picker option; shown (disabled) when the RHS is an Instantiate. */
+const AUTO_CLASS = 'instantiate'
+
 export interface DependentVariableEditorProps {
   open: boolean
   onClose: () => void
@@ -34,6 +38,8 @@ export interface DependentVariableEditorProps {
   networkTree: NetworkTree
   axes: ClassificationAxis[]
   domains: Domain[]
+  /** Equation-class nodes from /context — the picker's options. */
+  equationClasses: EquationClass[]
   initialDomain: string
   initialClassifications: Record<string, string>
   /** When set, the editor attaches the equation to this existing
@@ -52,6 +58,7 @@ export default function DependentVariableEditor({
   networkTree,
   axes,
   domains,
+  equationClasses,
   initialDomain,
   initialClassifications,
   editing,
@@ -67,6 +74,7 @@ export default function DependentVariableEditor({
 
   const [text, setText] = useState('')
   const [ast, setAst] = useState<AstNode | null>(null)
+  const [eqClass, setEqClass] = useState('')
   const [parseError, setParseError] = useState<string | null>(null)
   const [checkResult, setCheckResult] = useState<CheckResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -92,6 +100,7 @@ export default function DependentVariableEditor({
       setCheckResult(null)
       setError(null)
       setDoc(editing?.doc ?? '')
+      setEqClass(equationClasses.find((c) => c.label === 'generic')?.iri ?? '')
       setLoading(false)
       setGenCode(null)
       setGenLoading(false)
@@ -123,6 +132,10 @@ export default function DependentVariableEditor({
   // successful parse); the backend checker stays authoritative (ADR-008).
   const isInstantiate =
     ast?.type === 'Instantiate' || /^\s*Instantiate\s*\(/.test(text)
+  const instantiateClassIri =
+    equationClasses.find((c) => c.label === AUTO_CLASS)?.iri ?? ''
+  // Instantiate RHS pins the class; otherwise the picked value stands.
+  const effectiveEqClass = isInstantiate ? instantiateClassIri : eqClass
   // Structural fields lock while the edited variable is used — the
   // Instantiate class-forcing must not bypass the lock either.
   const structuralLocked = !!editing && used
@@ -280,6 +293,7 @@ export default function DependentVariableEditor({
       text,
       ast,
       check: checkResult,
+      equation_class: effectiveEqClass || undefined,
     }
 
     onAccept(draft, eq)
@@ -495,6 +509,35 @@ export default function DependentVariableEditor({
               onCheck={handleCheck}
               disabled={loading}
             />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={FIELD_LABEL_STYLE}>Equation class:</span>
+              <select
+                value={effectiveEqClass}
+                onChange={(e) => setEqClass(e.target.value)}
+                disabled={isInstantiate || equationClasses.length === 0}
+                title={
+                  isInstantiate
+                    ? 'Instantiate() right-hand sides are always class `instantiate`'
+                    : 'How this equation is used: generic algebra, a balance, an empirical correlation, a user function, or an t=0 initialisation'
+                }
+              >
+                {isInstantiate ? (
+                  <option value={instantiateClassIri}>{AUTO_CLASS} (auto)</option>
+                ) : (
+                  <>
+                    <option value="">generic</option>
+                    {equationClasses
+                      .filter((c) => c.label !== AUTO_CLASS)
+                      .map((c) => (
+                        <option key={c.iri} value={c.iri}>
+                          {c.label}
+                        </option>
+                      ))}
+                  </>
+                )}
+              </select>
+            </label>
 
             {parseError && (
               <div

@@ -74,12 +74,21 @@ export interface Domain {
   parent?: string | null
 }
 
+/** A promo:EquationClass node — ``promo:equationClass`` links by IRI. */
+export interface EquationClass {
+  iri: string
+  label: string
+  parent?: string | null
+}
+
 export interface ContextResponse {
   variables: Variable[]
   indices: Index[]
   network_tree: NetworkTree
   axes?: ClassificationAxis[]
   domains?: Domain[]
+  /** Equation-class hierarchy — the picker's options. */
+  equation_classes?: EquationClass[]
   /** Host capabilities the UI adapts to — e.g. `{ pdf: false }` when
    *  the backend host has no TeX toolchain (default Docker image). */
   capabilities?: Record<string, boolean>
@@ -161,4 +170,6 @@ export interface SavedEquation {
   text: string
   ast: AstNode | null
   check: CheckResponse | null
+  /** Picked equation class — a promo:EquationClass IRI. */
+  equation_class?: string
 }

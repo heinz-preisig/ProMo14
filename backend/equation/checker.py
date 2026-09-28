@@ -263,12 +263,9 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                     "-",
                 )
             units = arg.units
-        elif rule == "scalar_inverse":
-            if arg.indices:
-                raise IndexStructureError(
-                    "inv requires a scalar argument; got indices %s"
-                    % space.pretty_index_list(arg.indices)
-                )
+        elif rule == "inverse":
+            # Elementwise reciprocal: index-preserving, units invert.
+            # inv(x[N]) -> [N]; realised as 1 ./ x in the runtimes.
             units = arg.units.inverse()
         elif rule == "sqrt":
             units = arg.units.square_root()

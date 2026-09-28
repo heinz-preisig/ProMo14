@@ -526,7 +526,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
         if units:
             graph.set((iri, PROMO["unitVector"], _as_literal(units)))
 
-        for idx_iri in var.get("index_structures", []):
+        index_structures = var.get("index_structures", [])
+        if len(index_structures) != len(set(index_structures)):
+            raise ValueError("index structure must not repeat an index")
+        for idx_iri in index_structures:
             graph.add((iri, PROMO["indexStructure"], URIRef(idx_iri)))
 
         for token in var.get("tokens", []):
@@ -868,7 +871,11 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self._set_literal(graph, eq_iri, PROMO["internalID"], eq.get("internal_id"))
         self._set_literal(graph, eq_iri, PROMO["rhs"], eq.get("rhs"))
         self._set_literal(graph, eq_iri, PROMO["rhsLatex"], eq.get("rhs_latex"))
-        self._set_literal(graph, eq_iri, PROMO["equationClass"], eq.get("equation_class"))
+        eq_class = self._equation_class_ref(eq.get("equation_class"))
+        if eq_class is None:
+            graph.remove((eq_iri, PROMO["equationClass"], None))
+        else:
+            graph.set((eq_iri, PROMO["equationClass"], eq_class))
         self._set_literal(graph, eq_iri, PROMO["network"], eq.get("network"))
         if eq.get("domain_iri"):
             graph.set((eq_iri, PROMO["inDomain"], URIRef(eq["domain_iri"])))
@@ -880,3 +887,32 @@ class RdfStore(PersistenceMixin, SeedMixin):
         if eq.get("modified"):
             self._set_literal(graph, eq_iri, PROMO["modified"], eq["modified"])
         return eq_iri
+
+    def _equation_class_ref(self, value: Optional[str]):
+        """Resolve an ``equation_class`` field to a node reference.
+
+        ``promo:equationClass`` links an equation to a ``promo:EquationClass``
+        node (IRI, not string).  Accepts the class IRI directly or a bare
+        label (``"generic"``, ``"initialise"`` — legacy data and the
+        ``Instantiate`` auto-set write labels); an unknown label is kept as
+        a literal rather than dropped.
+        """
+        if not value:
+            return None
+        if value.startswith("promo:"):
+            return URIRef(str(PROMO[value.removeprefix("promo:")]))
+        if value.startswith("http://") or value.startswith("https://"):
+            return URIRef(value)
+        # Dataset() has no default_union — subjects()/value() see only
+        # the default graph; scan quads so named graphs are covered.
+        # (quads' fourth element is the graph identifier, not a Graph.)
+        seen = set()
+        for s, _, _, ctx in self.dataset.quads(
+                (None, RDF.type, PROMO["EquationClass"])):
+            if s in seen:
+                continue
+            seen.add(s)
+            label = self.dataset.graph(ctx).value(s, RDFS.label)
+            if str(label or "") == value:
+                return URIRef(s)
+        return Literal(value)

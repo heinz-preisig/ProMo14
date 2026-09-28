@@ -376,6 +376,10 @@ class Renderer:
             if node.name == "inv":
                 if self.target == "latex":
                     return r"{%s}^{-1}" % arg
+                if self.target in ("matlab", "julia"):
+                    # Elementwise reciprocal — "/" is mrdivide / matrix
+                    # inverse in both runtimes.
+                    return "1 ./ %s" % arg
                 return "1 / %s" % arg
             if self.target == "python":
                 return "%s(%s)" % (_UFUNC_PY.get(node.name, "np." + node.name), arg)

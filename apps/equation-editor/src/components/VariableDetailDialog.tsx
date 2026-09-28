@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
+import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, Variable } from '../types'
+import { equationClassLabel } from '../variableUtils'
 import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
 import { VARIABLE_CLASSES } from '../validation'
@@ -14,6 +15,8 @@ export interface VariableDetailDialogProps {
   networkTree: NetworkTree
   axes: ClassificationAxis[]
   domains: Domain[]
+  /** EquationClass nodes — maps stored class IRIs to labels. */
+  equationClasses?: EquationClass[]
   /** Persist the edited variable (POST /variables). Throws on failure. */
   onSave: (v: Variable) => Promise<void>
   /** Open the equation editor to attach another equation (§18). */
@@ -33,6 +36,7 @@ export default function VariableDetailDialog({
   networkTree,
   axes,
   domains,
+  equationClasses = [],
   onSave,
   onAddEquation,
   onClose,
@@ -362,7 +366,7 @@ export default function VariableDetailDialog({
               >
                 {eq.internal_id ?? eqId}: {variable.label} := {eq.rhs}
                 {eq.equation_class && (
-                  <span style={{ color: '#888' }}> [{eq.equation_class}]</span>
+                  <span style={{ color: '#888' }}> [{equationClassLabel(eq.equation_class, equationClasses)}]</span>
                 )}
               </code>
             ))}

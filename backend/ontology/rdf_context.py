@@ -137,6 +137,7 @@ class RdfContext(EquationContext):
         self._axes = self._load_axes()
         self._entity_types = self._load_entity_types()
         self._connection_rules = self._load_connection_rules()
+        self._equation_classes = self._load_equation_classes()
 
     def _all_graphs(self) -> List[Any]:
         """Graphs in scope: the explicit ``graph_iris`` set, or every
@@ -158,6 +159,10 @@ class RdfContext(EquationContext):
     def domains(self) -> List[Dict[str, Any]]:
         """Return domain records (two-branch tree)."""
         return self._domains
+
+    def equation_classes(self) -> List[Dict[str, Any]]:
+        """Return the equation-class hierarchy (promo:EquationClass)."""
+        return self._equation_classes
 
     def axes(self) -> List[Dict[str, Any]]:
         """Return classification axes with their terms."""
@@ -493,6 +498,23 @@ class RdfContext(EquationContext):
                 "terms": terms,
             })
         return axes
+
+    def _load_equation_classes(self) -> List[Dict[str, Any]]:
+        """Load equation classes (promo:EquationClass) from the graph.
+
+        ``promo:equationClass`` links to these nodes by IRI (the vocab
+        comment on the predicate); the class picker binds to ``iri``.
+        """
+        classes: List[Dict[str, Any]] = []
+        for s in self._graph.subjects(RDF.type, PROMO["EquationClass"]):
+            parent = self._graph.value(s, PROMO["parent"])
+            classes.append({
+                "iri": str(s),
+                "label": _one_literal(self._graph, s, RDFS.label),
+                "parent": str(parent) if parent else None,
+            })
+        classes.sort(key=lambda c: c["label"])
+        return classes
 
     def _load_entity_types(self) -> List[Dict[str, Any]]:
         """Load entity types (CWA 17960) from the graph."""

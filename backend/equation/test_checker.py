@@ -264,13 +264,12 @@ def test_ufunc_inverse():
     assert c.indices == []
 
 
-def test_inverse_rejects_indexed_argument():
+def test_inverse_preserves_index_structure():
+    # inv is the elementwise reciprocal: inv(rho[N]) -> [N], units invert.
     space = _space()
-    try:
-        check(parse("inv(rho)"), space)
-    except IndexStructureError:
-        return
-    raise AssertionError("expected IndexStructureError")
+    c = check(parse("inv(rho)"), space)
+    assert c.units == Units(mass=-1, length=3)
+    assert c.indices == ["http://promo.example/index/N"]
 
 
 def test_ufunc_loose():
@@ -385,9 +384,11 @@ def _add_var(space, label, units, index_structures):
 
 
 def test_duplicate_index_rejected():
+    # Rejected at Variable construction — the read-side funnel seals the
+    # invariant before the checker ever sees the variable.
     space = _space()
-    _add_var(space, "bad", Units(), [N, N])
     try:
+        _add_var(space, "bad", Units(), [N, N])
         check(parse("bad"), space)
     except IndexStructureError:
         return

@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
-from rdflib import Literal, URIRef
+from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import RDF
 
 from backend.core import graph_store
@@ -1215,3 +1215,71 @@ def test_network_create(client):
     })
     assert r.status_code == 200
     assert r.json()["name"] == "test_network"
+
+
+def test_equation_class_writes_iri(client):
+    """``promo:equationClass`` links to the seeded class node (IRI, not
+    string): a bare label resolves at the write funnel, and an
+    ``Instantiate`` RHS auto-sets ``eqclass_instantiate``."""
+    store = graph_store.get_store()
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    client.post("/api/catalogue/new", json={
+        "iri": "https://example.org/ecls", "type": "library",
+        "uses": [onto]})
+    # Picked class (bare label) → the eqclass_ node IRI.
+    client.post(
+        "/api/equation/variables?graph=https://example.org/ecls",
+        json={"iri": "", "label": "T0", "network": "root",
+              "type": "state", "units": [0] * 8, "index_structures": [],
+              "aliases": {}, "doc": "", "port_variable": False,
+              "tokens": [], "equations": {"E_1": {
+                  "iri": "", "internal_id": "E_1", "lhs": "",
+                  "rhs": "T0 . half", "equation_class": "initialise",
+                  "network": "root", "incidence_list": [], "doc": ""}}})
+    # Instantiate RHS → eqclass_instantiate regardless of the record.
+    client.post(
+        "/api/equation/variables?graph=https://example.org/ecls",
+        json={"iri": "", "label": "c0", "network": "root",
+              "type": "parameter", "units": [0] * 8,
+              "index_structures": [], "aliases": {}, "doc": "",
+              "port_variable": False, "tokens": [], "equations": {"E_2": {
+                  "iri": "", "internal_id": "E_2", "lhs": "",
+                  "rhs": "Instantiate(T0)", "equation_class": "generic",
+                  "network": "root", "incidence_list": [], "doc": ""}}})
+    g = store.dataset.graph("https://example.org/ecls")
+    classes = {str(o) for _, _, o in g.triples(
+        (None, graph_store.PROMO["equationClass"], None))}
+    assert f"{onto}#eqclass_initialise" in classes
+    assert f"{onto}#eqclass_instantiate" in classes
+    assert "generic" not in classes  # no bare literals survived
+
+
+def test_context_exposes_equation_classes(client):
+    """The picker reads its options from /context — every seeded class
+    (incl. ``initialise``) arrives with iri + label."""
+    r = client.get("/api/equation/context")
+    assert r.status_code == 200
+    classes = {c["label"]: c["iri"] for c in r.json()["equation_classes"]}
+    for label in ("generic", "instantiate", "initialise"):
+        assert label in classes
+        assert classes[label].endswith(f"#eqclass_{label}")
+
+
+def test_add_variable_dict_rejects_duplicate_index(client):
+    """Write funnel: add_variable_dict is the single persistence path —
+    it must refuse a repeated index IRI even when the caller bypassed
+    the pydantic validators (seeds, internal callers)."""
+    store = graph_store.get_store()
+    g = Graph()
+    var = {
+        "iri": "http://promo.example/var/dup_idx",
+        "label": "dup_idx",
+        "network": "universe",
+        "type": "state",
+        "index_structures": [
+            "http://promo.example/index/N",
+            "http://promo.example/index/N",
+        ],
+    }
+    with pytest.raises(ValueError, match="must not repeat an index"):
+        store.add_variable_dict(g, var)

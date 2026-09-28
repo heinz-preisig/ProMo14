@@ -60,7 +60,7 @@ export async function saveVariable(
       lhs: v.iri,
       rhs: equation.text,
       rhs_latex: null,
-      equation_class: 'generic',
+      equation_class: equation.equation_class ?? 'generic',
       network: v.network,
       incidence_list: equation.check?.incidence ?? [],
       doc: '',

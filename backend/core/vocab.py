@@ -39,7 +39,17 @@ SEED_CONSTANTS = (
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-09"
+SEED_FLOOR = "2026-09-2"
+
+# Top-level equation-class hierarchy, seeded by
+# ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for
+# ``Instantiate`` RHS; the rest are modeller-chosen.  ``initialise``
+# (added 2026-09-28): equations that hold only at t=0 — computed or
+# pinned initial conditions for integration/root problems.
+SEED_EQUATION_CLASSES = (
+    "generic", "instantiate", "balance", "empirical", "user_function",
+    "initialise",
+)
 
 # Legacy prefixes used in old TriG files.
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")

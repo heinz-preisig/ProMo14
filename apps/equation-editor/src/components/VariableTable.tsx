@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { indexShortLabel } from '../latex'
-import type { Index, Variable } from '../types'
+import type { EquationClass, Index, Variable } from '../types'
+import { equationClassLabel } from '../variableUtils'
 
 /** SI symbols matching UNIT_LABELS in the editors:
  *  time, length, amount, mass, temperature, current, light, nil. */
@@ -19,6 +20,8 @@ type SortKey = 'label' | 'type' | 'network' | 'eqs'
 export interface VariableTableProps {
   variables: Variable[]
   indices: Index[]
+  /** EquationClass nodes — maps stored class IRIs to labels. */
+  equationClasses?: EquationClass[]
   onSelect?: (v: Variable) => void
   /** Persist an edited variable — enables inline editing of the free
    *  fields (name, doc).  Structural fields stay in the detail dialog
@@ -31,7 +34,7 @@ type EditCell = { iri: string; field: 'label' | 'doc' }
 /** Repository browser: sortable/filterable table of all variables with
  *  per-variable expandable equation rows.  Name and doc cells are
  *  click-to-edit when ``onSave`` is given. */
-export default function VariableTable({ variables, indices, onSelect, onSave }: VariableTableProps) {
+export default function VariableTable({ variables, indices, equationClasses = [], onSelect, onSave }: VariableTableProps) {
   const [filter, setFilter] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('label')
   const [sortAsc, setSortAsc] = useState(true)
@@ -323,7 +326,7 @@ export default function VariableTable({ variables, indices, onSelect, onSave }: 
                             </code>
                             {eq.equation_class && (
                               <span style={{ fontSize: 10, color: '#888', marginLeft: 8 }}>
-                                [{eq.equation_class}]
+                                [{equationClassLabel(eq.equation_class, equationClasses)}]
                               </span>
                             )}
                           </td>

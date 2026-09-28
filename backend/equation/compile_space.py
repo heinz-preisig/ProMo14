@@ -27,7 +27,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from .errors import AmbiguousVariableError, VarError
+from .errors import (
+    AmbiguousVariableError, IndexStructureError, VarError,
+)
 from .symbols import DEFAULT_TABLE, SymbolTable
 from .units import Units
 
@@ -85,6 +87,18 @@ class Variable:
     aliases: Dict[str, str] = field(default_factory=dict)
     tokens: List[str] = field(default_factory=list)  # token-type IRIs
     value: Optional[str] = None  # pre-bound promo:value (universal constants)
+
+    def __post_init__(self) -> None:
+        # Read-side funnel: every consumer (checker space, rdf_context,
+        # instantiate VarInfo) materialises variables through this record.
+        # A duplicate index IRI can only arrive via corrupted persisted
+        # data — write paths validate upstream — so fail fast here.
+        if len(self.index_structures) != len(set(self.index_structures)):
+            raise IndexStructureError(
+                "variable %s repeats an index %s — an index structure "
+                "is a fixed sequence of unique indices"
+                % (self.label, self.index_structures)
+            )
 
 
 @dataclass(frozen=True)

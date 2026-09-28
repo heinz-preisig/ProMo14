@@ -74,8 +74,12 @@ def test_python_index_preserving_product():
     assert gen("rho . v", "python") == "V_1 * V_2"
 
 
-def test_python_scalar_inverse():
+def test_python_reciprocal():
     assert gen("inv(M)", "python") == "1 / V_3"
+
+
+def test_python_reciprocal_indexed():
+    assert gen("inv(rho)", "python") == "1 / V_1"
 
 
 def test_python_expand():
@@ -156,8 +160,14 @@ def test_matlab_index_preserving_product_einsum_no_reduce():
     assert gen("rho . v", "matlab") == "einsum(V_1, V_2)"
 
 
-def test_matlab_scalar_inverse():
-    assert gen("inv(M)", "matlab") == "1 / V_3"
+def test_matlab_reciprocal():
+    # "./" -> MultiDimVar.rdivide; "/" would be mrdivide, which
+    # MultiDimVar does not implement.
+    assert gen("inv(M)", "matlab") == "1 ./ V_3"
+
+
+def test_matlab_reciprocal_indexed():
+    assert gen("inv(rho)", "matlab") == "1 ./ V_1"
 
 
 def test_matlab_expand_einsum_outer():
@@ -236,7 +246,7 @@ def test_latex_index_preserving_product():
     assert gen("rho . v", "latex") == r"{\rho}_{N} \circ {v}_{N}"
 
 
-def test_latex_scalar_inverse():
+def test_latex_reciprocal():
     assert gen("inv(M)", "latex") == r"{M}^{-1}"
 
 

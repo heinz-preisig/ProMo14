@@ -210,6 +210,9 @@ class ContextResponse(BaseModel):
     # UI can map a variable's network (a domain name) to axis ancestry.
     axes: List[Dict[str, Any]] = Field(default_factory=list)
     domains: List[Dict[str, Any]] = Field(default_factory=dict)
+    # promo:EquationClass nodes — drives the class picker in the
+    # equation editor; ``promo:equationClass`` links by IRI.
+    equation_classes: List[Dict[str, Any]] = Field(default_factory=list)
     # Host capabilities the UI adapts to — e.g. {"pdf": false} when no
     # TeX toolchain is installed (default Docker image).
     capabilities: Dict[str, bool] = Field(default_factory=dict)
@@ -279,6 +282,7 @@ def context_endpoint(
         network_tree=ctx.tree(),
         axes=ctx.axes(),
         domains=ctx.domains(),
+        equation_classes=ctx.equation_classes(),
         capabilities={"pdf": pdf_available()},
     )
 

@@ -1,4 +1,14 @@
-import type { Variable } from './types'
+import type { EquationClass, Variable } from './types'
+
+/** Display label for a stored ``equation_class`` — resolves an
+ *  EquationClass IRI to its label; legacy bare labels pass through. */
+export function equationClassLabel(
+  ref: string | null | undefined,
+  classes: EquationClass[],
+): string {
+  if (!ref) return ''
+  return classes.find((c) => c.iri === ref)?.label ?? ref
+}
 
 /** Next free ``V_n`` internal id across the variable set. */
 export function nextInternalId(variables: Variable[]): string {

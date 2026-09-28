@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { deleteVariable, documentUrl, loadContext, saveOntology, saveVariable } from './api'
 import { useStoreDirty } from '@promo/ui'
-import type { ClassificationAxis, Domain, Index, NetworkTree, SavedEquation, Variable } from './types'
+import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, SavedEquation, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
@@ -18,6 +18,7 @@ export default function App() {
   const [networkTree, setNetworkTree] = useState<NetworkTree>(demoNetworkTree)
   const [axes, setAxes] = useState<ClassificationAxis[]>([])
   const [domains, setDomains] = useState<Domain[]>([])
+  const [equationClasses, setEquationClasses] = useState<EquationClass[]>([])
   const [expressionNetwork, setExpressionNetwork] = useState('root')
 
   const [equations, setEquations] = useState<SavedEquation[]>([])
@@ -60,6 +61,7 @@ export default function App() {
         setNetworkTree(ctx.network_tree)
         setAxes(ctx.axes ?? [])
         setDomains(ctx.domains ?? [])
+        setEquationClasses(ctx.equation_classes ?? [])
         setPdfCapable(ctx.capabilities?.pdf ?? false)
         // Rebuild SavedEquation list from persisted equations
         const saved: SavedEquation[] = []
@@ -94,6 +96,7 @@ export default function App() {
     setNetworkTree(ctx.network_tree)
     setAxes(ctx.axes ?? [])
     setDomains(ctx.domains ?? [])
+    setEquationClasses(ctx.equation_classes ?? [])
     // A rename changes the displayed lhs of the variable's equations —
     // refresh them from the reloaded records (keeps session ast/check).
     const eqIds = new Set(Object.keys(v.equations ?? {}))
@@ -299,6 +302,7 @@ export default function App() {
           <VariableTable
             variables={variables}
             indices={indices}
+            equationClasses={equationClasses}
             onSelect={setSelectedVariable}
             onSave={saveEditedVariable}
           />
@@ -312,6 +316,7 @@ export default function App() {
           networkTree={networkTree}
           axes={axes}
           domains={domains}
+          equationClasses={equationClasses}
           onSave={saveEditedVariable}
           onAddEquation={(v) => {
             setDependentEditing(v)
@@ -358,6 +363,7 @@ export default function App() {
         networkTree={networkTree}
         axes={axes}
         domains={domains}
+        equationClasses={equationClasses}
         initialDomain={lastDomain}
         initialClassifications={lastClassifications}
         editing={dependentEditing}

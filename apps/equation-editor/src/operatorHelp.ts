@@ -70,7 +70,7 @@ export const OPERATOR_HELP: OperatorHelpEntry[] = [
   {
     label: 'inv',
     syntax: 'inv(x)',
-    description: 'scalar reciprocal',
+    description: 'elementwise reciprocal — index structure is preserved',
   },
   {
     label: 'f(…)',

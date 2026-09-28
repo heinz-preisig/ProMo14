@@ -57,8 +57,9 @@ class SymbolTable:
     # Infix operators by surface symbol.
     infix: Dict[str, InfixEntry] = field(default_factory=dict)
 
-    # Unit behaviour per ufunc: "retain" | "none" | "inverse" | "loose".
-    # Semantic property of the symbol — used by the checker, not the parser.
+    # Unit behaviour per ufunc: "retain" | "none" | "inverse" | "sqrt"
+    # | "loose". Semantic property of the symbol — used by the checker,
+    # not the parser.
     ufunc_units: Dict[str, str] = field(default_factory=dict)
 
     def ufunc_unit_rule(self, name: str) -> Optional[str]:
@@ -107,7 +108,7 @@ DEFAULT_TABLE = SymbolTable(
         "asin", "acos", "atan",
         # square root
         "sqrt",
-        # scalar inverse
+        # elementwise reciprocal (index-preserving)
         "inv",
         # loose
         "sign",
@@ -125,7 +126,7 @@ DEFAULT_TABLE = SymbolTable(
            ("exp", "log", "ln", "sin", "cos", "tan",
             "asin", "acos", "atan")},
         "sqrt": "sqrt",
-        "inv": "scalar_inverse",
+        "inv": "inverse",
         "sign": "loose",
     },
     functions=set(),
