@@ -1,6 +1,55 @@
 # Session handoff — 2026-09-28
 
-## What landed
+State of the ProMo14 workspace at end of day.  Branch `main`, remote
+`heinz-preisig/ProMo14`.  Supersedes `session-handoff-2026-09-27.md`
+(morning section below; afternoon section added EOD).
+
+**Before switching machines:** work is committed but **6 commits are
+unpushed** — run `git push`.  `git status` is clean, `dist/` for the
+instantiation app is built, store was clean at last check (run
+`./dev.sh save` if unsure).  On the home machine: `git pull && uv sync
+&& npm install && ./dev.sh start`.  Do **not** `wipe-restart` —
+`data/` is the sync channel.
+
+## What landed — afternoon session
+
+- **Instantiation app is no longer scaffold** (`46b3204`): value-cell
+  editor (`ValuesCard` — per-coordinate inputs on parameter/state
+  bindings, `PUT /api/instantiate/values`, `|`-joined element-IRI keys)
+  and the t=0 solve UI (`SolveCard` — `ic_needs` table, par inputs,
+  steady-state toggle, per-state `y0` output).  `api.ts`/`types.ts`
+  wire `putValues`/`solveInitial`/`InitialOut`.  Two fixes worth
+  noting: par keys are **emitted names** (`emitName` mirrors
+  `plan.emit_name` — `V_5`, `ic0_V_1`), not display labels; and
+  `VarBinding.indices` element sets are nullable (unbound extent).
+- **Value-cell convention documented** (`91bd1dc`): the
+  coordinate-enumeration question discussed at length — a flat list
+  has no inherent order, so the contract is pinned and now
+  self-describing:
+  - `docs/value-cells.md` — the **normative doc**: coordinate→value
+    map is authoritative (`promo:coordinate` JSON ordered list +
+    `atIndexElement` nav links on each `ValueCell`); flat enumerations
+    are C order, last index fastest, in `indexStructure` order;
+    per-target `_array_lit` table (python native, julia/matlab
+    reshape-reverse+permute); `par` caller contract; silent-scramble
+    failure mode.
+  - `VOCAB_DOCS` in `backend/core/vocab.py` — `promo:doc` notes on
+    `ValueCell`/`valueCell`/`coordinate`/`atIndexElement`/`value`,
+    stamped by `declare_vocabulary`.
+  - **`load()` now re-declares vocabulary on every non-version
+    graph** (`persistence.py`) — docs self-migrate into `data/*.trig`
+    on next save; frozen version graphs skipped (immutable).
+  - `test_value_cell_layout_convention` — golden emitter literals on a
+    **non-square 2×3** table + numpy column-major simulation (square
+    dims can't detect a transpose bug).
+- **Design Q&A settled** (no code): `promo:value` is literal-only
+  (constants + cells); expression-valued cells would need a new
+  predicate (`promo:valueExpression`) on `ValueCell`, never a
+  polymorphic `promo:value` and not `promo:rhsExpression` (equation
+  vocabulary).  Deferred — `initialise` equations remain the computed-
+  IC channel; cells stay leaf data.
+
+## What landed — morning session
 
 - **`inv` is now elementwise reciprocal** (index-preserving): `inv(x[N]) → [N]`,
   units invert. Matches the MultiDimVar runtime (`rdivide.m` — `1 ./ x`; there
@@ -62,21 +111,33 @@
 
 ## State
 
-- Backend tests: **366 passed**.
-- Backend restarted; store saved; `dirty=false`.
-- `data/ontology.trig` now contains `eqclass_initialise` (working graph).
-- `data/library.trig`: 9 equations, all with `promo:rhsExpression`.
+- Backend tests: **390 passed** (`uv run pytest backend/ -x -q`).
+- Today's commits: `ed9f3ae`, `e62774d`, `e141d93`, `6336d97`
+  (IC machinery), `46b3204` (instantiation app UI), `91bd1dc`
+  (value-cell convention docs) — **unpushed at EOD**.
+- `data/ontology.trig` contains `eqclass_initialise` (working graph);
+  `data/library.trig`: 9 equations, all `promo:rhsExpression`.
+- `VOCAB_DOCS` doc triples reach `data/*.trig` on next
+  backend-restart + save (load declares them; a running pre-change
+  backend won't have them in memory).
+- Instantiation app `dist/` built and served at hub `:8000` —
+  value-cell editor + t=0 solve are live.
 
 ## Pending / next
 
-- **Instantiation-side IC machinery** (instantiation app is scaffold):
-  derive IC need from canonical ops; t0-system assembly; bound-cell +
-  initialise-equation coverage; guess requests for implicit solves.
-- **Expression-valued cells** — deferred; `initialise` equations cover
-  computed ICs for now.
-- Question left open: can an `initialise` equation share an LHS variable
-  with a generic equation (state carrying both its balance eq and a t0
-  pin)? Recommended yes — Modelica allows it; `hasEquation` is plural.
+- **Expression-valued cells** — the only IC channel gap.  Design
+  settled this session (new `promo:valueExpression` predicate if
+  done; cells stay leaf data otherwise — see afternoon notes).
+- **Exercise the instantiation UI** end-to-end against a real model
+  graph (`:8000` → instantiation, `?graph=` + `?vars=`).
+- **Sequential `E_N` minting** — frontend still uses `E_${Date.now()}`.
+- Deferred queue unchanged: reaction-domain equations, SHACL at
+  publish boundary, behaviour-linker UI, multi-pin `usesSpecies`,
+  external-IRI links on variables (predicate choice pending),
+  LaTeX→image cache, RDF vocabulary finalization.
+- Resolved this session: value-cell editor UI (was scaffold), the
+  `initialise`-shares-LHS question (yes — `initial_equations` gathered
+  separately), emitters-vs-cells wiring (was already wired).
 
 ## Commands
 
@@ -84,3 +145,6 @@
 - Restart + save: `./dev.sh restart backend`, then
   `curl -X POST localhost:8000/api/ontology/save` (or `./dev.sh save`)
 - Frontend after `apps/equation-editor/src` edits: `./dev.sh build equation`
+- Frontend after `apps/instantiation/src` edits:
+  `./dev.sh build instantiation` — **always rebuild before refreshing**,
+  the hub serves `dist/` not `src/`
