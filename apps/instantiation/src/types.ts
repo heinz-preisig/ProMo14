@@ -5,9 +5,12 @@ export interface VarBinding {
   role: string
   binding: string
   instance: string
-  indices: Record<string, string[]>
+  /** index IRI → bound element set (null: unbound/symbolic extent). */
+  indices: Record<string, string[] | null>
   matrix: string | null
   value: string | null
+  /** §20 value-cell table: "|"-joined element-IRI keys → scalar. */
+  values: Record<string, number>
 }
 
 export interface EqBinding {
@@ -24,6 +27,7 @@ export interface EntityInstantiation {
   state_variable: string | null
   variables: VarBinding[]
   equations: EqBinding[]
+  initial_equations: EqBinding[]
 }
 
 export interface PortBinding {
@@ -68,6 +72,20 @@ export interface IncidenceReport {
   sub_indices: IncidenceMatrix[]
 }
 
+/** One t=0 requirement — an ``ic`` on a differentiated/accumulated
+ *  state or a ``guess`` for a SolveRoot lhs.  ``status`` stays
+ *  ``needed`` until ``supplied_by`` names coverage (``initialise``
+ *  equation or value ``cells``). */
+export interface IcNeed {
+  var: string
+  entity_type: string
+  kind: string
+  equation: string
+  instance: string
+  supplied_by: string | null
+  status: string
+}
+
 /** GET /api/instantiate/model response. */
 export interface InstantiationReport {
   model: string
@@ -78,6 +96,7 @@ export interface InstantiationReport {
   incidence: IncidenceReport
   schedule: Schedule
   problems: Problem[]
+  ic_needs: IcNeed[]
   labels: Record<string, string>
 }
 
@@ -86,6 +105,30 @@ export interface CodeOut {
   ok: boolean
   target: string
   source: string
+  error: string | null
+  problems: string[]
+}
+
+/** GET/PUT /api/instantiate/values response. */
+export interface ValueCellsOut {
+  variable: string
+  values: Record<string, number>
+}
+
+/** POST /api/instantiate/initial response — the in-service t=0
+ *  solve: flat ``y0`` plus per-state slices, ``par_needed`` echoing
+ *  the parameter keys the emitted module reads. */
+export interface InitialOut {
+  ok: boolean
+  y0: number[]
+  states: {
+    name: string
+    var: string
+    entity_type: string
+    values: number[]
+  }[]
+  par_needed: string[]
+  steady_state: boolean
   error: string | null
   problems: string[]
 }
