@@ -18,12 +18,19 @@ parameter, constant, port (resolved per contact across arcs), or
 incidence (``[N,A]``-indexed vars → the numeric ``F`` matrices).
 ``vars`` selects the var/expr artefact (default: dataset-wide scope
 and the default assignment graph).
+
+``GET /code?graph=&vars=&target=`` renders the derivative function;
+``POST /initial?graph=&vars=`` runs the same plan's t=0 solve
+in-service — the emitted python module is exec'd and its ``initial``
+called with the caller's ``par`` dict (``steady_state`` releases the
+state pins and solves ``der = 0``).
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 from rdflib import RDF, RDFS, URIRef
@@ -53,6 +60,7 @@ from .builder import (
     is_initialise_class,
 )
 from .builder import build as build_model
+from .emit_common import inst_name
 from .emit_julia import emit_julia
 from .emit_matlab import emit_matlab
 from .emit_python import emit_python
@@ -184,6 +192,35 @@ class CodeOut(BaseModel):
     ok: bool
     target: str
     source: str = ""
+    error: Optional[str] = None
+    problems: List[str] = Field(default_factory=list)
+
+
+class InitialIn(BaseModel):
+    """POST body for the server-side t=0 solve (``/initial``).
+
+    ``par`` supplies the emitted module's parameter dict — keys are
+    the emitted names (``V_5`` for a parameter slot, ``ic0_V_1`` for
+    a ``par``-pinned IC); values are scalars or flat index-ordered
+    lists.  ``steady_state`` releases the state pins and solves
+    ``der = 0`` for the states instead."""
+
+    par: Dict[str, Any] = Field(default_factory=dict)
+    steady_state: bool = False
+
+
+class InitialOut(BaseModel):
+    """The t=0 solve result: the flat ``y0`` plus per-state slices
+    (emitted name, var/entity-type IRIs, flat values).  ``par_needed``
+    lists the keys the emitted module reads — non-cell parameters and
+    ``ic0_<name>`` for par-pinned states (unused under
+    ``steady_state``)."""
+
+    ok: bool
+    y0: List[float] = Field(default_factory=list)
+    states: List[Dict[str, Any]] = Field(default_factory=list)
+    par_needed: List[str] = Field(default_factory=list)
+    steady_state: bool = False
     error: Optional[str] = None
     problems: List[str] = Field(default_factory=list)
 
@@ -820,31 +857,12 @@ def _code_space(store, vars_graph: Optional[str]) -> CompileSpace:
         accessible_networks={v.network for v in variables.values()})
 
 
-_EMITTERS = {"python": emit_python, "julia": emit_julia,
-             "matlab": emit_matlab}
-
-
-@router.get("/code", response_model=CodeOut)
-def model_code(
-    graph_iri: Optional[str] = Depends(graph_param),
-    vars: Optional[str] = None,
-    target: str = "python",
-    species: Optional[str] = None,
-) -> CodeOut:
-    """§19 codegen: emit the model's derivative function.
-
-    Same assembly as ``/model`` (report + schedule + incidence),
-    then ``plan()`` lowers it to a ``CodePlan`` and the target
-    emitter renders the source.  ``target`` is ``python`` or
-    ``julia`` (matlab pending)."""
-    if not graph_iri:
-        raise HTTPException(
-            status_code=400,
-            detail="graph= (model artefact IRI) is required")
-    if target not in _EMITTERS:
-        raise HTTPException(
-            status_code=400,
-            detail="target must be one of %s" % sorted(_EMITTERS))
+def _plan_for(graph_iri: str, vars: Optional[str],
+              species: Optional[str]) -> Tuple:
+    """The shared ``/code`` + ``/initial`` assembly: resolve the
+    model artefact, build the instantiation report and schedule, then
+    ``plan()`` lowers them (with stored value cells and canonical RHS
+    trees) to a ``CodePlan``.  Returns ``(cp, report, store)``."""
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
     nodes, arcs, sub_indices, parents, labels = _collect(
@@ -881,6 +899,35 @@ def model_code(
               for e in report.entity_types for v in e.variables}
     cp = plan(report, sched, inc, equations, indices, values=values,
               canonicals=canonicals)
+    return cp, report, store
+
+
+_EMITTERS = {"python": emit_python, "julia": emit_julia,
+             "matlab": emit_matlab}
+
+
+@router.get("/code", response_model=CodeOut)
+def model_code(
+    graph_iri: Optional[str] = Depends(graph_param),
+    vars: Optional[str] = None,
+    target: str = "python",
+    species: Optional[str] = None,
+) -> CodeOut:
+    """§19 codegen: emit the model's derivative function.
+
+    Same assembly as ``/model`` (report + schedule + incidence),
+    then ``plan()`` lowers it to a ``CodePlan`` and the target
+    emitter renders the source.  ``target`` is ``python`` or
+    ``julia`` (matlab pending)."""
+    if not graph_iri:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= (model artefact IRI) is required")
+    if target not in _EMITTERS:
+        raise HTTPException(
+            status_code=400,
+            detail="target must be one of %s" % sorted(_EMITTERS))
+    cp, report, store = _plan_for(graph_iri, vars, species)
     try:
         source = _EMITTERS[target](cp, _code_space(store, vars))
     except (ParseError, VarError) as e:
@@ -888,3 +935,63 @@ def model_code(
                        problems=[p.kind for p in report.problems])
     return CodeOut(ok=True, target=target, source=source,
                    problems=[p.kind for p in report.problems])
+
+
+@router.post("/initial", response_model=InitialOut)
+def model_initial(
+    body: InitialIn,
+    graph_iri: Optional[str] = Depends(graph_param),
+    vars: Optional[str] = None,
+    species: Optional[str] = None,
+) -> InitialOut:
+    """§19 t=0 solve, in-service: plan as for ``/code``, emit the
+    python module, exec it and call ``initial(par, steady_state)``.
+
+    ``par`` keys are emitted names — parameter slots plus
+    ``ic0_<name>`` for par-pinned ICs (value-cell literals and
+    ``initialise`` equations need nothing).  ``steady_state=true``
+    releases the pins and solves ``der = 0`` for the states.  The
+    response echoes ``par_needed`` so callers can see which keys the
+    module reads."""
+    if not graph_iri:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= (model artefact IRI) is required")
+    cp, report, store = _plan_for(graph_iri, vars, species)
+    problems = [p.kind for p in report.problems]
+    par_needed = [
+        p.name or inst_name(p.instance)
+        for p in cp.params + cp.inputs
+        if not (p.kind == "constant" and p.value is not None)
+        and p.values is None]
+    par_needed += [
+        "ic0_%s" % (s.name or inst_name(s.instance))
+        for s in cp.states if s.ic_source == "par"]
+    try:
+        source = emit_python(cp, _code_space(store, vars))
+    except (ParseError, VarError) as e:
+        return InitialOut(ok=False, steady_state=body.steady_state,
+                          par_needed=par_needed,
+                          error=str(e), problems=problems)
+    try:
+        mod: Dict[str, Any] = {}
+        exec(source, mod)
+        par = {k: np.asarray(v, dtype=float) for k, v in
+               body.par.items()}
+        y0 = np.atleast_1d(
+            mod["initial"](par, steady_state=body.steady_state))
+    except Exception as e:  # numeric/par errors → diagnostic payload
+        return InitialOut(ok=False, steady_state=body.steady_state,
+                          par_needed=par_needed,
+                          error="%s: %s" % (type(e).__name__, e),
+                          problems=problems)
+    states = [{
+        "name": s.name or inst_name(s.instance),
+        "var": s.var, "entity_type": s.entity_type,
+        "values": [float(x) for x in np.atleast_1d(
+            y0[s.offset:s.offset + s.size])]}
+        for s in cp.states]
+    return InitialOut(ok=True, y0=[float(x) for x in y0],
+                      states=states, par_needed=par_needed,
+                      steady_state=body.steady_state,
+                      problems=problems)

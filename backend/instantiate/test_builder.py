@@ -1390,6 +1390,46 @@ def test_code_endpoint(client):
     assert r.status_code == 400
 
 
+def test_initial_endpoint(client):
+    """POST /api/instantiate/initial runs the t=0 solve in-service:
+    ``par`` supplies the parameter slot plus the ic0 pin; the response
+    echoes ``par_needed`` and the solved state slices.
+    ``steady_state`` releases the pins and solves der = 0."""
+    np = pytest.importorskip("numpy")
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+
+    r = client.post("/api/instantiate/initial",
+                    params={"graph": graph, "vars": graph},
+                    json={"par": {"V_5": 0.1, "ic0_V_1": [1.0, 0.0]}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"], body
+    np.testing.assert_allclose(body["y0"], [1.0, 0.0])
+    assert body["par_needed"] == ["V_5", "ic0_V_1"]
+    st = body["states"][0]
+    assert st["var"] == _var("m") and st["values"] == [1.0, 0.0]
+
+    # Steady state: the pin is released — no ic0 in par.  der = 0
+    # forces F·J = 0 → J = 0 → p = 0 → m = 0 (F invertible).
+    r = client.post("/api/instantiate/initial",
+                    params={"graph": graph, "vars": graph},
+                    json={"par": {"V_5": 0.1}, "steady_state": True})
+    body = r.json()
+    assert body["ok"], body
+    np.testing.assert_allclose(body["y0"], [0.0, 0.0], atol=1e-8)
+    assert body["steady_state"]
+
+    # Missing par keys → ok=False diagnostic, par_needed unchanged.
+    r = client.post("/api/instantiate/initial",
+                    params={"graph": graph, "vars": graph}, json={})
+    body = r.json()
+    assert not body["ok"]
+    assert "V_5" in body["par_needed"] and body["error"]
+
+
 def test_species_distribution_endpoint(client):
     """§20 readout: per-node/arc species sets, resolved through the
     model artefact's usesSpecies pin (no ?species= param)."""
