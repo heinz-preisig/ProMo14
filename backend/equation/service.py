@@ -335,9 +335,7 @@ def _build_space(req: CheckRequest) -> CompileSpace:
         ctx.variables(),
         ctx.indices(),
         variable_definition_network=req.variable_definition_network,
-        variable_definition_domain_iri=req.variable_definition_domain_iri,
         expression_definition_network=req.expression_definition_network,
-        expression_definition_domain_iri=req.expression_definition_domain_iri,
         accessible_networks=ctx.accessible_networks(req.expression_definition_network),
         network_tree=ctx.tree(),
     )
