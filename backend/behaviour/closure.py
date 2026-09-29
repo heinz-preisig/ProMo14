@@ -147,12 +147,12 @@ def evaluate(equations: Dict[str, EquationInfo],
         else:
             state_var = base.lhs
             if (not selection.sequence
-                    or selection.sequence[0] != selection.base_equation):
+                    or selection.sequence[-1] != selection.base_equation):
                 order_violations.append(OrderViolation(
                     equation=selection.base_equation,
                     variable=state_var,
                     defined_by=selection.base_equation,
-                    detail="base equation must head the sequence"))
+                    detail="base equation must close the sequence"))
 
     # -- role conflicts ----------------------------------------------------
     for var in sorted(selection.instantiated & set(defined_by)):

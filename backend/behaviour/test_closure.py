@@ -64,9 +64,10 @@ def test_base_equation_exposes_its_inputs():
 
 
 def test_closed_chain_with_state_feedback():
-    """E2 feeds back on the state variable — the one allowed cycle."""
+    """E2 feeds back on the state variable — the one allowed cycle.
+    The base equation is now the last step in the sequence."""
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         instantiated={"p"}, ports={"q"}))
     assert report.unresolved == []
     assert report.cycles == []
@@ -82,7 +83,7 @@ def test_unwanted_cycle_is_reported():
         _eq("E3", "y", ["x"]),      # x <-> y cycle not through state
     )
     report = evaluate(graph, Selection(
-        sequence=["E1", "E2", "E3"], base_equation="E1"))
+        sequence=["E2", "E3", "E1"], base_equation="E1"))
     assert report.cycles, "expected an unwanted cycle"
     assert not report.closed
 
@@ -110,7 +111,7 @@ def test_frontier_suggests_reachable_resolver():
 
 def test_frontier_empty_when_closed():
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         instantiated={"p"}, ports={"q"}))
     assert report.frontier == []
     assert report.closed
@@ -129,7 +130,7 @@ def test_frontier_reachable_from_stateless_sequence():
 def test_duplicate_definition_conflict():
     graph = _graph(_eq("E1", "s"), _eq("E2", "s"), _eq("E3", "s"))
     report = evaluate(graph, Selection(
-        sequence=["E1", "E2"], base_equation="E1"))
+        sequence=["E2", "E1"], base_equation="E1"))
     kinds = [c.kind for c in report.conflicts]
     assert "duplicate_definition" in kinds
     assert not report.closed
@@ -138,7 +139,7 @@ def test_duplicate_definition_conflict():
 def test_role_conflicts():
     graph = _graph(_eq("E1", "s", ["x"]), _eq("E2", "x"))
     report = evaluate(graph, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         instantiated={"x"}, ports={"x", "z"}))
     kinds = {c.kind for c in report.conflicts}
     assert "defined_and_instantiated" in kinds
@@ -155,7 +156,7 @@ def test_order_violation_late_dependency():
         _eq("E3", "x"),
     )
     report = evaluate(graph, Selection(
-        sequence=["E1", "E2", "E3"], base_equation="E1"))
+        sequence=["E2", "E3", "E1"], base_equation="E1"))
     assert report.order_violations
     assert report.order_violations[0].equation == "E2"
     assert report.order_violations[0].defined_by == "E3"
@@ -172,15 +173,15 @@ def test_any_base_equation_yields_state_variable():
                      incidence=[]),
     )
     report = evaluate(graph, Selection(
-        sequence=["E1", "E2"], base_equation="E1"))
+        sequence=["E2", "E1"], base_equation="E1"))
     assert report.state_variable == "a"
     assert report.cycles == []
     assert report.closed
 
 
-def test_base_equation_must_head_sequence():
+def test_base_equation_must_close_sequence():
     report = evaluate(CHAIN, Selection(
-        sequence=["E2", "E1"], base_equation="E1",
+        sequence=["E1", "E2"], base_equation="E1",
         instantiated={"p"}, ports={"q"}))
     assert any(v.equation == "E1" for v in report.order_violations)
 
@@ -193,7 +194,7 @@ def test_unknown_equation_conflict():
 
 def test_unused_port_warns():
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         instantiated={"p"}, ports={"q", "unused"}))
     assert any("unused" in w for w in report.warnings)
     assert report.closed          # warnings do not block closure
@@ -203,7 +204,7 @@ def test_unreferenced_instantiated_no_warning():
     """An instantiated mark with no internal reference is a legitimate
     interface declaration (bound value provided outward), not a hint."""
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         instantiated={"p", "provided"}, ports={"q"}))
     assert not any("provided" in w for w in report.warnings)
     assert report.closed
@@ -215,7 +216,7 @@ def test_unreachable_equation_warns():
         _eq("E9", "other"),        # disconnected from the base cone
     )
     report = evaluate(graph, Selection(
-        sequence=["E1", "E9"], base_equation="E1", instantiated={"p"}))
+        sequence=["E9", "E1"], base_equation="E1", instantiated={"p"}))
     assert any("E9" in w for w in report.warnings)
     assert report.closed
 
@@ -227,7 +228,7 @@ def test_unreachable_equation_warns():
 def test_auto_instantiated_resolves_without_marking():
     """A bound-value variable terminates the search on its own."""
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         ports={"q"}),
         auto_instantiated={"p"})
     assert report.unresolved == []
@@ -256,7 +257,7 @@ def test_auto_instantiated_overridden_by_equation():
         _eq("E2", "p"),
     )
     report = evaluate(graph, Selection(
-        sequence=["E1", "E2"], base_equation="E1"),
+        sequence=["E2", "E1"], base_equation="E1"),
         auto_instantiated={"p"})
     assert report.auto_instantiated == []
     assert report.defined["p"] == "E2"
@@ -266,7 +267,7 @@ def test_auto_instantiated_overridden_by_equation():
 def test_auto_instantiated_overridden_by_port():
     """An explicit port declaration wins over the class hint."""
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         ports={"p", "q"}),
         auto_instantiated={"p"})
     assert report.auto_instantiated == []
@@ -277,7 +278,7 @@ def test_auto_instantiated_overridden_by_port():
 def test_auto_instantiated_unreferenced_not_listed():
     """Auto vars the selection never touches stay out of the report."""
     report = evaluate(CHAIN, Selection(
-        sequence=["E1", "E2"], base_equation="E1",
+        sequence=["E2", "E1"], base_equation="E1",
         instantiated={"p"}, ports={"q"}),
         auto_instantiated={"p", "other_const"})
     assert [u.variable for u in report.auto_instantiated] == []
@@ -339,8 +340,8 @@ def test_evaluate_endpoint(client):
     _seed_vars()
     r = client.post("/api/behaviour/evaluate", json={
         "entity_type": "https://w3id.org/promo/ontology#Lumped",
-        "sequence": ["https://w3id.org/promo/ontology#eq_E1",
-                     "https://w3id.org/promo/ontology#eq_E2"],
+        "sequence": ["https://w3id.org/promo/ontology#eq_E2",
+                     "https://w3id.org/promo/ontology#eq_E1"],
         "base_equation": "https://w3id.org/promo/ontology#eq_E1",
     })
     assert r.status_code == 200
@@ -355,8 +356,8 @@ def test_assignment_roundtrip(client):
     et = "https://w3id.org/promo/ontology#Lumped"
     payload = {
         "entity_type": et,
-        "sequence": ["https://w3id.org/promo/ontology#eq_E1",
-                     "https://w3id.org/promo/ontology#eq_E2"],
+        "sequence": ["https://w3id.org/promo/ontology#eq_E2",
+                     "https://w3id.org/promo/ontology#eq_E1"],
         "base_equation": "https://w3id.org/promo/ontology#eq_E1",
         "instantiated": [],
         "ports": [],
@@ -394,7 +395,7 @@ def test_assignment_update_replaces_sequence(client):
         "entity_type": et, "sequence": [base], "base_equation": base})
     r = client.put("/api/behaviour/assignment", json={
         "entity_type": et,
-        "sequence": [base, "https://w3id.org/promo/ontology#eq_E2"],
+        "sequence": ["https://w3id.org/promo/ontology#eq_E2", base],
         "base_equation": base})
     assert r.json()["closed"]
     r = client.get("/api/behaviour/assignment",

@@ -167,6 +167,14 @@ export function useBehaviourLinker(): BehaviourLinkerState {
   const insertPos = useCallback(
     (forVar: string | null): number => {
       if (!forVar) return sequence.length
+      const baseIdx = baseEquation ? sequence.indexOf(baseEquation) : -1
+      if (
+        baseIdx >= 0 &&
+        baseEquation &&
+        eqs.get(baseEquation)?.incidence.includes(forVar)
+      ) {
+        return baseIdx
+      }
       let earliest = -1
       sequence.forEach((eqIri, i) => {
         if (eqIri === baseEquation) return
@@ -182,7 +190,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
   const pickBase = (eqIri: string | null) => {
     setBaseEquation(eqIri)
     if (eqIri) {
-      setSequence((s) => [eqIri, ...s.filter((e) => e !== eqIri)])
+      setSequence((s) => [...s.filter((e) => e !== eqIri), eqIri])
     }
   }
 
