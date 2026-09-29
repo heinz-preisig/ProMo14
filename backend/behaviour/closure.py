@@ -9,10 +9,9 @@ var/expr bipartite graph — the mechanics of
   **to-be-instantiated**, or it is declared an **external input**
   (port).  The subgraph is *closed* when every RHS variable is
   resolved.
-- A base equation whose LHS is a **state-class variable** defines a
-  stateful (capacity) entity; it owns the only permitted dependency
-  cycle (the integrator loop).  An algebraic base equation has no state
-  variable and no special cycle.
+- A selected base equation defines a stateful entity; its LHS variable
+  owns the only permitted dependency cycle (the integrator loop).
+  Choosing no base equation yields a stateless, acyclic entity.
 - The selection order *is* the computation sequence (§13): every
   non-base equation's inputs must be state, earlier-defined,
   instantiated, or port — the lower-triangular property.
@@ -89,6 +88,7 @@ class ClosureReport:
     defined: Dict[str, str]                     # variable -> equation
     unresolved: List[UnresolvedVar]
     auto_instantiated: List[UnresolvedVar]      # bound-value endpoints
+    frontier: List[str]                         # valid next equations
     cycles: List[List[str]]                     # equation-IRI paths
     conflicts: List[Conflict]
     order_violations: List[OrderViolation]
@@ -143,7 +143,7 @@ def evaluate(equations: Dict[str, EquationInfo],
                 "unknown_equation", equation=selection.base_equation,
                 detail="base equation is not in scope"))
         else:
-            state_var = base.lhs if base.lhs_class == "state" else None
+            state_var = base.lhs
             if (not selection.sequence
                     or selection.sequence[0] != selection.base_equation):
                 order_violations.append(OrderViolation(
@@ -269,6 +269,32 @@ def evaluate(equations: Dict[str, EquationInfo],
                     equation=eq_iri, variable=var, defined_by=dep,
                     detail="input is defined later in the sequence"))
 
+    # -- frontier: equations that resolve an unresolved variable and are
+    #    reachable from the selected base cone -----------------------------
+    full_reachable: Set[str] = set()
+    stack: List[str] = []
+    if selection.base_equation in equations:
+        stack.append(selection.base_equation)
+    else:
+        stack.extend(selection.sequence)
+    while stack:
+        cur = stack.pop()
+        if cur in full_reachable or cur not in equations:
+            continue
+        full_reachable.add(cur)
+        for var in equations[cur].incidence:
+            if (var in selection.instantiated or var in selection.ports
+                    or var in auto):
+                continue
+            for e in equations.values():
+                if e.lhs == var and e.iri not in full_reachable:
+                    stack.append(e.iri)
+
+    unresolved_eqs = {c for uv in unresolved for c in uv.candidates}
+    frontier = sorted(
+        eq_iri for eq_iri in unresolved_eqs
+        if eq_iri not in position and eq_iri in full_reachable)
+
     closed = (bool(selection.sequence)
               and not unresolved and not cycles and not conflicts
               and not order_violations)
@@ -277,6 +303,7 @@ def evaluate(equations: Dict[str, EquationInfo],
         defined=defined_by,
         unresolved=unresolved,
         auto_instantiated=auto_refs,
+        frontier=frontier,
         cycles=cycles,
         conflicts=conflicts,
         order_violations=order_violations,

@@ -27,6 +27,21 @@ function frag(iri: string): string {
   return s[s.length - 1]
 }
 
+/** Escape plain text so it is safe inside a LaTeX math \text{...} block. */
+function texEscape(s: string): string {
+  return s
+    .replace(/\\/g, '\\textbackslash{}')
+    .replace(/&/g, '\\&')
+    .replace(/%/g, '\\%')
+    .replace(/#/g, '\\#')
+    .replace(/_/g, '\\_')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}')
+    .replace(/\$/g, '\\$')
+    .replace(/~/g, '\\textasciitilde{}')
+    .replace(/\^/g, '\\textasciicircum{}')
+}
+
 const btn: React.CSSProperties = {
   fontSize: 12,
   padding: '2px 8px',
@@ -76,11 +91,15 @@ export default function App() {
   const [entityType, setEntityType] = useState<string | null>(null)
   const [sequence, setSequence] = useState<string[]>([])
   const [baseEquation, setBaseEquation] = useState<string | null>(null)
+  const [baseMode, setBaseMode] = useState<'state' | 'stateless'>('stateless')
+  const [lastSaved, setLastSaved] = useState<Assignment | null>(null)
   const [instantiated, setInstantiated] = useState<string[]>([])
   const [ports, setPorts] = useState<string[]>([])
   const [report, setReport] = useState<EvaluateReport | null>(null)
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [saveMsg, setSaveMsg] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [showSource, setShowSource] = useState(false)
   const [typeFilter, setTypeFilter] = useState('')
   const [dragIri, setDragIri] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
@@ -120,12 +139,28 @@ export default function App() {
   useEffect(() => {
     if (!entityType) return
     loadAssignment(entityType).then((a) => {
-      setSequence(a?.sequence ?? [])
-      setBaseEquation(a?.base_equation ?? null)
-      setInstantiated(a?.instantiated ?? [])
-      setPorts(a?.ports ?? [])
+      const assignment = a ?? {
+        entity_type: entityType,
+        sequence: [],
+        base_equation: null,
+        state_variable: null,
+        instantiated: [],
+        ports: [],
+        closed: false,
+      }
+      setSequence(assignment.sequence)
+      setBaseEquation(assignment.base_equation)
+      setBaseMode(assignment.base_equation ? 'state' : 'stateless')
+      setInstantiated(assignment.instantiated)
+      setPorts(assignment.ports)
+      setLastSaved(assignment)
     })
   }, [entityType])
+
+  // Keep the base-equation mode selector aligned with the actual selection.
+  useEffect(() => {
+    if (baseEquation) setBaseMode('state')
+  }, [baseEquation])
 
   // Every selection change re-evaluates (debounced) — the report drives
   // the whole UI: unresolved inputs, problems, closed flag.
@@ -230,6 +265,11 @@ export default function App() {
 
   const save = async () => {
     if (!entityType) return
+    if (sequence.length === 0 && !baseEquation) {
+      setSaveMsg('nothing to save')
+      setTimeout(() => setSaveMsg(''), 3000)
+      return
+    }
     try {
       await saveAssignment({
         entity_type: entityType,
@@ -239,6 +279,15 @@ export default function App() {
         ports,
       })
       await saveStore()
+      setLastSaved({
+        entity_type: entityType,
+        sequence,
+        base_equation: baseEquation,
+        state_variable: report?.state_variable ?? null,
+        instantiated,
+        ports,
+        closed: report?.closed ?? false,
+      })
       setSaveMsg('saved')
       refresh()
       listAssignments().then(setAssignments).catch(() => {})
@@ -251,10 +300,12 @@ export default function App() {
   const remove = async () => {
     if (!entityType) return
     await deleteAssignment(entityType)
+    await saveStore()
     setSequence([])
     setBaseEquation(null)
     setInstantiated([])
     setPorts([])
+    setLastSaved(null)
     listAssignments().then(setAssignments).catch(() => {})
     refresh()
   }
@@ -267,7 +318,139 @@ export default function App() {
     return m
   }, [assignments])
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (!entityType) return false
+    if (!lastSaved) {
+      return (
+        sequence.length > 0 ||
+        baseEquation !== null ||
+        instantiated.length > 0 ||
+        ports.length > 0
+      )
+    }
+    if (lastSaved.base_equation !== baseEquation) return true
+    if (JSON.stringify(lastSaved.sequence) !== JSON.stringify(sequence))
+      return true
+    const eqSet = (a: string[], b: string[]) => {
+      const sa = [...a].sort()
+      const sb = [...b].sort()
+      return JSON.stringify(sa) === JSON.stringify(sb)
+    }
+    if (!eqSet(lastSaved.instantiated, instantiated)) return true
+    if (!eqSet(lastSaved.ports, ports)) return true
+    return false
+  }, [entityType, lastSaved, sequence, baseEquation, instantiated, ports])
+
   const selectedType = ctx?.entity_types.find((t) => t.iri === entityType)
+
+  /** Render-ready LaTeX for the current entity assignment. */
+  const printableLatex = useMemo(() => {
+    if (!entityType || !report) return ''
+    const esc = texEscape
+    const lines: string[] = []
+    lines.push(
+      `\\text{Entity: ${esc(selectedType?.label ?? frag(entityType))}}`,
+    )
+    if (report.state_variable) {
+      lines.push(`\\text{state: } ${esc(lab(report.state_variable))}`)
+    }
+    const eqLines = sequence
+      .map((eqIri) => {
+        const e = eqs.get(eqIri)
+        if (!e) return ''
+        const marker = eqIri === baseEquation ? ' \\text{(base)}' : ''
+        const lhs = e.lhs_latex ?? esc(lab(e.lhs))
+        const rhs = e.rhs_latex ?? ''
+        return `${lhs} = ${rhs}${marker}`
+      })
+      .filter(Boolean)
+    lines.push(...eqLines)
+    if (instantiated.length > 0) {
+      lines.push(
+        `\\text{instantiated: } ${instantiated
+          .map((v) => esc(lab(v)))
+          .join(', ')}`,
+      )
+    }
+    if (ports.length > 0) {
+      lines.push(
+        `\\text{ports: } ${ports.map((v) => esc(lab(v))).join(', ')}`,
+      )
+    }
+    if (lines.length === 0) return ''
+    return `\\begin{gathered}\n${lines
+      .map((l) => `  ${l} \\\\\\`)
+      .join('\n')}\n\\end{gathered}`
+  }, [
+    entityType,
+    report,
+    selectedType,
+    baseEquation,
+    sequence,
+    instantiated,
+    ports,
+    eqs,
+    lab,
+  ])
+
+  const copyLatex = async () => {
+    if (!printableLatex) return
+    try {
+      await navigator.clipboard.writeText(printableLatex)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // ignore
+    }
+  }
+
+  const printRepresentation = () => {
+    if (!previewHtml || !entityType) return
+    const title = selectedType?.label ?? frag(entityType)
+    const w = window.open('', `print-${entityType}`, 'width=800,height=600')
+    if (!w) return
+    const styles = Array.from(
+      document.querySelectorAll('link[rel="stylesheet"], style'),
+    )
+      .map((el) => el.outerHTML)
+      .join('')
+    w.document.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Behaviour Linker — ${title}</title>
+    ${styles}
+    <style>
+      body { font-family: sans-serif; padding: 24px; }
+      pre { white-space: pre-wrap; background: #f5f5f5; padding: 12px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <div>${previewHtml}</div>
+    <h2>LaTeX source</h2>
+    <pre>${printableLatex
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')}</pre>
+  </body>
+</html>`)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 400)
+  }
+
+  const previewHtml = useMemo(() => {
+    if (!printableLatex) return ''
+    try {
+      return renderToString(printableLatex, {
+        displayMode: true,
+        throwOnError: false,
+      })
+    } catch {
+      return ''
+    }
+  }, [printableLatex])
 
   /** Sidebar order follows the ontology's promo:parent hierarchy —
    *  roots (sorted by branch then label) first, children indented
@@ -342,6 +525,9 @@ export default function App() {
           )}
           {dirty && (
             <span style={{ fontSize: 13, color: '#c80' }}>● unsaved</span>
+          )}
+          {hasUnsavedChanges && (
+            <span style={{ fontSize: 13, color: '#c00' }}>● modified</span>
           )}
           {saveMsg && <span style={{ fontSize: 13 }}>{saveMsg}</span>}
           <button style={btn} onClick={save} disabled={!entityType}>
@@ -438,23 +624,10 @@ export default function App() {
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Base equation
                 </div>
-                <label
-                  style={{ display: 'block', fontSize: 13, padding: '2px 0' }}
-                >
-                  <input
-                    type="radio"
-                    checked={baseEquation === null}
-                    onChange={() => pickBase(null)}
-                  />{' '}
-                  <em>none — entity without state</em>
-                </label>
                 {(() => {
-                  const stateEqs = (ctx?.equations ?? []).filter(
-                    (e) => e.lhs_class === 'state',
-                  )
-                  const algEqs = (ctx?.equations ?? []).filter(
-                    (e) => e.lhs_class !== 'state',
-                  )
+                  const allEqs = ctx?.equations ?? []
+                  const stateEqs = allEqs.filter((e) => e.lhs_class === 'state')
+                  const otherEqs = allEqs.filter((e) => e.lhs_class !== 'state')
                   const renderGroup = (title: string, eqs: Equation[]) =>
                     eqs.length === 0 ? null : (
                       <div key={title} style={{ marginTop: 6 }}>
@@ -487,10 +660,52 @@ export default function App() {
                       </div>
                     )
                   return (
-                    <>
-                      {renderGroup('state equations', stateEqs)}
-                      {renderGroup('algebraic equations', algEqs)}
-                    </>
+                    <div style={{ fontSize: 13 }}>
+                      <label style={{ display: 'block', padding: '2px 0' }}>
+                        <input
+                          type="radio"
+                          checked={baseMode === 'state'}
+                          disabled={allEqs.length === 0}
+                          onChange={() => setBaseMode('state')}
+                        />{' '}
+                        with state
+                      </label>
+                      {baseMode === 'state' && (
+                        <div style={{ marginLeft: 16 }}>
+                          {renderGroup('suggested state equations', stateEqs)}
+                          {renderGroup('other equations', otherEqs)}
+                        </div>
+                      )}
+                      <label style={{ display: 'block', padding: '2px 0' }}>
+                        <input
+                          type="radio"
+                          checked={baseMode === 'stateless'}
+                          onChange={() => {
+                            setBaseMode('stateless')
+                            pickBase(null)
+                          }}
+                        />{' '}
+                        without state
+                      </label>
+                      {baseMode === 'stateless' && (
+                        <div style={{ marginLeft: 16 }}>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: 13,
+                              padding: '2px 0',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              checked={baseEquation === null}
+                              onChange={() => pickBase(null)}
+                            />{' '}
+                            <em>none — entity without state</em>
+                          </label>
+                        </div>
+                      )}
+                    </div>
                   )
                 })()}
               </div>
@@ -567,6 +782,34 @@ export default function App() {
                     </div>
                   )
                 })}
+              </div>
+
+              {/* Suggested next equations ---------------------------------- */}
+              <div style={card}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  Suggested next equations
+                </div>
+                {(report?.frontier ?? []).length === 0 && (
+                  <div style={{ fontSize: 13, color: '#888' }}>
+                    No further equations needed.
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(report?.frontier ?? []).map((eqIri) => {
+                    const e = eqs.get(eqIri)
+                    if (!e) return null
+                    return (
+                      <button
+                        key={eqIri}
+                        style={btn}
+                        title={e.rhs}
+                        onClick={() => resolveWith(e.lhs, eqIri)}
+                      >
+                        + <EqLine eq={e} lhsLabel={lab(e.lhs)} />
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Unresolved inputs ---------------------------------------- */}
@@ -733,6 +976,58 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* Printable representation ---------------------------------- */}
+              {printableLatex && (
+                <div style={card}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}
+                  >
+                    Printable representation
+                  </div>
+                  {previewHtml && (
+                    <div
+                      style={{ marginBottom: 8, overflowX: 'auto' }}
+                      dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    />
+                  )}
+                  <div
+                    style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                  >
+                    <button style={btn} onClick={copyLatex}>
+                      Copy LaTeX
+                    </button>
+                    <button style={btn} onClick={printRepresentation}>
+                      Print
+                    </button>
+                    <button
+                      style={btn}
+                      onClick={() => setShowSource((s) => !s)}
+                    >
+                      {showSource ? 'Hide source' : 'Show source'}
+                    </button>
+                    {copied && (
+                      <span style={{ fontSize: 12, color: '#0a7' }}>
+                        copied
+                      </span>
+                    )}
+                  </div>
+                  {showSource && (
+                    <pre
+                      style={{
+                        fontSize: 12,
+                        background: '#f5f5f5',
+                        padding: 8,
+                        borderRadius: 4,
+                        overflowX: 'auto',
+                        marginTop: 8,
+                      }}
+                    >
+                      {printableLatex}
+                    </pre>
+                  )}
+                </div>
+              )}
 
               {/* Problems --------------------------------------------------- */}
               {report &&

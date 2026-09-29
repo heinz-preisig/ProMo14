@@ -1,12 +1,12 @@
 # Behaviour Linker — Implementation Status
 
-**Last updated:** 2026-09-22
+**Last updated:** 2026-09-29
 
 ## Current state
 
 Backend core implemented (closure engine + assignment artefact
-endpoints, 16 tests).  Frontend is still an empty scaffold.  Design is
-resolved — see `behaviour-linker-design-discussion.md` §1–18.
+endpoints, 23 tests).  Frontend SPA is functional and iterating.
+Design is resolved — see `behaviour-linker-design-discussion.md` §1–18.
 
 ## Backend
 
@@ -17,9 +17,14 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   - selection state = ordered equation `sequence` + `base_equation`
     (state-defining, must head the sequence; `None` for stateless
     entities like transport systems) + `instantiated` + `ports`;
+  - state is a user binding, not an ontology class: any selected
+    base equation's LHS becomes the privileged cycle variable;
   - per-variable resolution: defined by a selected equation /
     to-be-instantiated / external port, else *unresolved* with the
     candidate equations that could define it;
+  - frontier suggestion: `report.frontier` lists equations that resolve
+    a currently unresolved variable and are reachable from the selected
+    base cone (or from the sequence when stateless);
   - cycle check: only the loop through the state variable is allowed
     (the integrator loop); every other back-edge is reported;
   - conflicts: duplicate definition, defined+instantiated,
@@ -49,10 +54,10 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   (`promo:Assignment` type, pinned to the graph's resolution scope);
   unscoped mode uses `https://w3id.org/promo/assignments`.  Created
   lazily on first PUT.
-- `test_closure.py` — 21 tests: engine semantics (state loop allowed,
-  other cycles rejected, conflicts, ordering, warnings,
-  auto-instantiation) + endpoint roundtrips incl. rdf:List replacement
-  on re-PUT.
+- `test_closure.py` — 23 tests: engine semantics (state loop allowed,
+  any base equation yields the state variable, other cycles rejected,
+  conflicts, ordering, warnings, auto-instantiation) + endpoint
+  roundtrips incl. rdf:List replacement on re-PUT.
 
 `backend/instantiate/` (new, 2026-09-22) — §16 membership resolution:
 
@@ -136,13 +141,18 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
 
 ## Frontend
 
-`apps/behaviour-linker/` — minimal working SPA (React + Vite, dev on
+`apps/behaviour-linker/` — working SPA (React + Vite, dev on
 :3003, `npm run dev:behaviour` / `./dev.sh start behaviour`):
 
 - Sidebar: entity types with stored-assignment badges (closed/wip).
-- Base-equation radio list (incl. "none — stateless" for transport
-  systems); picking one moves it to the head of the sequence.
+- Base-equation picker with two modes:
+  - **with state** — all equations shown, state-class equations sorted to
+    the top as hints; selecting any equation makes its LHS the state;
+  - **without state** — only "none — entity without state" is offered.
 - Computation sequence list with ↑/↓ reorder and remove.
+- **Suggested next equations** panel driven by the engine's `frontier`
+  list: one-click addition of equations that resolve an open variable
+  and stay inside the selected base cone.
 - Unresolved-inputs panel driven by `POST /evaluate` (debounced on
   every change): each unresolved variable offers its candidate
   equations (`+ E_n` inserts before the earliest non-base consumer,
@@ -150,8 +160,11 @@ resolved — see `behaviour-linker-design-discussion.md` §1–18.
   "port" markings.
 - Roles panel (state / ports / instantiated with unmark), problems
   panel (cycles, conflicts, order violations, warnings), header
-  open/closed badge + store-dirty badge + Save (PUT assignment, then
-  store save) and Delete.
+  open/closed badge + store-dirty badge + assignment-level **modified**
+  badge + Save (PUT assignment, then store save) and Delete.
+- **Printable representation** card: KaTeX-rendered preview of the
+  current assignment, a **Print** button (opens a clean print window),
+  a **Copy LaTeX** button, and an on-demand **Show source** toggle.
 - `?graph=` session param honoured like the other apps.
 
 ## Design
@@ -191,12 +204,14 @@ contract, §18 variable mutability, §19 model instantiation).
    `BaseEntityDefinition.parentIri` for the is-transport check.
    F-builder done same day: `GET /api/instantiate/incidence` emits
    sparse `F[N,A]` per sub-index + base.
-7. ~~UI polish~~ **Done (2026-09-22):** KaTeX rendering — `/context`
+7. ~~UI polish~~ **Done (2026-09-29):** KaTeX rendering — `/context`
    returns server-rendered `lhs_latex`/`rhs_latex` (reusing
    `document.py`'s `_var_symbol`/`_rhs_latex`); SPA renders `lhs := rhs`
    as math with text fallback.  Sidebar entity-type filter box;
    drag-reorder on the sequence (drop = insert before target, ↑/↓
-   buttons kept).
+   buttons kept).  With/without-state base-equation picker; closure
+   frontier suggestions; assignment-level modified indicator; printable
+   LaTeX representation card with print/copy/source toggle.
 
 ## Dependencies
 

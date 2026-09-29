@@ -73,6 +73,9 @@ export interface EvaluateReport {
    *  referenced by the selection — implicit instantiation endpoints.
    *  Candidates are still listed so the hint can be overridden. */
   auto_instantiated: UnresolvedVar[]
+  /** Equations that resolve a currently unresolved variable and are
+   *  reachable from the selected base cone. */
+  frontier: string[]
   cycles: string[][]
   conflicts: Conflict[]
   order_violations: OrderViolation[]
