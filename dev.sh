@@ -252,6 +252,7 @@ for l in d.get("lines", []):
 
 cmd_start() {
     local service="${1:-all}"
+    _need_npm   # frontend starts run npm via nohup — needs nvm on PATH
     echo "Starting: $service"
     case "$service" in
         backend)  _start_backend ;;
