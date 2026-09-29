@@ -68,6 +68,7 @@ class EquationOut(BaseModel):
     rhs: str = ""
     rhs_latex: Optional[str] = None
     equation_class: Optional[str] = None
+    lhs_class: Optional[str] = None
     network: Optional[str] = None
     incidence: List[str] = Field(default_factory=list)
 
@@ -133,6 +134,7 @@ def _collect(ctx):
             equations[eq["iri"]] = EquationInfo(
                 iri=eq["iri"],
                 lhs=eq["lhs"],
+                lhs_class=getattr(var, "type", "state"),
                 incidence=list(eq.get("incidence_list") or []),
             )
     return variables, equations, auto
@@ -251,6 +253,7 @@ def context_endpoint(
             rhs=e.get("rhs") or "",
             rhs_latex=_rhs_latex(e, var, ctx),
             equation_class=e.get("equation_class"),
+            lhs_class=getattr(var, "type", "state"),
             network=e.get("network"),
             incidence=list(e.get("incidence_list") or []),
         ) for iri, var in ctx.variables().items()

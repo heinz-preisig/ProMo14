@@ -4,15 +4,15 @@ Pure-Python evaluation of an entity-behaviour selection against the
 var/expr bipartite graph — the mechanics of
 ``docs/behaviour-linker-design-discussion.md`` §8/§12/§13:
 
-- The user picks a **base (state-defining) equation**, then resolves
-  each RHS variable recursively: another equation defines it, it is
-  marked **to-be-instantiated**, or it is declared an **external
-  input** (port).  The subgraph is *closed* when every RHS variable
-  is resolved.
-- The only permitted dependency cycle runs through the **state
-  variable** (the integrator loop).  Any other cycle is an error the
-  user must break by instantiating the variable or declaring it a
-  port.
+- The user picks a **base equation**, then resolves each RHS variable
+  recursively: another equation defines it, it is marked
+  **to-be-instantiated**, or it is declared an **external input**
+  (port).  The subgraph is *closed* when every RHS variable is
+  resolved.
+- A base equation whose LHS is a **state-class variable** defines a
+  stateful (capacity) entity; it owns the only permitted dependency
+  cycle (the integrator loop).  An algebraic base equation has no state
+  variable and no special cycle.
 - The selection order *is* the computation sequence (§13): every
   non-base equation's inputs must be state, earlier-defined,
   instantiated, or port — the lower-triangular property.
@@ -34,6 +34,7 @@ class EquationInfo:
 
     iri: str
     lhs: str                              # variable IRI it defines
+    lhs_class: str = "state"              # variable class of LHS
     incidence: List[str] = field(default_factory=list)  # RHS var IRIs
 
 
@@ -142,11 +143,12 @@ def evaluate(equations: Dict[str, EquationInfo],
                 "unknown_equation", equation=selection.base_equation,
                 detail="base equation is not in scope"))
         else:
-            state_var = base.lhs
+            state_var = base.lhs if base.lhs_class == "state" else None
             if (not selection.sequence
                     or selection.sequence[0] != selection.base_equation):
                 order_violations.append(OrderViolation(
-                    equation=selection.base_equation, variable=state_var,
+                    equation=selection.base_equation,
+                    variable=state_var or base.lhs,
                     defined_by=selection.base_equation,
                     detail="base equation must head the sequence"))
 

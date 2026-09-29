@@ -16,6 +16,7 @@ export interface Equation {
   rhs: string
   rhs_latex: string | null
   equation_class: string | null
+  lhs_class: string
   network: string | null
   incidence: string[]
 }

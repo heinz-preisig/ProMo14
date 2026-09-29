@@ -137,6 +137,22 @@ def test_order_violation_late_dependency():
     assert not report.closed
 
 
+def test_algebraic_base_has_no_state_variable():
+    """A base equation whose LHS is not state-class defines an entity
+    without a state variable / integrator loop."""
+    graph = _graph(
+        EquationInfo(iri="E1", lhs="a", lhs_class="generic",
+                     incidence=["b"]),
+        EquationInfo(iri="E2", lhs="b", lhs_class="generic",
+                     incidence=[]),
+    )
+    report = evaluate(graph, Selection(
+        sequence=["E1", "E2"], base_equation="E1"))
+    assert report.state_variable is None
+    assert report.cycles == []
+    assert report.closed
+
+
 def test_base_equation_must_head_sequence():
     report = evaluate(CHAIN, Selection(
         sequence=["E2", "E1"], base_equation="E1",

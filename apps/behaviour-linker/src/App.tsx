@@ -436,7 +436,7 @@ export default function App() {
               {/* Base equation ------------------------------------------- */}
               <div style={card}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Base equation (state-defining)
+                  Base equation
                 </div>
                 <label
                   style={{ display: 'block', fontSize: 13, padding: '2px 0' }}
@@ -446,25 +446,53 @@ export default function App() {
                     checked={baseEquation === null}
                     onChange={() => pickBase(null)}
                   />{' '}
-                  <em>none — stateless entity (e.g. transport system)</em>
+                  <em>none — entity without state</em>
                 </label>
-                {(ctx?.equations ?? []).map((e) => (
-                  <label
-                    key={e.iri}
-                    style={{
-                      display: 'block',
-                      fontSize: 13,
-                      padding: '2px 0',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      checked={baseEquation === e.iri}
-                      onChange={() => pickBase(e.iri)}
-                    />{' '}
-                    <EqLine eq={e} lhsLabel={lab(e.lhs)} />
-                  </label>
-                ))}
+                {(() => {
+                  const stateEqs = (ctx?.equations ?? []).filter(
+                    (e) => e.lhs_class === 'state',
+                  )
+                  const algEqs = (ctx?.equations ?? []).filter(
+                    (e) => e.lhs_class !== 'state',
+                  )
+                  const renderGroup = (title: string, eqs: Equation[]) =>
+                    eqs.length === 0 ? null : (
+                      <div key={title} style={{ marginTop: 6 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: '#666',
+                            marginBottom: 2,
+                          }}
+                        >
+                          {title}
+                        </div>
+                        {eqs.map((e) => (
+                          <label
+                            key={e.iri}
+                            style={{
+                              display: 'block',
+                              fontSize: 13,
+                              padding: '2px 0',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              checked={baseEquation === e.iri}
+                              onChange={() => pickBase(e.iri)}
+                            />{' '}
+                            <EqLine eq={e} lhsLabel={lab(e.lhs)} />
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  return (
+                    <>
+                      {renderGroup('state equations', stateEqs)}
+                      {renderGroup('algebraic equations', algEqs)}
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Computation sequence ------------------------------------ */}
