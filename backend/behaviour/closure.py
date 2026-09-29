@@ -297,7 +297,10 @@ def evaluate(equations: Dict[str, EquationInfo],
         eq_iri for eq_iri in unresolved_eqs
         if eq_iri not in position and eq_iri in full_reachable)
 
-    closed = (bool(selection.sequence)
+    has_work = (bool(selection.sequence)
+                or bool(selection.instantiated)
+                or bool(selection.ports))
+    closed = (has_work
               and not unresolved and not cycles and not conflicts
               and not order_violations)
     return ClosureReport(
