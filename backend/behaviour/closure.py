@@ -9,9 +9,11 @@ var/expr bipartite graph — the mechanics of
   **to-be-instantiated**, or it is declared an **external input**
   (port).  The subgraph is *closed* when every RHS variable is
   resolved.
-- A selected base equation defines a stateful entity; its LHS variable
-  owns the only permitted dependency cycle (the integrator loop).
-  Choosing no base equation yields a stateless, acyclic entity.
+- A selected base equation makes its LHS variable the state of the
+  entity.  Which equation is chosen is a user decision; ``lhs_class``
+  is only a UI hint, not a semantic rule.  The state variable owns the
+  only permitted dependency cycle (the integrator loop).  Choosing no
+  base equation yields a stateless, acyclic entity.
 - The selection order *is* the computation sequence (§13): every
   non-base equation's inputs must be state, earlier-defined,
   instantiated, or port — the lower-triangular property.
@@ -148,7 +150,7 @@ def evaluate(equations: Dict[str, EquationInfo],
                     or selection.sequence[0] != selection.base_equation):
                 order_violations.append(OrderViolation(
                     equation=selection.base_equation,
-                    variable=state_var or base.lhs,
+                    variable=state_var,
                     defined_by=selection.base_equation,
                     detail="base equation must head the sequence"))
 

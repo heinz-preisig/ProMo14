@@ -10,6 +10,7 @@ import {
   saveAssignment,
   saveStore,
 } from './api'
+import { EqLine } from './components/EqLine'
 import type {
   Assignment,
   BehaviourContext,
@@ -17,6 +18,7 @@ import type {
   Equation,
   EvaluateReport,
 } from './types'
+import { buildPrintableLatex, escapeHtml } from './utils/latex'
 import { useStoreDirty } from '@promo/ui'
 
 /** Short display form of an IRI: fragment after # or last /. */
@@ -25,21 +27,6 @@ function frag(iri: string): string {
   if (h.length > 1) return h[h.length - 1]
   const s = iri.split('/')
   return s[s.length - 1]
-}
-
-/** Escape plain text so it is safe inside a LaTeX math \text{...} block. */
-function texEscape(s: string): string {
-  return s
-    .replace(/\\/g, '\\textbackslash{}')
-    .replace(/&/g, '\\&')
-    .replace(/%/g, '\\%')
-    .replace(/#/g, '\\#')
-    .replace(/_/g, '\\_')
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/\$/g, '\\$')
-    .replace(/~/g, '\\textasciitilde{}')
-    .replace(/\^/g, '\\textasciicircum{}')
 }
 
 const btn: React.CSSProperties = {
@@ -57,32 +44,6 @@ const card: React.CSSProperties = {
   borderRadius: 6,
   padding: '10px 14px',
   marginBottom: 12,
-}
-
-/** Inline KaTeX; falls back to monospace text when no latex is stored
- *  or rendering fails. */
-function Tex({ latex, fallback }: { latex?: string | null; fallback: string }) {
-  const html = useMemo(() => {
-    if (!latex) return null
-    try {
-      return renderToString(latex, { throwOnError: true, displayMode: false })
-    } catch {
-      return null
-    }
-  }, [latex])
-  if (html === null) return <code>{fallback}</code>
-  return <span dangerouslySetInnerHTML={{ __html: html }} />
-}
-
-/** ``E_n: lhs := rhs`` — math when the backend supplied latex, else text. */
-function EqLine({ eq, lhsLabel }: { eq: Equation; lhsLabel: string }) {
-  return (
-    <span>
-      <Tex latex={eq.lhs_latex} fallback={lhsLabel} />
-      {' := '}
-      <Tex latex={eq.rhs_latex} fallback={eq.rhs} />
-    </span>
-  )
 }
 
 export default function App() {
@@ -340,52 +301,21 @@ export default function App() {
 
   const selectedType = ctx?.entity_types.find((t) => t.iri === entityType)
 
-  /** Render-ready LaTeX for the current entity assignment. */
   const printableLatex = useMemo(() => {
     if (!entityType || !report) return ''
-    const esc = texEscape
-    const header: string[] = []
-    header.push(
-      `\\text{Entity: ${esc(selectedType?.label ?? frag(entityType))}}`,
-    )
-    if (report.state_variable) {
-      header.push(`\\text{state: } ${esc(lab(report.state_variable))}`)
-    }
-    const eqLines = sequence
-      .map((eqIri) => {
-        const e = eqs.get(eqIri)
-        if (!e) return ''
-        const marker = eqIri === baseEquation ? ' \\text{(base)}' : ''
-        const lhs = e.lhs_latex ?? esc(lab(e.lhs))
-        const rhs = e.rhs_latex ?? ''
-        return `${lhs} = ${rhs}${marker}`
-      })
-      .filter(Boolean)
-    const meta: string[] = []
-    if (instantiated.length > 0) {
-      meta.push(
-        `\\text{instantiated: } ${instantiated
-          .map((v) => esc(lab(v)))
-          .join(', ')}`,
-      )
-    }
-    if (ports.length > 0) {
-      meta.push(
-        `\\text{ports: } ${ports.map((v) => esc(lab(v))).join(', ')}`,
-      )
-    }
-    const all = [...header, ...eqLines, ...meta]
-    if (all.length === 0) return ''
-    const eqBlockEnd = header.length + eqLines.length - 1
-    return `\\begin{gathered}\n${all
-      .map((l, i) => {
-        const br =
-          eqLines.length > 0 && meta.length > 0 && i === eqBlockEnd
-            ? '\\\\[6pt]'
-            : '\\\\'
-        return `  ${l} ${br}`
-      })
-      .join('\n')}\n\\end{gathered}`
+    return buildPrintableLatex({
+      entityType,
+      entityLabel: selectedType?.label ?? null,
+      report,
+      assignment: {
+        sequence,
+        base_equation: baseEquation,
+        instantiated,
+        ports,
+      },
+      eqs,
+      lab,
+    })
   }, [
     entityType,
     report,
@@ -412,6 +342,7 @@ export default function App() {
   const printRepresentation = () => {
     if (!previewHtml || !entityType) return
     const title = selectedType?.label ?? frag(entityType)
+    const safeTitle = escapeHtml(title)
     const w = window.open('', `print-${entityType}`, 'width=800,height=600')
     if (!w) return
     const styles = Array.from(
@@ -423,7 +354,7 @@ export default function App() {
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Behaviour Linker — ${title}</title>
+    <title>Behaviour Linker — ${safeTitle}</title>
     ${styles}
     <style>
       body { font-family: sans-serif; padding: 24px; }
@@ -431,13 +362,10 @@ export default function App() {
     </style>
   </head>
   <body>
-    <h1>${title}</h1>
+    <h1>${safeTitle}</h1>
     <div>${previewHtml}</div>
     <h2>LaTeX source</h2>
-    <pre>${printableLatex
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')}</pre>
+    <pre>${escapeHtml(printableLatex)}</pre>
   </body>
 </html>`)
     w.document.close()

@@ -98,6 +98,31 @@ def test_stateless_selection_has_no_state_variable():
 
 
 # ---------------------------------------------------------------------------
+# Engine: frontier suggestions
+# ---------------------------------------------------------------------------
+
+def test_frontier_suggests_reachable_resolver():
+    """The frontier lists equations that resolve an open variable and are
+    reachable from the selected base cone."""
+    report = evaluate(CHAIN, Selection(sequence=["E1"], base_equation="E1"))
+    assert report.frontier == ["E2"]
+
+
+def test_frontier_empty_when_closed():
+    report = evaluate(CHAIN, Selection(
+        sequence=["E1", "E2"], base_equation="E1",
+        instantiated={"p"}, ports={"q"}))
+    assert report.frontier == []
+    assert report.closed
+
+
+def test_frontier_reachable_from_stateless_sequence():
+    graph = _graph(_eq("E1", "f", ["a"]), _eq("E2", "a", []))
+    report = evaluate(graph, Selection(sequence=["E1"]))
+    assert report.frontier == ["E2"]
+
+
+# ---------------------------------------------------------------------------
 # Engine: conflicts & ordering
 # ---------------------------------------------------------------------------
 

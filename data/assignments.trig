@@ -1,6 +1,7 @@
 @prefix promo: <https://w3id.org/promo#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://w3id.org/promo/library/assignments> {
     promo:Assignment a rdfs:Class .
@@ -64,5 +65,47 @@
     <https://w3id.org/promo/library/assignments> a promo:Assignment ;
         promo:usesOntology <https://w3id.org/promo/library/>,
             <https://w3id.org/promo/ontology> .
+
+    <https://w3id.org/promo/library/assignments#assignment_etype_environment> a promo:BehaviourAssignment ;
+        promo:closed false ;
+        promo:forEntityType <https://w3id.org/promo/ontology#etype_environment> ;
+        promo:hasEquationSequence [ ] ;
+        promo:hasInstantiatedVariable <promo:P>,
+            <promo:c> .
+
+    <https://w3id.org/promo/library/assignments#assignment_etype_lumped> a promo:BehaviourAssignment ;
+        promo:closed true ;
+        promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:hasBaseEquation <https://w3id.org/promo/library/#E_13> ;
+        promo:hasEquationSequence _:N61448472ae924e439a009ace65237fad ;
+        promo:hasInstantiatedVariable <promo:Axy>,
+            <promo:k_conv>,
+            <promo:rho>,
+            <promo:t> ;
+        promo:hasPortVariable <promo:F_conv>,
+            <promo:P>,
+            <promo:c> ;
+        promo:hasStateVariable <promo:n> .
+
+    _:N5976f961a5864103b7d84011cbf2c4b7 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:Nb783d5bbab0041e28466b75b2fb96b33 .
+
+    _:N61448472ae924e439a009ace65237fad rdf:first <https://w3id.org/promo/library/#E_13> ;
+        rdf:rest _:N6836b36eda3f4e67aa31859d5a4517e8 .
+
+    _:N6836b36eda3f4e67aa31859d5a4517e8 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:Nb2509039fac345c2a9063e2a09a63a1b .
+
+    _:N695771bdc1c242bf81797311192b31c4 rdf:first <https://w3id.org/promo/library/#E_17> ;
+        rdf:rest _:Nd915346f9f514c5eb52b59d0a3dd122f .
+
+    _:Nb2509039fac345c2a9063e2a09a63a1b rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:N5976f961a5864103b7d84011cbf2c4b7 .
+
+    _:Nb783d5bbab0041e28466b75b2fb96b33 rdf:first <https://w3id.org/promo/library/#E_16> ;
+        rdf:rest _:N695771bdc1c242bf81797311192b31c4 .
+
+    _:Nd915346f9f514c5eb52b59d0a3dd122f rdf:first <https://w3id.org/promo/library/#E_18> ;
+        rdf:rest () .
 }
 
