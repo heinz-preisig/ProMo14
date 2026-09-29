@@ -640,6 +640,38 @@ export default function App() {
                       ))}
                     </div>
                   )}
+                  <div style={{ marginTop: 4 }}>
+                    <b>mark variable:</b>{' '}
+                    <select
+                      style={{ fontSize: 13 }}
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value)
+                          mark(e.target.value, 'instantiated')
+                      }}
+                    >
+                      <option value="">instantiate…</option>
+                      {(ctx?.variables ?? []).map((v) => (
+                        <option key={v.iri} value={v.iri}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>{' '}
+                    <select
+                      style={{ fontSize: 13 }}
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) mark(e.target.value, 'ports')
+                      }}
+                    >
+                      <option value="">port…</option>
+                      {(ctx?.variables ?? []).map((v) => (
+                        <option key={v.iri} value={v.iri}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
