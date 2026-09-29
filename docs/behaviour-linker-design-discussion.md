@@ -502,9 +502,12 @@ classes remain hints.  The case not expressible is a variable that is
 its coherent reading is equation inversion — the retained equation
 determines one of its inputs instead — which is real assignment-problem
 machinery, deferred until a concrete case needs it.  Degenerate
-all-instantiated subgraphs are guarded by the closure check plus the
-"marked variable not referenced" warning rather than by class
-restrictions.
+all-instantiated subgraphs are guarded by the closure check rather
+than by class restrictions.  The unreferenced-mark warning applies to
+ports only: an instantiated-but-unreferenced variable is a legitimate
+interface declaration (a bound value provided outward — e.g. an
+environment fixing a boundary variable), while an unreferenced port
+promises an input nothing consumes.
 
 ### Cycle check is indirect (2026-09-13)
 

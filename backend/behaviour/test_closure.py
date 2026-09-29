@@ -150,12 +150,22 @@ def test_unknown_equation_conflict():
     assert any(c.kind == "unknown_equation" for c in report.conflicts)
 
 
-def test_unused_marking_warns():
+def test_unused_port_warns():
     report = evaluate(CHAIN, Selection(
         sequence=["E1", "E2"], base_equation="E1",
-        instantiated={"p", "unused"}, ports={"q"}))
+        instantiated={"p"}, ports={"q", "unused"}))
     assert any("unused" in w for w in report.warnings)
     assert report.closed          # warnings do not block closure
+
+
+def test_unreferenced_instantiated_no_warning():
+    """An instantiated mark with no internal reference is a legitimate
+    interface declaration (bound value provided outward), not a hint."""
+    report = evaluate(CHAIN, Selection(
+        sequence=["E1", "E2"], base_equation="E1",
+        instantiated={"p", "provided"}, ports={"q"}))
+    assert not any("provided" in w for w in report.warnings)
+    assert report.closed
 
 
 def test_unreachable_equation_warns():

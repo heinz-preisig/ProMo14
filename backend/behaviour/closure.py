@@ -198,10 +198,13 @@ def evaluate(equations: Dict[str, EquationInfo],
             unresolved.append(
                 UnresolvedVar(variable=var, candidates=candidates))
 
-    for var in sorted((selection.instantiated | selection.ports)
-                      - referenced):
+    # An instantiated variable may sit unreferenced on purpose — it
+    # declares a bound value the entity provides outward (e.g. an
+    # environment fixing a boundary variable).  An unreferenced port is
+    # always suspect: it promises an input nothing consumes.
+    for var in sorted(selection.ports - referenced):
         warnings.append(
-            "marked variable %s is not referenced by any selected "
+            "declared port %s is not referenced by any selected "
             "equation" % var)
 
     # -- cycle check (§8): only the loop through the state variable is
