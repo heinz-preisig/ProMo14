@@ -304,7 +304,7 @@ export default function App() {
           {report && entityType && (
             <span
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 color: report.closed ? '#0a7' : '#c80',
                 fontWeight: 600,
               }}
@@ -313,9 +313,9 @@ export default function App() {
             </span>
           )}
           {dirty && (
-            <span style={{ fontSize: 12, color: '#c80' }}>● unsaved</span>
+            <span style={{ fontSize: 13, color: '#c80' }}>● unsaved</span>
           )}
-          {saveMsg && <span style={{ fontSize: 12 }}>{saveMsg}</span>}
+          {saveMsg && <span style={{ fontSize: 13 }}>{saveMsg}</span>}
           <button style={btn} onClick={save} disabled={!entityType}>
             Save
           </button>
@@ -335,7 +335,7 @@ export default function App() {
             padding: 8,
           }}
         >
-          <div style={{ fontSize: 11, color: '#888', margin: '4px 4px 8px' }}>
+          <div style={{ fontSize: 12, color: '#888', margin: '4px 4px 8px' }}>
             ENTITY TYPES
           </div>
           <input
@@ -345,7 +345,7 @@ export default function App() {
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              fontSize: 12,
+              fontSize: 13,
               padding: '3px 6px',
               marginBottom: 6,
               border: '1px solid #ccc',
@@ -381,7 +381,7 @@ export default function App() {
                 {a && (
                   <span
                     style={{
-                      fontSize: 11,
+                      fontSize: 12,
                       color: a.closed ? '#0a7' : '#c80',
                     }}
                   >
@@ -404,11 +404,11 @@ export default function App() {
             <>
               {/* Base equation ------------------------------------------- */}
               <div style={card}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Base equation (state-defining)
                 </div>
                 <label
-                  style={{ display: 'block', fontSize: 12, padding: '2px 0' }}
+                  style={{ display: 'block', fontSize: 13, padding: '2px 0' }}
                 >
                   <input
                     type="radio"
@@ -422,7 +422,7 @@ export default function App() {
                     key={e.iri}
                     style={{
                       display: 'block',
-                      fontSize: 12,
+                      fontSize: 13,
                       padding: '2px 0',
                     }}
                   >
@@ -438,7 +438,7 @@ export default function App() {
 
               {/* Computation sequence ------------------------------------ */}
               <div style={card}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Computation sequence
                   {report?.state_variable && (
                     <span style={{ fontWeight: 400, color: '#666' }}>
@@ -448,7 +448,7 @@ export default function App() {
                   )}
                 </div>
                 {sequence.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#888' }}>
+                  <div style={{ fontSize: 13, color: '#888' }}>
                     No equations selected yet.
                   </div>
                 )}
@@ -479,7 +479,7 @@ export default function App() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
-                        fontSize: 12,
+                        fontSize: 13,
                         padding: '2px 4px',
                         cursor: 'grab',
                         borderTop:
@@ -512,7 +512,7 @@ export default function App() {
 
               {/* Unresolved inputs ---------------------------------------- */}
               <div style={card}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Unresolved inputs ({report?.unresolved.length ?? 0})
                 </div>
                 {(report?.unresolved ?? []).map((u) => (
@@ -523,7 +523,7 @@ export default function App() {
                       alignItems: 'center',
                       gap: 8,
                       flexWrap: 'wrap',
-                      fontSize: 12,
+                      fontSize: 13,
                       padding: '3px 0',
                     }}
                   >
@@ -564,7 +564,7 @@ export default function App() {
                   </div>
                 ))}
                 {report && report.unresolved.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#0a7' }}>
+                  <div style={{ fontSize: 13, color: '#0a7' }}>
                     all inputs resolved
                   </div>
                 )}
@@ -572,10 +572,10 @@ export default function App() {
 
               {/* Roles ----------------------------------------------------- */}
               <div style={card}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Roles
                 </div>
-                <div style={{ fontSize: 12 }}>
+                <div style={{ fontSize: 13 }}>
                   <div>
                     <b>state:</b> {lab(report?.state_variable)}
                   </div>
@@ -652,7 +652,7 @@ export default function App() {
                   <div style={{ ...card, borderColor: '#e0b0b0' }}>
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 600,
                         marginBottom: 6,
                         color: '#a00',
@@ -661,23 +661,23 @@ export default function App() {
                       Problems
                     </div>
                     {report.cycles.map((c, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#a00' }}>
+                      <div key={i} style={{ fontSize: 13, color: '#a00' }}>
                         cycle: {c.map(eqLhs).join(' → ')}
                       </div>
                     ))}
                     {report.conflicts.map((c, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#a00' }}>
+                      <div key={i} style={{ fontSize: 13, color: '#a00' }}>
                         {c.kind}: {lab(c.variable)} {c.detail}
                       </div>
                     ))}
                     {report.order_violations.map((v, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#a00' }}>
+                      <div key={i} style={{ fontSize: 13, color: '#a00' }}>
                         order: {eqLhs(v.equation)} uses {lab(v.variable)}{' '}
                         defined later by {eqLhs(v.defined_by)}
                       </div>
                     ))}
                     {report.warnings.map((w, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#c80' }}>
+                      <div key={i} style={{ fontSize: 13, color: '#c80' }}>
                         {w}
                       </div>
                     ))}
