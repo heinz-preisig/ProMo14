@@ -668,7 +668,8 @@ def _assignments_collect(store, vars_graph: Optional[str],
                          labels: Dict[str, str]) -> Dict[str, AssignmentInfo]:
     """All §13 behaviour assignments in the artefact's assignment graph."""
     out: Dict[str, AssignmentInfo] = {}
-    ag = store.dataset.graph(URIRef(_assignment_graph_iri(vars_graph)))
+    ag = store.dataset.graph(
+        URIRef(_assignment_graph_iri(store, vars_graph)))
     for res in ag.subjects(RDF.type, PROMO["BehaviourAssignment"]):
         a = _read_assignment(ag, res)
         if a is None or not a.entity_type:

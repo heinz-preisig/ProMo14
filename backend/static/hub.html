@@ -163,7 +163,9 @@
     <span class="chip species">spec:name</span> = usesSpecies (purple).
     Pin a frozen version for reproducibility.</p>
     <p><strong>Actions</strong> — Open edits the draft; view opens a
-    frozen version read-only.  Instantiate a model (instantiation
+    frozen version read-only.  Behaviour… opens a var/expr library in
+    the Behaviour Linker (it writes the library's derived assignment
+    artefact).  Instantiate a model (instantiation
     view), Species… pins a scheme to a model, Fork duplicates the
     artefact to a new IRI — branch it without touching the original.
     Or click a stage in the suite map — it opens the app directly when
@@ -212,10 +214,10 @@
         <text class="t" x="240" y="33">Equation Editor</text>
         <text class="s" x="240" y="48">library artefact</text>
       </g>
-      <g class="stage" data-stage="assignment" onclick="stageClick(['assignment'],
-        'Assignment artefacts hold behaviour closures — the ordered equation set per entity type.  Open one in the Behaviour Linker.',
-        [{types:['ontology'], stage:'ontology', label:'an ontology'},
-         {types:['library'], stage:'library', label:'a var/expr library'}])">
+      <g class="stage" data-stage="assignment" onclick="stageClick(['library'],
+        'The Behaviour Linker edits the assignment artefact derived from a var/expr library — the ordered equation set per entity type.  Opens on the library you pick; its …/assignments graph is created on first save.',
+        [{types:['ontology'], stage:'ontology', label:'an ontology'}],
+        'behaviour')">
         <rect x="340" y="15" width="130" height="44" rx="6"/>
         <text class="n" data-count-for="assignment" x="462" y="27"></text>
         <text class="t" x="405" y="33">Behaviour Linker</text>
@@ -286,6 +288,12 @@ const DEV = new URLSearchParams(location.search).has('dev');
 const DEV_PORTS = { ontology: 3001, library: 3002, assignment: 3003,
                     model: 3004, glass: 3004, species: 3005 };
 const INSTANTIATION_DEV_PORT = 3006;
+// Vite `base` per app in dev mode (equation serves at root; the rest
+// are namespaced) — appended explicitly rather than relying on the
+// dev-server redirect to preserve ?graph=.
+const DEV_BASES = { ontology: '/ontology/', library: '/',
+                    assignment: '/behaviour/', model: '/modeller/',
+                    glass: '/modeller/', species: '/species/' };
 // What each artefact type holds — used to explain a missing
 // prerequisite, not just name it.
 const TYPE_INFO = {
@@ -313,15 +321,28 @@ function guardDirty() {
     'across apps but are not written to disk — open anyway?');
 }
 
-function openArtefact(line) {
-  const app = APPS[line.type];
-  if (!app) { msg(`No app for artefact type "${line.type}"`); return; }
+function openIn(line, appKey) {
+  const app = APPS[appKey];
+  if (!app) { msg(`No app for artefact type "${appKey}"`); return; }
   if (!guardDirty()) return;
-  const base = DEV && DEV_PORTS[line.type]
-    ? `http://localhost:${DEV_PORTS[line.type]}/`
+  const base = DEV && DEV_PORTS[appKey]
+    ? `http://localhost:${DEV_PORTS[appKey]}${DEV_BASES[appKey] ?? '/'}`
     : `${app.path}/`;
   // New tab: the hub stays open as the persistent portal/launcher.
   window.open(`${base}?graph=${encodeURIComponent(line.iri)}`, '_blank');
+}
+
+function openArtefact(line) {
+  openIn(line, line.type);
+}
+
+// The Behaviour Linker edits the assignment artefact *derived from* a
+// var/expr artefact, so it opens on the library line (the derived
+// <iri>/assignments graph is created on first save).  An assignment
+// line can also be opened directly — the backend maps an
+// Assignment-typed ?graph back to itself.
+function openBehaviour(line) {
+  openIn(line, 'assignment');
 }
 
 function openVersion(type, iri) {
@@ -332,7 +353,7 @@ function openVersion(type, iri) {
 
 function instantiateArtefact(line) {
   if (!guardDirty()) return;
-  const base = DEV ? `http://localhost:${INSTANTIATION_DEV_PORT}/`
+  const base = DEV ? `http://localhost:${INSTANTIATION_DEV_PORT}/instantiation/`
                    : '/instantiation/';
   window.open(`${base}?graph=${encodeURIComponent(line.iri)}`, '_blank');
 }
@@ -508,6 +529,9 @@ function render(lines) {
     const instBtn = (l.type === 'model' || l.type === 'glass')
       ? `<button onclick='instantiateArtefact(${JSON.stringify(l)})'>Instantiate</button>`
       : '';
+    const behBtn = l.type === 'library'
+      ? `<button title="assign behaviour to entity types — writes this library's derived assignments artefact" onclick='openBehaviour(${JSON.stringify(l)})'>Behaviour…</button>`
+      : '';
     const pinBtn = (l.type === 'model' || l.type === 'glass') && l.status === 'draft'
       ? `<button onclick='pinSpecies(${JSON.stringify(l)})'>Species…</button>`
       : '';
@@ -520,7 +544,7 @@ function render(lines) {
       <td class="status-${l.status}">${esc(l.status)}${floorBadge}</td>
       <td>${vers}</td>
       <td>${pins}</td>
-      <td>${openBtn}${instBtn}${pinBtn}${forkBtn}</td>
+      <td>${openBtn}${behBtn}${instBtn}${pinBtn}${forkBtn}</td>
     </tr>`;
   }).join('');
   root.innerHTML = `<table>
@@ -566,8 +590,9 @@ function stageClick(types, hint, needs, action) {
     document.querySelectorAll(`#catalogue tr[data-type="${l.type}"]`)
       .forEach(r => r.classList.add('hit'));
   if (lines.length === 1) {
-    (action === 'instantiate' ? instantiateArtefact : openArtefact)
-      (lines[0]);
+    (action === 'instantiate' ? instantiateArtefact
+     : action === 'behaviour' ? openBehaviour
+     : openArtefact)(lines[0]);
     return;
   }
   if (types.length &&

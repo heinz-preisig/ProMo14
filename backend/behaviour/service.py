@@ -147,21 +147,30 @@ def _labels(variables, equations) -> Dict[str, str]:
     return labels
 
 
-def _assignment_graph_iri(graph_iri: Optional[str]) -> str:
+def _assignment_graph_iri(store, graph_iri: Optional[str]) -> str:
+    """The derived assignment artefact for a var/expr graph — or the
+    graph itself when ``graph_iri`` already names an ``Assignment``
+    artefact (e.g. the hub reopening a saved ``…/assignments`` line;
+    deriving again would nest ``…/assignments/assignments``).
+    """
     if graph_iri:
+        iri = URIRef(graph_iri)
+        if (iri, RDF.type, PROMO["Assignment"]) in store.dataset.graph(iri):
+            return graph_iri
         return graph_iri.rstrip("/") + "/assignments"
     return DEFAULT_ASSIGNMENT_GRAPH
 
 
-def _assignment_res(graph_iri: Optional[str], entity_type: str) -> URIRef:
+def _assignment_res(store, graph_iri: Optional[str],
+                    entity_type: str) -> URIRef:
     frag = entity_type.split("#")[-1].split("/")[-1]
-    return URIRef(_assignment_graph_iri(graph_iri)
+    return URIRef(_assignment_graph_iri(store, graph_iri)
                   + "#assignment_" + frag)
 
 
 def _assignment_graph(store, graph_iri: Optional[str]):
     """The assignment artefact graph, created on first use."""
-    iri = _assignment_graph_iri(graph_iri)
+    iri = _assignment_graph_iri(store, graph_iri)
     g = store.dataset.graph(URIRef(iri))
     if not len(g):
         uses = ([str(i) for i in store.resolution_scope(graph_iri)]
@@ -282,7 +291,8 @@ def list_assignments(
 ) -> List[AssignmentOut]:
     """All stored assignments in the scope's assignment graph."""
     store = get_store()
-    g = store.dataset.graph(URIRef(_assignment_graph_iri(graph_iri)))
+    g = store.dataset.graph(
+        URIRef(_assignment_graph_iri(store, graph_iri)))
     out = []
     for res in g.subjects(RDF.type, PROMO["BehaviourAssignment"]):
         found = _read_assignment(g, res)
@@ -298,8 +308,10 @@ def get_assignment(
 ) -> AssignmentOut:
     """Read the stored assignment for an entity type (404 if none)."""
     store = get_store()
-    g = store.dataset.graph(URIRef(_assignment_graph_iri(graph_iri)))
-    found = _read_assignment(g, _assignment_res(graph_iri, entity_type))
+    g = store.dataset.graph(
+        URIRef(_assignment_graph_iri(store, graph_iri)))
+    found = _read_assignment(
+        g, _assignment_res(store, graph_iri, entity_type))
     if found is None:
         raise HTTPException(
             status_code=404,
@@ -329,7 +341,7 @@ def put_assignment(
     ), auto_instantiated=auto)
 
     g = _assignment_graph(store, graph_iri)
-    res = _assignment_res(graph_iri, selection.entity_type)
+    res = _assignment_res(store, graph_iri, selection.entity_type)
 
     # Replace semantics: drop the old list cells before the resource's
     # own triples so no orphaned cons cells survive.
@@ -375,8 +387,9 @@ def delete_assignment(
 ) -> None:
     """Drop an entity type's assignment (404 if none)."""
     store = get_store()
-    g = store.dataset.graph(URIRef(_assignment_graph_iri(graph_iri)))
-    res = _assignment_res(graph_iri, entity_type)
+    g = store.dataset.graph(
+        URIRef(_assignment_graph_iri(store, graph_iri)))
+    res = _assignment_res(store, graph_iri, entity_type)
     if (res, RDF.type, PROMO["BehaviourAssignment"]) not in g:
         raise HTTPException(
             status_code=404,
