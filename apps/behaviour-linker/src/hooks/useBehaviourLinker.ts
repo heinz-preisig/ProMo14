@@ -112,11 +112,12 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     listAssignments().then(setAssignments).catch(() => {})
   }, [])
 
-  // Selecting an entity type loads its stored assignment (if any).
+  // Selecting an entity type loads its stored assignment (if any) and
+  // normalises the base equation to the end of the sequence.
   useEffect(() => {
     if (!entityType) return
     loadAssignment(entityType).then((a) => {
-      const assignment = a ?? {
+      let assignment = a ?? {
         entity_type: entityType,
         sequence: [],
         base_equation: null,
@@ -124,6 +125,19 @@ export function useBehaviourLinker(): BehaviourLinkerState {
         instantiated: [],
         ports: [],
         closed: false,
+      }
+      if (
+        assignment.base_equation &&
+        assignment.sequence.indexOf(assignment.base_equation) !==
+          assignment.sequence.length - 1
+      ) {
+        assignment = {
+          ...assignment,
+          sequence: [
+            ...assignment.sequence.filter((e) => e !== assignment.base_equation),
+            assignment.base_equation,
+          ],
+        }
       }
       setSequence(assignment.sequence)
       setBaseEquation(assignment.base_equation)
