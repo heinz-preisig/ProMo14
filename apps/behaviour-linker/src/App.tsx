@@ -344,12 +344,12 @@ export default function App() {
   const printableLatex = useMemo(() => {
     if (!entityType || !report) return ''
     const esc = texEscape
-    const lines: string[] = []
-    lines.push(
+    const header: string[] = []
+    header.push(
       `\\text{Entity: ${esc(selectedType?.label ?? frag(entityType))}}`,
     )
     if (report.state_variable) {
-      lines.push(`\\text{state: } ${esc(lab(report.state_variable))}`)
+      header.push(`\\text{state: } ${esc(lab(report.state_variable))}`)
     }
     const eqLines = sequence
       .map((eqIri) => {
@@ -361,22 +361,30 @@ export default function App() {
         return `${lhs} = ${rhs}${marker}`
       })
       .filter(Boolean)
-    lines.push(...eqLines)
+    const meta: string[] = []
     if (instantiated.length > 0) {
-      lines.push(
+      meta.push(
         `\\text{instantiated: } ${instantiated
           .map((v) => esc(lab(v)))
           .join(', ')}`,
       )
     }
     if (ports.length > 0) {
-      lines.push(
+      meta.push(
         `\\text{ports: } ${ports.map((v) => esc(lab(v))).join(', ')}`,
       )
     }
-    if (lines.length === 0) return ''
-    return `\\begin{gathered}\n${lines
-      .map((l) => `  ${l} \\\\\\`)
+    const all = [...header, ...eqLines, ...meta]
+    if (all.length === 0) return ''
+    const eqBlockEnd = header.length + eqLines.length - 1
+    return `\\begin{gathered}\n${all
+      .map((l, i) => {
+        const br =
+          eqLines.length > 0 && meta.length > 0 && i === eqBlockEnd
+            ? '\\\\[6pt]'
+            : '\\\\'
+        return `  ${l} ${br}`
+      })
       .join('\n')}\n\\end{gathered}`
   }, [
     entityType,
