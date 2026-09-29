@@ -265,13 +265,18 @@ export default function App() {
 
   const save = async () => {
     if (!entityType) return
-    if (sequence.length === 0 && !baseEquation) {
+    if (
+      sequence.length === 0 &&
+      !baseEquation &&
+      instantiated.length === 0 &&
+      ports.length === 0
+    ) {
       setSaveMsg('nothing to save')
       setTimeout(() => setSaveMsg(''), 3000)
       return
     }
     try {
-      await saveAssignment({
+      const saved = await saveAssignment({
         entity_type: entityType,
         sequence,
         base_equation: baseEquation,
@@ -279,15 +284,7 @@ export default function App() {
         ports,
       })
       await saveStore()
-      setLastSaved({
-        entity_type: entityType,
-        sequence,
-        base_equation: baseEquation,
-        state_variable: report?.state_variable ?? null,
-        instantiated,
-        ports,
-        closed: report?.closed ?? false,
-      })
+      setLastSaved(saved)
       setSaveMsg('saved')
       refresh()
       listAssignments().then(setAssignments).catch(() => {})
