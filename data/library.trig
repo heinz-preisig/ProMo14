@@ -7,6 +7,10 @@
 <https://w3id.org/promo/library/> {
     promo:Assignment a rdfs:Class .
 
+    promo:Equation a rdfs:Class .
+
+    promo:Expression a rdfs:Class .
+
     promo:Glass a rdfs:Class .
 
     promo:Library a rdfs:Class .
@@ -17,25 +21,77 @@
 
     promo:Species a rdfs:Class .
 
-    promo:ValueCell a rdfs:Class .
+    promo:ValueCell a rdfs:Class ;
+        promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
+
+    promo:Variable a rdfs:Class .
 
     promo:Version a rdfs:Class .
 
-    promo:atIndexElement a rdf:Property .
+    promo:aliases a rdf:Property .
 
-    promo:coordinate a rdf:Property .
+    promo:atIndexElement a rdf:Property ;
+        promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
+
+    promo:axisValue a rdf:Property .
+
+    promo:coordinate a rdf:Property ;
+        promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
+
+    promo:created a rdf:Property .
+
+    promo:doc a rdf:Property .
+
+    promo:equationClass a rdf:Property .
 
     promo:generatedFrom a rdf:Property .
 
+    promo:hasArguments a rdf:Property .
+
+    promo:hasEquation a rdf:Property .
+
+    promo:hasOperation a rdf:Property .
+
+    promo:imported a rdf:Property .
+
+    promo:inDomain a rdf:Property .
+
+    promo:incidenceList a rdf:Property .
+
+    promo:indexStructure a rdf:Property .
+
+    promo:internalID a rdf:Property .
+
+    promo:latex a rdf:Property .
+
+    promo:lhs a rdf:Property .
+
+    promo:modified a rdf:Property .
+
+    promo:network a rdf:Property .
+
+    promo:portVariable a rdf:Property .
+
     promo:publishedOn a rdf:Property .
 
+    promo:rhs a rdf:Property .
+
+    promo:rhsExpression a rdf:Property .
+
+    promo:rhsLatex a rdf:Property .
+
     promo:seedFloor a rdf:Property .
+
+    promo:unitVector a rdf:Property .
 
     promo:usesOntology a rdf:Property .
 
     promo:usesSpecies a rdf:Property .
 
-    promo:valueCell a rdf:Property .
+    promo:valueCell a rdf:Property ;
+        promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
+
+    promo:variableClass a rdf:Property .
 
     promo:versionInfo a rdf:Property .
 
@@ -59,7 +115,7 @@
         promo:rhsLatex "{{V}_{N}}^{-1} \\circ {n}_{N,S}" .
 
     <https://w3id.org/promo/library/#E_10/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b1 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b1 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_11> a promo:Equation ;
@@ -77,7 +133,7 @@
         promo:rhsLatex "\\mathrm{sign}\\left( \\sum_{N} {F}_{A\\_conv,N} \\, {p}_{N} \\right)" .
 
     <https://w3id.org/promo/library/#E_11/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b2 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b2 ;
         promo:hasOperation promolg:sign .
 
     <https://w3id.org/promo/library/#E_12> a promo:Equation ;
@@ -95,8 +151,26 @@
         promo:rhsLatex "\\sum_{N} \\left( \\frac{1}{2} \\circ \\left( {F}_{A\\_conv,N} - {d}_{A\\_conv} \\circ \\left| {F}_{A\\_conv,N} \\right| \\right) \\right) \\, {c}_{N,S}" .
 
     <https://w3id.org/promo/library/#E_12/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b3 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b3 ;
         promo:hasOperation promolg:ReduceProduct .
+
+    <https://w3id.org/promo/library/#E_13> a promo:Equation ;
+        promo:created "2026-09-29T12:46:04.658Z" ;
+        promo:doc "" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_balance> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:incidenceList "[\"promo:dndt\", \"promo:t\", \"promo:te\", \"promo:to\"]" ;
+        promo:internalID "E_13" ;
+        promo:lhs <promo:n> ;
+        promo:modified "2026-09-29T12:46:04.658Z" ;
+        promo:network "physical" ;
+        promo:rhs "Integral(dndt :: t in [to,te])" ;
+        promo:rhsExpression <https://w3id.org/promo/library/#E_13/expression> ;
+        promo:rhsLatex "\\int_{t^o}^{t^e} {\\dot{n}}_{A\\_conv,N,S} \\, dt" .
+
+    <https://w3id.org/promo/library/#E_13/expression> a promo:Expression ;
+        promo:hasArguments _:N48ae3966de2a4bfab0cc14bff1e76d03 ;
+        promo:hasOperation promolg:DefiniteIntegral .
 
     <https://w3id.org/promo/library/#E_14> a promo:Equation ;
         promo:created "2026-09-25T13:14:09.137Z" ;
@@ -113,7 +187,7 @@
         promo:rhsLatex "{{V}_{N}}^{-1} \\circ {m}_{N}" .
 
     <https://w3id.org/promo/library/#E_14/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b4 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b4 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_15> a promo:Equation ;
@@ -131,7 +205,7 @@
         promo:rhsLatex "{{\\rho}_{N}}^{-1} \\circ {k}_{N} \\circ {Axy}_{N} \\circ {F}_{A\\_conv,N} \\circ {p}_{N}" .
 
     <https://w3id.org/promo/library/#E_15/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b5 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b5 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_16> a promo:Equation ;
@@ -149,7 +223,7 @@
         promo:rhsLatex "{c}_{A\\_conv,S} \\circ {\\hat{V}}_{A\\_conv,N}" .
 
     <https://w3id.org/promo/library/#E_16/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b6 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b6 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_17> a promo:Equation ;
@@ -167,7 +241,7 @@
         promo:rhsLatex "{F}_{A\\_conv,N} \\circ \\hat{n}_{conv,A\\_conv,N,S}" .
 
     <https://w3id.org/promo/library/#E_17/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b7 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b7 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_18> a promo:Equation ;
@@ -199,27 +273,8 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {V}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b8 ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b8 ;
         promo:hasOperation promolg:PartialDerivative .
-
-    <promo:dndt> a promo:Variable ;
-        rdfs:label "dndt" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_state> ;
-        promo:doc "accumulation of species mass" ;
-        promo:hasEquation <https://w3id.org/promo/library/#E_18> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
-            <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_33" ;
-        promo:latex "\\dot{n}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
 
     <promo:an_conv> a promo:Variable ;
         rdfs:label "an_conv" ;
@@ -288,6 +343,25 @@
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
+    <promo:dndt> a promo:Variable ;
+        rdfs:label "dndt" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_state> ;
+        promo:doc "accumulation of species mass" ;
+        promo:hasEquation <https://w3id.org/promo/library/#E_18> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
+            <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_33" ;
+        promo:latex "\\dot{n}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
+        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
     <promo:fV> a promo:Variable ;
         rdfs:label "fV" ;
         promo:aliases "{\"latex\": \"\\\\hat{V}\", \"global_ID\": \"promo:fV\"}" ;
@@ -321,6 +395,23 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
+        promo:variableClass "state" .
+
+    <promo:n> a promo:Variable ;
+        rdfs:label "n" ;
+        promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
+        promo:doc "species in mole" ;
+        promo:hasEquation <https://w3id.org/promo/library/#E_13> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection>,
+            <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_6" ;
+        promo:latex "n" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
     <promo:rho> a promo:Variable ;
@@ -386,147 +477,159 @@
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
-    _:n1276283f21dd4d1a8548f538293b2150b1 rdf:first _:n1276283f21dd4d1a8548f538293b2150b9 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b10 .
+    _:N3f80c6a995c94c8385be376ae620ca1a rdf:first <promo:to> ;
+        rdf:rest _:Nf5c04b494be4495086df6a0aac7f74cb .
 
-    _:n1276283f21dd4d1a8548f538293b2150b10 rdf:first <promo:n> ;
+    _:N48ae3966de2a4bfab0cc14bff1e76d03 rdf:first <promo:dndt> ;
+        rdf:rest _:Nd476afa8680840f7a23ad4fd2b31fca4 .
+
+    _:Nd476afa8680840f7a23ad4fd2b31fca4 rdf:first <promo:t> ;
+        rdf:rest _:N3f80c6a995c94c8385be376ae620ca1a .
+
+    _:Nf5c04b494be4495086df6a0aac7f74cb rdf:first <promo:te> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b11 rdf:first _:n1276283f21dd4d1a8548f538293b2150b12 ;
+    _:na248127cb10d46c096cf4717cab4d983b1 rdf:first _:na248127cb10d46c096cf4717cab4d983b9 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b10 .
+
+    _:na248127cb10d46c096cf4717cab4d983b10 rdf:first <promo:n> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b12 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b13 ;
+    _:na248127cb10d46c096cf4717cab4d983b11 rdf:first _:na248127cb10d46c096cf4717cab4d983b12 ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b12 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b13 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:n1276283f21dd4d1a8548f538293b2150b13 rdf:first <promo:d> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b26 .
+    _:na248127cb10d46c096cf4717cab4d983b13 rdf:first <promo:d> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b14 .
 
-    _:n1276283f21dd4d1a8548f538293b2150b14 rdf:first _:n1276283f21dd4d1a8548f538293b2150b15 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b16 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b15 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b17 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:n1276283f21dd4d1a8548f538293b2150b16 rdf:first <promo:Axy> ;
+    _:na248127cb10d46c096cf4717cab4d983b14 rdf:first _:na248127cb10d46c096cf4717cab4d983b15 ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b17 rdf:first _:n1276283f21dd4d1a8548f538293b2150b18 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b19 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b18 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b20 ;
-        promo:hasOperation promolg:inv .
-
-    _:n1276283f21dd4d1a8548f538293b2150b19 rdf:first <promo:k_conv> ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b2 rdf:first _:n1276283f21dd4d1a8548f538293b2150b21 ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b20 rdf:first <promo:rho> ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b21 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b40 ;
-        promo:hasOperation promolg:ReduceProduct .
-
-    _:n1276283f21dd4d1a8548f538293b2150b22 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b23 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:n1276283f21dd4d1a8548f538293b2150b23 rdf:first <https://w3id.org/promo/ontology#const_half> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b31 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b24 rdf:first <promo:c> ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b25 rdf:first <promo:F_conv> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b11 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b26 rdf:first _:n1276283f21dd4d1a8548f538293b2150b27 ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b27 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b30 ;
+    _:na248127cb10d46c096cf4717cab4d983b15 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b16 ;
         promo:hasOperation promolg:abs .
 
-    _:n1276283f21dd4d1a8548f538293b2150b28 rdf:first <promo:m> ;
+    _:na248127cb10d46c096cf4717cab4d983b16 rdf:first <promo:F_conv> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b29 rdf:first <promo:V> ;
-        rdf:rest () .
+    _:na248127cb10d46c096cf4717cab4d983b17 rdf:first _:na248127cb10d46c096cf4717cab4d983b18 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b19 .
 
-    _:n1276283f21dd4d1a8548f538293b2150b3 rdf:first _:n1276283f21dd4d1a8548f538293b2150b22 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b24 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b30 rdf:first <promo:F_conv> ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b31 rdf:first _:n1276283f21dd4d1a8548f538293b2150b32 ;
-        rdf:rest () .
-
-    _:n1276283f21dd4d1a8548f538293b2150b32 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b25 ;
-        promo:hasOperation promolg:Subtract .
-
-    _:n1276283f21dd4d1a8548f538293b2150b33 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b34 ;
+    _:na248127cb10d46c096cf4717cab4d983b18 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b20 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:n1276283f21dd4d1a8548f538293b2150b34 rdf:first _:n1276283f21dd4d1a8548f538293b2150b35 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b36 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b35 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b14 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:n1276283f21dd4d1a8548f538293b2150b36 rdf:first <promo:F_conv> ;
+    _:na248127cb10d46c096cf4717cab4d983b19 rdf:first <promo:Axy> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b37 rdf:first <promo:V> ;
+    _:na248127cb10d46c096cf4717cab4d983b2 rdf:first _:na248127cb10d46c096cf4717cab4d983b21 ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b38 rdf:first <promo:P> ;
-        rdf:rest () .
+    _:na248127cb10d46c096cf4717cab4d983b20 rdf:first _:na248127cb10d46c096cf4717cab4d983b22 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b23 .
 
-    _:n1276283f21dd4d1a8548f538293b2150b39 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b37 ;
+    _:na248127cb10d46c096cf4717cab4d983b21 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b24 ;
+        promo:hasOperation promolg:ReduceProduct .
+
+    _:na248127cb10d46c096cf4717cab4d983b22 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b25 ;
         promo:hasOperation promolg:inv .
 
-    _:n1276283f21dd4d1a8548f538293b2150b4 rdf:first _:n1276283f21dd4d1a8548f538293b2150b39 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b28 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b40 rdf:first <promo:F_conv> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b41 .
-
-    _:n1276283f21dd4d1a8548f538293b2150b41 rdf:first <promo:P> ;
+    _:na248127cb10d46c096cf4717cab4d983b23 rdf:first <promo:k_conv> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b42 rdf:first <promo:fV> ;
+    _:na248127cb10d46c096cf4717cab4d983b24 rdf:first <promo:F_conv> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b26 .
+
+    _:na248127cb10d46c096cf4717cab4d983b25 rdf:first <promo:rho> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b43 rdf:first <promo:fn_conv> ;
+    _:na248127cb10d46c096cf4717cab4d983b26 rdf:first <promo:P> ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b44 rdf:first <promo:V> ;
+    _:na248127cb10d46c096cf4717cab4d983b27 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b28 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:na248127cb10d46c096cf4717cab4d983b28 rdf:first <https://w3id.org/promo/ontology#const_half> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b29 .
+
+    _:na248127cb10d46c096cf4717cab4d983b29 rdf:first _:na248127cb10d46c096cf4717cab4d983b30 ;
         rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b5 rdf:first _:n1276283f21dd4d1a8548f538293b2150b33 ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b38 .
+    _:na248127cb10d46c096cf4717cab4d983b3 rdf:first _:na248127cb10d46c096cf4717cab4d983b27 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b31 .
 
-    _:n1276283f21dd4d1a8548f538293b2150b6 rdf:first <promo:c_conv> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b42 .
+    _:na248127cb10d46c096cf4717cab4d983b30 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b32 ;
+        promo:hasOperation promolg:Subtract .
 
-    _:n1276283f21dd4d1a8548f538293b2150b7 rdf:first <promo:F_conv> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b43 .
+    _:na248127cb10d46c096cf4717cab4d983b31 rdf:first <promo:c> ;
+        rdf:rest () .
 
-    _:n1276283f21dd4d1a8548f538293b2150b8 rdf:first <promo:U> ;
-        rdf:rest _:n1276283f21dd4d1a8548f538293b2150b44 .
+    _:na248127cb10d46c096cf4717cab4d983b32 rdf:first <promo:F_conv> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b11 .
 
-    _:n1276283f21dd4d1a8548f538293b2150b9 a promo:Expression ;
-        promo:hasArguments _:n1276283f21dd4d1a8548f538293b2150b29 ;
+    _:na248127cb10d46c096cf4717cab4d983b33 rdf:first <promo:m> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b34 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b35 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b36 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:na248127cb10d46c096cf4717cab4d983b36 rdf:first _:na248127cb10d46c096cf4717cab4d983b37 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b38 .
+
+    _:na248127cb10d46c096cf4717cab4d983b37 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b17 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:na248127cb10d46c096cf4717cab4d983b38 rdf:first <promo:F_conv> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b39 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b4 rdf:first _:na248127cb10d46c096cf4717cab4d983b40 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b33 .
+
+    _:na248127cb10d46c096cf4717cab4d983b40 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b39 ;
+        promo:hasOperation promolg:inv .
+
+    _:na248127cb10d46c096cf4717cab4d983b41 rdf:first <promo:P> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b42 rdf:first <promo:fV> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b43 rdf:first <promo:fn_conv> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b44 rdf:first <promo:V> ;
+        rdf:rest () .
+
+    _:na248127cb10d46c096cf4717cab4d983b5 rdf:first _:na248127cb10d46c096cf4717cab4d983b35 ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b41 .
+
+    _:na248127cb10d46c096cf4717cab4d983b6 rdf:first <promo:c_conv> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b42 .
+
+    _:na248127cb10d46c096cf4717cab4d983b7 rdf:first <promo:F_conv> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b43 .
+
+    _:na248127cb10d46c096cf4717cab4d983b8 rdf:first <promo:U> ;
+        rdf:rest _:na248127cb10d46c096cf4717cab4d983b44 .
+
+    _:na248127cb10d46c096cf4717cab4d983b9 a promo:Expression ;
+        promo:hasArguments _:na248127cb10d46c096cf4717cab4d983b34 ;
         promo:hasOperation promolg:inv .
 }
 

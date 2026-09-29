@@ -3,7 +3,11 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
 <https://w3id.org/promo/species/> {
+    promo:Allocation a rdfs:Class .
+
     promo:Assignment a rdfs:Class .
+
+    promo:Component a rdfs:Class .
 
     promo:Glass a rdfs:Class .
 
@@ -13,19 +17,34 @@
 
     promo:Ontology a rdfs:Class .
 
+    promo:Reaction a rdfs:Class .
+
     promo:Species a rdfs:Class .
 
-    promo:ValueCell a rdfs:Class .
+    promo:ValueCell a rdfs:Class ;
+        promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
 
     promo:Version a rdfs:Class .
 
-    promo:atIndexElement a rdf:Property .
+    promo:atIndexElement a rdf:Property ;
+        promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
 
-    promo:coordinate a rdf:Property .
+    promo:coordinate a rdf:Property ;
+        promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
+
+    promo:doc a rdf:Property .
 
     promo:generatedFrom a rdf:Property .
 
+    promo:internalID a rdf:Property .
+
+    promo:member a rdf:Property .
+
+    promo:product a rdf:Property .
+
     promo:publishedOn a rdf:Property .
+
+    promo:reactant a rdf:Property .
 
     promo:seedFloor a rdf:Property .
 
@@ -33,7 +52,8 @@
 
     promo:usesSpecies a rdf:Property .
 
-    promo:valueCell a rdf:Property .
+    promo:valueCell a rdf:Property ;
+        promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
 
     promo:versionInfo a rdf:Property .
 
