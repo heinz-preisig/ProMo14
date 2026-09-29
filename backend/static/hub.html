@@ -28,6 +28,9 @@
   .chip { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px;
           border-radius: 10px; font-size: 11px; background: #eef3ee;
           color: #2e8b57; font-family: ui-monospace, monospace; }
+  .chip.ontology { background: #e8eef5; color: #1c3a5e; }
+  .chip.library { background: #f1eaf7; color: #6b3fa0; }
+  .chip.assignment { background: #d9e3ee; color: #3498db; }
   .chip.species { background: #f1eaf7; color: #6b3fa0; }
   .ver { font-family: ui-monospace, monospace; font-size: 12px;
          white-space: nowrap; }
@@ -42,17 +45,17 @@
   button.warn { border-color: #d98600; color: #a36a00; font-weight: 600; }
   button.warn:hover { background: #fdf3e3; }
   .dirty { color: #a36a00; font-size: 12px; font-weight: 600; margin-left: 8px; }
-  #newform { background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
+  #newform, #pinform { background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
              padding: 14px 16px; margin-bottom: 14px; display: none; }
-  #newform label { display: block; font-size: 12px; font-weight: 600;
+  #newform label, #pinform label { display: block; font-size: 12px; font-weight: 600;
                    color: #5a6068; margin: 8px 0 2px; }
-  #newform input[type=text], #newform select { width: 100%; padding: 5px 8px;
+  #newform input[type=text], #newform select, #pinform select { width: 100%; padding: 5px 8px;
       font-size: 13px; border: 1px solid #cdd3da; border-radius: 6px;
       background: #fff; }
-  #newform select[multiple] { height: 90px; }
-  #newform .row { display: flex; gap: 14px; }
-  #newform .row > div { flex: 1; min-width: 0; }
-  #newform .actions { margin-top: 10px; }
+  #newform select[multiple], #pinform select[multiple] { height: 110px; }
+  #newform .row, #pinform .row { display: flex; gap: 14px; }
+  #newform .row > div, #pinform .row > div { flex: 1; min-width: 0; }
+  #newform .actions, #pinform .actions { margin-top: 10px; }
   #msg { margin: 12px 0; font-size: 13px; color: #a33; min-height: 1em; }
   .empty { padding: 40px; text-align: center; color: #8a9098; }
   .toolbar { margin-bottom: 14px; }
@@ -123,8 +126,18 @@
     <input type="text" id="nfIri">
     <div class="row">
       <div>
-        <label for="nfUses">Ontology pins — usesOntology (draft or frozen version)</label>
+        <label for="nfUses">Ontology pins — usesOntology</label>
         <select id="nfUses" multiple></select>
+      </div>
+      <div>
+        <label for="nfUsesLibrary">Equation-library pins — usesLibrary</label>
+        <select id="nfUsesLibrary" multiple></select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="nfUsesAssignment">Behaviour-assignment pins — usesAssignment</label>
+        <select id="nfUsesAssignment" multiple></select>
       </div>
       <div id="nfSpeciesRow">
         <label for="nfUsesSpecies">Species pins — usesSpecies</label>
@@ -134,6 +147,33 @@
     <div class="actions">
       <button class="primary" onclick="createArtefact()">Create</button>
       <button onclick="toggleNewForm()">Cancel</button>
+    </div>
+  </div>
+  <div id="pinform">
+    <strong>Edit pins — <span id="pfLabel"></span></strong>
+    <div class="row">
+      <div>
+        <label for="pfUses">Ontology pins</label>
+        <select id="pfUses" multiple></select>
+      </div>
+      <div>
+        <label for="pfUsesLibrary">Equation-library pins</label>
+        <select id="pfUsesLibrary" multiple></select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="pfUsesAssignment">Behaviour-assignment pins</label>
+        <select id="pfUsesAssignment" multiple></select>
+      </div>
+      <div>
+        <label for="pfUsesSpecies">Species pins</label>
+        <select id="pfUsesSpecies" multiple></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="savePins()">Apply pins</button>
+      <button onclick="closePinForm()">Cancel</button>
     </div>
   </div>
   <div id="msg"></div>
@@ -159,7 +199,9 @@
     ontology version as .ttl).</p>
     <p><strong>Pins</strong> — which artefacts this one builds on.
     Chips are labelled by pin kind:
-    <span class="chip">ont:name</span> = usesOntology (green),
+    <span class="chip ontology">ont:name</span> = usesOntology (blue),
+    <span class="chip library">lib:name</span> = usesLibrary (purple),
+    <span class="chip assignment">asg:name</span> = usesAssignment (light blue),
     <span class="chip species">spec:name</span> = usesSpecies (purple).
     Pin a frozen version for reproducibility.</p>
     <p><strong>Actions</strong> — Open edits the draft; view opens a
@@ -406,13 +448,67 @@ async function put(path, body) {
   return r.json();
 }
 
-async function pinSpecies(line) {
-  const cur = (line.usesSpecies || [])[0] || '';
-  const iri = prompt('Species artefact IRI to pin (empty clears):', cur);
-  if (iri === null) return;
+async function editPins(line) {
+  EDITING_PINS = line;
+  document.getElementById('pfLabel').textContent = line.label;
+  fillPinSelect('pfUses', ['ontology'], line.usesOntology || [], line.iri);
+  fillPinSelect('pfUsesLibrary', ['library'], line.usesLibrary || [], line.iri);
+  fillPinSelect('pfUsesAssignment', ['assignment'], line.usesAssignment || [], line.iri);
+  fillPinSelect('pfUsesSpecies', ['species'], line.usesSpecies || [], line.iri);
+  document.getElementById('pinform').style.display = 'block';
+  document.getElementById('pinform').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function fillPinSelect(id, types, selected, ownIri) {
+  const select = document.getElementById(id);
+  select.innerHTML = '';
+  const selectedSet = new Set(selected);
+  for (const line of LINES.filter(x => types.includes(x.type))) {
+    if (line.iri !== ownIri) {
+      const option = document.createElement('option');
+      option.value = line.iri;
+      option.textContent = `${line.label} — draft`;
+      option.selected = selectedSet.has(line.iri);
+      select.appendChild(option);
+    }
+    for (const version of line.versions) {
+      const option = document.createElement('option');
+      option.value = version.iri;
+      option.textContent = `${line.label} — version ${version.version}`;
+      option.selected = selectedSet.has(version.iri);
+      select.appendChild(option);
+    }
+  }
+}
+
+function closePinForm() {
+  EDITING_PINS = null;
+  document.getElementById('pinform').style.display = 'none';
+}
+
+async function savePins() {
+  if (!EDITING_PINS) return;
   try {
-    await put('/api/catalogue/pins',
-              { iri: line.iri, usesSpecies: iri.trim() ? [iri.trim()] : [] });
+    await put('/api/catalogue/pins', {
+      iri: EDITING_PINS.iri,
+      usesOntology: selectedValues('pfUses'),
+      usesLibrary: selectedValues('pfUsesLibrary'),
+      usesAssignment: selectedValues('pfUsesAssignment'),
+      usesSpecies: selectedValues('pfUsesSpecies'),
+    });
+    location.reload();
+  } catch (e) { msg(e.message); }
+}
+
+async function deleteArtefact(line) {
+  if (!confirm(`Delete draft artefact "${line.label}"? This cannot be undone.`)) return;
+  try {
+    const r = await fetch(`/api/catalogue/artefact?iri=${encodeURIComponent(line.iri)}`,
+                          { method: 'DELETE' });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `delete: ${r.status}`);
+    }
     location.reload();
   } catch (e) { msg(e.message); }
 }
@@ -464,11 +560,13 @@ function onTypeChange() {
 function pinOptions() {
   // Pin candidates: every ontology/species line's draft IRI plus its
   // frozen version IRIs — pinning a version is the reproducible choice.
-  for (const [id, type] of [['nfUses', 'ontology'],
-                            ['nfUsesSpecies', 'species']]) {
+  for (const [id, types] of [['nfUses', ['ontology']],
+                             ['nfUsesLibrary', ['library']],
+                             ['nfUsesAssignment', ['assignment']],
+                             ['nfUsesSpecies', ['species']]]) {
     const sel = document.getElementById(id);
     sel.innerHTML = '';
-    for (const l of LINES.filter(x => x.type === type)) {
+    for (const l of LINES.filter(x => types.includes(x.type))) {
       const d = document.createElement('option');
       d.value = l.iri; d.textContent = `${l.label} (draft)`;
       sel.appendChild(d);
@@ -496,6 +594,8 @@ async function createArtefact() {
     await post('/api/catalogue/new', {
       iri, type, label: label || null,
       uses: selectedValues('nfUses'),
+      uses_library: selectedValues('nfUsesLibrary'),
+      uses_assignment: selectedValues('nfUsesAssignment'),
       uses_species: selectedValues('nfUsesSpecies') });
     location.reload();
   } catch (e) { msg(e.message); }
@@ -517,7 +617,11 @@ function render(lines) {
     ).join('<br>');
     const frag = p => p.split('#').pop().split('/').pop();
     const pins = l.usesOntology.map(p =>
-      `<span class="chip" title="usesOntology → ${esc(p)}">ont:${esc(frag(p))}</span>`
+      `<span class="chip ontology" title="usesOntology → ${esc(p)}">ont:${esc(frag(p))}</span>`
+    ).join('') + (l.usesLibrary || []).map(p =>
+      `<span class="chip library" title="usesLibrary → ${esc(p)}">lib:${esc(frag(p))}</span>`
+    ).join('') + (l.usesAssignment || []).map(p =>
+      `<span class="chip assignment" title="usesAssignment → ${esc(p)}">asg:${esc(frag(p))}</span>`
     ).join('') + (l.usesSpecies || []).map(p =>
       `<span class="chip species" title="usesSpecies → ${esc(p)}">spec:${esc(frag(p))}</span>`
     ).join('');
@@ -532,8 +636,11 @@ function render(lines) {
     const behBtn = l.type === 'library'
       ? `<button title="assign behaviour to entity types — writes this library's derived assignments artefact" onclick='openBehaviour(${JSON.stringify(l)})'>Behaviour…</button>`
       : '';
-    const pinBtn = (l.type === 'model' || l.type === 'glass') && l.status === 'draft'
-      ? `<button onclick='pinSpecies(${JSON.stringify(l)})'>Species…</button>`
+    const pinBtn = l.status === 'draft'
+      ? `<button onclick='editPins(${JSON.stringify(l)})'>Pins…</button>`
+      : '';
+    const deleteBtn = l.status === 'draft'
+      ? `<button class="warn" onclick='deleteArtefact(${JSON.stringify(l)})'>Delete…</button>`
       : '';
     const floorBadge = l.type === 'ontology' && l.status === 'draft' && l.staleFloor
       ? `<br><button class="warn" title="seed floor ${esc(l.seedFloor || 'none')} → ${esc(CURRENT_FLOOR)} — apply the current seed floor" onclick='applyFloor(${JSON.stringify(l.iri)})'>update floor</button>`
@@ -544,7 +651,7 @@ function render(lines) {
       <td class="status-${l.status}">${esc(l.status)}${floorBadge}</td>
       <td>${vers}</td>
       <td>${pins}</td>
-      <td>${openBtn}${behBtn}${instBtn}${pinBtn}${forkBtn}</td>
+      <td>${openBtn}${behBtn}${instBtn}${pinBtn}${forkBtn}${deleteBtn}</td>
     </tr>`;
   }).join('');
   root.innerHTML = `<table>
@@ -621,6 +728,7 @@ function updateCounts() {
 let CURRENT_FLOOR = '';
 let DIRTY = false;
 let LINES = [];
+let EDITING_PINS = null;
 
 // Mode toggle: show the current mode and where a click takes you.
 {

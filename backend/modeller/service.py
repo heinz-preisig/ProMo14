@@ -34,10 +34,12 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Optional
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 from rdflib import RDF, RDFS, Literal, URIRef
 
+from backend.behaviour.service import _read_assignment
+from backend.core.gestures import violations as gesture_violations
 from backend.core.graph_store import PROMO, get_store
 from backend.core.deps import editable_param, graph_param, resolve_graph
 
@@ -145,6 +147,29 @@ def _json(graph, s, p, default):
 # ---------------------------------------------------------------------------
 
 
+@router.get("/behaviour-entity-types", response_model=List[str])
+def behaviour_entity_types(
+    graph_iri: Optional[str] = Depends(graph_param),
+) -> List[str]:
+    store = get_store()
+    model_iri = URIRef(graph_iri) if graph_iri else None
+    model_graph = store.dataset.graph(model_iri) if model_iri else None
+    entity_types = set()
+    assignment_iris = (
+        model_graph.objects(model_iri, PROMO["usesAssignment"])
+        if model_graph is not None else []
+    )
+    for assignment_iri in assignment_iris:
+        assignments = store.dataset.graph(assignment_iri)
+        for resource in assignments.subjects(
+            RDF.type, PROMO["BehaviourAssignment"]
+        ):
+            assignment = _read_assignment(assignments, resource)
+            if assignment and assignment.closed and assignment.entity_type:
+                entity_types.add(assignment.entity_type)
+    return sorted(entity_types)
+
+
 @router.get("/model", response_model=ModelDocument)
 def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
     """Load the artefact graph's model document (empty doc if none)."""
@@ -229,6 +254,19 @@ def put_model(
     """Replace the artefact graph's model content with ``doc``."""
     store = get_store()
     graph = resolve_graph(store, graph_iri)
+
+    # §20 gesture admissibility (ontology capability gates): a rejected
+    # document leaves the graph untouched — validate before the wipe.
+    problems = gesture_violations(
+        store, graph.identifier,
+        nodes=[(n.iri, n.entityType or None, n.speciesAllocation,
+                list(n.reactions)) for n in doc.nodes],
+        arcs=[(a.iri, a.sourceIri or None, a.targetIri or None,
+               a.permeable) for a in doc.arcs])
+    if problems:
+        raise HTTPException(status_code=422,
+                            detail="inadmissible species gestures: "
+                                   + "; ".join(problems))
 
     # wipe existing model triples — but never the graph IRI itself:
     # it is typed promo:Model by create_artefact_graph and carries the

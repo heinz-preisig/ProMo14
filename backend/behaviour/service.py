@@ -176,9 +176,21 @@ def _assignment_graph(store, graph_iri: Optional[str]):
     iri = _assignment_graph_iri(store, graph_iri)
     g = store.dataset.graph(URIRef(iri))
     if not len(g):
-        uses = ([str(i) for i in store.resolution_scope(graph_iri)]
-                if graph_iri else [str(store.ONTOLOGY_GRAPH_IRI)])
-        store.create_artefact_graph(iri, "Assignment", uses=uses)
+        if graph_iri:
+            source = URIRef(graph_iri)
+            source_graph = store.dataset.graph(source)
+            ontologies = [
+                str(i) for i in source_graph.objects(
+                    source, PROMO["usesOntology"]
+                )
+            ]
+            libraries = [graph_iri]
+        else:
+            ontologies = [str(store.ONTOLOGY_GRAPH_IRI)]
+            libraries = []
+        store.create_artefact_graph(
+            iri, "Assignment", uses=ontologies, uses_library=libraries
+        )
         g = store.dataset.graph(URIRef(iri))
     return g
 

@@ -50,6 +50,11 @@ export async function saveModel(doc: ModelDocument): Promise<void> {
   if (!res.ok) throw new Error(`Failed to save model: ${res.status}`)
 }
 
+export async function fetchBehaviourEntityTypes(): Promise<Set<string>> {
+  const iris = await getJson<string[]>('/api/modeller/behaviour-entity-types')
+  return new Set(iris)
+}
+
 // --- §20 species artefact (vocabulary for the capability-gated gestures) ---
 
 export interface SpeciesComponent {

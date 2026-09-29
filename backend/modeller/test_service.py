@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
+from rdflib import RDF, Literal, URIRef
 from backend.core import graph_store
 from backend.main import app
 from backend.testing import GraphClient
@@ -169,3 +169,128 @@ def test_put_rejects_uncreated_graph(client):
     r = client.put(f"/api/modeller/model?graph={iri}", json=_doc())
     assert r.status_code == 404
     assert "no such artefact" in r.json()["detail"]
+
+
+def test_behaviour_entity_types_from_pinned_library(client):
+    store = graph_store.get_store()
+    library = "https://example.org/library"
+    assignments_iri = library + "/assignments"
+    store.create_artefact_graph(
+        library, "Library", uses=[str(store.ONTOLOGY_GRAPH_IRI)]
+    )
+    model_graph = store.dataset.graph(URIRef(MODEL))
+    model_graph.add((
+        URIRef(MODEL), graph_store.PROMO["usesLibrary"], URIRef(library)
+    ))
+    model_graph.add((
+        URIRef(MODEL), graph_store.PROMO["usesAssignment"],
+        URIRef(assignments_iri)
+    ))
+    store.create_artefact_graph(
+        assignments_iri, "Assignment",
+        uses=[str(store.ONTOLOGY_GRAPH_IRI)], uses_library=[library],
+    )
+    assignments = store.dataset.graph(URIRef(assignments_iri))
+    for name, entity_type, closed in (
+        ("defined", "https://example.org/entity/defined", True),
+        ("unfinished", "https://example.org/entity/unfinished", False),
+    ):
+        resource = URIRef(f"{assignments_iri}#{name}")
+        assignments.add((
+            resource, RDF.type, graph_store.PROMO["BehaviourAssignment"]
+        ))
+        assignments.add((
+            resource, graph_store.PROMO["forEntityType"], URIRef(entity_type)
+        ))
+        assignments.add((
+            resource, graph_store.PROMO["closed"], Literal(closed)
+        ))
+
+    response = client.get(
+        f"/api/modeller/behaviour-entity-types?graph={MODEL}"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == ["https://example.org/entity/defined"]
+
+
+# --- §20 gesture admissibility -------------------------------------------------
+
+ONTO = "https://w3id.org/promo/ontology"
+ET_ENV = f"{ONTO}#etype_environment"       # species_source
+ET_LUMPED = f"{ONTO}#etype_lumped"         # reaction_host
+ET_CONV = f"{ONTO}#etype_convection_transport"  # species_transport (via parent)
+ALLOC = "https://example.org/scheme#feed"
+RXN = "https://example.org/scheme#r1"
+COMPONENT = "https://example.org/scheme#H2O"
+
+
+def _species_doc(env_alloc=None, env_rxns=None, lump_alloc=None,
+                 lump_rxns=None, arc_perm=None, conv_endpoint=False):
+    """Minimal model: an Environment and a Lumped tank (optionally a
+    Convection pipe on the arc endpoint) with §20 gestures."""
+    nodes = [
+        {"iri": "promo:Model/Env", "entityType": ET_ENV,
+         "label": "Environment",
+         "speciesAllocation": env_alloc, "reactions": env_rxns or []},
+        {"iri": "promo:Model/Tank", "entityType": ET_LUMPED,
+         "label": "Tank",
+         "speciesAllocation": lump_alloc, "reactions": lump_rxns or []},
+    ]
+    target = "promo:Model/Tank"
+    if conv_endpoint:
+        nodes.append({"iri": "promo:Model/Pipe", "entityType": ET_CONV,
+                      "label": "Pipe"})
+        target = "promo:Model/Pipe"
+    doc = _doc()
+    doc["nodes"] = nodes
+    doc["arcs"] = [{"iri": "promo:Arc/Arc_1", "sourceIri": "promo:Model/Env",
+                    "targetIri": target, "arcType": "promo:ArcType/token-flow",
+                    "permeable": arc_perm}]
+    return doc
+
+
+def test_species_gesture_admissibility(client):
+    """PUT /model enforces the ontology capability gates — a rejected
+    document leaves the graph untouched."""
+    # Admissible baseline: allocation on environment, reaction on a
+    # capacity, permeability on an arc touching species transport.
+    r = client.put("/api/modeller/model", json=_species_doc(
+        env_alloc=ALLOC, lump_rxns=[RXN], arc_perm=[COMPONENT],
+        conv_endpoint=True))
+    assert r.status_code == 200
+
+    # Reactions on the environment → no reaction_host.
+    r = client.put("/api/modeller/model",
+                   json=_species_doc(env_rxns=[RXN]))
+    assert r.status_code == 422
+    assert "reaction_host" in r.json()["detail"]
+
+    # Allocation on a capacity → no species_source.
+    r = client.put("/api/modeller/model",
+                   json=_species_doc(lump_alloc=ALLOC))
+    assert r.status_code == 422
+    assert "species_source" in r.json()["detail"]
+
+    # Permeability between two non-transport endpoints → no
+    # species_transport.
+    r = client.put("/api/modeller/model",
+                   json=_species_doc(arc_perm=[COMPONENT]))
+    assert r.status_code == 422
+    assert "species_transport" in r.json()["detail"]
+
+
+def test_instantiation_reports_inadmissible_gestures(client):
+    """The /model report flags persisted gesture violations — the safety
+    net for artefacts that bypassed the save gate."""
+    store = graph_store.get_store()
+    g = store.dataset.graph(URIRef(MODEL))
+    node = URIRef("promo:Model/Env")
+    g.add((node, RDF.type, graph_store.PROMO["ModelNode"]))
+    g.add((node, graph_store.PROMO["entityType"], URIRef(ET_ENV)))
+    g.add((node, graph_store.PROMO["hostsReaction"], URIRef(RXN)))
+
+    r = client.get(f"/api/instantiate/model?graph={MODEL}")
+    assert r.status_code == 200
+    kinds = {p["kind"] for p in r.json()["problems"]}
+    assert "inadmissible-gesture" in kinds

@@ -1,0 +1,58 @@
+@prefix promo: <https://w3id.org/promo#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://w3id.org/promo/model/> {
+    promo:Assignment a rdfs:Class .
+
+    promo:Glass a rdfs:Class .
+
+    promo:Library a rdfs:Class .
+
+    promo:Model a rdfs:Class .
+
+    promo:Ontology a rdfs:Class .
+
+    promo:Species a rdfs:Class .
+
+    promo:ValueCell a rdfs:Class ;
+        promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
+
+    promo:Version a rdfs:Class .
+
+    promo:atIndexElement a rdf:Property ;
+        promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
+
+    promo:coordinate a rdf:Property ;
+        promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
+
+    promo:doc a rdf:Property .
+
+    promo:generatedFrom a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
+
+    promo:seedFloor a rdf:Property .
+
+    promo:usesAssignment a rdf:Property .
+
+    promo:usesLibrary a rdf:Property .
+
+    promo:usesOntology a rdf:Property .
+
+    promo:usesSpecies a rdf:Property .
+
+    promo:valueCell a rdf:Property ;
+        promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/model/> a promo:Model ;
+        rdfs:label "test_01" ;
+        promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
+        promo:usesLibrary <https://w3id.org/promo/library/> ;
+        promo:usesOntology <https://w3id.org/promo/ontology> .
+}
+

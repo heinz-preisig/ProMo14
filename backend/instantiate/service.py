@@ -28,7 +28,7 @@ state pins and solves ``der = 0``).
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 from fastapi import Depends, HTTPException
@@ -38,6 +38,9 @@ from rdflib import RDF, RDFS, URIRef
 from backend.behaviour.service import (
     _assignment_graph_iri,
     _read_assignment,
+)
+from backend.core.gestures import (
+    entity_capabilities, graph_violations,
 )
 from backend.core.graph_store import PROMO, get_store
 from backend.core.deps import editable_param, graph_param, resolve_graph
@@ -337,28 +340,8 @@ def _collect(store, model_graph):
 
 def _entity_capabilities(store, model_graph) -> Dict[str, Set[str]]:
     """entity-type IRI → capability fragments, resolved through
-    ``promo:parent`` ancestry (a subtype grants what its parents do)."""
-    direct: Dict[str, Set[str]] = {}
-    parents: Dict[str, str] = {}
-    for gi in store.resolution_scope(model_graph.identifier):
-        g = store.dataset.graph(gi)
-        for et in g.subjects(RDF.type, PROMO["EntityType"]):
-            acc = direct.setdefault(str(et), set())
-            for c in g.objects(et, PROMO["capability"]):
-                frag = str(c).rsplit("#", 1)[-1].rsplit("/", 1)[-1]
-                acc.add(frag[4:] if frag.startswith("cap_") else frag)
-            p = g.value(et, PROMO["parent"])
-            if p is not None:
-                parents[str(et)] = str(p)
-    out: Dict[str, Set[str]] = {}
-    for et in direct:
-        acc, cur, seen = set(), et, set()
-        while cur and cur not in seen:
-            seen.add(cur)
-            acc |= direct.get(cur, set())
-            cur = parents.get(cur)
-        out[et] = acc
-    return out
+    ``promo:parent`` ancestry — delegates to the shared gesture rules."""
+    return entity_capabilities(store, model_graph.identifier)
 
 
 def _species_index_iri(store, model_graph) -> Optional[str]:
@@ -664,12 +647,13 @@ def _ic_needs(report, canonicals: Dict[str, Argument],
     return needs
 
 
-def _assignments_collect(store, vars_graph: Optional[str],
+def _assignments_collect(store, assignment_graph: Optional[str],
                          labels: Dict[str, str]) -> Dict[str, AssignmentInfo]:
-    """All §13 behaviour assignments in the artefact's assignment graph."""
+    """All §13 behaviour assignments in the pinned assignment graph."""
     out: Dict[str, AssignmentInfo] = {}
-    ag = store.dataset.graph(
-        URIRef(_assignment_graph_iri(store, vars_graph)))
+    if not assignment_graph:
+        return out
+    ag = store.dataset.graph(URIRef(assignment_graph))
     for res in ag.subjects(RDF.type, PROMO["BehaviourAssignment"]):
         a = _read_assignment(ag, res)
         if a is None or not a.entity_type:
@@ -684,6 +668,19 @@ def _assignments_collect(store, vars_graph: Optional[str],
             closed=a.closed,
         )
     return out
+
+
+def _first_pin(graph, predicate) -> Optional[str]:
+    pin = next(iter(graph.objects(graph.identifier, predicate)), None)
+    return str(pin) if pin is not None else None
+
+
+def _model_dependencies(model_graph, vars_override: Optional[str]):
+    library = vars_override or _first_pin(model_graph, PROMO["usesLibrary"])
+    assignment = _first_pin(model_graph, PROMO["usesAssignment"])
+    if assignment is None and vars_override:
+        assignment = vars_override.rstrip("/") + "/assignments"
+    return library, assignment
 
 
 @router.put("/values", response_model=ValueCellsOut)
@@ -742,16 +739,17 @@ def model_instantiation(
             detail="graph= (model artefact IRI) is required")
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
+    library, assignment_graph = _model_dependencies(model_graph, vars)
     nodes, arcs, sub_indices, parents, labels = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
 
     variables, equations, indices, var_labels, canonicals = \
-        _vars_collect(store, vars)
+        _vars_collect(store, library)
     labels.update(var_labels)
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
-    assignments = _assignments_collect(store, vars, labels)
+    assignments = _assignments_collect(store, assignment_graph, labels)
 
     # §20 species distribution → bind the species index.  The
     # ?species= param overrides the artefact's usesSpecies pin.
@@ -789,6 +787,12 @@ def model_instantiation(
         token_parents, token_kinds,
         species=dist, species_index=species_index,
         reaction_index=reaction_index)
+    # §20 gesture admissibility — persisted model may predate the save
+    # gate or have been written by another client; report violations
+    # instead of silently instantiating them.
+    for msg in graph_violations(store, model_graph):
+        report.problems.append(Problem(
+            kind="inadmissible-gesture", message=msg))
     sched = schedule(report)
     for i, scc in enumerate(sched.loops):
         report.problems.append(Problem(
@@ -798,7 +802,7 @@ def model_instantiation(
 
     return InstantiationReportOut(
         model=str(model_graph.identifier),
-        vars_graph=vars,
+        vars_graph=library,
         indices=report.indices,
         entity_types=[EntityInstantiationOut(
             entity_type=e.entity_type,
@@ -866,16 +870,17 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     trees) to a ``CodePlan``.  Returns ``(cp, report, store)``."""
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
+    library, assignment_graph = _model_dependencies(model_graph, vars)
     nodes, arcs, sub_indices, parents, labels = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
 
     variables, equations, indices, var_labels, canonicals = \
-        _vars_collect(store, vars)
+        _vars_collect(store, library)
     labels.update(var_labels)
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
-    assignments = _assignments_collect(store, vars, labels)
+    assignments = _assignments_collect(store, assignment_graph, labels)
 
     # §20 species distribution → bind the species index.  The
     # ?species= param overrides the artefact's usesSpecies pin.
@@ -892,6 +897,9 @@ def _plan_for(graph_iri: str, vars: Optional[str],
         token_parents, token_kinds,
         species=dist, species_index=species_index,
         reaction_index=reaction_index)
+    for msg in graph_violations(store, model_graph):
+        report.problems.append(Problem(
+            kind="inadmissible-gesture", message=msg))
     sched = schedule(report)
     # §20 ν channel: stored value-cell tables on the model artefact,
     # keyed by variable IRI — plan() expands them over each binding's
@@ -951,7 +959,7 @@ def model_initial(
     ``par`` keys are emitted names — parameter slots plus
     ``ic0_<name>`` for par-pinned ICs (value-cell literals and
     ``initialise`` equations need nothing).  ``steady_state=true``
-    releases the pins and solves ``der = 0`` for the states.  The
+    releases the state pins and solves ``der = 0`` for the states.  The
     response echoes ``par_needed`` so callers can see which keys the
     module reads."""
     if not graph_iri:

@@ -902,7 +902,8 @@ def resolve_connection(
     (closest ancestor match wins), ties broken by IRI.
     """
     store = get_store()
-    graph = resolve_graph(store, graph_iri)
+    ctx = scoped_context(store, graph_iri)
+    graph = ctx.graph
     src_chain = _domain_ancestor_chain(graph, source)
     tgt_chain = _domain_ancestor_chain(graph, target)
     src_branch = _top_branch(src_chain)
@@ -910,7 +911,6 @@ def resolve_connection(
     src_eff = store.effective_tokens(graph, URIRef(source))
     tgt_eff = store.effective_tokens(graph, URIRef(target))
 
-    ctx = scoped_context(store, graph_iri)
     scored = []
     for rule in _list_connection_rule_records(ctx):
         orientation = _rule_match_orientation(rule, src_chain, tgt_chain)

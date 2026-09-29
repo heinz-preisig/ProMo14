@@ -33,8 +33,10 @@ Design is resolved — see `behaviour-linker-design-discussion.md` §1–18.
     consume state, earlier-defined, instantiated, or port variables;
   - warnings (non-blocking): unused markings, equations unreachable
     from the base cone;
-  - `closed` requires a non-empty sequence with no unresolved inputs,
-    cycles, conflicts, or order violations.
+  - `closed` requires some work — a non-empty sequence, instantiated,
+    or ports (role-only, equation-less assignments may close,
+    2026-09-29) — with no unresolved inputs, cycles, conflicts, or
+    order violations.
 - `service.py` — FastAPI router (`/api/behaviour`):
   - `GET /context?graph=` — entity types (with scale values),
     equations (lhs + incidence), variables of the scoped var/expr
@@ -51,9 +53,10 @@ Design is resolved — see `behaviour-linker-design-discussion.md` §1–18.
     so work-in-progress selections can be saved;
   - `DELETE /assignment?entity_type=&graph=`.
 - Assignment artefact graph: `{var/expr graph}/assignments`
-  (`promo:Assignment` type, pinned to the graph's resolution scope);
-  unscoped mode uses `https://w3id.org/promo/assignments`.  Created
-  lazily on first PUT.
+  (`promo:Assignment` type; stamps the source graph's own
+  `usesOntology` pins plus `usesLibrary` back to the source graph,
+  2026-09-29); unscoped mode uses
+  `https://w3id.org/promo/assignments`.  Created lazily on first PUT.
 - `test_closure.py` — 23 tests: engine semantics (state loop allowed,
   any base equation yields the state variable, other cycles rejected,
   conflicts, ordering, warnings, auto-instantiation) + endpoint

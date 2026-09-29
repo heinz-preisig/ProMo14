@@ -167,7 +167,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
         # they never appear inside the ontology itself.  The artefact
         # type classes are declared likewise — they mark graph IRIs,
         # which live outside the ontology's own instance data.
-        for term in (PROMO["usesOntology"], PROMO["usesSpecies"],
+        for term in (PROMO["usesOntology"], PROMO["usesLibrary"],
+                     PROMO["usesAssignment"], PROMO["usesSpecies"],
                      PROMO["generatedFrom"],
                      PROMO["versionOf"], PROMO["versionInfo"],
                      PROMO["publishedOn"], PROMO["seedFloor"],
@@ -243,16 +244,21 @@ class RdfStore(PersistenceMixin, SeedMixin):
         artefact_type: str,
         label: Optional[str] = None,
         uses: Optional[List[Union[str, URIRef]]] = None,
+        uses_library: Optional[List[Union[str, URIRef]]] = None,
+        uses_assignment: Optional[List[Union[str, URIRef]]] = None,
         uses_species: Optional[List[Union[str, URIRef]]] = None,
     ) -> URIRef:
         """Create an empty artefact graph with type marker and pins.
 
         ``artefact_type`` is one of ``ARTEFACT_TYPES`` (case-insensitive).
         ``uses`` stamps ``promo:usesOntology`` pins — the ontology set the
-        artefact is checked against (R2).  ``uses_species`` stamps
-        ``promo:usesSpecies`` pins — the §20 reaction scheme the artefact
-        draws its species vocabulary from.  Raises ``ValueError`` if the
-        graph already exists or the type is unknown.
+        artefact is checked against (R2).  ``uses_library`` stamps
+        ``promo:usesLibrary`` pins — the library artefacts the artefact
+        depends on.  ``uses_assignment`` stamps ``promo:usesAssignment``
+        pins — the assignment artefacts the artefact depends on.
+        ``uses_species`` stamps ``promo:usesSpecies`` pins — the §20 reaction
+        scheme the artefact draws its species vocabulary from.  Raises
+        ``ValueError`` if the graph already exists or the type is unknown.
         """
         if artefact_type.lower() not in {t.lower() for t in ARTEFACT_TYPES}:
             raise ValueError(
@@ -268,6 +274,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
             g.add((iri, RDFS.label, Literal(label)))
         for pin in uses or []:
             g.add((iri, PROMO["usesOntology"], URIRef(str(pin))))
+        for pin in uses_library or []:
+            g.add((iri, PROMO["usesLibrary"], URIRef(str(pin))))
+        for pin in uses_assignment or []:
+            g.add((iri, PROMO["usesAssignment"], URIRef(str(pin))))
         for pin in uses_species or []:
             g.add((iri, PROMO["usesSpecies"], URIRef(str(pin))))
         self.declare_vocabulary(g)
@@ -323,10 +333,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
             if (isinstance(t, URIRef) and str(t).startswith(str(PROMO))
                     and t != PROMO["Version"]):
                 dst.add((new, RDF.type, t))
-        for pin in src.objects(source, PROMO["usesOntology"]):
-            dst.add((new, PROMO["usesOntology"], pin))
-        for pin in src.objects(source, PROMO["usesSpecies"]):
-            dst.add((new, PROMO["usesSpecies"], pin))
+        for predicate in ("usesOntology", "usesLibrary", "usesAssignment",
+                          "usesSpecies"):
+            for pin in src.objects(source, PROMO[predicate]):
+                dst.add((new, PROMO[predicate], pin))
         # The seed-floor stamp is content-accurate on a fork: the copy
         # carries the same floor content as its source (re-homed), so
         # it inherits the source's staleness state — a fork of a stale
@@ -344,8 +354,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self, graph_iri: Union[str, URIRef]
     ) -> List[URIRef]:
         """An artefact's resolution context: itself plus the transitive
-        ``promo:usesOntology`` closure (R2/R4).  Cycle-safe; order is the
-        artefact first, then pins breadth-first."""
+        ``promo:usesOntology`` and ``promo:usesLibrary`` closure (R2/R4).
+        Cycle-safe; order is the artefact first, then pins breadth-first."""
         start = URIRef(str(graph_iri))
         scope: List[URIRef] = []
         seen: set = set()
@@ -357,9 +367,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
             seen.add(iri)
             scope.append(iri)
             g = self.dataset.graph(iri)
-            for pin in g.objects(iri, PROMO["usesOntology"]):
-                if isinstance(pin, URIRef):
-                    stack.append(pin)
+            for predicate in (PROMO["usesOntology"], PROMO["usesLibrary"]):
+                for pin in g.objects(iri, predicate):
+                    if isinstance(pin, URIRef):
+                        stack.append(pin)
         return scope
 
     # ------------------------------------------------------------------

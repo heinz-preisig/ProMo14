@@ -2,7 +2,7 @@
 
 Implementation status of §20 in
 `docs/behaviour-linker-design-discussion.md` (species allocation and
-distribution).  Last updated 2026-09-23.
+distribution).  Last updated 2026-09-29.
 
 ## Concept
 
@@ -65,6 +65,15 @@ The model carries placements (persisted in the model artefact):
 The Properties panel (`apps/modeller/src/SpeciesPanel.tsx`) gates the
 pickers by capability.
 
+**Enforcement (2026-09-29):** capability gating is now authoritative
+in the backend — `backend/core/gestures.py` resolves each entity
+type's capability set through `promo:parent` ancestry over the
+artefact's resolution scope.  `PUT /api/modeller/model` rejects
+inadmissible placements with 422 *before* the wipe (the graph is left
+untouched), and `/api/instantiate/model` + `/code` report persisted
+violations as `inadmissible-gesture` problems — the safety net for
+graphs that predate the gate or bypassed it.
+
 ## Model→species pin (implemented 2026-09-23)
 
 The model names its species artefact via a `promo:usesSpecies` pin on
@@ -73,8 +82,9 @@ mirroring `usesOntology`:
 
 - **Stamped** at creation (`POST /api/catalogue/new` `uses_species`),
   copied on fork, replaceable on drafts via `PUT /api/catalogue/pins`
-  (frozen → 403).  The hub shows purple species chips and a
-  **Species…** button on model lines.
+  (frozen → 403).  The hub's **Pins…** editor covers all pin kinds
+  (ontology/library/assignment/species) on every draft line, with
+  per-kind chips (`ont:`/`lib:`/`asg:`/`spec:`).
 - **Read** by the modeller: `ModelDocument.usesSpecies` round-trips;
   `?species=` overrides the pin and is seeded into state so the next
   save stamps it (migration path from the URL param).
@@ -167,8 +177,11 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
 - `backend/species/service.py` — artefact GET/PUT.
 - `backend/core/graph_store.py` — `_seed_capabilities`, `Species` in
   `ARTEFACT_TYPES`.
+- `backend/core/gestures.py` — capability resolution + admissibility
+  (`violations`, `graph_violations`), shared by the save gate and the
+  instantiation report.
 - `backend/modeller/service.py` — `speciesAllocation`/`hostsReaction`/
-  `permeable` persistence.
+  `permeable` persistence; PUT admissibility gate.
 - `apps/species/` — the `/species` SPA (port 3005, `dev.sh species`).
 - `apps/modeller/src/SpeciesPanel.tsx` — the capability-gated gestures.
 - `apps/modeller/src/SpeciesAliasDialog.tsx` — model-level alias table.
@@ -223,8 +236,10 @@ data, not var/expr vocabulary:
   cell → NaN) and the emitters render it as a shaped array literal
   (numpy `reshape`; julia/matlab `reshape`+`permute` for
   column-major).  No table → the `par` lookup fallback stays.
-- **Value-cell UI** — no editor surface yet (the instantiation app
-  at :3006 is a scaffold); cells are API-only.
+- ~~**Value-cell UI**~~ — **done (2026-09-28):** the instantiation
+  app's `ValuesCard` edits per-coordinate cells through
+  `PUT /api/instantiate/values` (and `SolveCard` drives the t=0
+  solve).
 - **Multi-pin** — `usesSpecies` is multi-valued in RDF but the
   modeller UI uses the first only; a model doc save drops additional
   pins (single-scheme-per-model assumption).

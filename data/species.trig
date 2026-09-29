@@ -48,6 +48,10 @@
 
     promo:seedFloor a rdf:Property .
 
+    promo:usesAssignment a rdf:Property .
+
+    promo:usesLibrary a rdf:Property .
+
     promo:usesOntology a rdf:Property .
 
     promo:usesSpecies a rdf:Property .

@@ -133,4 +133,6 @@ HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
 @app.get("/{full_path:path}", include_in_schema=False)
 def serve_hub(full_path: str = "") -> FileResponse:
     """Serve the suite hub (artefact catalogue) as the entry point."""
-    return FileResponse(str(HUB_PAGE))
+    return FileResponse(
+        str(HUB_PAGE), headers={"Cache-Control": "no-cache"}
+    )

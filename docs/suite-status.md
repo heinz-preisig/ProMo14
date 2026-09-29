@@ -1,22 +1,22 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-27
+**Last updated:** 2026-09-29
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork` | `backend/static/hub.html` at `/` | covered by service tests | **Working** — artefact lines, pins, fork, open-in-app |
+| Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork`, `PUT /pins`, `DELETE /artefact` | `backend/static/hub.html` at `/` (served no-cache) | covered by service tests | **Working** — artefact lines, all four pin kinds with editor, fork, open-in-app, delete with reference check |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
-| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 361 backend tests total | Backend and frontend functional; canonical RHS migrated where checkable |
-| Behaviour Linker | `PUT`/`GET /api/behaviour/assignment` (closure-evaluated) | Scaffold | covered by service tests | Assignment artefact + closure live; UI scaffold |
-| Modeller | `GET`/`PUT /api/modeller/model` (ADR-007) | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures |
+| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 402 backend tests total | Backend and frontend functional; canonical RHS migrated where checkable |
+| Behaviour Linker | `PUT`/`GET`/`DELETE /api/behaviour/assignment`, `POST /evaluate` (closure engine) | Working SPA (:3003), modularised 2026-09-29 | 23 closure tests + service tests | Assignment artefact + closure live; guided-resolution UI, frontier suggestions, printable LaTeX |
+| Modeller | `GET`/`PUT /api/modeller/model` (ADR-007), `GET /behaviour-entity-types` | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures, capability-gated server-side; palette filtered to entity types with closed assignments |
 | Species | `GET`/`PUT /api/species/species` | `/species` SPA (:3005) | covered by service tests | Named reaction schemes: components, allocations, reactions |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
 | Shared (`packages/ui`) | — | `GRAPH_IRI`/`sessionParam`, `withParams`/`apiFetch`, `useStoreDirty`, store status/save fetchers | `tsc` clean | Single source for session plumbing — apps re-export from `./api` (2026-09-25) |
 | Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope, value cells), catalogue, full ontology CRUD, `deps.py` graph-selection helpers | — | — | `graph_store` split into `vocab`/`persistence`/`seed` mixins (2026-09-25); legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
-| Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values` | scaffold app (:3006) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end |
+| Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values`, `/initial` | value-cell editor + t=0 solve UI (:3006) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end; deps resolved from `usesLibrary`/`usesAssignment` pins |
 | Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code` | — | emitter tests in `test_builder.py` | Derivative function emitted for all three targets; emitters share the `emit_common` dialect walker (2026-09-25) |
 
 ## Versioning & graph selection (2026-09-17)
@@ -29,6 +29,14 @@ Implemented per `docs/versioning-and-session-design.md` (commits
 - **Catalogue** — `GET /api/catalogue` groups drafts + frozen versions
   into artefact lines with `usesOntology` pins; `POST /api/catalogue/new`
   and `/fork` create lines (fork re-homes instance IRIs).
+- **Pin kinds (2026-09-29):** `usesOntology`, `usesLibrary`,
+  `usesAssignment`, `usesSpecies` are all first-class — declared
+  vocabulary, stamped at creation, copied on fork, editable on drafts
+  via `PUT /api/catalogue/pins` and the hub **Pins…** editor
+  (per-kind chips).  `resolution_scope` traverses `usesOntology` +
+  `usesLibrary`.  `DELETE /api/catalogue/artefact` removes a draft
+  (403 on the core ontology / frozen versions, 409 while still
+  referenced by pins or `versionOf`).
 - **Hub** — `backend/static/hub.html` at `/` lists artefact lines with
   Open/Fork/Publish/Export; apps launched as `app?graph=<iri>`.
 - **Versioning** — `RdfStore.freeze_version(v)` copies the working graph
@@ -200,8 +208,16 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `/api/behaviour/assignment` writes/reads `promo:BehaviourAssignment`
   resources in the artefact's `<iri>/assignments` graph; the closure
   evaluator stamps `closed`/`state_variable`.  `test_closure.py`.
-- **Frontend:** `apps/behaviour-linker/` — scaffold (:3003).
-- **Next:** Resolve open design questions, then implement the UI.
+- **Frontend:** `apps/behaviour-linker/` — working guided-resolution
+  SPA (:3003): state/stateless base-equation picker, computation
+  sequence with reorder, frontier suggestions, unresolved-inputs
+  panel with per-variable candidates/markings, roles + problems
+  panels, printable LaTeX, unsaved indicator.  Modularised into
+  components + `useBehaviourLinker` hook; role-only (equation-less)
+  assignments may close (2026-09-29).  See
+  `docs/behaviour-linker-status.md`.
+- **Next:** graphical assignment interaction; equation-eligibility
+  hints from regime/scale.
 
 ### Instantiation & code generation
 
@@ -220,8 +236,15 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   artefact, surfaced as `values` on each report binding).
 - **Frontend:** `apps/instantiation/` — scaffold (:3006; no `dev.sh`
   service, hub opens it on the backend path).
-- **Next:** wire value cells into `plan()`/emitters' `par` lookups;
-  value-cell editor UI; reaction-domain equations.
+- **Dependency resolution (2026-09-29):** `/model`, `/code` and
+  `/initial` read the model graph's `usesLibrary`/`usesAssignment`
+  pins (`_model_dependencies`); `?vars=` still overrides as the
+  library IRI and implies `<iri>/assignments`.  Persisted §20 gesture
+  violations surface as `inadmissible-gesture` problems.
+- **Next:** reaction-domain equations.  (ν→codegen and the
+  value-cell editor landed 2026-09-24/28 — `ParamSlot.values` →
+  shaped array literals in all three dialects; `ValuesCard` +
+  `SolveCard` in the instantiation app.)
 
 ### Modeller
 
@@ -231,13 +254,20 @@ Implemented per `docs/versioning-and-session-design.md` (commits
 - **Tests:** 35 unit tests passing (TreeOps, ModelState, buildScene,
   connectionService).
 - **Backend:** `backend/modeller/service.py` — `GET`/`PUT
-  `/api/modeller/model` (ADR-007, 2026-09-18).  Known gap: `main.py`
+  `/api/modeller/model` (ADR-007, 2026-09-18) + `GET
+  `/api/modeller/behaviour-entity-types` (closed assignments in the
+  pinned assignment graphs, 2026-09-29).  PUT is capability-gated by
+  `backend/core/gestures.py` — inadmissible §20 placements are
+  rejected 422 before the wipe; instantiation reports persisted
+  violations as `inadmissible-gesture` problems.  Known gap: `main.py`
   has no `/modeller` SPA route — hub→model links hit the hub
   catch-all (2026-09-20).
 - **Features:** Node/arc creation, drag, selection, deletion,
   three-panel hierarchy navigation, composite grouping, open-arc
   reconnection, pan/zoom, catalogue-resolved graphics,
-  connection-rule enforcement.
+  connection-rule enforcement.  The node palette lists only entity
+  types with a closed behaviour assignment in the pinned assignment
+  graph (`fetchBehaviourEntityTypes`, 2026-09-29).
 - **Resolver:** `RemoteRuleResolver` (`packages/semantic`) consumes
   `GET /api/ontology/resolve-connection` — sync cache for hover
   feedback, `resolveAsync` for connect actions, `carrier` →

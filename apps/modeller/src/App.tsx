@@ -3,7 +3,7 @@ import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
-import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchEntityCapabilities, fetchSpecies, fetchSpeciesDistribution, loadModel, saveModel, saveOntology } from './api'
+import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchBehaviourEntityTypes, fetchEntityCapabilities, fetchSpecies, fetchSpeciesDistribution, loadModel, saveModel, saveOntology } from './api'
 import type { SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
@@ -37,10 +37,9 @@ export default function App() {
     currentY: number
   } | null>(null)
 
-  // --- Semantic catalogue: placeholder until the ontology-backed one loads ---
   const [catalogue, setCatalogue] = useState<SemanticCatalogue>(placeholderCatalogue)
+  const [behaviourEntityTypes, setBehaviourEntityTypes] = useState<Set<string>>(new Set())
 
-  // --- §20 species artefact + entity-type capabilities (gesture gating) ---
   const [speciesDoc, setSpeciesDoc] = useState<SpeciesDocument | null>(null)
   const [speciesIri, setSpeciesIri] = useState<string | undefined>(undefined)
   const [dist, setDist] = useState<SpeciesDistribution | null>(null)
@@ -52,6 +51,14 @@ export default function App() {
     RemoteCatalogue.load(catalogueFetchers, placeholderCatalogue).then((cat) => {
       if (!cancelled) setCatalogue(cat)
     })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchBehaviourEntityTypes()
+      .then((types) => { if (!cancelled) setBehaviourEntityTypes(types) })
+      .catch(() => { if (!cancelled) setBehaviourEntityTypes(new Set()) })
     return () => { cancelled = true }
   }, [])
 
@@ -108,10 +115,12 @@ export default function App() {
     }
   }, [state])
 
-  const NODE_TYPES = useMemo(() => catalogue.getBaseEntities().map((entity) => {
-    const g = catalogue.getGraphicalDefinition(entity.graphicalDefinitionIri!) as NodeGraphicalDefinition | undefined
-    return { id: entity.iri, label: entity.label, fill: g?.fill ?? '#eee', stroke: g?.stroke ?? '#333' }
-  }), [catalogue])
+  const NODE_TYPES = useMemo(() => catalogue.getBaseEntities()
+    .filter((entity) => behaviourEntityTypes.has(entity.iri))
+    .map((entity) => {
+      const g = catalogue.getGraphicalDefinition(entity.graphicalDefinitionIri!) as NodeGraphicalDefinition | undefined
+      return { id: entity.iri, label: entity.label, fill: g?.fill ?? '#eee', stroke: g?.stroke ?? '#333' }
+    }), [catalogue, behaviourEntityTypes])
 
   const ARC_TYPES = useMemo(() => catalogue.getArcTypes().map((arcType) => {
     const g = catalogue.getGraphicalDefinition(arcType.graphicalDefinitionIri!) as ArcGraphicalDefinition | undefined

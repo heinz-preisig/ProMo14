@@ -54,6 +54,8 @@ def _new_line(iri: str) -> Dict[str, Any]:
         "status": "frozen",
         "versions": [],
         "usesOntology": [],
+        "usesLibrary": [],
+        "usesAssignment": [],
         "usesSpecies": [],
         "seedFloor": None,
         "staleFloor": False,
@@ -92,6 +94,10 @@ def catalogue() -> Dict[str, Any]:
             line["label"] = _label(g, gid)
             line["usesOntology"] = [
                 str(o) for o in g.objects(gid, PROMO["usesOntology"])]
+            line["usesLibrary"] = [
+                str(o) for o in g.objects(gid, PROMO["usesLibrary"])]
+            line["usesAssignment"] = [
+                str(o) for o in g.objects(gid, PROMO["usesAssignment"])]
             line["usesSpecies"] = [
                 str(o) for o in g.objects(gid, PROMO["usesSpecies"])]
             if atype == "ontology":
@@ -116,6 +122,8 @@ class NewArtefactRequest(BaseModel):
     type: str
     label: Optional[str] = None
     uses: List[str] = []
+    uses_library: List[str] = []
+    uses_assignment: List[str] = []
     uses_species: List[str] = []
 
 
@@ -136,6 +144,8 @@ def new_artefact(req: NewArtefactRequest) -> Dict[str, Any]:
     try:
         iri = store.create_artefact_graph(
             req.iri, req.type, label=req.label, uses=req.uses,
+            uses_library=req.uses_library,
+            uses_assignment=req.uses_assignment,
             uses_species=req.uses_species)
     except ValueError as exc:
         detail = str(exc)
@@ -148,6 +158,8 @@ def new_artefact(req: NewArtefactRequest) -> Dict[str, Any]:
 class PinsRequest(BaseModel):
     iri: str
     usesOntology: Optional[List[str]] = None
+    usesLibrary: Optional[List[str]] = None
+    usesAssignment: Optional[List[str]] = None
     usesSpecies: Optional[List[str]] = None
 
 
@@ -170,6 +182,8 @@ def update_pins(req: PinsRequest) -> Dict[str, Any]:
                             detail="frozen versions are read-only")
     for pred, targets in (
         (PROMO["usesOntology"], req.usesOntology),
+        (PROMO["usesLibrary"], req.usesLibrary),
+        (PROMO["usesAssignment"], req.usesAssignment),
         (PROMO["usesSpecies"], req.usesSpecies),
     ):
         if targets is None:
@@ -177,7 +191,46 @@ def update_pins(req: PinsRequest) -> Dict[str, Any]:
         g.remove((gid, pred, None))
         for t in targets:
             g.add((gid, pred, URIRef(t)))
+    store.dirty = True
     return {"iri": req.iri}
+
+
+@router.delete("/artefact")
+def delete_artefact(iri: str) -> Dict[str, str]:
+    store = get_store()
+    gid = URIRef(iri)
+    graph = store.dataset.graph(gid)
+    if not len(graph):
+        raise HTTPException(status_code=404,
+                            detail=f"no such artefact: {iri}")
+    if gid == store.ONTOLOGY_GRAPH_IRI:
+        raise HTTPException(status_code=403,
+                            detail="the core ontology cannot be deleted")
+    if store.is_frozen(graph):
+        raise HTTPException(status_code=403,
+                            detail="frozen versions cannot be deleted")
+
+    references = []
+    for candidate in store.dataset.graphs():
+        if candidate.identifier == gid:
+            continue
+        for predicate in (PROMO["usesOntology"], PROMO["usesLibrary"],
+                          PROMO["usesAssignment"], PROMO["usesSpecies"],
+                          PROMO["versionOf"]):
+            if (None, predicate, gid) in candidate:
+                references.append(str(candidate.identifier))
+                break
+    if references:
+        raise HTTPException(
+            status_code=409,
+            detail="artefact is still referenced by: "
+                   + ", ".join(sorted(set(references))),
+        )
+
+    store.dataset.remove_graph(gid)
+    store.dirty = True
+    store.save()
+    return {"deleted": iri}
 
 
 @router.post("/fork")

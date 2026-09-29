@@ -1318,3 +1318,41 @@ def test_initialise_equation_may_share_lhs(client):
     assert len(classes) == 2
     assert f"{onto}#eqclass_generic" in classes
     assert f"{onto}#eqclass_initialise" in classes
+
+def test_catalogue_delete_artefact(client):
+    store = graph_store.get_store()
+    target = "https://example.org/delete-me"
+    consumer = "https://example.org/consumer"
+    assert client.post("/api/catalogue/new", json={
+        "iri": target, "type": "library",
+    }).status_code == 200
+    assert client.post("/api/catalogue/new", json={
+        "iri": consumer, "type": "model", "uses": [target],
+    }).status_code == 200
+
+    blocked = client.delete(
+        "/api/catalogue/artefact", params={"iri": target}
+    )
+    assert blocked.status_code == 409
+    assert consumer in blocked.json()["detail"]
+
+    assert client.put("/api/catalogue/pins", json={
+        "iri": consumer, "usesOntology": [],
+    }).status_code == 200
+    deleted = client.delete(
+        "/api/catalogue/artefact", params={"iri": target}
+    )
+    assert deleted.status_code == 200
+    assert len(store.dataset.graph(URIRef(target))) == 0
+    assert not any(
+        line["iri"] == target
+        for line in client.get("/api/catalogue").json()["lines"]
+    )
+
+    assert client.delete(
+        "/api/catalogue/artefact", params={"iri": target}
+    ).status_code == 404
+    assert client.delete(
+        "/api/catalogue/artefact",
+        params={"iri": str(store.ONTOLOGY_GRAPH_IRI)},
+    ).status_code == 403
