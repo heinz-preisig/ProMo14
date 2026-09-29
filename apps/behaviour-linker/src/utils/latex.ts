@@ -82,6 +82,13 @@ export function buildPrintableLatex(args: {
       `\\text{ports: } ${ports.map((v) => esc(lab(v))).join(', ')}`,
     )
   }
+  if (report.auto_instantiated.length > 0) {
+    meta.push(
+      `\\text{constants/parameters: } ${report.auto_instantiated
+        .map((u) => esc(lab(u.variable)))
+        .join(', ')}`,
+    )
+  }
   const all = [...header, ...eqLines, ...meta]
   if (all.length === 0) return ''
   const eqBlockEnd = header.length + eqLines.length - 1
