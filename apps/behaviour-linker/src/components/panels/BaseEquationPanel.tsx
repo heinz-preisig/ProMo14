@@ -68,11 +68,11 @@ export function BaseEquationPanel({
             disabled={allEqs.length === 0}
             onChange={() => onSetMode('state')}
           />{' '}
-          with state
+          with base equation
         </label>
         {baseMode === 'state' && (
           <div style={{ marginLeft: 16 }}>
-            {renderGroup('suggested state equations', stateEqs)}
+            {renderGroup('suggested base equations', stateEqs)}
             {renderGroup('other equations', otherEqs)}
           </div>
         )}
@@ -85,7 +85,7 @@ export function BaseEquationPanel({
               onPickBase(null)
             }}
           />{' '}
-          without state
+          without base equation
         </label>
         {baseMode === 'stateless' && (
           <div style={{ marginLeft: 16 }}>
@@ -101,7 +101,7 @@ export function BaseEquationPanel({
                 checked={baseEquation === null}
                 onChange={() => onPickBase(null)}
               />{' '}
-              <em>none — entity without state</em>
+              <em>none — entity without base equation</em>
             </label>
           </div>
         )}

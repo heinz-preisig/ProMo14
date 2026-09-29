@@ -66,6 +66,19 @@
         promo:usesOntology <https://w3id.org/promo/library/>,
             <https://w3id.org/promo/ontology> .
 
+    <https://w3id.org/promo/library/assignments#assignment_etype_convection_transport> a promo:BehaviourAssignment ;
+        promo:closed true ;
+        promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
+        promo:hasBaseEquation <https://w3id.org/promo/library/#E_16> ;
+        promo:hasEquationSequence _:Nf52d87bcba8b4de78ce307b1afa92131 ;
+        promo:hasInstantiatedVariable <promo:Axy>,
+            <promo:F_conv>,
+            <promo:k_conv>,
+            <promo:rho> ;
+        promo:hasPortVariable <promo:P>,
+            <promo:c> ;
+        promo:hasStateVariable <promo:fn_conv> .
+
     <https://w3id.org/promo/library/assignments#assignment_etype_environment> a promo:BehaviourAssignment ;
         promo:closed false ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_environment> ;
@@ -77,7 +90,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_13> ;
-        promo:hasEquationSequence _:N61448472ae924e439a009ace65237fad ;
+        promo:hasEquationSequence _:nfd5f70da99884f0899d53b9030d92732b2 ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:k_conv>,
             <promo:rho>,
@@ -87,25 +100,37 @@
             <promo:c> ;
         promo:hasStateVariable <promo:n> .
 
-    _:N5976f961a5864103b7d84011cbf2c4b7 rdf:first <https://w3id.org/promo/library/#E_15> ;
-        rdf:rest _:Nb783d5bbab0041e28466b75b2fb96b33 .
+    _:N62fb7f7178be4cbd869958272198aa06 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:N9ce21495652746f386284f394f2e499e .
 
-    _:N61448472ae924e439a009ace65237fad rdf:first <https://w3id.org/promo/library/#E_13> ;
-        rdf:rest _:N6836b36eda3f4e67aa31859d5a4517e8 .
+    _:N9ce21495652746f386284f394f2e499e rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:Nd3ee37b83e864598a7a83486b6136675 .
 
-    _:N6836b36eda3f4e67aa31859d5a4517e8 rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:Nb2509039fac345c2a9063e2a09a63a1b .
+    _:Nd3ee37b83e864598a7a83486b6136675 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest () .
 
-    _:N695771bdc1c242bf81797311192b31c4 rdf:first <https://w3id.org/promo/library/#E_17> ;
-        rdf:rest _:Nd915346f9f514c5eb52b59d0a3dd122f .
+    _:Nf52d87bcba8b4de78ce307b1afa92131 rdf:first <https://w3id.org/promo/library/#E_16> ;
+        rdf:rest _:N62fb7f7178be4cbd869958272198aa06 .
 
-    _:Nb2509039fac345c2a9063e2a09a63a1b rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:N5976f961a5864103b7d84011cbf2c4b7 .
+    _:nfd5f70da99884f0899d53b9030d92732b2 rdf:first <https://w3id.org/promo/library/#E_13> ;
+        rdf:rest _:nfd5f70da99884f0899d53b9030d92732b5 .
 
-    _:Nb783d5bbab0041e28466b75b2fb96b33 rdf:first <https://w3id.org/promo/library/#E_16> ;
-        rdf:rest _:N695771bdc1c242bf81797311192b31c4 .
+    _:nfd5f70da99884f0899d53b9030d92732b3 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:nfd5f70da99884f0899d53b9030d92732b4 .
 
-    _:Nd915346f9f514c5eb52b59d0a3dd122f rdf:first <https://w3id.org/promo/library/#E_18> ;
+    _:nfd5f70da99884f0899d53b9030d92732b4 rdf:first <https://w3id.org/promo/library/#E_16> ;
+        rdf:rest _:nfd5f70da99884f0899d53b9030d92732b7 .
+
+    _:nfd5f70da99884f0899d53b9030d92732b5 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:nfd5f70da99884f0899d53b9030d92732b6 .
+
+    _:nfd5f70da99884f0899d53b9030d92732b6 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:nfd5f70da99884f0899d53b9030d92732b3 .
+
+    _:nfd5f70da99884f0899d53b9030d92732b7 rdf:first <https://w3id.org/promo/library/#E_17> ;
+        rdf:rest _:nfd5f70da99884f0899d53b9030d92732b8 .
+
+    _:nfd5f70da99884f0899d53b9030d92732b8 rdf:first <https://w3id.org/promo/library/#E_18> ;
         rdf:rest () .
 }
 
