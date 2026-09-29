@@ -491,6 +491,21 @@ marking, port) overrides the hint.  Whether marking an arbitrary
 *state-class* variable should be allowed remains open — the degenerate
 "instantiate everything" subgraph is still possible today.
 
+**Discussed (2026-09-29)**: marking is per variable, not per occurrence —
+the unresolved-input mark already instantiates "the variable itself"
+(the old ProMo distinction between instantiating a variable vs its
+arguments collapses here).  Any variable is in principle a value
+endpoint: measurement and prescription are meaningful for states too,
+so value-endpoint is a *role* (binding), while `constant`/`parameter`
+classes remain hints.  The case not expressible is a variable that is
+*both* defined and instantiated (`defined_and_instantiated` conflict):
+its coherent reading is equation inversion — the retained equation
+determines one of its inputs instead — which is real assignment-problem
+machinery, deferred until a concrete case needs it.  Degenerate
+all-instantiated subgraphs are guarded by the closure check plus the
+"marked variable not referenced" warning rather than by class
+restrictions.
+
 ### Cycle check is indirect (2026-09-13)
 
 The cycle check is **not** an explicit graph-theoretic cycle detection.
