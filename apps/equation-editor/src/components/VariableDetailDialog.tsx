@@ -364,7 +364,7 @@ export default function VariableDetailDialog({
                 key={eqId}
                 style={{ fontSize: 12, background: '#f5f5f5', padding: 8, borderRadius: 4 }}
               >
-                {eq.internal_id ?? eqId}: {variable.label} := {eq.rhs}
+                {variable.label} := {eq.rhs}
                 {eq.equation_class && (
                   <span style={{ color: '#888' }}> [{equationClassLabel(eq.equation_class, equationClasses)}]</span>
                 )}

@@ -322,7 +322,7 @@ export default function VariableTable({ variables, indices, equationClasses = []
                             style={{ padding: '3px 8px', borderBottom: '1px solid #f0f0f0' }}
                           >
                             <code style={{ fontSize: 11 }}>
-                              {eq.internal_id ?? eqId}: {v.label} := {eq.rhs}
+                              {v.label} := {eq.rhs}
                             </code>
                             {eq.equation_class && (
                               <span style={{ fontSize: 10, color: '#888', marginLeft: 8 }}>

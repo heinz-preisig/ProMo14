@@ -98,12 +98,14 @@ export default function App() {
     [labels],
   )
 
-  const eqName = useCallback(
+  /** Readable handle for an equation in problem messages: the label of
+   *  the variable it defines (internal ids are bookkeeping, not shown). */
+  const eqLhs = useCallback(
     (iri: string) => {
       const e = eqs.get(iri)
-      return e?.internal_id ?? frag(iri)
+      return e ? lab(e.lhs) : frag(iri)
     },
-    [eqs],
+    [eqs, lab],
   )
 
   // -- data loading --------------------------------------------------------
@@ -429,7 +431,6 @@ export default function App() {
                       checked={baseEquation === e.iri}
                       onChange={() => pickBase(e.iri)}
                     />{' '}
-                    <code>{eqName(e.iri)}</code>:{' '}
                     <EqLine eq={e} lhsLabel={lab(e.lhs)} />
                   </label>
                 ))}
@@ -490,7 +491,6 @@ export default function App() {
                     >
                       <span style={{ color: '#999', width: 18 }}>{i}</span>
                       <span style={{ flex: 1 }}>
-                        <code>{eqName(eqIri)}</code>:{' '}
                         {e ? <EqLine eq={e} lhsLabel={lab(e.lhs)} /> : '?'}
                         {eqIri === baseEquation && (
                           <span style={{ color: '#06c' }}> (base)</span>
@@ -537,11 +537,11 @@ export default function App() {
                           title={cand?.rhs}
                           onClick={() => resolveWith(u.variable, c)}
                         >
-                          + {eqName(c)}
-                          {cand?.rhs_latex && (
-                            <span style={{ marginLeft: 4, color: '#666' }}>
-                              <Tex latex={cand.rhs_latex} fallback="" />
-                            </span>
+                          +{' '}
+                          {cand ? (
+                            <EqLine eq={cand} lhsLabel={lab(cand.lhs)} />
+                          ) : (
+                            frag(c)
                           )}
                         </button>
                       )
@@ -615,16 +615,27 @@ export default function App() {
                       {report!.auto_instantiated.map((u) => (
                         <span key={u.variable} style={{ marginRight: 8 }}>
                           <code>{lab(u.variable)}</code>
-                          {u.candidates.map((c) => (
-                            <button
-                              key={c}
-                              style={{ ...btn, marginLeft: 4 }}
-                              title={`override: define via ${eqName(c)} — ${eqs.get(c)?.rhs ?? ''}`}
-                              onClick={() => resolveWith(u.variable, c)}
-                            >
-                              + {eqName(c)}
-                            </button>
-                          ))}
+                          {u.candidates.map((c) => {
+                            const cand = eqs.get(c)
+                            return (
+                              <button
+                                key={c}
+                                style={{ ...btn, marginLeft: 4 }}
+                                title={`override: define via ${cand?.rhs ?? ''}`}
+                                onClick={() => resolveWith(u.variable, c)}
+                              >
+                                +{' '}
+                                {cand ? (
+                                  <EqLine
+                                    eq={cand}
+                                    lhsLabel={lab(cand.lhs)}
+                                  />
+                                ) : (
+                                  frag(c)
+                                )}
+                              </button>
+                            )
+                          })}
                         </span>
                       ))}
                     </div>
@@ -651,7 +662,7 @@ export default function App() {
                     </div>
                     {report.cycles.map((c, i) => (
                       <div key={i} style={{ fontSize: 12, color: '#a00' }}>
-                        cycle: {c.map(eqName).join(' → ')}
+                        cycle: {c.map(eqLhs).join(' → ')}
                       </div>
                     ))}
                     {report.conflicts.map((c, i) => (
@@ -661,8 +672,8 @@ export default function App() {
                     ))}
                     {report.order_violations.map((v, i) => (
                       <div key={i} style={{ fontSize: 12, color: '#a00' }}>
-                        order: {eqName(v.equation)} uses {lab(v.variable)}{' '}
-                        defined later by {eqName(v.defined_by)}
+                        order: {eqLhs(v.equation)} uses {lab(v.variable)}{' '}
+                        defined later by {eqLhs(v.defined_by)}
                       </div>
                     ))}
                     {report.warnings.map((w, i) => (
