@@ -7,7 +7,7 @@ import AxisClassifications, {
   FIELD_LABEL_STYLE,
   findTermIri,
 } from '../axisClassifications'
-import { nextInternalId } from '../variableUtils'
+import { nextEquationId, nextInternalId } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
 import ExpressionInput from './ExpressionInput'
 import LaTeXPreview from './LaTeXPreview'
@@ -287,8 +287,10 @@ export default function DependentVariableEditor({
 
     const draft = draftVariable()
 
+    // Sequential E_n — same smallest-free mint as saveVariable's store
+    // key, so the pending id matches the persisted record's identity.
     const eq: SavedEquation = {
-      id: `${Date.now()}`,
+      id: nextEquationId(variables),
       lhs,
       text,
       ast,
