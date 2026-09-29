@@ -13,6 +13,7 @@ import {
 import type {
   Assignment,
   BehaviourContext,
+  EntityType,
   Equation,
   EvaluateReport,
 } from './types'
@@ -268,6 +269,33 @@ export default function App() {
 
   const selectedType = ctx?.entity_types.find((t) => t.iri === entityType)
 
+  /** Sidebar order follows the ontology's promo:parent hierarchy —
+   *  roots (sorted by branch then label) first, children indented
+   *  beneath their parent.  Orphaned parents fall back to root. */
+  const orderedTypes = useMemo(() => {
+    const all = ctx?.entity_types ?? []
+    const byParent = new Map<string | null, EntityType[]>()
+    for (const t of all) {
+      const p = t.parent && all.some((x) => x.iri === t.parent)
+        ? t.parent
+        : null
+      byParent.set(p, [...(byParent.get(p) ?? []), t])
+    }
+    const key = (t: EntityType) =>
+      `${t.branch}\n${t.label.toLowerCase()}`
+    for (const l of byParent.values())
+      l.sort((a, b) => key(a).localeCompare(key(b)))
+    const out: { t: EntityType; depth: number }[] = []
+    const visit = (p: string | null, d: number) => {
+      for (const t of byParent.get(p) ?? []) {
+        out.push({ t, depth: d })
+        visit(t.iri, d + 1)
+      }
+    }
+    visit(null, 0)
+    return out
+  }, [ctx])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <header
@@ -352,13 +380,15 @@ export default function App() {
               borderRadius: 4,
             }}
           />
-          {(ctx?.entity_types ?? [])
-            .filter(
-              (t) =>
-                !typeFilter ||
-                t.label.toLowerCase().includes(typeFilter.toLowerCase()),
-            )
-            .map((t) => {
+          {(typeFilter
+            ? orderedTypes
+                .filter(({ t }) =>
+                  t.label
+                    .toLowerCase()
+                    .includes(typeFilter.toLowerCase()))
+                .map(({ t }) => ({ t, depth: 0 }))
+            : orderedTypes
+          ).map(({ t, depth }) => {
             const a = assignmentByType.get(t.iri)
             const active = t.iri === entityType
             return (
@@ -367,6 +397,7 @@ export default function App() {
                 onClick={() => setEntityType(t.iri)}
                 style={{
                   padding: '6px 8px',
+                  paddingLeft: 8 + depth * 14,
                   marginBottom: 2,
                   borderRadius: 4,
                   cursor: 'pointer',

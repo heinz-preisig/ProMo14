@@ -56,6 +56,7 @@ class EntityTypeOut(BaseModel):
     iri: str
     label: str
     branch: str = ""
+    parent: Optional[str] = None
     scale_values: List[str] = Field(default_factory=list)
 
 
@@ -230,7 +231,7 @@ def context_endpoint(
             URIRef(et["iri"]), PROMO["hasScaleValue"])]
         entity_types.append(EntityTypeOut(
             iri=et["iri"], label=et["label"], branch=et["branch"],
-            scale_values=scale_values))
+            parent=et.get("parent"), scale_values=scale_values))
 
     # Symbol rendering only needs index aliases — same CompileSpace
     # shortcut as document.build_document.

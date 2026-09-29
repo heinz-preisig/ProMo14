@@ -4,6 +4,7 @@ export interface EntityType {
   iri: string
   label: string
   branch: string
+  parent: string | null
   scale_values: string[]
 }
 

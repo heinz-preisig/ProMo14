@@ -526,6 +526,7 @@ class RdfContext(EquationContext):
             spatial_size = self._graph.value(s, PROMO["spatialSize"])
             branch = _one_literal(self._graph, s, PROMO["branch"])
             doc = _one_literal(self._graph, s, PROMO["doc"])
+            parent = self._graph.value(s, PROMO["parent"])
             entity_types.append({
                 "iri": str(s),
                 "label": label,
@@ -533,6 +534,7 @@ class RdfContext(EquationContext):
                 "spatial_type": str(spatial_type) if spatial_type else None,
                 "spatial_size": str(spatial_size) if spatial_size else None,
                 "branch": branch,
+                "parent": str(parent) if parent else None,
                 "description": doc,
             })
         return entity_types
