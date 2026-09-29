@@ -10,7 +10,15 @@ import {
   saveAssignment,
   saveStore,
 } from './api'
-import { EqLine } from './components/EqLine'
+import { Header } from './components/Header'
+import { Sidebar } from './components/Sidebar'
+import { BaseEquationPanel } from './components/panels/BaseEquationPanel'
+import { ComputationSequencePanel } from './components/panels/ComputationSequencePanel'
+import { PrintablePanel } from './components/panels/PrintablePanel'
+import { ProblemsPanel } from './components/panels/ProblemsPanel'
+import { RolesPanel } from './components/panels/RolesPanel'
+import { SuggestedEquationsPanel } from './components/panels/SuggestedEquationsPanel'
+import { UnresolvedInputsPanel } from './components/panels/UnresolvedInputsPanel'
 import type {
   Assignment,
   BehaviourContext,
@@ -19,32 +27,8 @@ import type {
   EvaluateReport,
 } from './types'
 import { buildPrintableLatex, escapeHtml } from './utils/latex'
+import { frag } from './utils/iri'
 import { useStoreDirty } from '@promo/ui'
-
-/** Short display form of an IRI: fragment after # or last /. */
-function frag(iri: string): string {
-  const h = iri.split('#')
-  if (h.length > 1) return h[h.length - 1]
-  const s = iri.split('/')
-  return s[s.length - 1]
-}
-
-const btn: React.CSSProperties = {
-  fontSize: 12,
-  padding: '2px 8px',
-  border: '1px solid #bbb',
-  borderRadius: 4,
-  background: '#fff',
-  cursor: 'pointer',
-}
-
-const card: React.CSSProperties = {
-  background: '#fff',
-  border: '1px solid #ddd',
-  borderRadius: 6,
-  padding: '10px 14px',
-  marginBottom: 12,
-}
 
 export default function App() {
   const [ctx, setCtx] = useState<BehaviourContext | null>(null)
@@ -412,596 +396,94 @@ export default function App() {
     return out
   }, [ctx])
 
+  const title = `Behaviour Linker${selectedType ? ` — ${selectedType.label}` : ''}`
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          flexWrap: 'wrap',
-          minHeight: 44,
-          padding: '0 16px',
-          background: '#fff',
-          borderBottom: '1px solid #ddd',
-        }}
-      >
-        <strong
-          style={{
-            fontSize: 14,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          Behaviour Linker
-          {selectedType ? ` — ${selectedType.label}` : ''}
-        </strong>
-        <div
-          style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          {report && entityType && (
-            <span
-              style={{
-                fontSize: 13,
-                color: report.closed ? '#0a7' : '#c80',
-                fontWeight: 600,
-              }}
-            >
-              {report.closed ? 'closed' : 'open'}
-            </span>
-          )}
-          {dirty && (
-            <span style={{ fontSize: 13, color: '#c80' }}>● unsaved</span>
-          )}
-          {hasUnsavedChanges && (
-            <span style={{ fontSize: 13, color: '#c00' }}>● modified</span>
-          )}
-          {saveMsg && <span style={{ fontSize: 13 }}>{saveMsg}</span>}
-          <button style={btn} onClick={save} disabled={!entityType}>
-            Save
-          </button>
-          <button style={btn} onClick={remove} disabled={!entityType}>
-            Delete
-          </button>
-        </div>
-      </header>
-
+      <Header
+        title={title}
+        report={report}
+        entityType={entityType}
+        dirty={dirty}
+        hasUnsavedChanges={hasUnsavedChanges}
+        saveMsg={saveMsg}
+        onSave={save}
+        onDelete={remove}
+      />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <aside
-          style={{
-            width: 240,
-            borderRight: '1px solid #ddd',
-            background: '#fafafa',
-            overflowY: 'auto',
-            padding: 8,
-          }}
-        >
-          <div style={{ fontSize: 12, color: '#888', margin: '4px 4px 8px' }}>
-            ENTITY TYPES
-          </div>
-          <input
-            placeholder="filter…"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              fontSize: 13,
-              padding: '3px 6px',
-              marginBottom: 6,
-              border: '1px solid #ccc',
-              borderRadius: 4,
-            }}
-          />
-          {(typeFilter
-            ? orderedTypes
-                .filter(({ t }) =>
-                  t.label
-                    .toLowerCase()
-                    .includes(typeFilter.toLowerCase()))
-                .map(({ t }) => ({ t, depth: 0 }))
-            : orderedTypes
-          ).map(({ t, depth }) => {
-            const a = assignmentByType.get(t.iri)
-            const active = t.iri === entityType
-            return (
-              <div
-                key={t.iri}
-                onClick={() => setEntityType(t.iri)}
-                style={{
-                  padding: '6px 8px',
-                  paddingLeft: 8 + depth * 14,
-                  marginBottom: 2,
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  background: active ? '#e3ecff' : 'transparent',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                }}
-              >
-                <span>{t.label}</span>
-                {a && (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: a.closed ? '#0a7' : '#c80',
-                    }}
-                  >
-                    {a.closed ? 'closed' : 'wip'}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </aside>
-
+        <Sidebar
+          orderedTypes={orderedTypes}
+          selected={entityType}
+          onSelect={setEntityType}
+          filter={typeFilter}
+          onFilterChange={setTypeFilter}
+          assignmentByType={assignmentByType}
+        />
         <main style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
           {!entityType && (
             <div style={{ color: '#888', fontSize: 13 }}>
               Select an entity type to link its behaviour.
             </div>
           )}
-
           {entityType && (
             <>
-              {/* Base equation ------------------------------------------- */}
-              <div style={card}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Base equation
-                </div>
-                {(() => {
-                  const allEqs = ctx?.equations ?? []
-                  const stateEqs = allEqs.filter((e) => e.lhs_class === 'state')
-                  const otherEqs = allEqs.filter((e) => e.lhs_class !== 'state')
-                  const renderGroup = (title: string, eqs: Equation[]) =>
-                    eqs.length === 0 ? null : (
-                      <div key={title} style={{ marginTop: 6 }}>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: '#666',
-                            marginBottom: 2,
-                          }}
-                        >
-                          {title}
-                        </div>
-                        {eqs.map((e) => (
-                          <label
-                            key={e.iri}
-                            style={{
-                              display: 'block',
-                              fontSize: 13,
-                              padding: '2px 0',
-                            }}
-                          >
-                            <input
-                              type="radio"
-                              checked={baseEquation === e.iri}
-                              onChange={() => pickBase(e.iri)}
-                            />{' '}
-                            <EqLine eq={e} lhsLabel={lab(e.lhs)} />
-                          </label>
-                        ))}
-                      </div>
-                    )
-                  return (
-                    <div style={{ fontSize: 13 }}>
-                      <label style={{ display: 'block', padding: '2px 0' }}>
-                        <input
-                          type="radio"
-                          checked={baseMode === 'state'}
-                          disabled={allEqs.length === 0}
-                          onChange={() => setBaseMode('state')}
-                        />{' '}
-                        with state
-                      </label>
-                      {baseMode === 'state' && (
-                        <div style={{ marginLeft: 16 }}>
-                          {renderGroup('suggested state equations', stateEqs)}
-                          {renderGroup('other equations', otherEqs)}
-                        </div>
-                      )}
-                      <label style={{ display: 'block', padding: '2px 0' }}>
-                        <input
-                          type="radio"
-                          checked={baseMode === 'stateless'}
-                          onChange={() => {
-                            setBaseMode('stateless')
-                            pickBase(null)
-                          }}
-                        />{' '}
-                        without state
-                      </label>
-                      {baseMode === 'stateless' && (
-                        <div style={{ marginLeft: 16 }}>
-                          <label
-                            style={{
-                              display: 'block',
-                              fontSize: 13,
-                              padding: '2px 0',
-                            }}
-                          >
-                            <input
-                              type="radio"
-                              checked={baseEquation === null}
-                              onChange={() => pickBase(null)}
-                            />{' '}
-                            <em>none — entity without state</em>
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {/* Computation sequence ------------------------------------ */}
-              <div style={card}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Computation sequence
-                  {report?.state_variable && (
-                    <span style={{ fontWeight: 400, color: '#666' }}>
-                      {' '}
-                      — state: {lab(report.state_variable)}
-                    </span>
-                  )}
-                </div>
-                {sequence.length === 0 && (
-                  <div style={{ fontSize: 13, color: '#888' }}>
-                    No equations selected yet.
-                  </div>
-                )}
-                {sequence.map((eqIri, i) => {
-                  const e = eqs.get(eqIri)
-                  return (
-                    <div
-                      key={eqIri}
-                      draggable
-                      onDragStart={() => setDragIri(eqIri)}
-                      onDragOver={(ev) => {
-                        ev.preventDefault()
-                        setDropTarget(eqIri)
-                      }}
-                      onDragLeave={() =>
-                        setDropTarget((d) => (d === eqIri ? null : d))
-                      }
-                      onDrop={() => {
-                        dropOn(eqIri)
-                        setDragIri(null)
-                        setDropTarget(null)
-                      }}
-                      onDragEnd={() => {
-                        setDragIri(null)
-                        setDropTarget(null)
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        fontSize: 13,
-                        padding: '2px 4px',
-                        cursor: 'grab',
-                        borderTop:
-                          dropTarget === eqIri && dragIri !== eqIri
-                            ? '2px solid #06c'
-                            : '2px solid transparent',
-                        opacity: dragIri === eqIri ? 0.4 : 1,
-                      }}
-                    >
-                      <span style={{ color: '#999', width: 18 }}>{i}</span>
-                      <span style={{ flex: 1 }}>
-                        {e ? <EqLine eq={e} lhsLabel={lab(e.lhs)} /> : '?'}
-                        {eqIri === baseEquation && (
-                          <span style={{ color: '#06c' }}> (base)</span>
-                        )}
-                      </span>
-                      <button style={btn} onClick={() => move(eqIri, -1)}>
-                        ↑
-                      </button>
-                      <button style={btn} onClick={() => move(eqIri, 1)}>
-                        ↓
-                      </button>
-                      <button style={btn} onClick={() => removeEq(eqIri)}>
-                        ✕
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Suggested next equations ---------------------------------- */}
-              <div style={card}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Suggested next equations
-                </div>
-                {(report?.frontier ?? []).length === 0 && (
-                  <div style={{ fontSize: 13, color: '#888' }}>
-                    No further equations needed.
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(report?.frontier ?? []).map((eqIri) => {
-                    const e = eqs.get(eqIri)
-                    if (!e) return null
-                    return (
-                      <button
-                        key={eqIri}
-                        style={btn}
-                        title={e.rhs}
-                        onClick={() => resolveWith(e.lhs, eqIri)}
-                      >
-                        + <EqLine eq={e} lhsLabel={lab(e.lhs)} />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Unresolved inputs ---------------------------------------- */}
-              <div style={card}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Unresolved inputs ({report?.unresolved.length ?? 0})
-                </div>
-                {(report?.unresolved ?? []).map((u) => (
-                  <div
-                    key={u.variable}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      flexWrap: 'wrap',
-                      fontSize: 13,
-                      padding: '3px 0',
-                    }}
-                  >
-                    <code style={{ minWidth: 90 }}>{lab(u.variable)}</code>
-                    {u.candidates.map((c) => {
-                      const cand = eqs.get(c)
-                      return (
-                        <button
-                          key={c}
-                          style={btn}
-                          title={cand?.rhs}
-                          onClick={() => resolveWith(u.variable, c)}
-                        >
-                          +{' '}
-                          {cand ? (
-                            <EqLine eq={cand} lhsLabel={lab(cand.lhs)} />
-                          ) : (
-                            frag(c)
-                          )}
-                        </button>
-                      )
-                    })}
-                    {u.candidates.length === 0 && (
-                      <span style={{ color: '#999' }}>no defining eq</span>
-                    )}
-                    <button
-                      style={btn}
-                      onClick={() => mark(u.variable, 'instantiated')}
-                    >
-                      instantiate
-                    </button>
-                    <button
-                      style={btn}
-                      onClick={() => mark(u.variable, 'ports')}
-                    >
-                      port
-                    </button>
-                  </div>
-                ))}
-                {report && report.unresolved.length === 0 && (
-                  <div style={{ fontSize: 13, color: '#0a7' }}>
-                    all inputs resolved
-                  </div>
-                )}
-              </div>
-
-              {/* Roles ----------------------------------------------------- */}
-              <div style={card}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Roles
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <div>
-                    <b>state:</b> {lab(report?.state_variable)}
-                  </div>
-                  <div>
-                    <b>ports:</b>{' '}
-                    {ports.map((v) => (
-                      <span key={v} style={{ marginRight: 8 }}>
-                        <code>{lab(v)}</code>{' '}
-                        <a
-                          style={{ cursor: 'pointer', color: '#c00' }}
-                          onClick={() => unmark(v)}
-                        >
-                          ✕
-                        </a>
-                      </span>
-                    ))}
-                    {ports.length === 0 && '—'}
-                  </div>
-                  <div>
-                    <b>instantiated:</b>{' '}
-                    {instantiated.map((v) => (
-                      <span key={v} style={{ marginRight: 8 }}>
-                        <code>{lab(v)}</code>{' '}
-                        <a
-                          style={{ cursor: 'pointer', color: '#c00' }}
-                          onClick={() => unmark(v)}
-                        >
-                          ✕
-                        </a>
-                      </span>
-                    ))}
-                    {instantiated.length === 0 && '—'}
-                  </div>
-                  {(report?.auto_instantiated.length ?? 0) > 0 && (
-                    <div>
-                      <b>constants/parameters:</b>{' '}
-                      {report!.auto_instantiated.map((u) => (
-                        <span key={u.variable} style={{ marginRight: 8 }}>
-                          <code>{lab(u.variable)}</code>
-                          {u.candidates.map((c) => {
-                            const cand = eqs.get(c)
-                            return (
-                              <button
-                                key={c}
-                                style={{ ...btn, marginLeft: 4 }}
-                                title={`override: define via ${cand?.rhs ?? ''}`}
-                                onClick={() => resolveWith(u.variable, c)}
-                              >
-                                +{' '}
-                                {cand ? (
-                                  <EqLine
-                                    eq={cand}
-                                    lhsLabel={lab(cand.lhs)}
-                                  />
-                                ) : (
-                                  frag(c)
-                                )}
-                              </button>
-                            )
-                          })}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ marginTop: 4 }}>
-                    <b>mark variable:</b>{' '}
-                    <select
-                      style={{ fontSize: 13 }}
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value)
-                          mark(e.target.value, 'instantiated')
-                      }}
-                    >
-                      <option value="">instantiate…</option>
-                      {(ctx?.variables ?? []).map((v) => (
-                        <option key={v.iri} value={v.iri}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>{' '}
-                    <select
-                      style={{ fontSize: 13 }}
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value) mark(e.target.value, 'ports')
-                      }}
-                    >
-                      <option value="">port…</option>
-                      {(ctx?.variables ?? []).map((v) => (
-                        <option key={v.iri} value={v.iri}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Printable representation ---------------------------------- */}
-              {printableLatex && (
-                <div style={card}>
-                  <div
-                    style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}
-                  >
-                    Printable representation
-                  </div>
-                  {previewHtml && (
-                    <div
-                      style={{ marginBottom: 8, overflowX: 'auto' }}
-                      dangerouslySetInnerHTML={{ __html: previewHtml }}
-                    />
-                  )}
-                  <div
-                    style={{ display: 'flex', gap: 8, alignItems: 'center' }}
-                  >
-                    <button style={btn} onClick={copyLatex}>
-                      Copy LaTeX
-                    </button>
-                    <button style={btn} onClick={printRepresentation}>
-                      Print
-                    </button>
-                    <button
-                      style={btn}
-                      onClick={() => setShowSource((s) => !s)}
-                    >
-                      {showSource ? 'Hide source' : 'Show source'}
-                    </button>
-                    {copied && (
-                      <span style={{ fontSize: 12, color: '#0a7' }}>
-                        copied
-                      </span>
-                    )}
-                  </div>
-                  {showSource && (
-                    <pre
-                      style={{
-                        fontSize: 12,
-                        background: '#f5f5f5',
-                        padding: 8,
-                        borderRadius: 4,
-                        overflowX: 'auto',
-                        marginTop: 8,
-                      }}
-                    >
-                      {printableLatex}
-                    </pre>
-                  )}
-                </div>
-              )}
-
-              {/* Problems --------------------------------------------------- */}
-              {report &&
-                (report.cycles.length > 0 ||
-                  report.conflicts.length > 0 ||
-                  report.order_violations.length > 0 ||
-                  report.warnings.length > 0) && (
-                  <div style={{ ...card, borderColor: '#e0b0b0' }}>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        marginBottom: 6,
-                        color: '#a00',
-                      }}
-                    >
-                      Problems
-                    </div>
-                    {report.cycles.map((c, i) => (
-                      <div key={i} style={{ fontSize: 13, color: '#a00' }}>
-                        cycle: {c.map(eqLhs).join(' → ')}
-                      </div>
-                    ))}
-                    {report.conflicts.map((c, i) => (
-                      <div key={i} style={{ fontSize: 13, color: '#a00' }}>
-                        {c.kind}: {lab(c.variable)} {c.detail}
-                      </div>
-                    ))}
-                    {report.order_violations.map((v, i) => (
-                      <div key={i} style={{ fontSize: 13, color: '#a00' }}>
-                        order: {eqLhs(v.equation)} uses {lab(v.variable)}{' '}
-                        defined later by {eqLhs(v.defined_by)}
-                      </div>
-                    ))}
-                    {report.warnings.map((w, i) => (
-                      <div key={i} style={{ fontSize: 13, color: '#c80' }}>
-                        {w}
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <BaseEquationPanel
+                ctx={ctx}
+                baseEquation={baseEquation}
+                baseMode={baseMode}
+                onPickBase={pickBase}
+                onSetMode={setBaseMode}
+                lab={lab}
+              />
+              <ComputationSequencePanel
+                sequence={sequence}
+                baseEquation={baseEquation}
+                report={report}
+                eqs={eqs}
+                lab={lab}
+                onRemove={removeEq}
+                onMove={move}
+                dragIri={dragIri}
+                setDragIri={setDragIri}
+                dropTarget={dropTarget}
+                setDropTarget={setDropTarget}
+                dropOn={dropOn}
+              />
+              <SuggestedEquationsPanel
+                frontier={report?.frontier ?? []}
+                eqs={eqs}
+                lab={lab}
+                onResolve={resolveWith}
+              />
+              <UnresolvedInputsPanel
+                unresolved={report?.unresolved ?? []}
+                report={report}
+                eqs={eqs}
+                lab={lab}
+                onResolve={resolveWith}
+                onMark={mark}
+              />
+              <RolesPanel
+                report={report}
+                eqs={eqs}
+                instantiated={instantiated}
+                ports={ports}
+                variables={ctx?.variables ?? []}
+                lab={lab}
+                onUnmark={unmark}
+                onMark={mark}
+                onResolve={resolveWith}
+              />
+              <PrintablePanel
+                previewHtml={previewHtml}
+                source={printableLatex}
+                copied={copied}
+                showSource={showSource}
+                onToggleSource={() => setShowSource((s) => !s)}
+                onCopy={copyLatex}
+                onPrint={printRepresentation}
+              />
+              <ProblemsPanel report={report} lab={lab} eqLhs={eqLhs} />
             </>
           )}
         </main>
