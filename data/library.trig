@@ -119,7 +119,7 @@
         promo:rhsLatex "{{V}_{N}}^{-1} \\circ {n}_{N,S}" .
 
     <https://w3id.org/promo/library/#E_10/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b1 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b1 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_11> a promo:Equation ;
@@ -137,7 +137,7 @@
         promo:rhsLatex "\\mathrm{sign}\\left( \\sum_{N} {F}_{A\\_conv,N} \\, {p}_{N} \\right)" .
 
     <https://w3id.org/promo/library/#E_11/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b2 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b2 ;
         promo:hasOperation promolg:sign .
 
     <https://w3id.org/promo/library/#E_12> a promo:Equation ;
@@ -155,7 +155,7 @@
         promo:rhsLatex "\\sum_{N} \\left( \\frac{1}{2} \\circ \\left( {F}_{A\\_conv,N} - {d}_{A\\_conv} \\circ \\left| {F}_{A\\_conv,N} \\right| \\right) \\right) \\, {c}_{N,S}" .
 
     <https://w3id.org/promo/library/#E_12/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b3 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b3 ;
         promo:hasOperation promolg:ReduceProduct .
 
     <https://w3id.org/promo/library/#E_13> a promo:Equation ;
@@ -173,7 +173,7 @@
         promo:rhsLatex "\\int_{t^o}^{t^e} {\\dot{n}}_{A\\_conv,N,S} \\, dt" .
 
     <https://w3id.org/promo/library/#E_13/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b4 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b4 ;
         promo:hasOperation promolg:DefiniteIntegral .
 
     <https://w3id.org/promo/library/#E_14> a promo:Equation ;
@@ -191,7 +191,7 @@
         promo:rhsLatex "{{V}_{N}}^{-1} \\circ {m}_{N}" .
 
     <https://w3id.org/promo/library/#E_14/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b5 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b5 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_15> a promo:Equation ;
@@ -209,7 +209,7 @@
         promo:rhsLatex "{{\\rho}_{N}}^{-1} \\circ {k}_{N} \\circ {Axy}_{N} \\circ {F}_{A\\_conv,N} \\circ {p}_{N}" .
 
     <https://w3id.org/promo/library/#E_15/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b6 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b6 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_16> a promo:Equation ;
@@ -227,7 +227,7 @@
         promo:rhsLatex "{c}_{A\\_conv,S} \\circ {\\hat{V}}_{A\\_conv,N}" .
 
     <https://w3id.org/promo/library/#E_16/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b7 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b7 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_17> a promo:Equation ;
@@ -245,7 +245,7 @@
         promo:rhsLatex "{F}_{A\\_conv,N} \\circ \\hat{n}_{conv,A\\_conv,N,S}" .
 
     <https://w3id.org/promo/library/#E_17/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b8 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b8 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library/#E_18> a promo:Equation ;
@@ -277,7 +277,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {V}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b9 ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b9 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <promo:an_conv> a promo:Variable ;
@@ -477,163 +477,163 @@
         promo:internalID "V_25" ;
         promo:latex "F" ;
         promo:network "physical" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:variableClass "constant" .
 
-    _:nb758077b59b14a119011386ee693b8f7b1 rdf:first _:nb758077b59b14a119011386ee693b8f7b10 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b11 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b1 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b10 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b11 .
 
-    _:nb758077b59b14a119011386ee693b8f7b10 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b12 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b10 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b12 ;
         promo:hasOperation promolg:inv .
 
-    _:nb758077b59b14a119011386ee693b8f7b11 rdf:first <promo:n> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b11 rdf:first <promo:n> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b12 rdf:first <promo:V> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b12 rdf:first <promo:V> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b13 rdf:first <promo:to> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b14 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b13 rdf:first <promo:to> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b14 .
 
-    _:nb758077b59b14a119011386ee693b8f7b14 rdf:first <promo:te> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b14 rdf:first <promo:te> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b15 rdf:first <promo:t> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b13 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b15 rdf:first <promo:t> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b13 .
 
-    _:nb758077b59b14a119011386ee693b8f7b16 rdf:first _:nb758077b59b14a119011386ee693b8f7b17 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b16 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b17 ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b17 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b18 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b17 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b18 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:nb758077b59b14a119011386ee693b8f7b18 rdf:first <promo:d> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b19 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b18 rdf:first <promo:d> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b19 .
 
-    _:nb758077b59b14a119011386ee693b8f7b19 rdf:first _:nb758077b59b14a119011386ee693b8f7b20 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b19 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b20 ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b2 rdf:first _:nb758077b59b14a119011386ee693b8f7b21 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b2 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b21 ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b20 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b22 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b20 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b22 ;
         promo:hasOperation promolg:abs .
 
-    _:nb758077b59b14a119011386ee693b8f7b21 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b23 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b21 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b23 ;
         promo:hasOperation promolg:ReduceProduct .
 
-    _:nb758077b59b14a119011386ee693b8f7b22 rdf:first <promo:F_conv> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b22 rdf:first <promo:F_conv> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b23 rdf:first <promo:F_conv> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b24 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b23 rdf:first <promo:F_conv> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b24 .
 
-    _:nb758077b59b14a119011386ee693b8f7b24 rdf:first <promo:P> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b24 rdf:first <promo:P> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b25 rdf:first _:nb758077b59b14a119011386ee693b8f7b26 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b27 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b25 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b26 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b27 .
 
-    _:nb758077b59b14a119011386ee693b8f7b26 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b28 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b26 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b28 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:nb758077b59b14a119011386ee693b8f7b27 rdf:first <promo:Axy> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b27 rdf:first <promo:Axy> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b28 rdf:first _:nb758077b59b14a119011386ee693b8f7b29 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b30 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b28 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b29 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b30 .
 
-    _:nb758077b59b14a119011386ee693b8f7b29 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b31 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b29 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b31 ;
         promo:hasOperation promolg:inv .
 
-    _:nb758077b59b14a119011386ee693b8f7b3 rdf:first _:nb758077b59b14a119011386ee693b8f7b32 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b33 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b3 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b32 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b33 .
 
-    _:nb758077b59b14a119011386ee693b8f7b30 rdf:first <promo:k_conv> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b30 rdf:first <promo:k_conv> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b31 rdf:first <promo:rho> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b31 rdf:first <promo:rho> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b32 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b34 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b32 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b34 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:nb758077b59b14a119011386ee693b8f7b33 rdf:first <promo:c> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b33 rdf:first <promo:c> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b34 rdf:first <https://w3id.org/promo/ontology#const_half> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b35 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b34 rdf:first <https://w3id.org/promo/ontology#const_half> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b35 .
 
-    _:nb758077b59b14a119011386ee693b8f7b35 rdf:first _:nb758077b59b14a119011386ee693b8f7b36 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b35 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b36 ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b36 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b37 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b36 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b37 ;
         promo:hasOperation promolg:Subtract .
 
-    _:nb758077b59b14a119011386ee693b8f7b37 rdf:first <promo:F_conv> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b16 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b37 rdf:first <promo:F_conv> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b16 .
 
-    _:nb758077b59b14a119011386ee693b8f7b38 rdf:first <promo:m> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b38 rdf:first <promo:m> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b39 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b40 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b39 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b40 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:nb758077b59b14a119011386ee693b8f7b4 rdf:first <promo:dndt> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b15 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b4 rdf:first <promo:dndt> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b15 .
 
-    _:nb758077b59b14a119011386ee693b8f7b40 rdf:first _:nb758077b59b14a119011386ee693b8f7b41 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b42 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b40 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b41 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b42 .
 
-    _:nb758077b59b14a119011386ee693b8f7b41 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b25 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b41 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b25 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:nb758077b59b14a119011386ee693b8f7b42 rdf:first <promo:F_conv> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b42 rdf:first <promo:F_conv> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b43 rdf:first <promo:V> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b43 rdf:first <promo:V> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b44 a promo:Expression ;
-        promo:hasArguments _:nb758077b59b14a119011386ee693b8f7b43 ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b44 a promo:Expression ;
+        promo:hasArguments _:ndf0e22abb8e84dc0ba0537bae77b49d5b43 ;
         promo:hasOperation promolg:inv .
 
-    _:nb758077b59b14a119011386ee693b8f7b45 rdf:first <promo:P> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b45 rdf:first <promo:P> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b46 rdf:first <promo:fV> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b46 rdf:first <promo:fV> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b47 rdf:first <promo:fn_conv> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b47 rdf:first <promo:fn_conv> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b48 rdf:first <promo:V> ;
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b48 rdf:first <promo:V> ;
         rdf:rest () .
 
-    _:nb758077b59b14a119011386ee693b8f7b5 rdf:first _:nb758077b59b14a119011386ee693b8f7b44 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b38 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b5 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b44 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b38 .
 
-    _:nb758077b59b14a119011386ee693b8f7b6 rdf:first _:nb758077b59b14a119011386ee693b8f7b39 ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b45 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b6 rdf:first _:ndf0e22abb8e84dc0ba0537bae77b49d5b39 ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b45 .
 
-    _:nb758077b59b14a119011386ee693b8f7b7 rdf:first <promo:c_conv> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b46 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b7 rdf:first <promo:c_conv> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b46 .
 
-    _:nb758077b59b14a119011386ee693b8f7b8 rdf:first <promo:F_conv> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b47 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b8 rdf:first <promo:F_conv> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b47 .
 
-    _:nb758077b59b14a119011386ee693b8f7b9 rdf:first <promo:U> ;
-        rdf:rest _:nb758077b59b14a119011386ee693b8f7b48 .
+    _:ndf0e22abb8e84dc0ba0537bae77b49d5b9 rdf:first <promo:U> ;
+        rdf:rest _:ndf0e22abb8e84dc0ba0537bae77b49d5b48 .
 }
 

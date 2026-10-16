@@ -1,15 +1,22 @@
 @prefix promo: <https://w3id.org/promo#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://w3id.org/promo/model/> {
     promo:Assignment a rdfs:Class .
+
+    promo:Composite a rdfs:Class .
 
     promo:Glass a rdfs:Class .
 
     promo:Library a rdfs:Class .
 
     promo:Model a rdfs:Class .
+
+    promo:ModelArc a rdfs:Class .
+
+    promo:ModelNode a rdfs:Class .
 
     promo:Ontology a rdfs:Class .
 
@@ -20,19 +27,43 @@
 
     promo:Version a rdfs:Class .
 
+    promo:arcCounter a rdf:Property .
+
+    promo:arcType a rdf:Property .
+
     promo:atIndexElement a rdf:Property ;
         promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
+
+    promo:children a rdf:Property .
 
     promo:coordinate a rdf:Property ;
         promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
 
     promo:doc a rdf:Property .
 
+    promo:entityType a rdf:Property .
+
     promo:generatedFrom a rdf:Property .
+
+    promo:internalID a rdf:Property .
+
+    promo:layout a rdf:Property .
+
+    promo:nextTreeId a rdf:Property .
 
     promo:publishedOn a rdf:Property .
 
+    promo:referenceFrom a rdf:Property .
+
+    promo:referenceTo a rdf:Property .
+
+    promo:rootComposite a rdf:Property .
+
     promo:seedFloor a rdf:Property .
+
+    promo:source a rdf:Property .
+
+    promo:target a rdf:Property .
 
     promo:usesAssignment a rdf:Property .
 
@@ -54,5 +85,47 @@
         promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
         promo:usesLibrary <https://w3id.org/promo/library/> ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
+
+    <https://w3id.org/promo/model/Model> a promo:Model ;
+        promo:arcCounter 3 ;
+        promo:nextTreeId 3 ;
+        promo:rootComposite <https://w3id.org/promo/model/Composite_0> .
+
+    <promo:Arc/Arc_1> a promo:ModelArc ;
+        promo:arcType <promo:ArcType/token-flow> ;
+        promo:internalID "Arc_1" ;
+        promo:referenceFrom <promo:Model/Node_1> ;
+        promo:referenceTo <promo:Model/Node_2> ;
+        promo:source <promo:Model/Node_1> ;
+        promo:target <promo:Model/Node_2> .
+
+    <promo:Arc/Arc_2> a promo:ModelArc ;
+        promo:arcType <promo:ArcType/token-flow> ;
+        promo:internalID "Arc_2" ;
+        promo:referenceFrom <promo:Model/Node_2> ;
+        promo:referenceTo <promo:Model/Node_3> ;
+        promo:source <promo:Model/Node_2> ;
+        promo:target <promo:Model/Node_3> .
+
+    <https://w3id.org/promo/model/Composite_0> a promo:Composite ;
+        rdfs:label "Root" ;
+        promo:children "[{\"id\": 1, \"iri\": \"promo:Model/Node_1\"}, {\"id\": 2, \"iri\": \"promo:Model/Node_2\"}, {\"id\": 3, \"iri\": \"promo:Model/Node_3\"}]" ;
+        promo:internalID 0 ;
+        promo:layout "{\"1\": {\"x\": -166.0, \"y\": -455.5}, \"2\": {\"x\": -27.0, \"y\": -453.5}, \"3\": {\"x\": 105.0, \"y\": -458.5}}" .
+
+    <promo:Model/Node_1> a promo:ModelNode ;
+        rdfs:label "Node 1" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_environment> ;
+        promo:internalID "Node_1" .
+
+    <promo:Model/Node_3> a promo:ModelNode ;
+        rdfs:label "Node 3" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_3" .
+
+    <promo:Model/Node_2> a promo:ModelNode ;
+        rdfs:label "Node 2" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
+        promo:internalID "Node_2" .
 }
 

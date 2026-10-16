@@ -594,7 +594,11 @@ def build(nodes: Dict[str, NodeInfo],
                     hidden = False
                     for w_iri in sorted(peer_defined(peer)):
                         w = variables.get(w_iri)
-                        if w is None or not any(
+                        if w is None:
+                            continue
+                        # Identity is comparable: a boundary entity that
+                        # instantiates the same variable exports its value.
+                        if w_iri != v_iri and not any(
                                 _comparable(t, wt, token_parents)
                                 for t in var.tokens
                                 for wt in w.tokens):
@@ -634,6 +638,38 @@ def build(nodes: Dict[str, NodeInfo],
                 else:
                     per_contact = [candidates_at(a_iri)
                                    for a_iri in carrier_ok]
+                    node_indexed = any(
+                        _node_like(indices.get(i), indices)
+                        for i in var.index_structures)
+                    if node_indexed:
+                        # A node-indexed port reads a value at EACH
+                        # contact — emit one binding per arc, like the
+                        # arc-indexed case above.
+                        if not carrier_ok:
+                            emit_port(PortBinding(
+                                node=n, var=v_iri, status="unbound"), var)
+                        for a_iri, (contact, hidden) in zip(
+                                carrier_ok, per_contact):
+                            pb = PortBinding(
+                                node=n, var=v_iri, arc=a_iri,
+                                status="unbound",
+                                candidates=[(a_iri, p, w)
+                                            for p, w in contact])
+                            if len(contact) == 1:
+                                peer, w_iri = contact[0]
+                                pb.status = "bound"
+                                pb.peer_node = peer
+                                pb.peer_var = w_iri
+                                pb.element = (
+                                    a_iri if any(
+                                        _arc_like(indices.get(i), indices)
+                                        for i in
+                                        variables[w_iri].index_structures)
+                                    else peer)
+                            elif len(contact) > 1:
+                                pb.status = "ambiguous"
+                            emit_port(pb, var, state_hidden=hidden)
+                        continue
                     cands = [
                         (a_iri, peer, w_iri)
                         for a_iri, (contact, _hidden) in zip(
@@ -657,5 +693,38 @@ def build(nodes: Dict[str, NodeInfo],
                     elif len(cands) > 1:
                         pb.status = "ambiguous"
                     emit_port(pb, var, state_hidden=hidden)
+
+    # -- port chaining ---------------------------------------------------
+    # A port may read through a mediating entity (e.g. transport): when
+    # the peer defines nothing comparable but itself binds the same
+    # variable as a port, the value is whatever that port resolved to.
+    # Boundary values (e.g. an environment's instantiated p/c) thus
+    # propagate through the chain to downstream capacities.
+    changed = True
+    while changed:
+        changed = False
+        bound = [pb for pb in report.ports if pb.status == "bound"]
+        for pb in report.ports:
+            if pb.status != "unbound":
+                continue
+            if pb.arc is not None:
+                peers = [peer_of(pb.arc, pb.node)]
+            else:
+                peers = [peer_of(a, pb.node)
+                         for a in incident.get(pb.node, [])]
+            chained = [b for b in bound
+                       if b.node in peers and b.peer_var == pb.var]
+            if len(chained) == 1:
+                src = chained[0]
+                pb.status = "bound"
+                pb.peer_node = src.peer_node
+                pb.peer_var = src.peer_var
+                pb.element = src.element
+                changed = True
+                report.problems = [
+                    p for p in report.problems
+                    if not (p.kind == "unbound-port" and p.node == pb.node
+                            and p.message.startswith(
+                                f"port {variables[pb.var].label or _frag(pb.var)} "))]
 
     return report
