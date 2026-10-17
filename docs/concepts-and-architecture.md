@@ -415,7 +415,6 @@ overloads them. This list is normative for new documentation.
 Tracked here so the document stays honest about what is built vs.
 designed:
 
-- Fix marking persistence in the model artefact (ADR-008 layer 2).
 - Composite/reuse semantics: referenced-model composites, port surfacing
   (behaviour-linker-design-discussion §8; codegen approach 2).
 - Meshing (distributed-systems-design.md).
