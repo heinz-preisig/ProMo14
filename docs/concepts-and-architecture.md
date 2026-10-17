@@ -428,8 +428,10 @@ designed:
 - Fix marking (ADR-008 layer 2) — engine done 2026-10-17: `promo:fix`
   on `ModelNode` (modeller PUT/GET persists), binds `fixed` (fix wins
   over defining equations); problems `fix-conflict`, `fix-partial`,
-  `fixed-unbound`. Remaining: modeller fix-marking gesture; BL
-  admissibility checks (role filter, perfect-matching) from ADR-008.
+  `fixed-unbound`; modeller gesture done too — selected leaf shows a
+  "Fix (bound at this node)" checklist fed by
+  `GET /entity-variables`. Remaining: BL admissibility checks
+  (role filter, perfect-matching) from ADR-008.
 - Track 2 complete at seed level: problem catalogue
   (`docs/problem-catalogue.md`), doc anchors on `ProblemOut`, per-tool
   guide (`docs/what-am-i-authoring.md`), end-to-end example
