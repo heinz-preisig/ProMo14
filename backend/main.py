@@ -127,6 +127,23 @@ for _route, _env, _dist, _label in _SPAS:
 
 
 HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
+DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
+
+
+@app.get("/docs/{filename}", include_in_schema=False)
+def serve_doc(filename: str) -> Response:
+    """Serve a documentation markdown file (read-only, basename only).
+
+    Problem reports link here via ``doc`` anchors
+    (``/docs/problem-catalogue.md#<kind>``)."""
+    safe = Path(filename).name
+    if not safe.endswith(".md"):
+        return PlainTextResponse("not a markdown document", status_code=404)
+    path = DOCS_DIR / safe
+    if not path.is_file():
+        return PlainTextResponse(f"no such document: {safe}", status_code=404)
+    return FileResponse(str(path), media_type="text/markdown; charset=utf-8",
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/", include_in_schema=False)

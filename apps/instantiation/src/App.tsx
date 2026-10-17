@@ -115,7 +115,12 @@ function Problems({ report }: { report: InstantiationReport }) {
       </h3>
       {report.problems.map((p, i) => (
         <div key={i} style={{ fontSize: 12, padding: '2px 0' }}>
-          <span style={S.badge('#f59e0b')}>{p.kind}</span>{' '}
+          {p.doc
+            ? <a href={p.doc} target="_blank" rel="noreferrer"
+                 style={{ textDecoration: 'none' }}>
+                <span style={S.badge('#f59e0b')}>{p.kind}</span>
+              </a>
+            : <span style={S.badge('#f59e0b')}>{p.kind}</span>}{' '}
           {p.message}
         </div>
       ))}

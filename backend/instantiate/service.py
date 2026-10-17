@@ -171,6 +171,19 @@ class ProblemOut(BaseModel):
     message: str
     node: Optional[str] = None
     entity_type: Optional[str] = None
+    doc: Optional[str] = None    # catalogue anchor: /docs/<file>#<kind>
+
+
+# Every Problem.kind is documented under an identical `### <kind>`
+# heading in docs/problem-catalogue.md — the anchor is the kind itself.
+_PROBLEM_DOC = "/docs/problem-catalogue.md#"
+
+
+def _problem_out(p: "Problem") -> ProblemOut:
+    return ProblemOut(
+        kind=p.kind, message=p.message,
+        node=p.node, entity_type=p.entity_type,
+        doc=_PROBLEM_DOC + p.kind)
 
 
 class SchedBlockOut(BaseModel):
@@ -836,10 +849,7 @@ def model_instantiation(
                 lhs=b.lhs, loop=b.loop) for b in lvl]
                 for lvl in sched.levels],
             loops=[[[t, q] for t, q in scc] for scc in sched.loops]),
-        problems=[ProblemOut(
-            kind=p.kind, message=p.message,
-            node=p.node, entity_type=p.entity_type)
-            for p in report.problems],
+        problems=[_problem_out(p) for p in report.problems],
         ic_needs=_ic_needs(
             report, canonicals,
             {q.lhs for q in equations.values()
