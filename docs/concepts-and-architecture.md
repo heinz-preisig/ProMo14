@@ -216,6 +216,22 @@ global incidence matrix **F** `[N, A]`; equations reference F
 symbolically, so flipping an orientation only flips signs at codegen — the
 model document stays untouched.
 
+**Tokens are implicit, not declared.** An arc's type records only a
+carrier category (`token-flow`, `reference`) — the actual token (mass,
+energy, signal) is determined by the connected transport node's entity
+type, which is what places the arc into a sub-index like `A_mass` or
+`A_conv` (§3.2). One source of truth: re-typing the transport node
+re-tokens the arc without touching topology. Consequences:
+
+- The token is *derivable*, never stored — tools that show it must
+  compute it (incident transport node → sub-index → token).
+- **Capacity↔capacity arcs are underdetermined** — with no transport
+  node, no convention derives the token; they may eventually need an
+  explicit token assertion on the arc.
+- UX note: the derived token should be *displayed* in the Modeller
+  (arc label/hover, connect-time confirmation) — planned improvement,
+  see §8.
+
 ### 4.2 Port resolution at boundaries
 
 Entities meet through ports. A port on entity X resolves against a peer
@@ -360,3 +376,6 @@ designed:
   remaining: doc anchors from problem objects, per-tool "what am I
   authoring" pages, end-to-end worked example.
 - `promo:inDomain` / `network` field naming — see §7.
+- Modeller: display derived arc token (label/hover + connect-time
+  confirmation via resolve-connection) — do when next touching the
+  Modeller.
