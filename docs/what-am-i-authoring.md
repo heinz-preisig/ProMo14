@@ -130,3 +130,4 @@ tool.
 - `docs/concepts-and-architecture.md` §3 — the artefact table and
   ownership rule this guide applies.
 - `docs/problem-catalogue.md` — full cause/remedy per problem kind.
+- `docs/worked-example.md` — the whole thing on one model.

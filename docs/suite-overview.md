@@ -325,6 +325,7 @@ is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
 - `docs/concepts-and-architecture.md` — living conceptual layer: philosophy, objectives, artefact model, pipeline, flexibility (source for user docs & publication)
 - `docs/problem-catalogue.md` — engine-reported problems: cause + remedy per `kind` (Track 2 guidance seed)
 - `docs/what-am-i-authoring.md` — per-tool guide: artefact owned, correctness criteria, problems produced (Track 2)
+- `docs/worked-example.md` — end-to-end walkthrough: environment→transport→lumped through all artefacts (Track 2)
 - `docs/suite-overview.md` — this document
 - `docs/suite-status.md` — suite-wide implementation status
 

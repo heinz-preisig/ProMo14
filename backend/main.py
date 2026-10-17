@@ -129,12 +129,34 @@ for _route, _env, _dist, _label in _SPAS:
 HUB_PAGE = Path(__file__).resolve().parent / "static" / "hub.html"
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
+_DOC_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8"><title>{title}</title>
+<style>
+body {{ max-width: 56em; margin: 2em auto; padding: 0 1em;
+       font: 15px/1.55 -apple-system, "Segoe UI", sans-serif;
+       color: #1f2937; }}
+code, pre {{ font: 0.9em ui-monospace, monospace; background: #f3f4f6;
+            border-radius: 4px; }}
+code {{ padding: 0.1em 0.3em; }}
+pre {{ padding: 0.8em; overflow-x: auto; }}
+table {{ border-collapse: collapse; }}
+th, td {{ border: 1px solid #d1d5db; padding: 0.3em 0.7em;
+         text-align: left; }}
+h1, h2, h3, h4 {{ color: #111827; }}
+a {{ color: #2563eb; }}
+blockquote {{ border-left: 3px solid #d1d5db; margin-left: 0;
+             padding-left: 1em; color: #4b5563; }}
+</style></head><body>{body}</body></html>"""
+
 
 @app.get("/docs/{filename}", include_in_schema=False)
-def serve_doc(filename: str) -> Response:
-    """Serve a documentation markdown file (read-only, basename only).
+def serve_doc(filename: str, raw: bool = False) -> Response:
+    """Serve a documentation markdown file rendered as HTML.
 
-    Problem reports link here via ``doc`` anchors
+    Read-only, basename only, ``.md`` only.  Heading anchors come from
+    the ``toc`` extension — GitHub-style slugs, so ``#unbound-port``
+    scrolls to ``### unbound-port``.  ``?raw=1`` returns the markdown
+    source.  Problem reports link here via ``doc`` anchors
     (``/docs/problem-catalogue.md#<kind>``)."""
     safe = Path(filename).name
     if not safe.endswith(".md"):
@@ -142,8 +164,18 @@ def serve_doc(filename: str) -> Response:
     path = DOCS_DIR / safe
     if not path.is_file():
         return PlainTextResponse(f"no such document: {safe}", status_code=404)
-    return FileResponse(str(path), media_type="text/markdown; charset=utf-8",
-                        headers={"Cache-Control": "no-cache"})
+    headers = {"Cache-Control": "no-cache"}
+    if raw:
+        return FileResponse(str(path),
+                            media_type="text/markdown; charset=utf-8",
+                            headers=headers)
+    import markdown
+    body = markdown.markdown(
+        path.read_text(encoding="utf-8"),
+        extensions=["toc", "tables", "fenced_code", "sane_lists"])
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(
+        _DOC_PAGE.format(title=safe, body=body), headers=headers)
 
 
 @app.get("/", include_in_schema=False)
