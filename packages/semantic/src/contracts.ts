@@ -112,6 +112,9 @@ export interface ConnectionRuleQuery {
 export interface AllowedConnection {
   ruleIri: Iri
   arcTypeIri: Iri
+  /** Tokens the rule licensed across this endpoint pair (backend
+   *  ``matched_tokens``) — what an arc of this type carries. */
+  matchedTokens?: Iri[]
   sourcePortIri?: Iri
   targetPortIri?: Iri
 }

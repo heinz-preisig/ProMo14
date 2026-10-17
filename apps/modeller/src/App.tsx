@@ -191,7 +191,7 @@ export default function App() {
   )
 
   // --- Compute connection-rule feedback for hovered target ---
-  const { hoveredHighlight, validArcTypes } = useMemo(() => {
+  const { hoveredHighlight, validConnections } = useMemo(() => {
     // Use pendingConnection as source if set (cross-view), else selectedVisibleNodeId (same-view)
     const sourceEntityType = pendingConnection?.sourceEntityType
       ?? (state.selectedVisibleNodeId
@@ -199,15 +199,15 @@ export default function App() {
         : undefined)
     const hasSource = !!(pendingConnection || state.selectedVisibleNodeId)
     if (!hasSource || !hoveredNodeId || sourceEntityType === undefined) {
-      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     const targetNode = graphView.nodes.find((n) => n.id === hoveredNodeId)
     if (targetNode?.type !== 'leaf' || !targetNode.entityType) {
-      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     // Don't show feedback if hovering the pending source itself
     if (pendingConnection && targetNode.modelNodeIri === pendingConnection.sourceModelIri) {
-      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     const result = resolveConnection(
       sourceEntityType,
@@ -216,15 +216,18 @@ export default function App() {
       ruleResolver,
     )
     if (result.status === 'forbidden') {
-      return { hoveredHighlight: 'invalid' as const, validArcTypes: [] as Iri[] }
+      return { hoveredHighlight: 'invalid' as const, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     if (result.connections.length === 0) {
       // Cache miss — remote answer in flight; no highlight yet.
-      return { hoveredHighlight: null, validArcTypes: [] as Iri[] }
+      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     return {
       hoveredHighlight: 'valid' as const,
-      validArcTypes: result.connections.map((c) => c.arcTypeIri),
+      validConnections: result.connections.map((c) => ({
+        arcTypeIri: c.arcTypeIri,
+        matchedTokens: c.matchedTokens,
+      })),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump])
@@ -263,6 +266,26 @@ export default function App() {
 
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
   const selectedArc = graphView.arcs.find((a) => a.modelArcIri === state.selectedModelArcIri)
+
+  // Derived arc token display: the arc carries no declared token — the
+  // licensed token set comes from resolve-connection's matched_tokens
+  // for its endpoint entity types (cache-backed sync read).
+  const tokenLabel = (iri: Iri) =>
+    catalogue.getToken(iri)?.label ?? iri.split(/[/#]/).pop() ?? iri
+  const selectedArcTokens = ((): Iri[] => {
+    if (!selectedArc) return []
+    const selArc = state.modelArcs.get(selectedArc.modelArcIri)
+    if (!selArc) return []
+    const srcEt = state.modelNodes.get(selArc.sourceIri)?.entityType
+    const tgtEt = state.modelNodes.get(selArc.targetIri)?.entityType
+    if (!srcEt || !tgtEt) return []
+    const res = resolveConnection(srcEt, tgtEt, catalogue, ruleResolver)
+    if (res.status !== 'allowed') return []
+    const conn =
+      res.connections.find((c) => c.arcTypeIri === selectedArc.modelArcType)
+      ?? res.connections[0]
+    return conn?.matchedTokens ?? []
+  })()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
@@ -500,6 +523,9 @@ export default function App() {
               <div>Type: {selectedArc.arcType}</div>
               <div>From: {selectedArc.sourceId}</div>
               <div>To: {selectedArc.targetId}</div>
+              {selectedArcTokens.length > 0 && (
+                <div>Tokens: {selectedArcTokens.map(tokenLabel).join(', ')}</div>
+              )}
             </div>
           )}
           {/* §20 species gestures — capability-gated, needs ?species= */}
@@ -529,17 +555,17 @@ export default function App() {
               />
             )
           })()}
-          {validArcTypes.length > 0 && (
+          {validConnections.length > 0 && (
             <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 8 }}>
               <strong style={{ fontSize: 12 }}>Valid arc types</strong>
               <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Click to select, then right-click target</div>
-              {validArcTypes.map((arcIri) => {
-                const arcDef = ARC_TYPES.find((t) => t.id === arcIri)
-                const isActive = activeArcType === arcIri
+              {validConnections.map(({ arcTypeIri, matchedTokens }) => {
+                const arcDef = ARC_TYPES.find((t) => t.id === arcTypeIri)
+                const isActive = activeArcType === arcTypeIri
                 return (
                   <button
-                    key={arcIri}
-                    onClick={() => setActiveArcType(arcIri)}
+                    key={arcTypeIri}
+                    onClick={() => setActiveArcType(arcTypeIri)}
                     style={{
                       fontSize: 12,
                       padding: '4px 6px',
@@ -552,7 +578,12 @@ export default function App() {
                       marginBottom: 2,
                     }}
                   >
-                    {arcDef?.label ?? arcIri}
+                    {arcDef?.label ?? arcTypeIri}
+                    {matchedTokens && matchedTokens.length > 0 && (
+                      <span style={{ fontSize: 10, color: '#888' }}>
+                        {' '}· {matchedTokens.map(tokenLabel).join(', ')}
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -624,7 +655,7 @@ export default function App() {
       >
         <span style={{ color: '#555' }}>
           {hoveredHighlight === 'valid'
-            ? `Valid target — right-click to connect (${validArcTypes.length} arc type${validArcTypes.length > 1 ? 's' : ''})`
+            ? `Valid target — right-click to connect (${validConnections.length} arc type${validConnections.length > 1 ? 's' : ''})`
             : hoveredHighlight === 'invalid'
               ? 'Invalid target — connection not allowed'
               : pendingConnection && !state.selectedVisibleNodeId

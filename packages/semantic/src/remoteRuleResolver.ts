@@ -43,7 +43,7 @@ export interface RemoteRuleResolverOptions {
 }
 
 interface ResolveConnectionResponse {
-  rules: { iri: Iri; rule_type?: string; carrier?: string }[]
+  rules: { iri: Iri; rule_type?: string; carrier?: string; matched_tokens?: string[] }[]
 }
 
 export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
@@ -108,6 +108,7 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
               connections: body.rules.map((r) => ({
                 ruleIri: r.iri,
                 arcTypeIri: `promo:ArcType/${r.carrier ?? r.rule_type ?? 'generic'}`,
+                matchedTokens: r.matched_tokens,
               })),
             }
         // Only real backend answers are cached — a fallback result below

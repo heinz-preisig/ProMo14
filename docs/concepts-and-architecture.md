@@ -418,17 +418,22 @@ designed:
 - Fix marking persistence in the model artefact (ADR-008 layer 2).
 - Composite/reuse semantics: referenced-model composites, port surfacing
   (behaviour-linker-design-discussion §8; codegen approach 2).
-- `usesSpecies` pin (species currently passed as a URL param, not a
-  persistent artefact link).
 - Meshing (distributed-systems-design.md).
 - Empirical model selection artefact (energy-function + EOS pattern).
-- Instantiation artefact persistence for codegen input.
+- Instantiation artefact persistence for codegen input — `CodePlan`
+  is the natural serialisable shape (plan.py docstring); storage form
+  (new artefact graph vs triples on the model) needs a decision.
+- Fix marking (ADR-008 layer 2) — mark storage/granularity design
+  discussion pending, see below.
 - Track 2 complete at seed level: problem catalogue
   (`docs/problem-catalogue.md`), doc anchors on `ProblemOut`, per-tool
   guide (`docs/what-am-i-authoring.md`), end-to-end example
   (`docs/worked-example.md`), `/docs/` renders HTML with scrolling
   anchors.
 - `promo:inDomain` / `network` field naming — see §7.
-- Modeller: display derived arc token (label/hover + connect-time
-  confirmation via resolve-connection) — do when next touching the
-  Modeller.
+- Arc-token display — done 2026-10-17: `matchedTokens` on
+  `AllowedConnection` (backend `matched_tokens`), shown in the
+  connect-gesture arc-type list and the selected-arc panel. Remaining:
+  capacity↔capacity arcs are underdetermined (no transport node
+  determines the token — matched_tokens may still answer via endpoint
+  effective tokens; explicit token assertion stays an option).
