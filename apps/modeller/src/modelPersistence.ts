@@ -13,6 +13,8 @@ export interface ModelNodeDoc {
   /** §20 species placement (capability-gated). */
   speciesAllocation?: string
   reactions?: string[]
+  /** ADR-008 layer 2 — promo:fix marks (variable IRIs). */
+  fixes?: string[]
 }
 
 export interface ModelArcDoc {
@@ -64,6 +66,7 @@ export function serializeState(state: AppState): ModelDocument {
     label: n.label,
     speciesAllocation: n.speciesAllocation,
     reactions: n.reactions,
+    fixes: n.fixes,
   }))
 
   const arcs: ModelArcDoc[] = [...state.modelArcs.values()].map((a) => ({
@@ -113,6 +116,7 @@ export function deserializeState(doc: ModelDocument): AppState {
         label: n.label,
         speciesAllocation: n.speciesAllocation,
         reactions: n.reactions,
+        fixes: n.fixes,
       },
     ]),
   )

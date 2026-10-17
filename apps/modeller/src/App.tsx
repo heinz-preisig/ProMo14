@@ -3,8 +3,8 @@ import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
-import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchBehaviourEntityTypes, fetchEntityCapabilities, fetchSpecies, fetchSpeciesDistribution, loadModel, saveModel, saveOntology } from './api'
-import type { SpeciesDistribution, SpeciesDocument } from './api'
+import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchBehaviourEntityTypes, fetchEntityCapabilities, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, saveModel, saveOntology } from './api'
+import type { EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { deserializeState, hasContent, serializeState } from './modelPersistence'
@@ -45,6 +45,7 @@ export default function App() {
   const [dist, setDist] = useState<SpeciesDistribution | null>(null)
   const [capabilities, setCapabilities] = useState<Map<string, string[]>>(new Map())
   const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
+  const [fixVars, setFixVars] = useState<EntityVariable[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -189,6 +190,18 @@ export default function App() {
     () => computeGraphView(state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height),
     [state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height]
   )
+
+  // ADR-008 fix picker: the selected leaf's assignment variables.
+  useEffect(() => {
+    const vis = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
+    const sel = vis?.modelNodeIri ? state.modelNodes.get(vis.modelNodeIri) : undefined
+    if (!sel) { setFixVars([]); return }
+    let cancelled = false
+    fetchEntityVariables(sel.entityType).then((vs) => {
+      if (!cancelled) setFixVars(vs)
+    })
+    return () => { cancelled = true }
+  }, [state.selectedVisibleNodeId, state.modelNodes, graphView])
 
   // --- Compute connection-rule feedback for hovered target ---
   const { hoveredHighlight, validConnections } = useMemo(() => {
@@ -517,6 +530,30 @@ export default function App() {
               <div>y: {selectedVisibleNode.y.toFixed(1)}</div>
             </div>
           )}
+          {selectedVisibleNode?.modelNodeIri && fixVars.length > 0 && (() => {
+            const selNode = state.modelNodes.get(selectedVisibleNode.modelNodeIri!)
+            const fixed = new Set(selNode?.fixes ?? [])
+            return (
+              <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
+                <strong style={{ fontSize: 12 }}>Fix (bound at this node)</strong>
+                {fixVars.map((v) => (
+                  <label key={v.var} style={{ display: 'block', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={fixed.has(v.var)}
+                      onChange={() => dispatch({
+                        type: 'toggleNodeFix',
+                        iri: selNode!.iri,
+                        varIri: v.var,
+                      })}
+                    />
+                    {' '}{v.label || v.var.split(/[/#]/).pop()}
+                    <span style={{ color: '#999' }}> · {v.role}</span>
+                  </label>
+                ))}
+              </div>
+            )
+          })()}
           {selectedArc && (
             <div style={{ fontSize: 11 }}>
               <div>Arc: {selectedArc.modelArcIri}</div>

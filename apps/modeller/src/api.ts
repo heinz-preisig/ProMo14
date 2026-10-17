@@ -116,3 +116,22 @@ export async function fetchEntityCapabilities(): Promise<Map<string, string[]>> 
   const ets = await getJson<EntityTypeRecord[]>('/api/ontology/entity-types')
   return new Map(ets.map((e) => [e.iri, e.capabilities ?? []]))
 }
+
+/** ADR-008 layer 2: the variables an entity type's assignment mentions
+ *  — the candidate set for promo:fix marks on a model node. */
+export interface EntityVariable {
+  var: string
+  label: string
+  role: string   // state|port|instantiated|defined|input
+}
+
+export async function fetchEntityVariables(
+  entityType: string,
+): Promise<EntityVariable[]> {
+  if (!entityType) return []
+  const path = withParams('/api/instantiate/entity-variables',
+                          { entity_type: entityType })
+  const res = await fetch(path)
+  if (!res.ok) return []
+  return res.json()
+}

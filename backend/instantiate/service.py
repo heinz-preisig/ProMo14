@@ -1135,3 +1135,70 @@ def instantiation_plan(
                         if g.value(subj, PROMO["generatedFrom"]) else None),
         uses=[str(o) for o in g.objects(subj, PROMO["usesOntology"])],
         plan=json.loads(str(raw)) if raw is not None else None)
+
+
+class EntityVariableOut(BaseModel):
+    """One fixable variable of an entity type (the modeller's
+    fix-marking picker list)."""
+
+    var: str
+    label: str = ""
+    role: str = ""          # state|port|instantiated|defined|input
+
+
+@router.get("/entity-variables", response_model=List[EntityVariableOut])
+def entity_variables(
+    entity_type: str,
+    graph_iri: Optional[str] = Depends(graph_param),
+    vars: Optional[str] = None,
+) -> List[EntityVariableOut]:
+    """The variables an entity type's assignment mentions — the
+    candidate set for ``promo:fix`` marks in the modeller.
+
+    Same resolution scope as ``/model``: the model artefact's pins
+    (or ``?vars=`` override) supply the var/expr + assignment graphs.
+    """
+    store = get_store()
+    model_graph = resolve_graph(store, graph_iri)
+    library, assignment_graph = _model_dependencies(model_graph, vars)
+    variables, equations, _idx, var_labels, _c = _vars_collect(
+        store, library)
+    assignments = _assignments_collect(
+        store, assignment_graph, var_labels)
+    asg = assignments.get(entity_type)
+    if asg is None:
+        return []
+
+    ordered: List[str] = []
+    seen: Set[str] = set()
+
+    def _add(v: Optional[str], role: str, roles: Dict[str, str]) -> None:
+        if v and v not in seen:
+            seen.add(v)
+            ordered.append(v)
+            roles[v] = role
+
+    roles: Dict[str, str] = {}
+    for eq_iri in asg.sequence:
+        eq = equations.get(eq_iri)
+        if eq is None:
+            continue
+        _add(eq.lhs, "defined", roles)
+        for v in eq.inputs:
+            _add(v, "input", roles)
+    _add(asg.state_variable, "state", roles)
+    for v in asg.instantiated:
+        roles[v] = "instantiated"
+        if v not in seen:
+            seen.add(v)
+            ordered.append(v)
+    for v in asg.ports:
+        roles[v] = "port"
+        if v not in seen:
+            seen.add(v)
+            ordered.append(v)
+
+    return [EntityVariableOut(
+        var=v,
+        label=var_labels.get(v, ""),
+        role=roles[v]) for v in ordered]

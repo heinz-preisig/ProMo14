@@ -22,6 +22,9 @@ export interface ModelNode {
   speciesAllocation?: string
   /** reaction_host → hosted Reaction IRIs. */
   reactions?: string[]
+  /** ADR-008 layer 2 — promo:fix marks: variable IRIs bound to values
+   *  at this node occurrence. */
+  fixes?: string[]
   // No layout data — purely semantic
 }
 

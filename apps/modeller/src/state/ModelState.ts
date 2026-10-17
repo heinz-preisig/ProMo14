@@ -58,6 +58,7 @@ export type Command =
   | { type: 'setArcPermeable'; iri: string; permeable?: string[] }
   | { type: 'setSpeciesAlias'; componentIri: string; alias: string }
   | { type: 'setSpeciesPin'; iri: string | null }
+  | { type: 'toggleNodeFix'; iri: string; varIri: string }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -226,6 +227,18 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
 
     case 'setSpeciesPin':
       return { ...state, speciesPin: cmd.iri }
+
+    case 'toggleNodeFix': {
+      const modelNodes = new Map(state.modelNodes)
+      const n = modelNodes.get(cmd.iri)
+      if (n) {
+        const fixes = new Set(n.fixes ?? [])
+        if (fixes.has(cmd.varIri)) fixes.delete(cmd.varIri)
+        else fixes.add(cmd.varIri)
+        modelNodes.set(cmd.iri, { ...n, fixes: [...fixes] })
+      }
+      return { ...state, modelNodes }
+    }
 
     case 'groupNodes': {
       const nextTree = new TreeOps(state.tree)
