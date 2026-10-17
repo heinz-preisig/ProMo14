@@ -241,7 +241,8 @@ Species ───┤                                              ├─► Mode
    permeable transport → conditional reactions.
 5. **Instantiation** (§19) — binds the model topology to the assigned
    equations: index sets become concrete element sets, symbolic
-   references (`incidence`, `constant`, `parameter`, `port`, `local`)
+   references (`incidence`, `constant`, `parameter`, `port`, `local`,
+   `fixed`)
    resolve to bound values or matrices, ports resolve across entity
    boundaries. Output: an assembled equation set + a computed report
    (problems, not silent fixes).
@@ -419,11 +420,16 @@ designed:
   (behaviour-linker-design-discussion §8; codegen approach 2).
 - Meshing (distributed-systems-design.md).
 - Empirical model selection artefact (energy-function + EOS pattern).
-- Instantiation artefact persistence for codegen input — `CodePlan`
-  is the natural serialisable shape (plan.py docstring); storage form
-  (new artefact graph vs triples on the model) needs a decision.
-- Fix marking (ADR-008 layer 2) — mark storage/granularity design
-  discussion pending, see below.
+- Instantiation artefact — done 2026-10-17: `promo:Instantiation`
+  artefact type; `POST /instantiations` persists the `CodePlan` JSON
+  with `generatedFrom` + full pin set, `GET /instantiation-plan` reads
+  it back. Remaining: emitters consuming a *pinned* plan instead of
+  recomputing.
+- Fix marking (ADR-008 layer 2) — engine done 2026-10-17: `promo:fix`
+  on `ModelNode` (modeller PUT/GET persists), binds `fixed` (fix wins
+  over defining equations); problems `fix-conflict`, `fix-partial`,
+  `fixed-unbound`. Remaining: modeller fix-marking gesture; BL
+  admissibility checks (role filter, perfect-matching) from ADR-008.
 - Track 2 complete at seed level: problem catalogue
   (`docs/problem-catalogue.md`), doc anchors on `ProblemOut`, per-tool
   guide (`docs/what-am-i-authoring.md`), end-to-end example
