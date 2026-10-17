@@ -234,6 +234,52 @@ another artefact supplies the value. Rules (R3 + 2026-10-16 extension):
 Unresolvable ports are reported (`unbound-port`, `ambiguous-port`) — the
 model is incomplete, not silently defaulted.
 
+### 4.3 Worked example: environment → transport → lumped
+
+The running example (validated 2026-10-16) is the smallest model that
+exercises every mechanism: two capacity-type nodes joined through a
+transport node by two token-flow arcs.
+
+```
+environment ──arc──► convection transport ──arc──► lumped capacity
+   (boundary)            (stateless)                  (holds state)
+```
+
+- **Index sets.** `N = {env, transport, lumped}`, `A = {a1, a2}`,
+  `A_conv = {a1, a2}` (both arcs' mechanism is convection, selected by
+  the transport node's type). Per-type subsets: `N_env = {env}`,
+  `N_lumped = {lumped}`.
+- **Bindings.** The incidence variable `F[N, A_conv]` binds the numeric
+  incidence matrix *on both entities* — the constant-class `[N, arc]`
+  slot is reserved for exactly this (§4.1). The lumped node's state `m`
+  binds `local` over `N_lumped`; the transport's conductivity `k` binds
+  `parameter`; the environment's `p`, `T` bind `constant` values.
+- **Port resolution.** The transport's effort ports bind directly to
+  each peer's exported effort per contact. The lumped capacity's `p`/`c`
+  ports find no direct peer supply — they resolve by *port chaining*
+  through the transport's already-bound ports back to the environment's
+  pins. One propagation pass; the `unbound-port` problems are retracted
+  on success.
+- **Schedule.** The lumped balance's LHS `m` is a *state* → source, not
+  a product of the balance. What remains is acyclic in this example:
+  constants/ports at level 0, the transport's `J` next, the lumped
+  balance (yielding `dm/dt`) last. No `algebraic-loop` problems.
+- **Report.** Zero problems: all ports bound, all assignments closed.
+  The assembled equation set — `F` numeric, `p`/`T` pinned, `m` marked
+  integrator output — is what codegen consumes.
+
+Two observations the example demonstrates, both worth stating explicitly:
+
+- **A stateless entity declares no base equation.** The transport has no
+  balance of its own; giving it one would stamp its LHS as a state
+  variable and the scheduler would wrongly treat it as integrator
+  output. The balance lives on the capacities; transport contributes
+  flows.
+- **"Environment" is a role, not a special type.** Nothing in the engine
+  knows about environments. An entity that defines bound, comparable
+  values is a boundary; the same `lumped_capacity` type would work if it
+  exported `p`.
+
 ---
 
 ## 5. Flexibility by consequence
