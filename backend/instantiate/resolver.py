@@ -27,6 +27,10 @@ class NodeInfo:
 
     iri: str
     entity_type: Optional[str] = None
+    #: ADR-008 layer 2 — ``promo:fix`` marks: variable IRIs bound to
+    #: values *at this node* (per-occurrence override of the variable's
+    #: class regime).  Read by the §19 builder, not the resolver itself.
+    fixes: List[str] = field(default_factory=list)
 
 
 @dataclass

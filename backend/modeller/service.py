@@ -60,6 +60,9 @@ class ModelNodeDoc(BaseModel):
     # §20 species placement (capability-gated in the modeller):
     speciesAllocation: Optional[str] = None  # reservoir → Allocation IRI
     reactions: List[str] = Field(default_factory=list)  # hosted Reaction IRIs
+    # ADR-008 layer 2: promo:fix marks — variable IRIs bound to values
+    # at this node occurrence.
+    fixes: List[str] = Field(default_factory=list)
 
 
 class ModelArcDoc(BaseModel):
@@ -186,6 +189,8 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
             speciesAllocation=_one(graph, s, PROMO["speciesAllocation"]),
             reactions=sorted(str(r) for r in
                              graph.objects(s, PROMO["hostsReaction"])),
+            fixes=sorted(str(f) for f in
+                         graph.objects(s, PROMO["fix"])),
         ))
 
     for s in graph.subjects(RDF.type, PROMO["ModelArc"]):
@@ -292,6 +297,8 @@ def put_model(
                        URIRef(n.speciesAllocation)))
         for r in n.reactions:
             graph.add((s, PROMO["hostsReaction"], URIRef(r)))
+        for f in n.fixes:
+            graph.add((s, PROMO["fix"], URIRef(f)))
         graph.set((s, PROMO["internalID"],
                    Literal(n.iri.rsplit("/", 1)[-1])))
 

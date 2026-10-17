@@ -186,6 +186,7 @@ class Problem:
     kind: str
     message: str
     node: Optional[str] = None
+    var: Optional[str] = None
     entity_type: Optional[str] = None
 
 
@@ -405,10 +406,34 @@ def build(nodes: Dict[str, NodeInfo],
                 message=f"assignment for {_frag(et)} is not closed",
                 entity_type=et))
 
+        # ADR-008 layer 2 — promo:fix marks on this type's nodes.
+        # Bindings are per-entity-type, so a mark only binds cleanly
+        # when every node of the type carries it; a partial mark is
+        # applied anyway but reported (the unmarked nodes read values
+        # too — the report flags the intent gap).
+        fix_counts: Dict[str, int] = {}
+        for n in t_nodes:
+            for v in nodes[n].fixes:
+                fix_counts[v] = fix_counts.get(v, 0) + 1
+        fixed_vars: Set[str] = set(fix_counts)
+        for v_iri, cnt in sorted(fix_counts.items()):
+            if cnt < len(t_nodes):
+                problems.append(Problem(
+                    kind="fix-partial",
+                    message=f"{v_iri.rsplit('/', 1)[-1]} is fixed on "
+                            f"{cnt} of {len(t_nodes)} {_frag(et)} "
+                            f"nodes — the fix applies to the whole "
+                            f"type's binding",
+                    var=v_iri, entity_type=et))
+
         defined: Set[str] = set()
         if asg.state_variable:
             defined.add(asg.state_variable)
         eq_seq: List[EqInfo] = []
+        # LHSs of equations dropped by a fix — the var is bound, not
+        # computed, but must still enter discovery (its only link to
+        # the assignment may be that equation).
+        fixed_lhs: List[str] = []
         for eq_iri in asg.sequence:
             eq = equations.get(eq_iri)
             if eq is None:
@@ -417,6 +442,18 @@ def build(nodes: Dict[str, NodeInfo],
                     message=f"assignment references unknown equation "
                             f"{_frag(eq_iri)}",
                     entity_type=et))
+                continue
+            if eq.lhs in fixed_vars:
+                # Fix wins: the variable is bound, not computed — the
+                # defining equation drops out of this entity's set.
+                problems.append(Problem(
+                    kind="fix-conflict",
+                    message=f"{eq.lhs.rsplit('/', 1)[-1]} is marked "
+                            f"fixed on {_frag(et)} but is defined by "
+                            f"{_frag(eq_iri)} — the equation is "
+                            f"dropped",
+                    var=eq.lhs, entity_type=et))
+                fixed_lhs.append(eq.lhs)
                 continue
             eq_seq.append(eq)
             defined.add(eq.lhs)
@@ -432,7 +469,8 @@ def build(nodes: Dict[str, NodeInfo],
                     seen.add(v)
                     ordered_vars.append(v)
         for v in ([asg.state_variable] if asg.state_variable else []
-                  ) + list(asg.instantiated) + list(asg.ports):
+                  ) + list(asg.instantiated) + list(asg.ports) \
+                + fixed_lhs:
             if v not in seen:
                 seen.add(v)
                 ordered_vars.append(v)
@@ -460,13 +498,17 @@ def build(nodes: Dict[str, NodeInfo],
             else:
                 role = "input"
 
-            # Binding kind.
+            # Binding kind.  A fix mark overrides the class-derived
+            # regime: the variable is bound data at this occurrence.
             idx_iris = list(var.index_structures)
             arc_idx = next((i for i in idx_iris
                             if _arc_like(indices.get(i), indices)), None)
             node_idx = next((i for i in idx_iris
                              if _node_like(indices.get(i), indices)), None)
-            if arc_idx and node_idx and var.var_class == "constant":
+            if v_iri in fixed_vars:
+                binding = "fixed"
+                role = "fixed"
+            elif arc_idx and node_idx and var.var_class == "constant":
                 binding = "incidence"
             elif var.value is not None:
                 binding = "constant"
@@ -478,6 +520,14 @@ def build(nodes: Dict[str, NodeInfo],
                 binding = "input"
             else:
                 binding = "local"
+
+            if binding == "fixed" and var.value is None:
+                problems.append(Problem(
+                    kind="fixed-unbound",
+                    message=f"{var.label or _frag(v_iri)} is marked "
+                            f"fixed on {_frag(et)} but has no bound "
+                            f"value (set promo:value or a value cell)",
+                    var=v_iri, entity_type=et))
 
             if binding == "input":
                 problems.append(Problem(

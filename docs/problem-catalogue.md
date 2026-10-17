@@ -129,6 +129,48 @@ or add a measurement variable)`)
   comparable variable exists across the arc. The model should say which
   peer supplies the value, not leave it to inference.
 
+## Fix-marking problems (ADR-008 layer 2)
+
+`promo:fix` on a `ModelNode` marks a variable as bound *at that
+occurrence* — a per-node override of the variable's class regime. A
+fixed variable binds as `fixed`: a `promo:value` inlines it like a
+constant; otherwise it becomes a codegen input slot (value cells or
+`par`). Fix **wins** over a defining equation — the equation is dropped.
+
+### `fix-conflict`
+**Message:** `<var> is marked fixed on <type> but is defined by
+<eq> — the equation is dropped`
+
+- **Cause.** The variable is both fix-marked and equation-defined in
+  the same entity's assignment. Bound *and* computed is
+  overdetermined — the fix takes precedence.
+- **Remedy.** Decide which owns the value. To compute it, remove the
+  fix mark. To prescribe it, the conflict is informative only — but the
+  dropped equation may leave its other outputs' consumers unsatisfied;
+  check for follow-on `unmarked-input`s.
+
+### `fix-partial`
+**Message:** `<var> is fixed on <k> of <n> <type> nodes — the fix
+applies to the whole type's binding`
+
+- **Cause.** Some but not all nodes of an entity type carry the mark.
+  Bindings are per entity *type* (index element sets span all its
+  nodes), so a per-node mark can only widen to the type — the unmarked
+  nodes read values too.
+- **Remedy.** Mark the variable on **all** nodes of that type if the
+  widening is intended (silences the report), or split the entity types
+  if the two occurrences genuinely differ.
+
+### `fixed-unbound`
+**Message:** `<var> is marked fixed on <type> but has no bound value
+(set promo:value or a value cell)`
+
+- **Cause.** A fix mark without data: no `promo:value` scalar and no
+  value cells cover the bound extent. (Cells are invisible to the
+  builder — the service retracts this problem when cells exist.)
+- **Remedy.** Bind the value: `promo:value` for a scalar, or a
+  `ValueCell` table when the variable indexes over nodes/arcs.
+
 ## Scheduling problems
 
 ### `algebraic-loop`

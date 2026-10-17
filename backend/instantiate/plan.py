@@ -243,14 +243,18 @@ def plan(report: Instantiation, sched: Schedule,
     # -- params / inputs ------------------------------------------------------
     for e in report.entity_types:
         for v in e.variables:
-            if v.binding in ("constant", "parameter"):
+            if v.binding in ("constant", "parameter") \
+                    or (v.binding == "fixed" and v.value is not None):
+                # A fixed var carrying promo:value inlines like a
+                # constant; without one it becomes an input slot below.
                 out.params.append(ParamSlot(
                     var=v.var, instance=v.instance,
-                    kind=v.binding, value=v.value,
+                    kind="constant" if v.binding == "fixed" else v.binding,
+                    value=v.value,
                     indices=v.indices,
                     values=_value_table(v, values or {}),
                     name=names[e.entity_type][v.var]))
-            elif v.binding == "input":
+            elif v.binding in ("input", "fixed"):
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
                     indices=v.indices,

@@ -22,7 +22,7 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 # artefact graph carries ``<graphIRI> a promo:<Type>`` so the catalogue
 # can classify it.  ``promo:Version`` marks frozen graphs separately.
 ARTEFACT_TYPES = ("Ontology", "Library", "Assignment", "Model", "Glass",
-                  "Species")
+                  "Species", "Instantiation")
 
 # Convention docs on self-describing vocabulary terms, applied by
 # ``RdfStore.declare_vocabulary`` wherever the term is declared so every

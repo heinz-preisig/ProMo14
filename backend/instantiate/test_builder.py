@@ -1773,3 +1773,78 @@ def test_model_endpoint_ic_needs(client):
     assert [[q["equation"], q["lhs"]] for q in cap["initial_equations"]] == [
         [str(e_ic), ids["m"]]]
     assert all(q["equation"] != str(e_ic) for q in cap["equations"])
+
+
+# ---------------------------------------------------------------------------
+# Fix marking (ADR-008 layer 2 — promo:fix on ModelNode)
+# ---------------------------------------------------------------------------
+
+def _fixed_nodes(fix_map):
+    """NODES with promo:fix marks: {node_key: [var_iris]}."""
+    nodes = {}
+    for key, n in NODES.items():
+        nodes[key] = NodeInfo(n.iri, n.entity_type,
+                              fixes=list(fix_map.get(key, [])))
+    return nodes
+
+
+def test_fix_binds_fixed_and_drops_equation():
+    """p is defined by eq_prop on lumped_capacity; fixing it on BOTH
+    capacity nodes binds 'fixed' and drops the defining equation."""
+    nodes = _fixed_nodes({"c1": [_var("p")], "c2": [_var("p")]})
+    rep = _build(nodes=nodes)
+    cap = _entity(rep, _et("lumped_capacity"))
+    p = _binding(cap, _var("p"))
+    assert p.binding == "fixed"
+    assert p.role == "fixed"
+    # Fix wins: the defining equation is out of the entity's set.
+    assert all(q.lhs != _var("p") for q in cap.equations)
+    kinds = [pr.kind for pr in rep.problems]
+    assert "fix-conflict" in kinds
+    # No promo:value and (engine level) no cells → value missing.
+    assert "fixed-unbound" in kinds
+    assert "fix-partial" not in kinds
+
+
+def test_fix_partial_marks_widen_to_type():
+    """A fix on only one of the type's nodes still binds 'fixed' but
+    is reported — per-node marks can't express partial bindings."""
+    nodes = _fixed_nodes({"c1": [_var("p")]})
+    rep = _build(nodes=nodes)
+    cap = _entity(rep, _et("lumped_capacity"))
+    assert _binding(cap, _var("p")).binding == "fixed"
+    kinds = [pr.kind for pr in rep.problems]
+    assert "fix-partial" in kinds
+    assert "fix-conflict" in kinds
+
+
+def test_fix_with_value_is_quiet():
+    """A fixed var carrying promo:value binds 'fixed' with no
+    fixed-unbound problem (it inlines like a constant downstream)."""
+    nodes = _fixed_nodes({"c1": [_var("p")], "c2": [_var("p")]})
+    variables = dict(VARIABLES)
+    p = variables[_var("p")]
+    variables[_var("p")] = VarInfo(
+        p.iri, p.label, p.internal_id,
+        index_structures=p.index_structures, tokens=p.tokens,
+        value="101325", var_class=p.var_class,
+        port_variable=p.port_variable)
+    rep = _build(nodes=nodes, variables=variables)
+    cap = _entity(rep, _et("lumped_capacity"))
+    binding = _binding(cap, _var("p"))
+    assert binding.binding == "fixed"
+    kinds = [pr.kind for pr in rep.problems]
+    assert "fixed-unbound" not in kinds
+
+
+def test_fix_unmarked_input_var():
+    """Fixing an input-class var gives it a source — no unmarked-input
+    problem even though it is neither port nor instantiated."""
+    # p_in on the transport is an external input of eq_flow; marking
+    # it fixed on t1 resolves the input without a port.
+    nodes = _fixed_nodes({"t1": [_var("p_in")]})
+    rep = _build(nodes=nodes)
+    tr = _entity(rep, _et("diffusion_transport"))
+    assert _binding(tr, _var("p_in")).binding == "fixed"
+    assert not any(pr.kind == "unmarked-input"
+                   for pr in rep.problems)

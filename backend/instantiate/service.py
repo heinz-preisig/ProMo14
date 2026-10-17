@@ -28,12 +28,15 @@ state pins and solves ``der = 0``).
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
-from rdflib import RDF, RDFS, URIRef
+from rdflib import RDF, RDFS, Literal, URIRef
 
 from backend.behaviour.service import (
     _assignment_graph_iri,
@@ -301,7 +304,9 @@ def _collect(store, model_graph):
     for s in model_graph.subjects(RDF.type, PROMO["ModelNode"]):
         et = model_graph.value(s, PROMO["entityType"])
         nodes[str(s)] = NodeInfo(
-            iri=str(s), entity_type=str(et) if et else None)
+            iri=str(s), entity_type=str(et) if et else None,
+            fixes=[str(f) for f in
+                   model_graph.objects(s, PROMO["fix"])])
         lbl = model_graph.value(s, RDFS.label)
         if lbl is not None:
             labels[str(s)] = str(lbl)
@@ -732,6 +737,16 @@ def get_values(
         values=store.value_cells(graph, variable))
 
 
+def _filter_fixed_unbound(store, model_graph, report) -> None:
+    """Retract ``fixed-unbound`` problems for vars whose value cells
+    supply the data — the builder only sees ``promo:value``, not the
+    cell store."""
+    report.problems[:] = [
+        p for p in report.problems
+        if not (p.kind == "fixed-unbound" and p.var
+                and store.value_cells(model_graph.identifier, p.var))]
+
+
 @router.get("/model", response_model=InstantiationReportOut)
 def model_instantiation(
     graph_iri: Optional[str] = Depends(graph_param),
@@ -812,6 +827,7 @@ def model_instantiation(
             kind="algebraic-loop",
             message=(f"algebraic loop {i}: "
                      + ", ".join(_frag(q) for _t, q in scc))))
+    _filter_fixed_unbound(store, model_graph, report)
 
     return InstantiationReportOut(
         model=str(model_graph.identifier),
@@ -911,6 +927,7 @@ def _plan_for(graph_iri: str, vars: Optional[str],
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))
     sched = schedule(report)
+    _filter_fixed_unbound(store, model_graph, report)
     # §20 ν channel: stored value-cell tables on the model artefact,
     # keyed by variable IRI — plan() expands them over each binding's
     # element sets; emitters render them as literals.
@@ -1014,3 +1031,107 @@ def model_initial(
                       states=states, par_needed=par_needed,
                       steady_state=body.steady_state,
                       problems=problems)
+
+
+# ---------------------------------------------------------------------------
+# Instantiation artefact — the computed CodePlan, persisted
+# ---------------------------------------------------------------------------
+#
+# The report+plan were computed-on-demand like the §15/§16 resolvers;
+# codegen that consumes a *pinned* instantiation needs them as an
+# artefact.  A promo:Instantiation graph stamps generatedFrom → model
+# plus the ontology/library/species pins the plan was computed against,
+# and carries the serialised plan as a promo:plan JSON literal.
+
+
+class InstantiationSaveIn(BaseModel):
+    """Body for POST /instantiations."""
+
+    iri: Optional[str] = None        # artefact graph IRI; minted if absent
+    label: Optional[str] = None
+    vars: Optional[str] = None
+    species: Optional[str] = None
+
+
+class InstantiationSaveOut(BaseModel):
+    iri: str
+    generated_from: str
+    problems: List[str] = Field(default_factory=list)
+
+
+class InstantiationPlanOut(BaseModel):
+    iri: str
+    generated_from: Optional[str] = None
+    uses: List[str] = Field(default_factory=list)
+    plan: Optional[Dict[str, Any]] = None
+
+
+@router.post("/instantiations", response_model=InstantiationSaveOut)
+def save_instantiation(
+    body: InstantiationSaveIn,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> InstantiationSaveOut:
+    """Compute the §19 report+plan for a model and persist the plan as
+    a ``promo:Instantiation`` artefact graph.
+
+    The artefact carries the full pin set the plan was computed against
+    (ontology, library, assignment, species) plus ``generatedFrom`` —
+    so a pinned plan is replayable and auditable, not a recomputation.
+    """
+    if not graph_iri:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= (model artefact IRI) is required")
+    store = get_store()
+    model_graph = resolve_graph(store, graph_iri)
+    cp, report, _ = _plan_for(graph_iri, body.vars, body.species)
+
+    model_iri = model_graph.identifier
+    iri = body.iri or (
+        f"{model_iri}#instantiation_"
+        f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}")
+    if len(store.dataset.graph(URIRef(iri))):
+        raise HTTPException(
+            status_code=409, detail=f"artefact {iri} already exists")
+
+    def _pins(pred: str) -> List[URIRef]:
+        return [o for o in model_graph.objects(model_iri, PROMO[pred])
+                if isinstance(o, URIRef)]
+
+    store.create_artefact_graph(
+        iri, "instantiation",
+        label=body.label or f"instantiation of {model_iri}",
+        uses=_pins("usesOntology"),
+        uses_library=_pins("usesLibrary"),
+        uses_assignment=_pins("usesAssignment"),
+        uses_species=_pins("usesSpecies"))
+    g = store.dataset.graph(URIRef(iri))
+    g.add((URIRef(iri), PROMO["generatedFrom"], model_iri))
+    g.set((URIRef(iri), PROMO["plan"],
+           Literal(json.dumps(asdict(cp)))))
+    g.set((URIRef(iri), PROMO["computedAt"],
+           Literal(datetime.now(timezone.utc).isoformat())))
+    return InstantiationSaveOut(
+        iri=iri, generated_from=str(model_iri),
+        problems=[p.kind for p in report.problems])
+
+
+@router.get("/instantiation-plan", response_model=InstantiationPlanOut)
+def instantiation_plan(
+    iri: str,
+) -> InstantiationPlanOut:
+    """Read a persisted ``promo:Instantiation`` artefact's plan back."""
+    store = get_store()
+    g = resolve_graph(store, iri)
+    subj = g.identifier
+    if (subj, RDF.type, PROMO["Instantiation"]) not in g:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{iri} is not a promo:Instantiation artefact")
+    raw = g.value(subj, PROMO["plan"])
+    return InstantiationPlanOut(
+        iri=iri,
+        generated_from=(str(g.value(subj, PROMO["generatedFrom"]))
+                        if g.value(subj, PROMO["generatedFrom"]) else None),
+        uses=[str(o) for o in g.objects(subj, PROMO["usesOntology"])],
+        plan=json.loads(str(raw)) if raw is not None else None)
