@@ -310,6 +310,7 @@ designed:
 - Meshing (distributed-systems-design.md).
 - Empirical model selection artefact (energy-function + EOS pattern).
 - Instantiation artefact persistence for codegen input.
-- Track 2: problem catalogue with doc anchors; per-tool "what am I
-  authoring" pages; end-to-end worked example.
+- Track 2: problem catalogue started (`docs/problem-catalogue.md`);
+  remaining: doc anchors from problem objects, per-tool "what am I
+  authoring" pages, end-to-end worked example.
 - `promo:inDomain` / `network` field naming — see §7.
