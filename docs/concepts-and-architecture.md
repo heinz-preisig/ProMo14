@@ -162,6 +162,57 @@ Equations are written **symbolically over indices**; turning index sets
 into concrete tensor dimensions is an instantiation concern. This is what
 makes one equation serve a 2-node and a 200-node model.
 
+### 3.3 The species scheme — what can happen, kept outside the model
+
+The species artefact is deliberately *not* part of the model. A
+`promo:Species` graph declares the chemistry: `promo:Component`s (the
+species), `promo:Allocation`s (where each species can reside), and
+`promo:Reaction`s (what can happen). The model never copies any of this —
+it *references* the scheme through placements:
+
+- `promo:speciesAllocation` — a node declares which allocation it
+  realises (a reservoir injects species).
+- `promo:hostsReaction` — a node declares which reactions it may host.
+- `promo:permeable` — a transport node declares which species it passes.
+
+Whether a placement is legal is governed by **capabilities** —
+`promo:capability` links on entity types, inherited through
+`promo:parent`: `species_source` (environments), `reaction_host`
+(lumped/distributed/point capacities), `species_transport`
+(mass-transport mechanisms). Capabilities are ontology content: the rule
+"convection transports species" is data on the type hierarchy, editable
+and versioned — not a check baked into the Modeller.
+
+The payoff appears at instantiation: species presence is **computed, not
+declared**. A monotone fixpoint (reservoir injection → permeable
+transport → conditional reactions, spreading bidirectionally) derives
+which species exist at each node and arc — that set is what the index
+`S` binds to, and which reactions actually *fire* is what `Q` binds to.
+Change the scheme or the placements and `S`/`Q` change everywhere they
+are used, with no equation edits.
+
+### 3.4 Behaviour assignments — selection, not authoring
+
+The behaviour-linker artefact answers "which of the checked equations
+describe *this* entity type?" Its content is a **selection**: for each
+entity type, an ordered sequence of equation IRIs drawn from the
+var/expr graph, plus structural marks:
+
+- `base_equation` — *the* balance. Its LHS becomes the entity's
+  `state_variable` at closure — which is why a stateless entity
+  (transport) must declare none (§4.3).
+- `instantiated` — variables the entity supplies as bound values rather
+  than computing (boundary conditions).
+- `closed` — whether every variable the selection consumes is either
+  produced inside it or resolved externally (port, bound value); an open
+  assignment reports `assignment-open` at instantiation.
+
+The assignment owns no physics. It is a subgraph of the var/expr
+bipartite graph picked under user control and validated for consistency —
+the same equations can be selected by several entity types, and swapping
+one constitutive relation for an alternative definition is an
+assignment edit, not an equation edit.
+
 ---
 
 ## 4. The pipeline
