@@ -322,6 +322,7 @@ is the primary consumer.  See `docs/ontology-design-discussion-2026-09-11.md`
 ## 9. Documentation map
 
 ### Suite-level
+- `docs/concepts-and-architecture.md` — living conceptual layer: philosophy, objectives, artefact model, pipeline, flexibility (source for user docs & publication)
 - `docs/suite-overview.md` — this document
 - `docs/suite-status.md` — suite-wide implementation status
 
