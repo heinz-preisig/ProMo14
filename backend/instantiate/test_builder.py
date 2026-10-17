@@ -7,6 +7,7 @@ the assembled report.
 """
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -53,6 +54,7 @@ from backend.instantiate.plan import (
     CodePlan,
     ParamSlot,
     PlanBlock,
+    code_plan_from_dict,
     plan,
 )
 from backend.instantiate.scheduler import schedule
@@ -1848,3 +1850,12 @@ def test_fix_unmarked_input_var():
     assert _binding(tr, _var("p_in")).binding == "fixed"
     assert not any(pr.kind == "unmarked-input"
                    for pr in rep.problems)
+
+
+def test_code_plan_round_trip():
+    """A persisted CodePlan (asdict → JSON → code_plan_from_dict)
+    rebuilds an equal plan — the promo:Instantiation replay path."""
+    cp = _plan(_build())
+    raw = json.loads(json.dumps(asdict(cp)))
+    rt = code_plan_from_dict(raw)
+    assert rt == cp

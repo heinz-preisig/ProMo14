@@ -381,3 +381,33 @@ def _all_elements(v: VarBinding) -> List[str]:
     for els in v.indices.values():
         out.extend(els or [])
     return out
+
+
+# ---------------------------------------------------------------------------
+# Deserialisation — a persisted promo:Instantiation's promo:plan JSON
+# ---------------------------------------------------------------------------
+
+def _mk(cls, d: Dict[str, Any]):
+    """Construct a dataclass from a JSON dict, ignoring unknown keys."""
+    return cls(**{k: v for k, v in d.items()
+                  if k in cls.__dataclass_fields__})
+
+
+def code_plan_from_dict(d: Dict[str, Any]) -> CodePlan:
+    """Rebuild a ``CodePlan`` from its ``asdict`` JSON form —
+    the shape persisted on a ``promo:Instantiation`` artefact."""
+    cp = CodePlan()
+    cp.states = [_mk(StateSlot, s) for s in d.get("states", [])]
+    cp.gathers = [_mk(Gather, g) for g in d.get("gathers", [])]
+    cp.matrices = [_mk(MatrixLit, m) for m in d.get("matrices", [])]
+    for m in cp.matrices:
+        m.entries = [tuple(e) for e in m.entries]
+    cp.params = [_mk(ParamSlot, p) for p in d.get("params", [])]
+    cp.inputs = [_mk(ParamSlot, p) for p in d.get("inputs", [])]
+    cp.levels = [[_mk(PlanBlock, b) for b in lvl]
+                 for lvl in d.get("levels", [])]
+    cp.loops = [[tuple(pair) for pair in scc]
+                for scc in d.get("loops", [])]
+    cp.initials = [_mk(PlanBlock, b) for b in d.get("initials", [])]
+    cp.names = {et: dict(m) for et, m in d.get("names", {}).items()}
+    return cp

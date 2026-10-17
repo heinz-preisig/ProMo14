@@ -79,7 +79,7 @@ from .distribute import (
     SpeciesNode,
     distribute,
 )
-from .plan import plan
+from .plan import plan, code_plan_from_dict
 from .scheduler import schedule
 from .resolver import (
     ArcInfo,
@@ -948,21 +948,38 @@ def model_code(
     vars: Optional[str] = None,
     target: str = "python",
     species: Optional[str] = None,
+    instantiation: Optional[str] = None,
 ) -> CodeOut:
     """§19 codegen: emit the model's derivative function.
 
     Same assembly as ``/model`` (report + schedule + incidence),
     then ``plan()`` lowers it to a ``CodePlan`` and the target
     emitter renders the source.  ``target`` is ``python`` or
-    ``julia`` (matlab pending)."""
-    if not graph_iri:
+    ``julia`` (matlab pending).
+
+    ``instantiation=<artefact-iri>`` replays a *pinned*
+    ``promo:Instantiation`` plan instead of recomputing — the
+    var/expr scope comes from the artefact's ``usesLibrary`` pin
+    (``?vars=`` still overrides)."""
+    if not graph_iri and not instantiation:
         raise HTTPException(
             status_code=400,
-            detail="graph= (model artefact IRI) is required")
+            detail="graph= or instantiation= is required")
     if target not in _EMITTERS:
         raise HTTPException(
             status_code=400,
             detail="target must be one of %s" % sorted(_EMITTERS))
+    if instantiation:
+        store = get_store()
+        cp, problems, pin = _pinned_plan(store, instantiation)
+        try:
+            source = _EMITTERS[target](
+                cp, _code_space(store, vars or pin))
+        except (ParseError, VarError) as e:
+            return CodeOut(ok=False, target=target, error=str(e),
+                           problems=problems)
+        return CodeOut(ok=True, target=target, source=source,
+                       problems=problems)
     cp, report, store = _plan_for(graph_iri, vars, species)
     try:
         source = _EMITTERS[target](cp, _code_space(store, vars))
@@ -979,6 +996,7 @@ def model_initial(
     graph_iri: Optional[str] = Depends(graph_param),
     vars: Optional[str] = None,
     species: Optional[str] = None,
+    instantiation: Optional[str] = None,
 ) -> InitialOut:
     """§19 t=0 solve, in-service: plan as for ``/code``, emit the
     python module, exec it and call ``initial(par, steady_state)``.
@@ -988,13 +1006,22 @@ def model_initial(
     ``initialise`` equations need nothing).  ``steady_state=true``
     releases the state pins and solves ``der = 0`` for the states.  The
     response echoes ``par_needed`` so callers can see which keys the
-    module reads."""
-    if not graph_iri:
+    module reads.
+
+    ``instantiation=<artefact-iri>`` replays a *pinned*
+    ``promo:Instantiation`` plan instead of recomputing."""
+    if not graph_iri and not instantiation:
         raise HTTPException(
             status_code=400,
-            detail="graph= (model artefact IRI) is required")
-    cp, report, store = _plan_for(graph_iri, vars, species)
-    problems = [p.kind for p in report.problems]
+            detail="graph= or instantiation= is required")
+    if instantiation:
+        store = get_store()
+        cp, problems, pin = _pinned_plan(store, instantiation)
+        emit_scope = vars or pin
+    else:
+        cp, report, store = _plan_for(graph_iri, vars, species)
+        problems = [p.kind for p in report.problems]
+        emit_scope = vars
     par_needed = [
         p.name or inst_name(p.instance)
         for p in cp.params + cp.inputs
@@ -1004,7 +1031,7 @@ def model_initial(
         "ic0_%s" % (s.name or inst_name(s.instance))
         for s in cp.states if s.ic_source == "par"]
     try:
-        source = emit_python(cp, _code_space(store, vars))
+        source = emit_python(cp, _code_space(store, emit_scope))
     except (ParseError, VarError) as e:
         return InitialOut(ok=False, steady_state=body.steady_state,
                           par_needed=par_needed,
@@ -1111,6 +1138,8 @@ def save_instantiation(
            Literal(json.dumps(asdict(cp)))))
     g.set((URIRef(iri), PROMO["computedAt"],
            Literal(datetime.now(timezone.utc).isoformat())))
+    g.set((URIRef(iri), PROMO["problems"],
+           Literal(json.dumps([p.kind for p in report.problems]))))
     return InstantiationSaveOut(
         iri=iri, generated_from=str(model_iri),
         problems=[p.kind for p in report.problems])

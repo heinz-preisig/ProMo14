@@ -423,8 +423,10 @@ designed:
 - Instantiation artefact — done 2026-10-17: `promo:Instantiation`
   artefact type; `POST /instantiations` persists the `CodePlan` JSON
   with `generatedFrom` + full pin set, `GET /instantiation-plan` reads
-  it back. Remaining: emitters consuming a *pinned* plan instead of
-  recomputing.
+  it back. Pinned replay done too: `GET /code?instantiation=<iri>` and
+  `POST /initial?instantiation=<iri>` emit from the persisted plan
+  (problem kinds stored as `promo:problems`; var/expr scope comes from
+  the artefact's `usesLibrary` pin, `?vars=` overrides).
 - Fix marking (ADR-008 layer 2) — engine done 2026-10-17: `promo:fix`
   on `ModelNode` (modeller PUT/GET persists), binds `fixed` (fix wins
   over defining equations); problems `fix-conflict`, `fix-partial`,
