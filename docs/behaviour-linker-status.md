@@ -1,12 +1,12 @@
 # Behaviour Linker — Implementation Status
 
-**Last updated:** 2026-09-29
+**Last updated:** 2026-10-27
 
 ## Current state
 
 Backend core implemented (closure engine + assignment artefact
 endpoints, 23 tests).  Frontend SPA is functional and iterating.
-Design is resolved — see `behaviour-linker-design-discussion.md` §1–18.
+Design is resolved — see `behaviour-linker-design-discussion.md` §1–21.
 
 ## Backend
 
@@ -176,7 +176,14 @@ Role is defined in ADR-004; the full mechanics are resolved in
 `behaviour-linker-design-discussion.md` (§8 closure algorithm, §12
 validation scope, §13 assignment artefact, §14 tokens/ports, §15
 reference coordinates, §16 arc sub-indices, §17 scale regimes/seed
-contract, §18 variable mutability, §19 model instantiation).
+contract, §18 variable mutability, §19 model instantiation, §20
+species allocation, **§21 admissibility** — designed 2026-10-27:
+the selection is a lower-triangular sequence maintained by moves
+(pick / exchange / delete / unmark output), each move re-closing the
+subgraph; four endpoint kinds — state, instantiated, port, **output**
+(external sink, reachability root); `lhs_class` becomes a candidate
+filter, not a gate.  **Not yet implemented** — `closure.py` is still
+evaluate-driven.
 
 ## Pending items
 
@@ -185,18 +192,27 @@ contract, §18 variable mutability, §19 model instantiation).
 2. Graphical assignment interaction (Graphic Object Editor) — design
    exists, implementation not started.
 3. Equation-eligibility hints from ontology (regime/scale filtering of
-   candidate lists) — engine accepts any equation today.
+   candidate lists) — engine accepts any equation today.  **Superseded
+   by §21 (2026-10-27):** candidate filtering is folded into the move
+   semantics — offered expressions are those that keep the subgraph
+   completable.
 4. Port satisfaction check against connection rules (§14) — needs the
    Modeller-side arc check (ADR-008 deferred item).  §19 port
    *binding* is done (token + `port_variable` export); the missing
    half is the rule-direction check on connect.
-5. Fix marking (three-layer binding model, ADR-008) — per-occurrence
-   override belongs to the model artefact.
+5. ~~Fix marking (three-layer binding model, ADR-008)~~ **Done
+   (2026-10-17):** `promo:fix` on `ModelNode` → `fixed` binding;
+   modeller gesture via `GET /entity-variables`; instantiation artefact
+   + pinned-plan codegen done the same day.
    ~~Instantiation proper~~ **Done (2026-09-22):** §19 report —
    `GET /api/instantiate/model?graph=&vars=` assembles the equation
    set: index element sets, variable bindings (incl. symbolic `F` →
    numeric matrices), per-contact port resolution, problem list.
-   Persisting an instantiation artefact for codegen is the next step.
+   ~~Persisting an instantiation artefact~~ **Done (2026-10-17):**
+   `promo:Instantiation` + pinned replay.
+   **New (2026-10-27):** §21 admissibility — rewrite `closure.py` from
+   `evaluate()` to invariant-restoring moves; add the output endpoint
+   (`promo:hasOutputVariable` on the assignment artefact, open).
 6. ~~§15 orientation capture~~ **Done (2026-09-22, modeller side):**
    `ModelArc.referenceFrom`/`referenceTo` persisted as
    `promo:referenceFrom`/`referenceTo` (token-flow arcs only);

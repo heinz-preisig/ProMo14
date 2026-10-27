@@ -1964,3 +1964,89 @@ the model graph), never in the species app.
   and `/api/instantiate/model` + `/code` fall back to it.
 
 ```
+
+## 21. Admissibility — moves preserve the closed-subgraph invariant (2026-10-27)
+
+### Terminology (pinned)
+
+- **variable** — the symbol being defined.
+- **expression** — the right-hand side, a formula over variables.
+- **equation** — the pair `variable := expression`; the unit of
+  selection in the BL.  A variable may own several equations
+  (alternative expressions).
+
+### The invariant
+
+An assignment is an ordered list of definitions
+`v₁ := e₁, v₂ := e₂, …, vₙ := eₙ` where each expression `eᵢ` may only
+reference variables defined at positions `< i` or endpoints.  The
+lower-triangular sequence **is** the data structure — not a check
+applied on top.  This is the same principle the equation editor
+already enforces at authoring time (an expression can only be written
+once its constituent variables exist); the BL applies the positional
+version: "defined" = bound to an expression at an earlier slot (or an
+endpoint), not merely declared.
+
+Consequence: declaration-before-use does **not** prevent
+equation-level cycles in the store (`a := f(b)`, `b := g(a)` are both
+authorable).  The triangular sequence breaks them by construction —
+whichever order is picked, one equation consumes a not-yet-defined
+variable, so a closed assignment simply cannot contain the pair.  The
+only cycle that survives is the integrator loop through the state
+variable.
+
+### Endpoints (all four must be matched)
+
+- **state** — the base equation's LHS; owns the integrator loop.
+- **instantiated** — variable bound to a value (constant/parameter
+  class or `promo:value` pre-binding; explicit marking).
+- **port** — external input, satisfied across a model arc.
+- **output** — external *sink*: a variable computed for
+  observation/measurement/recording that nothing else consumes.
+  Declared outputs are **roots of the reachability check** alongside
+  the base cone — an equation feeding an output's cone is legitimately
+  in the subgraph.
+
+### Moves, not edits
+
+The user never edits the sequence into a broken state.  Every
+operation is a *move* whose result must restore the invariant —
+each move is a re-closure:
+
+- **Choose base equation** — opens the integrator loop; its
+  expression's variables become the frontier to resolve.
+- **Pick `v := e′` for an unresolved `v`** — the candidate list is
+  restricted to expressions that keep the subgraph completable; the
+  act of picking *is* the closure step.
+- **Exchange an expression for `v`** — drop `v := e`, take `v := e′`;
+  `e`'s now-exclusive provider subtree is pruned; `e′`'s variables
+  must already be defined before `v`'s position or their definers are
+  pulled in and the sequence repositioned so `v` sits after them.
+- **Delete `v := e`** — everything only needed by `e`'s cone is
+  pruned; whatever `v` fed reopens as unresolved and resolution
+  continues until endpoints are matched again.
+- **Unmark an output** — re-runs pruning: if its cone is not needed
+  elsewhere, it is dead.
+
+"Unreachable" is therefore not a report category — it is a transient
+that the move completes or prunes.  An equation can only be
+unreachable if it feeds neither the base cone nor a declared output,
+and that state never persists past a move.
+
+### What changes in the current engine
+
+- `closure.py` today *evaluates* a selection: unreachable is a
+  warning, `resolveWith` appends without replacing, `removeEq` filters
+  without cascading.  Under §21 the engine **computes the minimal
+  sequence change that restores the invariant** for each move.
+- `lhs_class` folds into candidate filtering — the expressions offered
+  for `v` are those that keep the subgraph completable, not a hard
+  gate.
+
+### Open
+
+- Exact prune semantics on delete (full cascade vs. reopen
+  dependents) — the moves above assume cascade; confirm in UX.
+- Whether output endpoints persist as `promo:hasOutputVariable` on the
+  assignment artefact (symmetric with `hasInstantiatedVariable` /
+  `hasPortVariable`).

@@ -432,8 +432,14 @@ designed:
   over defining equations); problems `fix-conflict`, `fix-partial`,
   `fixed-unbound`; modeller gesture done too — selected leaf shows a
   "Fix (bound at this node)" checklist fed by
-  `GET /entity-variables`. Remaining: BL admissibility checks
-  (role filter, perfect-matching) from ADR-008.
+  `GET /entity-variables`. BL admissibility — **designed
+  2026-10-27** (behaviour-linker-design-discussion §21): admissibility
+  is positional lower-triangularity maintained by moves (pick /
+  exchange / delete / unmark output), not a validation pass; a fourth
+  endpoint kind — **output** (external sink, reachability root) — was
+  added. Remaining: engine rewrite from `evaluate()` to
+  invariant-restoring moves, plus `promo:hasOutputVariable`
+  persistence.
 - Track 2 complete at seed level: problem catalogue
   (`docs/problem-catalogue.md`), doc anchors on `ProblemOut`, per-tool
   guide (`docs/what-am-i-authoring.md`), end-to-end example
