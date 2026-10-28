@@ -174,7 +174,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
                      PROMO["publishedOn"], PROMO["seedFloor"],
                      PROMO["valueCell"], PROMO["atIndexElement"],
                      PROMO["coordinate"], PROMO["valueFill"],
-                     PROMO["fillPattern"], PROMO["valueExpression"]):
+                     PROMO["fillPattern"]):
             if (term, RDF.type, RDF.Property) not in graph:
                 graph.add((term, RDF.type, RDF.Property))
                 added += 1
@@ -622,9 +622,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
 
         Convention: docs/value-cells.md.  ``cells`` maps a coordinate
         key — ``|``-joined index-element IRIs in the variable's
-        ``indexStructure`` order — to a scalar value, or to
-        ``{"expr": "<expression>"}`` for an expression cell stored as
-        ``promo:valueExpression`` (docs/value-expression.md).  Each entry
+        ``indexStructure`` order — to a scalar value.  Each entry
         becomes a ``promo:ValueCell`` resource under the artefact's IRI
         space: the variable links to it via ``promo:valueCell``; the
         cell carries ``promo:value``, ``promo:coordinate`` (the ordered
@@ -660,7 +658,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
                     if el != "*":
                         graph.add((fill, PROMO["atIndexElement"],
                                    URIRef(el)))
-                self._set_cell_payload(graph, fill, value)
+                graph.set((fill, PROMO["value"], _as_literal(value)))
                 continue
             cell = self.mint_iri(graph.identifier, f"cell_{digest}")
             graph.add((cell, RDF.type, PROMO["ValueCell"]))
@@ -669,32 +667,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
                        Literal(json.dumps(elements))))
             for el in elements:
                 graph.add((cell, PROMO["atIndexElement"], URIRef(el)))
-            self._set_cell_payload(graph, cell, value)
-
-    @staticmethod
-    def _set_cell_payload(graph: Graph, cell: URIRef, value: Any) -> None:
-        """A cell/fill carries either ``promo:value`` (literal) or
-        ``promo:valueExpression`` (``{"expr": str}`` on the API —
-        docs/value-expression.md)."""
-        if isinstance(value, dict) and "expr" in value:
-            graph.set((cell, PROMO["valueExpression"],
-                       Literal(str(value["expr"]))))
-        else:
             graph.set((cell, PROMO["value"], _as_literal(value)))
-
-    @staticmethod
-    def _cell_payload(graph: Graph, cell: URIRef) -> Any:
-        """Inverse of ``_set_cell_payload``; ``None`` when the cell
-        carries neither.  Both present surfaces as a dict with both
-        keys — plan() reports it as ``bad-cell``."""
-        val = graph.value(cell, PROMO["value"])
-        expr = graph.value(cell, PROMO["valueExpression"])
-        if expr is None:
-            return None if val is None else val.toPython()
-        out: Dict[str, Any] = {"expr": str(expr)}
-        if val is not None:
-            out["value"] = val.toPython()
-        return out
 
     def value_cells(
         self,
@@ -719,9 +692,9 @@ class RdfStore(PersistenceMixin, SeedMixin):
                 elements = sorted(
                     str(e) for e in
                     graph.objects(cell, PROMO["atIndexElement"]))
-            val = self._cell_payload(graph, cell)
+            val = graph.value(cell, PROMO["value"])
             if val is not None:
-                out[self._coord_key(elements)] = val
+                out[self._coord_key(elements)] = val.toPython()
         # fill rules — '*' selectors keyed by their fillPattern
         # (docs/value-fill.md).  Same dict surface; '*' in a segment
         # is what marks a key as a fill on the way back in.
@@ -733,9 +706,9 @@ class RdfStore(PersistenceMixin, SeedMixin):
                 elements = json.loads(str(pattern))
             except ValueError:
                 continue
-            val = self._cell_payload(graph, fill)
+            val = graph.value(fill, PROMO["value"])
             if val is not None:
-                out[self._coord_key(elements)] = val
+                out[self._coord_key(elements)] = val.toPython()
         return out
 
     def add_token(self, graph: Graph, iri: URIRef, label: str, parent: Optional[URIRef] = None, kind: Optional[str] = None) -> URIRef:

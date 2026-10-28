@@ -51,17 +51,8 @@ VOCAB_DOCS = {
     "value":
         "Literal scalar payload — a constant's pre-bound value "
         "(ADR-008) or a promo:ValueCell's value.  Never an expression: "
-        "a computed cell carries promo:valueExpression instead; model "
-        "equations are promo:Expression trees behind "
+        "computed values are promo:Expression trees behind "
         "promo:rhsExpression or 'initialise'-class equations.",
-    "valueExpression":
-        "On a promo:ValueCell / promo:ValueFill, instead of promo:value: "
-        "a ProMo expression string evaluated to a scalar at plan() "
-        "time.  Its symbols are emitted names of scalar bindings that "
-        "resolve to a number (constants, literal or expression cells); "
-        "the language has no numeric literals.  Unknown symbols are "
-        "unresolved-cell problems, mutual references cell-cycle "
-        "problems.  See docs/value-expression.md.",
     "ValueFill":
         "A fill rule covering many cells of a variable's value table "
         "at once — the '*' selector mechanism for mostly-uniform "

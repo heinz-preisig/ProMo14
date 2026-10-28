@@ -1,9 +1,5 @@
 /** Types mirroring backend/instantiate/service.py models. */
 
-/** A value-cell payload: a literal scalar or an expression cell
- *  (docs/value-expression.md). */
-export type CellValue = number | { expr: string }
-
 export interface VarBinding {
   var: string
   role: string
@@ -13,8 +9,8 @@ export interface VarBinding {
   indices: Record<string, string[] | null>
   matrix: string | null
   value: string | null
-  /** §20 value-cell table: "|"-joined element-IRI keys → cell. */
-  values: Record<string, CellValue>
+  /** §20 value-cell table: "|"-joined element-IRI keys → scalar. */
+  values: Record<string, number>
 }
 
 export interface EqBinding {
@@ -118,7 +114,7 @@ export interface CodeOut {
 /** GET/PUT /api/instantiate/values response. */
 export interface ValueCellsOut {
   variable: string
-  values: Record<string, CellValue>
+  values: Record<string, number>
 }
 
 /** POST /api/instantiate/initial response — the in-service t=0

@@ -9,7 +9,6 @@ import {
   VARS_IRI,
 } from './api'
 import type {
-  CellValue,
   CodeOut,
   EntityInstantiation,
   InitialOut,
@@ -27,24 +26,6 @@ function coordKeys(indices: Record<string, string[] | null>): string[] {
   for (const els of Object.values(indices))
     keys = keys.flatMap((k) => (els ?? []).map((e) => (k ? `${k}|${e}` : e)))
   return keys
-}
-
-/** Editor text form of a stored cell — expression cells read as
- *  ``=expr`` (docs/value-expression.md). */
-function cellToText(val: CellValue): string {
-  return typeof val === 'number' ? String(val) : `=${val.expr}`
-}
-
-/** Inverse of ``cellToText``: a leading ``=`` marks an expression;
- *  anything else must be a number (the expression language has no
- *  numeric literals, so the two never overlap). */
-function textToCell(raw: string): CellValue | string {
-  if (raw.startsWith('=')) {
-    const expr = raw.slice(1).trim()
-    return expr ? { expr } : 'empty expression'
-  }
-  const num = Number(raw)
-  return Number.isNaN(num) ? `not a number: '${raw}' (prefix '=' for an expression)` : num
 }
 
 /** Sub-index IRI → member element set, from the incidence report —
@@ -283,7 +264,7 @@ function seedCells(report: InstantiationReport) {
   for (const e of report.entity_types)
     for (const v of e.variables)
       for (const [k, val] of Object.entries(v.values ?? {}))
-        (out[v.var] ??= {})[k] = cellToText(val)
+        (out[v.var] ??= {})[k] = String(val)
   return out
 }
 
@@ -320,17 +301,17 @@ function ValuesCard({
     try {
       // concrete cells AND fill patterns travel in the same map —
       // PUT is replace-semantics, so every non-empty entry goes.
-      const values: Record<string, CellValue> = {}
+      const values: Record<string, number> = {}
       for (const [key, raw0] of Object.entries(edits[v.var] ?? {})) {
         const raw = raw0.trim()
         if (raw === '') continue
-        const cell = textToCell(raw)
-        if (typeof cell === 'string') {
-          setErr(`${cell} (key ${key || 'scalar'})`)
+        const num = Number(raw)
+        if (Number.isNaN(num)) {
+          setErr(`not a number: '${raw}' (key ${key || 'scalar'})`)
           setSaving(null)
           return
         }
-        values[key] = cell
+        values[key] = num
       }
       const res = await putValues(v.var, values)
       // skeleton of concrete coords + whatever the store kept
@@ -341,7 +322,7 @@ function ValuesCard({
           ...Object.fromEntries(
             coordKeys(v.indices).map((k) => [k, ''])),
           ...Object.fromEntries(Object.entries(res.values)
-            .map(([k, val]) => [k, cellToText(val)])),
+            .map(([k, val]) => [k, String(val)])),
         },
       }))
       onSaved()
@@ -357,8 +338,7 @@ function ValuesCard({
       <h3 style={S.h3}>Values</h3>
       <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>
         value cells — ν parameter tables and IC pins, keyed by
-        index-element coordinates; <code>=expr</code> computes a cell
-        from scalar bindings' emitted names (e.g. <code>=V_5 * V_7</code>)
+        index-element coordinates
       </div>
       {err && (
         <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>
@@ -383,8 +363,7 @@ function ValuesCard({
         // in the global Problems card.
         const varProblems = report.problems.filter(
           (p) => p.var === v.var
-            && ['bad-fill', 'fill-conflict', 'bad-cell',
-                'unresolved-cell', 'cell-cycle'].includes(p.kind))
+            && (p.kind === 'bad-fill' || p.kind === 'fill-conflict'))
         // coverage: cells with a concrete entry or a matching fill —
         // provable now that fills exist (docs/value-fill.md).
         const covered = keys.filter(
@@ -393,12 +372,12 @@ function ValuesCard({
         const editInput = (k: string) => (
           <input
             style={{
-              width: 140, padding: '2px 6px', fontSize: 12,
+              width: 110, padding: '2px 6px', fontSize: 12,
               border: '1px solid #ccc', borderRadius: 4,
               textAlign: 'right', fontFamily: 'monospace',
             }}
             value={tbl[k] ?? ''}
-            placeholder='— or =expr'
+            placeholder='—'
             onChange={(e) => setEdits((prev) => ({
               ...prev,
               [v.var]: { ...prev[v.var], [k]: e.target.value },
