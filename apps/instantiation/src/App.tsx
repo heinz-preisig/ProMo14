@@ -359,6 +359,11 @@ function ValuesCard({
         const fillKeys = Object.keys(tbl).filter(
           (k) => !coordSet.has(k) && k !== '' && tbl[k].trim() !== '')
         const stored = Object.keys(v.values ?? {}).length
+        // coverage: cells with a concrete entry or a matching fill —
+        // provable now that fills exist (docs/value-fill.md).
+        const covered = keys.filter(
+          (k) => (tbl[k] ?? '').trim() !== ''
+            || resolveFill(tbl, k, subs) !== null).length
         const editInput = (k: string) => (
           <input
             style={{
@@ -381,6 +386,12 @@ function ValuesCard({
               <span style={{ color: '#888', fontSize: 11 }}>
                 {lab(entityType)}{v.role === 'state' ? ' · IC pin' : ''}
                 {stored ? ` · ${stored} entr${stored > 1 ? 'ies' : 'y'}` : ''}
+                {' '}
+                <span style={S.badge(
+                  covered === keys.length ? '#059669'
+                  : covered > 0 ? '#f59e0b' : '#94a3b8')}>
+                  {covered}/{keys.length}
+                </span>
               </span>
               <button
                 style={{ ...S.btn(false), float: 'right', padding: '2px 10px', fontSize: 11 }}
