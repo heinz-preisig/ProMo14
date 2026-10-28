@@ -28,6 +28,49 @@ function coordKeys(indices: Record<string, string[] | null>): string[] {
   return keys
 }
 
+/** Sub-index IRI → member element set, from the incidence report —
+ *  the client-side mirror of plan()'s ``subsets`` for element-class
+ *  fill selectors (docs/value-fill.md). */
+function subsetsOf(report: InstantiationReport) {
+  const subs = new Map<string, Set<string>>()
+  for (const inc of report.incidence.sub_indices)
+    subs.set(inc.index, new Set(inc.arcs))
+  return subs
+}
+
+/** The fill a concrete coordinate resolves to under the draft table
+ *  — exact keys are checked by the caller first; here only patterns
+ *  ('*' or sub-index segments) match, best per-axis weight wins
+ *  (element 2, sub-index 1, '*' 0 — same as plan._value_table). */
+function resolveFill(
+  tbl: Record<string, string>,
+  coord: string,
+  subs: Map<string, Set<string>>,
+): { val: string; pat: string } | null {
+  const coordSegs = coord === '' ? [] : coord.split('|')
+  let best = -1
+  let hit: { val: string; pat: string } | null = null
+  for (const [key, raw] of Object.entries(tbl)) {
+    if (raw.trim() === '') continue
+    const segs = key.split('|').filter(Boolean)
+    if (!segs.includes('*') && !segs.some((s) => subs.has(s))) continue
+    if (segs.length !== coordSegs.length) continue
+    let score = 0
+    let ok = true
+    for (let i = 0; i < segs.length; i++) {
+      if (segs[i] === coordSegs[i]) score += 2
+      else if (segs[i] === '*') { /* wildcard — no weight */ }
+      else if (subs.get(segs[i])?.has(coordSegs[i])) score += 1
+      else { ok = false; break }
+    }
+    if (ok && score > best) {
+      best = score
+      hit = { val: raw, pat: key }
+    }
+  }
+  return hit
+}
+
 /** Parse a par input — a lone number or a comma/space-separated flat
  *  list (index order). */
 function parsePar(raw: string): number | number[] | undefined {
@@ -39,7 +82,7 @@ function parsePar(raw: string): number | number[] | undefined {
   return nums.length === 1 ? nums[0] : nums
 }
 
-const TARGETS = ['python', 'julia', 'matlab'] as const
+const TARGETS = ['python', 'julia', 'matlab', 'data'] as const
 type Target = (typeof TARGETS)[number]
 
 /** Short display form of an IRI — the label map, else the fragment. */
@@ -250,21 +293,37 @@ function ValuesCard({
   }, [report])
 
   const rows = editableBindings(report)
+  const subs = subsetsOf(report)
 
   const save = async (v: VarBinding) => {
     setSaving(v.var)
     setErr(null)
     try {
+      // concrete cells AND fill patterns travel in the same map —
+      // PUT is replace-semantics, so every non-empty entry goes.
       const values: Record<string, number> = {}
-      for (const key of coordKeys(v.indices)) {
-        const raw = (edits[v.var]?.[key] ?? '').trim()
-        if (raw !== '') values[key] = Number(raw)
+      for (const [key, raw0] of Object.entries(edits[v.var] ?? {})) {
+        const raw = raw0.trim()
+        if (raw === '') continue
+        const num = Number(raw)
+        if (Number.isNaN(num)) {
+          setErr(`not a number: '${raw}' (key ${key || 'scalar'})`)
+          setSaving(null)
+          return
+        }
+        values[key] = num
       }
       const res = await putValues(v.var, values)
+      // skeleton of concrete coords + whatever the store kept
+      // (cells and fills come back verbatim).
       setEdits((prev) => ({
         ...prev,
-        [v.var]: Object.fromEntries(coordKeys(v.indices).map((k) =>
-          [k, res.values[k] != null ? String(res.values[k]) : ''])),
+        [v.var]: {
+          ...Object.fromEntries(
+            coordKeys(v.indices).map((k) => [k, ''])),
+          ...Object.fromEntries(Object.entries(res.values)
+            .map(([k, val]) => [k, String(val)])),
+        },
       }))
       onSaved()
     } catch (e) {
@@ -293,14 +352,35 @@ function ValuesCard({
       )}
       {rows.map(({ entityType, v }) => {
         const keys = coordKeys(v.indices)
+        const coordSet = new Set(keys)
+        const tbl = edits[v.var] ?? {}
+        // stored/drafted keys that aren't concrete coordinates are
+        // fill patterns — '*'/sub-index selectors (docs/value-fill.md).
+        const fillKeys = Object.keys(tbl).filter(
+          (k) => !coordSet.has(k) && k !== '' && tbl[k].trim() !== '')
         const stored = Object.keys(v.values ?? {}).length
+        const editInput = (k: string) => (
+          <input
+            style={{
+              width: 110, padding: '2px 6px', fontSize: 12,
+              border: '1px solid #ccc', borderRadius: 4,
+              textAlign: 'right', fontFamily: 'monospace',
+            }}
+            value={tbl[k] ?? ''}
+            placeholder='—'
+            onChange={(e) => setEdits((prev) => ({
+              ...prev,
+              [v.var]: { ...prev[v.var], [k]: e.target.value },
+            }))}
+          />
+        )
         return (
           <div key={v.instance} style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 12, marginBottom: 4 }}>
               <b>{lab(v.var)}</b>{' '}
               <span style={{ color: '#888', fontSize: 11 }}>
                 {lab(entityType)}{v.role === 'state' ? ' · IC pin' : ''}
-                {stored ? ` · ${stored} cell${stored > 1 ? 's' : ''}` : ''}
+                {stored ? ` · ${stored} entr${stored > 1 ? 'ies' : 'y'}` : ''}
               </span>
               <button
                 style={{ ...S.btn(false), float: 'right', padding: '2px 10px', fontSize: 11 }}
@@ -312,33 +392,100 @@ function ValuesCard({
             </div>
             <table style={S.table}>
               <tbody>
-                {keys.map((k) => (
+                {fillKeys.map((k) => (
                   <tr key={k}>
-                    <td style={{ ...S.td, fontSize: 11, color: '#666' }}>
-                      {k ? k.split('|').map(lab).join(' · ') : 'scalar'}
+                    <td style={{ ...S.td, fontSize: 11, color: '#7c3aed' }}>
+                      {k.split('|').map((s) => s === '*' ? '*' : lab(s))
+                        .join(' · ')}
+                      <span style={{ ...S.badge('#7c3aed'),
+                                     marginLeft: 6 }}>fill</span>
                     </td>
                     <td style={{ ...S.td, textAlign: 'right' }}>
-                      <input
-                        style={{
-                          width: 110, padding: '2px 6px', fontSize: 12,
-                          border: '1px solid #ccc', borderRadius: 4,
-                          textAlign: 'right', fontFamily: 'monospace',
-                        }}
-                        value={edits[v.var]?.[k] ?? ''}
-                        placeholder='—'
-                        onChange={(e) => setEdits((prev) => ({
+                      {editInput(k)}{' '}
+                      <button
+                        title='remove fill'
+                        style={{ border: 'none', background: 'none',
+                                 color: '#dc2626', cursor: 'pointer',
+                                 fontSize: 12 }}
+                        onClick={() => setEdits((prev) => ({
                           ...prev,
-                          [v.var]: { ...prev[v.var], [k]: e.target.value },
+                          [v.var]: { ...prev[v.var], [k]: '' },
                         }))}
-                      />
+                      >✕</button>
                     </td>
                   </tr>
                 ))}
+                {keys.map((k) => {
+                  const filled = (tbl[k] ?? '').trim() === ''
+                    ? resolveFill(tbl, k, subs) : null
+                  return (
+                    <tr key={k}>
+                      <td style={{ ...S.td, fontSize: 11, color: '#666' }}>
+                        {k ? k.split('|').map(lab).join(' · ') : 'scalar'}
+                        {filled && (
+                          <span style={{ fontSize: 10, color: '#7c3aed',
+                                         marginLeft: 6 }}>
+                            ← {filled.val} via{' '}
+                            {filled.pat.split('|')
+                              .map((s) => s === '*' ? '*' : lab(s))
+                              .join('·')}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ ...S.td, textAlign: 'right' }}>
+                        {editInput(k)}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
+            <FillAdder onAdd={(k, val) => setEdits((prev) => ({
+              ...prev,
+              [v.var]: { ...prev[v.var], [k]: val },
+            }))} />
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** New fill pattern: raw ``|``-joined key ('*' or sub-index segments)
+ *  + value — lands in the same edits map the cells live in. */
+function FillAdder({ onAdd }: { onAdd: (key: string, val: string) => void }) {
+  const [key, setKey] = useState('')
+  const [val, setVal] = useState('')
+  const add = () => {
+    if (!key.trim() || !val.trim()) return
+    onAdd(key.trim(), val.trim())
+    setKey('')
+    setVal('')
+  }
+  return (
+    <div style={{ marginTop: 4, display: 'flex', gap: 6,
+                  alignItems: 'center' }}>
+      <input
+        style={{ width: 150, padding: '2px 6px', fontSize: 11,
+                 border: '1px dashed #aaa', borderRadius: 4,
+                 fontFamily: 'monospace' }}
+        value={key}
+        placeholder='fill key: *|B or sub-idx'
+        onChange={(e) => setKey(e.target.value)}
+      />
+      <input
+        style={{ width: 80, padding: '2px 6px', fontSize: 11,
+                 border: '1px dashed #aaa', borderRadius: 4,
+                 textAlign: 'right', fontFamily: 'monospace' }}
+        value={val}
+        placeholder='value'
+        onChange={(e) => setVal(e.target.value)}
+      />
+      <button
+        style={{ border: 'none', background: 'none', color: '#2563eb',
+                 cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+        onClick={add}
+      >+ fill</button>
     </div>
   )
 }
@@ -560,11 +707,12 @@ export default function App() {
 
   const download = useCallback(() => {
     if (!code?.source) return
-    const ext = { python: 'py', julia: 'jl', matlab: 'm' }[code.target] || 'txt'
+    const ext = { python: 'py', julia: 'jl', matlab: 'm', data: 'json' }[code.target] || 'txt'
     const a = document.createElement('a')
     a.href = URL.createObjectURL(
       new Blob([code.source], { type: 'text/plain' }))
-    a.download = `derivative.${ext}`
+    a.download = code.target === 'data'
+      ? 'model_data.json' : `derivative.${ext}`
     a.click()
     URL.revokeObjectURL(a.href)
   }, [code])
