@@ -110,5 +110,6 @@ exposes `entity_types[].outputs`.
 2. Composites/reuse semantics (design-discussion §8; codegen
    approach 2).
 3. Direction-aware donor selection for chained port `c` (§15).
-4. Deferred: cross-artefact consistency review, ν→codegen wiring
-   (value cells into `plan()`/emitters' `par` lookups).
+4. Deferred: cross-artefact consistency review.  (~~ν→codegen
+   wiring~~ — stale: landed 2026-09-24, verified 2026-09-28; cells
+   reach the emitters via `ParamSlot.values` → `model_data.json`.)
