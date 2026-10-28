@@ -60,12 +60,21 @@ callers need no new shapes:
 cells + fills:
 
 1. A **cell** at that exact coordinate always wins.
-2. Otherwise the **most specific matching fill** wins — specificity =
-   number of concrete (non-`*`) segments; `a1|*` (1) beats `*|*` (0).
-3. Two matching fills of **equal specificity** that cover the same
+2. Otherwise the **highest-scoring matching fill** wins.  Each
+   segment of a matching pattern contributes a per-axis weight —
+   concrete element **2**, sub-index (element-class) **1**, `*` **0** —
+   and the pattern's score is the axis sum.  `a1|*` (2) beats
+   `sub_idx|*` (1) beats `*|*` (0).
+3. Two matching fills of **equal score** that cover the same
    cell → a `fill-conflict` problem on the report (never a silent
    winner — which value you get must be auditable).
 4. No cell and no fill → `None` → `NaN`, as today.
+
+**Element-class selectors**: a segment may name a sub-index IRI
+instead of `*` or an element — it matches every member of that
+sub-index's element set (the §16 partitioning metadata).  A segment
+that is neither `*`, a bound element, nor a known sub-index simply
+matches nothing — like a cell key on an unbound element.
 
 Fills on a var whose index is unbound (symbolic extent) resolve like
 cells: no table.
@@ -74,13 +83,13 @@ cells: no table.
 
 Models combine at the algebraic level (before `plan()`); each
 contributing artefact may carry cells/fills for a shared variable.
-Rule: **specificity decides, provenance never does.**
+Rule: **score decides, provenance never does.**
 
-- Any artefact's more-specific selector beats any other's
-  less-specific one.  A parent's `*|*` default does not override a
+- Any artefact's higher-scoring selector beats any other's
+  lower-scoring one.  A parent's `*|*` default does not override a
   child model's `a1|*` slice — the child already said something more
   precise.
-- Equal-specificity overlap across artefacts → `fill-conflict`, same
+- Equal-score overlap across artefacts → `fill-conflict`, same
   as within one artefact.
 
 Why not "parent wins": a sub-model's concrete data is its contract —
@@ -101,9 +110,10 @@ disagrees, the conflict problem forces an explicit resolution.
 
 ## Non-goals (deferred)
 
-- **Element-class selectors** (`"conversion|*"` — all elements of an
-  indexClass).  Needs named element subsets in the ontology; the `*`
-  machinery above is its prerequisite.
+- **indexClass-level selectors** (`"conversion|*"` — all elements of
+  an index class, not a sub-index).  Sub-index membership covers the
+  authored case today; index-class selection is a wider net that may
+  surprise (it follows whatever the index binds).
 - **Expression-valued cells/fills** — `promo:value` stays literal-only
   (separate open item).
 - **PATCH semantics** — PUT still replaces the whole cell+fill set.

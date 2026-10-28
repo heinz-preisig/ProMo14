@@ -829,6 +829,27 @@ def test_value_fills_conflict():
     assert flat == [2.0, 1.0, 2.0, None]
 
 
+def test_value_fills_sub_index():
+    """Element-class selectors: a fill segment naming a sub-index
+    matches its element set — more specific than ``*``, less than a
+    concrete element (weights 2/1/0 per axis)."""
+    from backend.instantiate.plan import _value_table
+    vb = VarBinding(var="v", role="parameter", binding="parameter",
+                    instance="V_9@et",
+                    indices={"I": ["a1", "a2", "a3"]})
+    subsets = {"idx_diff": {"a1", "a2"}}       # a3 not in the class
+
+    # the class selector fills only its members
+    flat = _value_table(vb, {"v": {"idx_diff": 1.5}}, [], subsets)
+    assert flat == [1.5, 1.5, None]
+
+    # wildcard under the class, concrete on top
+    flat = _value_table(
+        vb, {"v": {"*": 0.0, "idx_diff": 1.5, "a2": 9.0}},
+        [], subsets)
+    assert flat == [1.5, 9.0, 0.0]
+
+
 def test_emit_values_2d():
     """A 2-index table emits as a ``_tab`` reference; the data file
     carries the C-order flat list + bound dims (missing cell → null),

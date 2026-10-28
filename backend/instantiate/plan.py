@@ -180,6 +180,11 @@ def plan(report: Instantiation, sched: Schedule,
 
     out = CodePlan()
     canonicals = canonicals or {}
+    # element-class selectors: sub-index IRI → its element set, so a
+    # fill-pattern segment can name a sub-index and match the members
+    # (docs/value-fill.md).
+    subsets = {inc.index: set(inc.arcs)
+               for inc in incidence.sub_indices}
 
     bindings: Dict[Tuple[str, str], VarBinding] = {}
     for e in report.entity_types:
@@ -218,7 +223,8 @@ def plan(report: Instantiation, sched: Schedule,
         size = 1
         for els in vb.indices.values():
             size *= max(1, len(els or []))
-        ic_values = _value_table(vb, values or {}, report.problems)
+        ic_values = _value_table(vb, values or {}, report.problems,
+                                 subsets)
         init_lhs = {q.lhs for q in e.initial_equations}
         ic_source = ("cells" if ic_values is not None
                      else "initialise" if vb.var in init_lhs
@@ -268,13 +274,15 @@ def plan(report: Instantiation, sched: Schedule,
                     kind="constant" if v.binding == "fixed" else v.binding,
                     value=v.value,
                     indices=v.indices,
-                    values=_value_table(v, values or {}, report.problems),
+                    values=_value_table(v, values or {}, report.problems,
+                                        subsets),
                     name=names[e.entity_type][v.var]))
             elif v.binding in ("input", "fixed"):
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
                     indices=v.indices,
-                    values=_value_table(v, values or {}, report.problems),
+                    values=_value_table(v, values or {}, report.problems,
+                                        subsets),
                     name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
@@ -371,6 +379,7 @@ def plan(report: Instantiation, sched: Schedule,
 def _value_table(v: VarBinding,
                  values: Dict[str, Dict[str, Any]],
                  problems: Optional[List[Problem]] = None,
+                 subsets: Optional[Dict[str, set]] = None,
                  ) -> Optional[List[Any]]:
     """A var's stored value cells + fill rules expanded over its
     bound element sets — flat in C order (last index varies fastest;
@@ -384,8 +393,12 @@ def _value_table(v: VarBinding,
 
     Keys containing a ``*`` segment are fill rules (docs/value-fill.md):
     a cell takes the exact key first, else the most specific matching
-    fill (count of concrete segments); equal-specificity overlaps
-    append a ``fill-conflict`` problem — never a silent winner."""
+    fill; equal-score overlaps append a ``fill-conflict`` problem —
+    never a silent winner.  ``subsets`` maps a sub-index IRI to its
+    element set so a pattern segment can select an element *class*.
+
+    Per-axis match weight: concrete element 2, sub-index 1, ``*`` 0 —
+    a pattern's score is the axis sum."""
     cells = values.get(v.var)
     if not cells:
         return None
@@ -394,11 +407,14 @@ def _value_table(v: VarBinding,
         if els is None:
             return None
         axes.append(els)
+    subsets = subsets or {}
     exact: Dict[str, Any] = {}
     fills: List[Tuple[Tuple[str, ...], Any]] = []
     for key, val in cells.items():
         segs = tuple(s for s in str(key).split("|") if s)
-        if "*" in segs:
+        # '*' or a sub-index segment marks a fill pattern — an exact
+        # key is all concrete elements (docs/value-fill.md).
+        if "*" in segs or any(s in subsets for s in segs):
             fills.append((segs, val))
         else:
             exact[key] = val
@@ -419,11 +435,20 @@ def _value_table(v: VarBinding,
             if len(pat) != len(coord):
                 n_bad += 1
                 continue
-            if all(p == "*" or p == c for p, c in zip(pat, coord)):
-                spec = sum(1 for p in pat if p != "*")
-                if spec > best_spec:
-                    best_spec, best = spec, [(pat, val)]
-                elif spec == best_spec:
+            score = 0
+            for p, c in zip(pat, coord):
+                if p == c:
+                    score += 2
+                elif p == "*":
+                    pass
+                elif c in subsets.get(p, ()):
+                    score += 1
+                else:
+                    break
+            else:
+                if score > best_spec:
+                    best_spec, best = score, [(pat, val)]
+                elif score == best_spec:
                     best.append((pat, val))
         if len(best) > 1:
             n_conflict += 1
