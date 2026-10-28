@@ -795,6 +795,40 @@ def test_emit_values_indexed():
     assert "par.V_5" not in src
 
 
+def test_value_fills_resolve():
+    """'*' selectors (docs/value-fill.md): a wildcard fills every cell;
+    an exact coordinate beats the fill; unfilled cells stay None."""
+    k = _var("k")
+    slot = _plan(_build_indexed_k(),
+                 values={k: {"*": 1.5}}).params[0]
+    assert slot.values == [1.5, 1.5]
+
+    slot = _plan(_build_indexed_k(),
+                 values={k: {"*": 1.5, "a1": 2.0}}).params[0]
+    assert slot.values == [2.0, 1.5]          # exact beats fill
+
+    slot = _plan(_build_indexed_k(),
+                 values={k: {"a1": 2.0}}).params[0]
+    assert slot.values == [2.0, None]          # no fill → unfilled
+
+
+def test_value_fills_conflict():
+    """Equal-specificity fills covering the same cell report a
+    ``fill-conflict`` problem — never a silent winner."""
+    from backend.instantiate.plan import _value_table
+    vb = VarBinding(var="v", role="parameter", binding="parameter",
+                    instance="V_9@et",
+                    indices={"I": ["a1", "a2"], "J": ["b1", "b2"]})
+    problems = []
+    flat = _value_table(vb, {"v": {"a1|*": 1.0, "*|b1": 2.0}},
+                        problems)
+    # coord (a1,b1) is covered by both — deterministic pick ('*|b1'
+    # sorts first), problem recorded; (a2,b2) is unfilled → None.
+    assert [p.kind for p in problems] == ["fill-conflict"]
+    assert "a1|b1" in problems[0].message
+    assert flat == [2.0, 1.0, 2.0, None]
+
+
 def test_emit_values_2d():
     """A 2-index table emits as a ``_tab`` reference; the data file
     carries the C-order flat list + bound dims (missing cell → null),
@@ -1639,6 +1673,20 @@ def test_values_endpoint(client):
                    params={"graph": graph, "variable": ids["k"]})
     assert r.status_code == 200
     assert r.json()["values"] == cells
+
+    # Fill rules (docs/value-fill.md): '*' keys round-trip as
+    # promo:ValueFill resources — same API surface.
+    fills = {"*|B": -1.0, "r1|C": 1.0}
+    r = client.put("/api/instantiate/values",
+                   json={"variable": ids["k"], "values": fills})
+    assert r.status_code == 200, r.text
+    assert r.json()["values"] == fills
+    r = client.get("/api/instantiate/values",
+                   params={"graph": graph, "variable": ids["k"]})
+    assert r.json()["values"] == fills
+    # restore the concrete table for the report check below
+    client.put("/api/instantiate/values",
+               json={"variable": ids["k"], "values": cells})
 
     # The /model report surfaces supplied cells on the binding.
     r = client.get("/api/instantiate/model",

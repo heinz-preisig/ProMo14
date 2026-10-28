@@ -173,11 +173,13 @@ class RdfStore(PersistenceMixin, SeedMixin):
                      PROMO["versionOf"], PROMO["versionInfo"],
                      PROMO["publishedOn"], PROMO["seedFloor"],
                      PROMO["valueCell"], PROMO["atIndexElement"],
-                     PROMO["coordinate"]):
+                     PROMO["coordinate"], PROMO["valueFill"],
+                     PROMO["fillPattern"]):
             if (term, RDF.type, RDF.Property) not in graph:
                 graph.add((term, RDF.type, RDF.Property))
                 added += 1
-        for term in ([PROMO["Version"], PROMO["ValueCell"]]
+        for term in ([PROMO["Version"], PROMO["ValueCell"],
+                      PROMO["ValueFill"]]
                      + [PROMO[t] for t in ARTEFACT_TYPES]):
             if (term, RDF.type, RDFS.Class) not in graph:
                 graph.add((term, RDF.type, RDFS.Class))
@@ -626,17 +628,38 @@ class RdfStore(PersistenceMixin, SeedMixin):
         cell carries ``promo:value``, ``promo:coordinate`` (the ordered
         element list as a JSON literal — the authoritative axis order)
         and one ``promo:atIndexElement`` per element for graph
-        navigation.  Existing cells of the variable are wiped first
-        (replace semantics, like ``add_variable_dict`` aliases).
+        navigation.  A key containing a ``*`` segment is a fill rule
+        instead (``promo:ValueFill`` + ``promo:fillPattern`` —
+        docs/value-fill.md).  Existing cells and fills of the variable
+        are wiped first (replace semantics, like ``add_variable_dict``
+        aliases).
         """
         var = URIRef(str(variable))
-        for cell in list(graph.objects(var, PROMO["valueCell"])):
-            graph.remove((cell, None, None))
-        graph.remove((var, PROMO["valueCell"], None))
+        for obj, link in ((PROMO["ValueCell"], PROMO["valueCell"]),
+                          (PROMO["ValueFill"], PROMO["valueFill"])):
+            for cell in list(graph.objects(var, link)):
+                graph.remove((cell, None, None))
+            graph.remove((var, link, None))
         for key, value in cells.items():
             elements = [e for e in str(key).split("|") if e]
             digest = hashlib.sha1(
                 f"{var}|{key}".encode()).hexdigest()[:12]
+            if "*" in elements:
+                # a fill rule — '*' segments match every element on
+                # that axis (docs/value-fill.md); the pattern keeps
+                # '*' placeholders instead of concrete elements.
+                fill = self.mint_iri(graph.identifier,
+                                     f"fill_{digest}")
+                graph.add((fill, RDF.type, PROMO["ValueFill"]))
+                graph.add((var, PROMO["valueFill"], fill))
+                graph.set((fill, PROMO["fillPattern"],
+                           Literal(json.dumps(elements))))
+                for el in elements:
+                    if el != "*":
+                        graph.add((fill, PROMO["atIndexElement"],
+                                   URIRef(el)))
+                graph.set((fill, PROMO["value"], _as_literal(value)))
+                continue
             cell = self.mint_iri(graph.identifier, f"cell_{digest}")
             graph.add((cell, RDF.type, PROMO["ValueCell"]))
             graph.add((var, PROMO["valueCell"], cell))
@@ -670,6 +693,20 @@ class RdfStore(PersistenceMixin, SeedMixin):
                     str(e) for e in
                     graph.objects(cell, PROMO["atIndexElement"]))
             val = graph.value(cell, PROMO["value"])
+            if val is not None:
+                out[self._coord_key(elements)] = val.toPython()
+        # fill rules — '*' selectors keyed by their fillPattern
+        # (docs/value-fill.md).  Same dict surface; '*' in a segment
+        # is what marks a key as a fill on the way back in.
+        for fill in graph.objects(var, PROMO["valueFill"]):
+            pattern = graph.value(fill, PROMO["fillPattern"])
+            if pattern is None:
+                continue
+            try:
+                elements = json.loads(str(pattern))
+            except ValueError:
+                continue
+            val = graph.value(fill, PROMO["value"])
             if val is not None:
                 out[self._coord_key(elements)] = val.toPython()
         return out

@@ -36,6 +36,7 @@ from .builder import (
     EqInfo,
     IndexInfo,
     Instantiation,
+    Problem,
     VarBinding,
     _arc_like,
     _node_like,
@@ -217,7 +218,7 @@ def plan(report: Instantiation, sched: Schedule,
         size = 1
         for els in vb.indices.values():
             size *= max(1, len(els or []))
-        ic_values = _value_table(vb, values or {})
+        ic_values = _value_table(vb, values or {}, report.problems)
         init_lhs = {q.lhs for q in e.initial_equations}
         ic_source = ("cells" if ic_values is not None
                      else "initialise" if vb.var in init_lhs
@@ -267,13 +268,13 @@ def plan(report: Instantiation, sched: Schedule,
                     kind="constant" if v.binding == "fixed" else v.binding,
                     value=v.value,
                     indices=v.indices,
-                    values=_value_table(v, values or {}),
+                    values=_value_table(v, values or {}, report.problems),
                     name=names[e.entity_type][v.var]))
             elif v.binding in ("input", "fixed"):
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
                     indices=v.indices,
-                    values=_value_table(v, values or {}),
+                    values=_value_table(v, values or {}, report.problems),
                     name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
@@ -368,17 +369,23 @@ def plan(report: Instantiation, sched: Schedule,
 
 
 def _value_table(v: VarBinding,
-                 values: Dict[str, Dict[str, Any]]
+                 values: Dict[str, Dict[str, Any]],
+                 problems: Optional[List[Problem]] = None,
                  ) -> Optional[List[Any]]:
-    """A var's stored value cells expanded over its bound element
-    sets — flat in C order (last index varies fastest; convention:
-    docs/value-cells.md), ``None`` for missing cells.  ``None`` when
-    the var carries no table or one of its indices is unbound
-    (symbolic extent).
+    """A var's stored value cells + fill rules expanded over its
+    bound element sets — flat in C order (last index varies fastest;
+    convention: docs/value-cells.md), ``None`` for unfilled cells.
+    ``None`` when the var carries no table or one of its indices is
+    unbound (symbolic extent).
 
     The coordinate key joins element IRIs in ``indexStructure`` order
     — the same order ``v.indices`` is built in — so the product of
-    the bound element sets enumerates every cell exactly once."""
+    the bound element sets enumerates every cell exactly once.
+
+    Keys containing a ``*`` segment are fill rules (docs/value-fill.md):
+    a cell takes the exact key first, else the most specific matching
+    fill (count of concrete segments); equal-specificity overlaps
+    append a ``fill-conflict`` problem — never a silent winner."""
     cells = values.get(v.var)
     if not cells:
         return None
@@ -387,7 +394,57 @@ def _value_table(v: VarBinding,
         if els is None:
             return None
         axes.append(els)
-    return [cells.get("|".join(coord)) for coord in product(*axes)]
+    exact: Dict[str, Any] = {}
+    fills: List[Tuple[Tuple[str, ...], Any]] = []
+    for key, val in cells.items():
+        segs = tuple(s for s in str(key).split("|") if s)
+        if "*" in segs:
+            fills.append((segs, val))
+        else:
+            exact[key] = val
+    # deterministic order: pattern string sort — a conflict's pick
+    # must not depend on dict insertion order.
+    fills.sort(key=lambda f: f[0])
+    n_bad = 0
+    n_conflict = 0
+    first_conflict = ""
+
+    def _resolve(coord: Tuple[str, ...]) -> Any:
+        nonlocal n_bad, n_conflict, first_conflict
+        key = "|".join(coord)
+        if key in exact:
+            return exact[key]
+        best_spec, best = -1, []
+        for pat, val in fills:
+            if len(pat) != len(coord):
+                n_bad += 1
+                continue
+            if all(p == "*" or p == c for p, c in zip(pat, coord)):
+                spec = sum(1 for p in pat if p != "*")
+                if spec > best_spec:
+                    best_spec, best = spec, [(pat, val)]
+                elif spec == best_spec:
+                    best.append((pat, val))
+        if len(best) > 1:
+            n_conflict += 1
+            if not first_conflict:
+                first_conflict = key
+        return best[0][1] if best else None
+
+    out = [_resolve(coord) for coord in product(*axes)]
+    if problems is not None:
+        if n_bad:
+            problems.append(Problem(
+                kind="bad-fill", var=v.var,
+                message=("%d fill pattern(s) with the wrong axis count "
+                         "ignored" % n_bad)))
+        if n_conflict:
+            problems.append(Problem(
+                kind="fill-conflict", var=v.var,
+                message=("%d cell(s) covered by equal-specificity fill "
+                         "patterns (first: %s) — resolve explicitly"
+                         % (n_conflict, first_conflict))))
+    return out
 
 
 def _bound_elements(v: VarBinding, indices: Dict[str, IndexInfo],

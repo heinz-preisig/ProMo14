@@ -53,6 +53,22 @@ VOCAB_DOCS = {
         "(ADR-008) or a promo:ValueCell's value.  Never an expression: "
         "computed values are promo:Expression trees behind "
         "promo:rhsExpression or 'initialise'-class equations.",
+    "ValueFill":
+        "A fill rule covering many cells of a variable's value table "
+        "at once — the '*' selector mechanism for mostly-uniform "
+        "tables.  The variable links it via promo:valueFill; the fill "
+        "carries promo:fillPattern (JSON list of element IRIs and '*' "
+        "segments in indexStructure order) and promo:value.  Resolved "
+        "to concrete cells at plan() time.  See docs/value-fill.md.",
+    "valueFill":
+        "Variable → promo:ValueFill: a fill rule covering a region of "
+        "the variable's value table.  See docs/value-fill.md.",
+    "fillPattern":
+        "On a promo:ValueFill: JSON list like promo:coordinate but "
+        "with '*' allowed per segment — '*' matches every element on "
+        "that axis.  The most specific matching selector wins; equal-"
+        "specificity overlaps are fill-conflict problems.  See "
+        "docs/value-fill.md.",
 }
 
 # Universal constants seeded into every ontology (ADR-008): pre-bound
