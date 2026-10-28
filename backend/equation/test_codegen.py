@@ -87,9 +87,10 @@ def test_python_expand():
 
 
 def test_python_reduce_tensordot_axes():
-    # rho[N] * v[N]: the shared index N sits at position 0 in both operands.
-    assert gen("rho * v", "python") == \
-        "np.tensordot(V_1, V_2, axes=([0], [0]))"
+    # rho[N] * v[N]: the shared index N sits at position 0 in both
+    # operands — a 1-D·1-D contraction renders as ``@`` (sparse-safe
+    # matmul, here the inner product).
+    assert gen("rho * v", "python") == "V_1 @ V_2"
 
 
 def test_python_power():

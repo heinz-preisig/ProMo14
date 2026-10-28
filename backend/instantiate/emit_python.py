@@ -73,16 +73,21 @@ class _Python(Dialect):
         return arr
 
     @staticmethod
-    def _dense(rows: int, cols: int,
-               entries: List[Tuple[int, int, int]]) -> str:
-        """A COO entry list as a dense ``np.array`` literal."""
-        m = [[0] * cols for _ in range(rows)]
-        for r, c, s in entries:
-            m[r][c] = s
-        return "np.array([%s])" % ", ".join(str(r) for r in m)
+    def _coo(rows: int, cols: int,
+             entries: List[Tuple[int, int, int]]) -> str:
+        """A COO entry list as a ``scipy.sparse.coo_array`` literal —
+        incidence matrices are sparse by nature; the contraction
+        renderer emits ``@`` for patterns that support it."""
+        vv = ", ".join(str(s) for _, _, s in entries)
+        ii = ", ".join(str(r) for r, _, _ in entries)
+        jj = ", ".join(str(c) for _, c, _ in entries)
+        return ("scipy.sparse.coo_array(([%s], ([%s], [%s])), "
+                "shape=(%d, %d))" % (vv, ii, jj, rows, cols))
 
     def header(self, cp: CodePlan) -> List[str]:
         out = ["import numpy as np"]
+        if cp.matrices:
+            out.append("import scipy.sparse")
         if cp.loops or cp.states:
             # fsolve: algebraic loops + the t=0 solve; the module import
             # backs ``scipy.optimize.fsolve`` inside root!() bodies.
@@ -94,7 +99,7 @@ class _Python(Dialect):
     def matrix(self, mx, space: CompileSpace) -> str:
         return "%s = %s  # F over [%d x %d]" % (
             mx.name or inst_name(mx.instance),
-            self._dense(len(mx.rows), len(mx.cols), mx.entries),
+            self._coo(len(mx.rows), len(mx.cols), mx.entries),
             len(mx.rows), len(mx.cols))
 
     def fn_open(self, cp: CodePlan) -> List[str]:
@@ -122,6 +127,18 @@ class _Python(Dialect):
             return "    %s = %s[%d]  # port gather" % (gn, pn, g.map[0])
         return "    %s = %s[%s]  # port gather" % (gn, pn, g.map)
 
+    def _den(self, expr: str) -> str:
+        """``_d(expr)`` when sparse values can reach this file —
+        identity otherwise (no helper emitted then)."""
+        return "_d(%s)" % expr if self.sparse_names else expr
+
+    def state_assign(self, st, b, rhs, space: CompileSpace) -> List[str]:
+        """``dy[...] = rhs`` — a sparse rhs must be densified for the
+        packed derivative slice."""
+        return ["%sdy[%d:%d] = %s" % (
+            self.indent, st.offset, st.offset + st.size,
+            self._den(rhs))]
+
     def loop(self, out: List[str], loop_id: int, blocks, space,
              cp: CodePlan) -> None:
         """One algebraic loop as an ``fsolve`` residual block: the
@@ -138,7 +155,8 @@ class _Python(Dialect):
         for b, nm in zip(blocks, names):
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
-            out.append("        _r_%s = (%s) - %s" % (nm, rhs, nm))
+            out.append("        _r_%s = (%s) - %s"
+                       % (nm, self._den(rhs), nm))
         out.append("        return np.concatenate([%s])"
                    % ", ".join("np.atleast_1d(_r_%s)" % nm
                                for nm in names))
@@ -161,7 +179,8 @@ class _Python(Dialect):
         out.append("    if out is not None:  # §21 outputs")
         for o in cp.outputs:
             nm = o.name or inst_name(o.instance)
-            out.append('        out["%s"] = %s' % (nm, nm))
+            out.append('        out["%s"] = %s'
+                       % (nm, self._den(nm)))
 
     def outputs_fn(self, out, cp: CodePlan, space: CompileSpace
                    ) -> None:
@@ -172,6 +191,17 @@ class _Python(Dialect):
         out.append("    derivative(t, y, par, out=_o)")
         out.append("    return _o")
         out.append("")
+
+    def footer(self, out: List[str], cp: CodePlan,
+               space: CompileSpace) -> None:
+        """``_d`` — the densify shim used at residual/dy/output
+        assign points (sparse results unwrap, denses pass through)."""
+        if not cp.matrices:
+            return
+        out += ["",
+                "def _d(x):",
+                "    return x.toarray() if scipy.sparse.issparse(x) "
+                "else x"]
 
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,
@@ -217,7 +247,8 @@ class _Python(Dialect):
         for i, (b, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
-            out.append("        _r%d = (%s) - %s" % (i, rhs, term))
+            out.append("        _r%d = (%s) - %s"
+                       % (i, self._den(rhs), term))
         out.append("        _rs = [%s]" % ", ".join(
             "np.atleast_1d(_r%d)" % i
             for i in range(len(spec.residuals))))

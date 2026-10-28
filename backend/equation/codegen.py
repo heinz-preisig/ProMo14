@@ -30,7 +30,7 @@ expression language carries the semantics, the runtime supplies the solver.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from .checker import Checked
 from .compile_space import CompileSpace
@@ -144,9 +144,13 @@ def tex_append_subscripts(base: str, subs: List[str]) -> str:
 class Renderer:
     """Render one ``Checked`` tree for one target."""
 
+    #: ufuncs that preserve sparsity (zeros stay zero).
+    _SPARSE_UFUNCS = {"sign", "abs"}
+
     def __init__(self, space: CompileSpace, target: str,
                  lhs: Optional[str] = None,
-                 names: Optional[Dict[str, str]] = None):
+                 names: Optional[Dict[str, str]] = None,
+                 sparse: Optional[Iterable[str]] = None):
         if target not in TARGETS:
             raise VarError("unknown codegen target %r (expected one of %s)"
                            % (target, TARGETS))
@@ -156,6 +160,10 @@ class Renderer:
         #: Optional var-IRI → emitted-name override (model codegen:
         #: per-entity-type instance names, not bare internal_ids).
         self.names = names or {}
+        #: Emitted identifiers bound to scipy.sparse literals — the
+        #: renderer's sparse-type knowledge for python (other targets
+        #: ignore it).
+        self.sparse = frozenset(sparse or ())
 
     # -- variable naming ----------------------------------------------------
 
@@ -208,6 +216,29 @@ class Renderer:
         return "{%s}" % ",".join(
             "'%s'" % self._index_name(iri) for iri in iris)
 
+    def _is_sparse(self, c: Checked) -> bool:
+        """True when the subtree's emitted value is a scipy.sparse
+        array — python only; lets mixed sparse/dense operators emit
+        the right call shape."""
+        if self.target != "python":
+            return False
+        node = c.node
+        if isinstance(node, Var):
+            return self._var_name(node) in self.sparse
+        if isinstance(node, Group):
+            return self._is_sparse(c.children[0])
+        if isinstance(node, IndexPreservingProduct):
+            # sparse × anything stays sparse (nonzero pattern only
+            # shrinks).
+            return any(self._is_sparse(x) for x in c.children)
+        if isinstance(node, Add):
+            # sparse ± sparse stays sparse; a dense partner densifies.
+            return all(self._is_sparse(x) for x in c.children)
+        if isinstance(node, UFunc):
+            return (node.name in self._SPARSE_UFUNCS
+                    and self._is_sparse(c.children[0]))
+        return False
+
     # -- dispatch -------------------------------------------------------------
 
     def render(self, c: Checked) -> str:
@@ -232,7 +263,16 @@ class Renderer:
             return "( %s )" % inner
 
         if isinstance(node, Add):
-            return "%s %s %s" % (self.render(ch[0]), node.op, self.render(ch[1]))
+            left, right = self.render(ch[0]), self.render(ch[1])
+            if self.target == "python":
+                # sparse ± dense is unsupported by scipy — densify
+                # the sparse operand.
+                ls, rs = (self._is_sparse(x) for x in ch)
+                if ls and not rs:
+                    left = "%s.toarray()" % left
+                elif rs and not ls:
+                    right = "%s.toarray()" % right
+            return "%s %s %s" % (left, node.op, right)
 
         if isinstance(node, Expand):
             left, right = self.render(ch[0]), self.render(ch[1])
@@ -249,6 +289,13 @@ class Renderer:
         if isinstance(node, IndexPreservingProduct):
             left, right = self.render(ch[0]), self.render(ch[1])
             if self.target == "python":
+                ls, rs = (self._is_sparse(x) for x in ch)
+                if ls and rs:
+                    return "%s.multiply(%s)" % (left, right)
+                if ls:
+                    return "%s.multiply(np.asarray(%s))" % (left, right)
+                if rs:
+                    return "%s.multiply(np.asarray(%s))" % (right, left)
                 return "%s * %s" % (left, right)
             if self.target == "matlab":
                 # einsum with no reduce labels: shared indices become
@@ -293,7 +340,11 @@ class Renderer:
             body, var, lo, hi = (self.render(x) for x in ch)
             if self.target == "python":
                 # quad_vec takes scalar or vector integrands and
-                # yields (value, error) — [0] takes the value.
+                # yields (value, error) — [0] takes the value; its
+                # internal norm can't read sparse arrays, so a
+                # sparse-typed body is densified.
+                if self._is_sparse(ch[0]):
+                    body = "(%s).toarray()" % body
                 return ("scipy.integrate.quad_vec(lambda %s: %s, "
                         "%s, %s)[0]"
                         % (var, body, lo, hi))
@@ -446,6 +497,20 @@ class Renderer:
                 return "%s * %s" % (l_src, r_src)
             return ("contract(%s, %s, (%d,), (%d,))"
                     % (l_src, r_src, li + 1, ri + 1))
+        # python — ``@`` is the sparse-safe contraction (scipy sparse
+        # supports it on either operand); it applies when the reduced
+        # axis is the left operand's last and the right operand's
+        # first (or second-to-last for ≥2-D, matching @ semantics).
+        if (li == len(left.indices) - 1
+                and ri == (len(right.indices) - 2
+                           if len(right.indices) >= 2 else 0)):
+            return "%s @ %s" % (l_src, r_src)
+        # Off-axis / higher-order contractions keep tensordot — it
+        # densifies sparse operands explicitly.
+        if self._is_sparse(left):
+            l_src = "(%s).toarray()" % l_src
+        if self._is_sparse(right):
+            r_src = "(%s).toarray()" % r_src
         return ("np.tensordot(%s, %s, axes=([%d], [%d]))"
                 % (l_src, r_src, li, ri))
 
@@ -456,6 +521,8 @@ def render(
     target: str,
     lhs: Optional[str] = None,
     names: Optional[Dict[str, str]] = None,
+    sparse: Optional[Iterable[str]] = None,
 ) -> str:
     """Render a checked expression tree to ``target`` source code."""
-    return Renderer(space, target, lhs=lhs, names=names).render(checked)
+    return Renderer(space, target, lhs=lhs, names=names,
+                    sparse=sparse).render(checked)

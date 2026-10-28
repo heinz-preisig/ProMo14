@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
 from backend.equation.checker import check
-from backend.equation.codegen import render
+from backend.equation.codegen import Renderer
 from backend.equation.compile_space import CompileSpace
 from backend.equation.parser import parse
 from backend.equation.syntax import Var
@@ -160,6 +160,10 @@ class Dialect:
     comment: str = "#"
     stmt_end: str = ""
     no_rhs: str = "None"
+    #: Emitted identifiers bound to scipy.sparse literals — set by
+    #: :func:`emit_plan` from ``cp.matrices``; the renderer uses it
+    #: to pick sparse-safe op forms (python only).
+    sparse_names = frozenset()
 
     def render_rhs(self, block: PlanBlock, space: CompileSpace,
                    names: Dict[str, str]) -> str:
@@ -169,8 +173,15 @@ class Dialect:
             return self.no_rhs
         lhs = Var(inst_name(block.lhs_instance))
         checked = check(parse(block.rhs), space, lhs)
-        return render(checked, space, self.target, lhs=lhs.name,
-                      names=names)
+        rnd = Renderer(space, self.target, lhs=lhs.name,
+                       names=names, sparse=self.sparse_names)
+        src = rnd.render(checked)
+        if rnd._is_sparse(checked):
+            # A local bound to a sparse result is itself sparse —
+            # downstream blocks may need the sparse-safe op forms.
+            self.sparse_names = self.sparse_names | {
+                block.lhs_name or inst_name(block.lhs_instance)}
+        return src
 
     # -- whole-function shape -----------------------------------------
 
@@ -262,6 +273,8 @@ class Dialect:
 def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
     """Walk a ``CodePlan`` once, asking ``d`` for each emitted line."""
     out: List[str] = list(d.header(cp))
+    d.sparse_names = {mx.name or inst_name(mx.instance)
+                      for mx in cp.matrices}
 
     for mx in cp.matrices:
         out.append(d.matrix(mx, space))

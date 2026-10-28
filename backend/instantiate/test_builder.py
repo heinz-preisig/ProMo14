@@ -711,7 +711,9 @@ def test_emit_python():
     J is shared (capacity port + transport defined) → its instances
     get type-suffixed names."""
     src = emit_python(_plan(_build()), _emit_space())
-    assert "V_4 = np.array([[-1, 0], [0, 1]])" in src
+    assert "import scipy.sparse" in src
+    assert ("V_4 = scipy.sparse.coo_array(([-1, 1], ([0, 1], [0, 1])), "
+            "shape=(2, 2))" in src)
     assert "def derivative(t, y, par):" in src
     assert "V_1 = y[0:2]" in src
     assert 'V_5 = par["V_5"]' in src
@@ -723,8 +725,7 @@ def test_emit_python():
     # level 2: J gather (identity over A_diff); dm = F·J
     assert ("V_3_lumped_capacity = V_3_diffusion_transport[[0, 1]]"
             in src)
-    assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
-            "axes=([1], [0]))" in src)
+    assert ("dy[0:2] = _d(V_4 @ V_3_lumped_capacity)" in src)
     assert "return dy" in src
 
 
@@ -1010,10 +1011,9 @@ def test_emit_python_initial():
     assert "V_3_diffusion_transport = u[4:6]" in src
     assert "dV_1 = u[6:8]" in src                 # der(m) slot
     assert "V_6 = V_2[[0, 1]]  # port gather" in src
-    assert "_r0 = (V_1) - V_2" in src             # prop at t0
-    assert "_r1 = (V_5 * V_6) - V_3_diffusion_transport" in src
-    assert ("_r2 = (np.tensordot(V_4, V_3_lumped_capacity, "
-            "axes=([1], [0]))) - dV_1" in src)
+    assert "_r0 = (_d(V_1)) - V_2" in src         # prop at t0
+    assert "_r1 = (_d(V_5 * V_6)) - V_3_diffusion_transport" in src
+    assert ("_r2 = (_d(V_4 @ V_3_lumped_capacity)) - dV_1" in src)
     assert "total_diff = lambda x, y: np.zeros_like(x)" in src
     assert "_rs += [np.atleast_1d(dV_1)]  # der = 0" in src
     assert '_e0 = (par["ic0_V_1"]) - V_1  # IC pin' in src
@@ -1154,8 +1154,7 @@ def test_emit_python_instantiated_pressure():
     assert "V_2 = V_1" not in src         # no prop block
     assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
-    assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
-            "axes=([1], [0]))" in src)
+    assert ("dy[0:2] = _d(V_4 @ V_3_lumped_capacity)" in src)
 
 
 # ---------------------------------------------------------------------------
@@ -1430,15 +1429,14 @@ def test_code_endpoint(client):
     assert 'V_5 = par["V_5"]' in src
     assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
-    assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
-            "axes=([1], [0]))" in src)
+    assert ("dy[0:2] = _d(V_4 @ V_3_lumped_capacity)" in src)
     # §21 outputs — p (lumped, V_2) and j (transport export,
     # V_3_diffusion_transport) ride the out channel; the wrapper
     # returns the recorded dict.
     assert "if out is not None:  # §21 outputs" in src
-    assert 'out["V_2"] = V_2' in src
-    assert ('out["V_3_diffusion_transport"] = V_3_diffusion_transport'
-            in src)
+    assert 'out["V_2"] = _d(V_2)' in src
+    assert ('out["V_3_diffusion_transport"] = '
+            '_d(V_3_diffusion_transport)' in src)
     assert "def outputs(t, y, par):" in src
     assert "derivative(t, y, par, out=_o)" in src
 
