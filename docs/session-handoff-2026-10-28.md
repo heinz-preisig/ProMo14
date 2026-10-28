@@ -82,10 +82,20 @@ without output marks, or with dead-code equations) may read stale
 re-closes and shows *modified* until re-saved.  No manual `.trig`
 edits — re-save via the app.
 
+**Audited + re-saved 2026-10-28:** all 3 stored assignments checked
+via dry-run `reorder` + `evaluate`.  `etype_lumped` and
+`etype_environment` were already canonical and closed; no output
+marks needed anywhere (every defined var is consumed internally).
+`etype_convection_transport` was re-PUT — only drift was sequence
+order (base was first); now canonical `[E_11, E_12, E_15, E_16]`,
+still `closed`.  The audit also caught an engine bug — unknown
+equations were kept instead of pruned, then crashed the dedupe pass;
+fixed with a regression test.
+
 ## Where to pick up — candidate queue
 
-1. Re-save legacy assignments through the SPA (normalizes artefacts
-   under §21: output marks on transport exports, dead code pruned).
+1. ~~Re-save legacy assignments~~ — done above; `data/assignments.trig`
+   is §21-canonical.
 2. Composites/reuse semantics (design-discussion §8; codegen
    approach 2).
 3. Direction-aware donor selection for chained port `c` (§15).

@@ -301,8 +301,13 @@ def _reclose(equations: Dict[str, EquationInfo],
     pruned: List[str] = []
 
     # Unknown equations cannot be kept.
-    selection.sequence = [e for e in selection.sequence
-                          if e in equations or not pruned.append(e)]
+    kept: List[str] = []
+    for eq_iri in selection.sequence:
+        if eq_iri in equations:
+            kept.append(eq_iri)
+        else:
+            pruned.append(eq_iri)
+    selection.sequence = kept
 
     # Duplicate definitions: first occurrence wins.
     seen_lhs: Set[str] = set()

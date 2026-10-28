@@ -10,6 +10,8 @@
 
     promo:Glass a rdfs:Class .
 
+    promo:Instantiation a rdfs:Class .
+
     promo:Library a rdfs:Class .
 
     promo:Model a rdfs:Class .
@@ -74,7 +76,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_16> ;
-        promo:hasEquationSequence _:n94848fa281b24f62adc4b80cf2d09746b1 ;
+        promo:hasEquationSequence _:N366da1b40fd649ad9d8d02286b1dd3ae ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:F_conv>,
             <promo:k_conv>,
@@ -94,7 +96,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_13> ;
-        promo:hasEquationSequence _:N4e7e0181993d4098ae264ac3ffe9017b ;
+        promo:hasEquationSequence _:n0fcb0c3772974ac5a49df214269db5f6b3 ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:P>,
             <promo:k_conv>,
@@ -103,37 +105,37 @@
         promo:hasPortVariable <promo:c> ;
         promo:hasStateVariable <promo:n> .
 
-    _:N2e0722e4b9fd40d1b35f8578cbd1ddfa rdf:first <https://w3id.org/promo/library/#E_15> ;
-        rdf:rest _:Nddd66f0c4289488fbe3345cd9a215729 .
+    _:N366da1b40fd649ad9d8d02286b1dd3ae rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:Nb20d0e91d8e14d45a156dbfd3580ea28 .
 
-    _:N4e7e0181993d4098ae264ac3ffe9017b rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:Nb60eeaab8c03453893ef1d91ae46ec65 .
+    _:N56d8f059d65744e9b82a9a1f4490ebbb rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:Nf7d3c010c73e4fa6959fc2617ea6a41e .
 
-    _:N6867f733ebd446e387bd1a351dbce2b0 rdf:first <https://w3id.org/promo/library/#E_17> ;
-        rdf:rest _:Ncd95632f5c394555bd3841b109841397 .
+    _:Nb20d0e91d8e14d45a156dbfd3580ea28 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:N56d8f059d65744e9b82a9a1f4490ebbb .
 
-    _:Nb60eeaab8c03453893ef1d91ae46ec65 rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:N2e0722e4b9fd40d1b35f8578cbd1ddfa .
-
-    _:Ncd95632f5c394555bd3841b109841397 rdf:first <https://w3id.org/promo/library/#E_18> ;
-        rdf:rest _:Nfdeedb4a33e040c08006daa59799fc85 .
-
-    _:Nddd66f0c4289488fbe3345cd9a215729 rdf:first <https://w3id.org/promo/library/#E_16> ;
-        rdf:rest _:N6867f733ebd446e387bd1a351dbce2b0 .
-
-    _:Nfdeedb4a33e040c08006daa59799fc85 rdf:first <https://w3id.org/promo/library/#E_13> ;
+    _:Nf7d3c010c73e4fa6959fc2617ea6a41e rdf:first <https://w3id.org/promo/library/#E_16> ;
         rdf:rest () .
 
-    _:n94848fa281b24f62adc4b80cf2d09746b1 rdf:first <https://w3id.org/promo/library/#E_16> ;
-        rdf:rest _:n94848fa281b24f62adc4b80cf2d09746b10 .
+    _:n0fcb0c3772974ac5a49df214269db5f6b3 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b6 .
 
-    _:n94848fa281b24f62adc4b80cf2d09746b10 rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:n94848fa281b24f62adc4b80cf2d09746b11 .
+    _:n0fcb0c3772974ac5a49df214269db5f6b4 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b5 .
 
-    _:n94848fa281b24f62adc4b80cf2d09746b11 rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:n94848fa281b24f62adc4b80cf2d09746b12 .
+    _:n0fcb0c3772974ac5a49df214269db5f6b5 rdf:first <https://w3id.org/promo/library/#E_16> ;
+        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b7 .
 
-    _:n94848fa281b24f62adc4b80cf2d09746b12 rdf:first <https://w3id.org/promo/library/#E_15> ;
+    _:n0fcb0c3772974ac5a49df214269db5f6b6 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b4 .
+
+    _:n0fcb0c3772974ac5a49df214269db5f6b7 rdf:first <https://w3id.org/promo/library/#E_17> ;
+        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b8 .
+
+    _:n0fcb0c3772974ac5a49df214269db5f6b8 rdf:first <https://w3id.org/promo/library/#E_18> ;
+        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b9 .
+
+    _:n0fcb0c3772974ac5a49df214269db5f6b9 rdf:first <https://w3id.org/promo/library/#E_13> ;
         rdf:rest () .
 }
 

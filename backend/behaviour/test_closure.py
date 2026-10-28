@@ -408,6 +408,16 @@ def test_move_reorder_yields_legal_order():
     assert sel.sequence == ["E3", "E2", "E1"]
 
 
+def test_move_reorder_prunes_unknown_equations():
+    """Equations not in scope are dropped, not kept (found by auditing
+    legacy artefacts — the filter kept them and the dedupe crashed)."""
+    result = apply_move(CHAIN, Selection(
+        sequence=["E2", "E_missing", "E1"], base_equation="E1"),
+        kind="reorder", sequence=["E2", "E_missing", "E1"])
+    assert result["pruned"] == ["E_missing"]
+    assert result["selection"].sequence == ["E2", "E1"]
+
+
 def test_move_output_demands_definer():
     """An output mark on an undefined variable opens a demand; the
     picker offers its definers and picking one closes it."""

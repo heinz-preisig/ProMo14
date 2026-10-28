@@ -10,6 +10,8 @@
 
     promo:Glass a rdfs:Class .
 
+    promo:Instantiation a rdfs:Class .
+
     promo:Library a rdfs:Class .
 
     promo:Model a rdfs:Class .
