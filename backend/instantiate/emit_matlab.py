@@ -57,7 +57,7 @@ from backend.equation.compile_space import CompileSpace
 from .emit_common import (
     Dialect,
     T0Layout,
-    bound_dims,
+    data_kinds,
     emit_plan,
     inst_name,
     loop_layout,
@@ -108,53 +108,15 @@ class _Matlab(Dialect):
         cell, dim = cls._labels(indices, space)
         return "MultiDimVar(%s, %s, %s, %s)" % (cell, dim, cell, value)
 
-    # -- literals --------------------------------------------------------
-
-    @staticmethod
-    def _num(v) -> str:
-        """One cell value as a literal; missing cells are NaN."""
-        return "NaN" if v is None else repr(v)
-
-    @classmethod
-    def _array_lit(cls, flat: List, dims: List[int]) -> str:
-        """A flat C-order value table as a Matlab array literal shaped
-        to the bound index sizes.  Matlab is column-major: an n-D table
-        is reshaped to the reversed dims and permuted back so element
-        order matches the C-order coordinate enumeration; a 1-D table
-        emits as a column vector (convention: docs/value-cells.md)."""
-        if not dims:
-            return cls._num(flat[0]) if flat else "NaN"
-        if len(dims) == 1:
-            return "[%s]" % "; ".join(cls._num(v) for v in flat)
-        n = len(dims)
-        items = ", ".join(cls._num(v) for v in flat)
-        rev = " ".join(str(d) for d in reversed(dims))
-        perm = " ".join(str(i) for i in range(n, 0, -1))
-        return ("permute(reshape([%s], %s), [%s])"
-                % (items, rev, perm))
-
-    @classmethod
-    def _sparse(cls, entries: List[Tuple[int, int, int]],
-                rows: int, cols: int) -> str:
-        """A COO entry list as a ``sparse(I, J, V, m, n)`` literal —
-        column vectors, indices shifted to Matlab's 1-based
-        convention."""
-        ii = [str(r + 1) for r, _, _ in entries]
-        jj = [str(c + 1) for _, c, _ in entries]
-        vv = [str(s) for _, _, s in entries]
-        return ("sparse([%s], [%s], [%s], %d, %d)"
-                % ("; ".join(ii), "; ".join(jj), "; ".join(vv),
-                   rows, cols))
-
     # -- dialect hooks ---------------------------------------------------
 
     def matrix(self, mx, space: CompileSpace) -> str:
-        lit = self._sparse(mx.entries, len(mx.rows), len(mx.cols))
+        nm = mx.name or inst_name(mx.instance)
+        lit = '_mx("%s")' % nm
         # Wrap so einsum sees the [row, col] index labels.
         idx = dict(mx.indices or {})
         return "%s = %s;  %% F over [%d x %d]" % (
-            mx.name or inst_name(mx.instance),
-            self._mdv(idx, space, lit) if idx else lit,
+            nm, self._mdv(idx, space, lit) if idx else lit,
             len(mx.rows), len(mx.cols))
 
     def fn_open(self, cp: CodePlan) -> List[str]:
@@ -175,9 +137,7 @@ class _Matlab(Dialect):
         nm = p.name or inst_name(p.instance)
         if p.values is not None:
             return "  %s = %s;  %% value cells" % (
-                nm, self._mdv(p.indices, space,
-                              self._array_lit(p.values,
-                                              bound_dims(p.indices))))
+                nm, self._mdv(p.indices, space, '_tab("%s")' % nm))
         return "  %s = %s;" % (nm, self._mdv(p.indices, space,
                                              "par.%s" % nm))
 
@@ -254,16 +214,56 @@ class _Matlab(Dialect):
 
     def footer(self, out: List[str], cp: CodePlan,
                space: CompileSpace) -> None:
-        """``_mdv_value`` — the unwrap referenced by ``integral``
-        renders (an Integral's body may be a MultiDimVar or a plain
-        double, e.g. the integration var itself)."""
-        if not any("integral(" in ln for ln in out):
-            return
-        out += ["",
-                "function v = _mdv_value(x)",
-                "  if isa(x, 'MultiDimVar'), x = x.value; end",
-                "  v = x;",
-                "end"]
+        """File-end locals: ``_mdv_value`` (integral body unwrap) and
+        the ``model_data.json`` loaders — ``_model_data`` keeps the
+        decoded dict in a ``persistent`` so it parses once."""
+        if any("integral(" in ln for ln in out):
+            out += ["",
+                    "function v = _mdv_value(x)",
+                    "  if isa(x, 'MultiDimVar'), x = x.value; end",
+                    "  v = x;",
+                    "end"]
+        kinds = data_kinds(cp)
+        if kinds:
+            out += ["",
+                    "% the shared data file — the language-neutral half",
+                    "% of the data/code split (parsed once, persistent)",
+                    "function d = _model_data()",
+                    "  persistent d_",
+                    "  if isempty(d_)",
+                    "    d_ = jsondecode(fileread(fullfile("
+                    "fileparts(mfilename('fullpath')), "
+                    "'model_data.json')));",
+                    "  end",
+                    "  d = d_;",
+                    "end"]
+        if "matrices" in kinds:
+            out += ["",
+                    "function a = _mx(n)",
+                    "  d = _model_data();",
+                    "  e = d.matrices.(n);",
+                    "  a = sparse(e.i + 1, e.j + 1, e.v, e.m, e.n);",
+                    "end"]
+        if {"values", "ics"} & kinds:
+            out += ["",
+                    "function a = _shape(e)",
+                    "  d = e.dims;",
+                    "  if numel(d) <= 1, a = e.flat(:); return; end",
+                    "  a = permute(reshape(e.flat, fliplr(d)), "
+                    "fliplr(1:numel(d)));",
+                    "end"]
+        if "values" in kinds:
+            out += ["",
+                    "function a = _tab(n)",
+                    "  d = _model_data();",
+                    "  a = _shape(d.values.(n));",
+                    "end"]
+        if "ics" in kinds:
+            out += ["",
+                    "function a = _ictab(n)",
+                    "  d = _model_data();",
+                    "  a = _shape(d.ics.(n));",
+                    "end"]
 
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,
@@ -271,9 +271,7 @@ class _Matlab(Dialect):
         solve."""
         nm = st.name or inst_name(st.instance)
         if st.ic_source == "cells":
-            return self._mdv(st.indices, space,
-                             self._array_lit(st.ic_values or [],
-                                             bound_dims(st.indices)))
+            return self._mdv(st.indices, space, '_ictab("%s")' % nm)
         return self._mdv(st.indices, space, "par.ic0_%s" % nm)
 
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,

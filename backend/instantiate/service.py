@@ -66,7 +66,7 @@ from .builder import (
     is_initialise_class,
 )
 from .builder import build as build_model
-from .emit_common import inst_name
+from .emit_common import emit_data, inst_name
 from .emit_julia import emit_julia
 from .emit_matlab import emit_matlab
 from .emit_python import emit_python
@@ -943,7 +943,7 @@ def _plan_for(graph_iri: str, vars: Optional[str],
 
 
 _EMITTERS = {"python": emit_python, "julia": emit_julia,
-             "matlab": emit_matlab}
+             "matlab": emit_matlab, "data": emit_data}
 
 
 @router.get("/code", response_model=CodeOut)
@@ -1041,7 +1041,10 @@ def model_initial(
                           par_needed=par_needed,
                           error=str(e), problems=problems)
     try:
-        mod: Dict[str, Any] = {}
+        # the data/code split: emitted python references _DATA — inject
+        # it so no model_data.json file is needed server-side.
+        mod: Dict[str, Any] = {"_DATA": json.loads(
+            emit_data(cp, _code_space(store, emit_scope)))}
         exec(source, mod)
         par = {k: np.asarray(v, dtype=float) for k, v in
                body.par.items()}

@@ -46,6 +46,7 @@ from backend.equation.canonical_rdf import attach_rhs_expression
 from backend.equation.compile_space import CompileSpace, Index, Variable
 from backend.equation.units import Units
 from backend.instantiate.service import _ic_needs
+from backend.instantiate.emit_common import emit_data
 from backend.instantiate.emit_julia import _Julia, emit_julia
 from backend.instantiate.emit_matlab import _Matlab, emit_matlab
 from backend.instantiate.emit_python import _Python, emit_python
@@ -712,8 +713,9 @@ def test_emit_python():
     get type-suffixed names."""
     src = emit_python(_plan(_build()), _emit_space())
     assert "import scipy.sparse" in src
-    assert ("V_4 = scipy.sparse.coo_array(([-1, 1], ([0, 1], [0, 1])), "
-            "shape=(2, 2))" in src)
+    # the data/code split — F comes from model_data.json via _mx
+    assert '_DATA = _json.load' in src
+    assert 'V_4 = _mx("V_4")  # F over [2 x 2]' in src
     assert "def derivative(t, y, par):" in src
     assert "V_1 = y[0:2]" in src
     assert 'V_5 = par["V_5"]' in src
@@ -734,7 +736,8 @@ def test_emit_julia():
     slices/maps, sparse F literal, broadcast Hadamard, plain ``*``
     for the matrix·vector balance."""
     src = emit_julia(_plan(_build()), _emit_space())
-    assert "V_4 = sparse([1, 2], [1, 2], [-1, 1], 2, 2)" in src
+    assert 'V_4 = _mx("V_4")  # F over [2 x 2]' in src
+    assert "using JSON" in src
     assert "function derivative!(dy, y, par, t)" in src
     assert "V_1 = @view y[1:2]" in src
     assert "V_5 = par.V_5" in src
@@ -754,7 +757,7 @@ def test_emit_matlab():
     unwraps via a d<lhs> temp."""
     src = emit_matlab(_plan(_build()), _emit_space())
     assert ("V_4 = MultiDimVar({'N', 'A_diff'}, [2 2], "
-            "{'N', 'A_diff'}, sparse([1; 2], [1; 2], [-1; 1], 2, 2))"
+            "{'N', 'A_diff'}, _mx(\"V_4\"));"
             in src)
     assert "function dy = derivative(t, y, par)" in src
     assert "V_1 = MultiDimVar({'N'}, 2, {'N'}, y(1:2));" in src
@@ -773,28 +776,30 @@ def test_emit_matlab():
 
 def test_emit_values_indexed():
     """ν → emitters: an arc-indexed parameter with a partial table
-    emits as an array literal (missing cell → NaN) instead of the
-    par lookup — python, julia, matlab."""
+    lands in ``model_data.json`` (missing cell → NaN) and emits as a
+    ``_tab`` reference instead of the par lookup — python, julia,
+    matlab."""
     cp = _plan(_build_indexed_k(), values={_var("k"): {"a1": 1.5}})
 
     src = emit_python(cp, _emit_space())
-    assert "V_5 = np.array([1.5, np.nan])  # value cells" in src
+    assert 'V_5 = _tab("V_5")  # value cells' in src
     assert 'par["V_5"]' not in src
 
     src = emit_julia(cp, _emit_space())
-    assert "V_5 = [1.5, NaN]  # value cells" in src
+    assert 'V_5 = _tab("V_5")  # value cells' in src
     assert "par.V_5" not in src
 
     src = emit_matlab(cp, _emit_space())
     assert ("V_5 = MultiDimVar({'A_diff'}, 2, {'A_diff'}, "
-            "[1.5; NaN]);  % value cells" in src)
+            '_tab("V_5"));  % value cells' in src)
     assert "par.V_5" not in src
 
 
 def test_emit_values_2d():
-    """A 2-index table emits shaped to the bound dims: numpy reshape
-    (row-major); julia/matlab reshape+permute (column-major) so the
-    C-order cell enumeration lands on the right coordinates."""
+    """A 2-index table emits as a ``_tab`` reference; the data file
+    carries the C-order flat list + bound dims (missing cell → null),
+    and the loaders reshape per-language (numpy row-major direct,
+    julia/matlab reverse+permute for column-major)."""
     idx = {_idx("idx_reaction_q"): ["r1", "r2"],
            _idx("idx_species"): ["A", "B"]}
     slot = ParamSlot(var="v", instance="V_9@et", kind="parameter",
@@ -802,20 +807,20 @@ def test_emit_values_2d():
                      values=[-1.0, -2.0, 1.0, None])
     cp = CodePlan(params=[slot], names={})
 
-    assert ("V_9 = np.array([-1.0, -2.0, 1.0, np.nan])"
-            ".reshape((2, 2))"
-            in emit_python(cp, _emit_space()))
-    assert ("V_9 = permutedims(reshape([-1.0, -2.0, 1.0, NaN], "
-            "2, 2), (2, 1))"
-            in emit_julia(cp, _emit_space()))
-    assert ("permute(reshape([-1.0, -2.0, 1.0, NaN], 2 2), [2 1])"
-            in emit_matlab(cp, _emit_space()))
+    data = json.loads(emit_data(cp, _emit_space()))
+    assert data["values"]["V_9"] == {
+        "flat": [-1.0, -2.0, 1.0, None], "dims": [2, 2]}
+
+    assert 'V_9 = _tab("V_9")' in emit_python(cp, _emit_space())
+    assert 'V_9 = _tab("V_9")' in emit_julia(cp, _emit_space())
+    assert '_tab("V_9")' in emit_matlab(cp, _emit_space())
 
 
-def test_value_cell_layout_convention():
+def test_value_cell_layout_convention(tmp_path, monkeypatch):
     """Golden layout (docs/value-cells.md): the canonical flat list
-    enumerates the coordinate product last-index-fastest; each
-    emitter's literal must land every value on its coordinate.
+    enumerates the coordinate product last-index-fastest; the data
+    file carries it verbatim + the bound dims, and each loader must
+    land every value on its coordinate.
 
     The table is 2x3 — deliberately non-square: a square table keeps
     its shape under a transpose and cannot detect an ordering bug.
@@ -824,36 +829,31 @@ def test_value_cell_layout_convention():
     np = pytest.importorskip("numpy")
 
     flat = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    dims = [2, 3]
-    canonical = np.array(flat).reshape(dims)  # a[i,j] = ν(I_i, J_j)
+    idx = {_idx("idx_reaction_q"): ["r1", "r2"],
+           _idx("idx_species"): ["A", "B", "C"]}
+    slot = ParamSlot(var="v", instance="V_9@et", kind="parameter",
+                     name="V_9", indices=idx, values=flat)
+    cp = CodePlan(params=[slot], names={})
+    space = _emit_space()
+    canonical = np.array(flat).reshape((2, 3))
 
-    # Python — the emitted literal executes verbatim.
-    lit = _Python._array_lit(flat, dims)
-    assert lit == ("np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])"
-                   ".reshape((2, 3))")
-    assert (eval(lit, {"np": np}) == canonical).all()
+    data = json.loads(emit_data(cp, space))
+    assert data["values"]["V_9"] == {"flat": flat, "dims": [2, 3]}
 
-    # Julia / MATLAB can't exec here — golden the emitted expression
-    # and simulate its column-major semantics (first index fastest ==
-    # numpy order="F") to prove the coordinate→value map survives.
-    lit = _Julia._array_lit(flat, dims)
-    assert lit == ("permutedims(reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "
-                   "3, 2), (2, 1))")
-    col_major = np.array(flat).reshape(dims[::-1], order="F").T
-    assert (col_major == canonical).all()
+    # Python — exec the emitted module against the data file and
+    # call the real _tab loader.
+    (tmp_path / "model_data.json").write_text(emit_data(cp, space))
+    ns = {}
+    monkeypatch.chdir(tmp_path)
+    exec(emit_python(cp, space), ns)
+    assert (ns["_tab"]("V_9") == canonical).all()
 
-    lit = _Matlab._array_lit(flat, dims)
-    assert lit == ("permute(reshape([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "
-                   "3 2), [2 1])")
-    # Same reshape+permute idiom as julia — simulation above covers it.
-
-    # 1-D: julia row vector / matlab column vector — order preserved.
-    assert (_Julia._array_lit(flat, [6])
-            == "[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]")
-    assert (_Matlab._array_lit(flat, [6])
-            == "[1.0; 2.0; 3.0; 4.0; 5.0; 6.0]")
-    assert _Python._array_lit(flat, [6]) == \
-        "np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])"
+    # Julia / MATLAB can't exec here — golden the loader idiom
+    # (reverse dims + permute back, column-major == numpy order="F").
+    assert "reverse(d)..." in emit_julia(cp, space)
+    assert "reverse(1:length(d))" in emit_julia(cp, space)
+    assert "fliplr(d)" in emit_matlab(cp, space)
+    assert "fliplr(1:numel(d))" in emit_matlab(cp, space)
 
 
 def test_emit_python_algebraic_loop():
@@ -1040,7 +1040,7 @@ def test_emit_python_initial_cells():
     src = emit_python(
         _plan(_build(), values={_var("m"): {"c1": 1.0, "c2": 2.0}}),
         _emit_space())
-    assert "_e0 = (np.array([1.0, 2.0])) - V_1  # IC pin" in src
+    assert '_e0 = (_ictab("V_1")) - V_1  # IC pin' in src
     assert 'par["ic0_V_1"]' not in src
     assert "V_1 = u[0:2]" in src            # state — always unknown
     assert "V_1 = _u[0:2]" in src
@@ -1073,7 +1073,7 @@ def test_emit_python_initial_guess():
             "# root! guess" in src)
 
 
-def test_emit_python_executes():
+def test_emit_python_executes(tmp_path, monkeypatch):
     """The emitted module actually runs: ``initial`` fsolves the t=0
     system (pin residual honoured, ``steady_state`` releases it and
     solves der = 0), ``derivative`` feeds ``solve_ivp``.  Skips without
@@ -1082,8 +1082,12 @@ def test_emit_python_executes():
     np = pytest.importorskip("numpy")
     sivp = pytest.importorskip("scipy.integrate")
     pytest.importorskip("scipy.optimize")
+    cp = _plan(_build())
+    space = _emit_space()
+    (tmp_path / "model_data.json").write_text(emit_data(cp, space))
+    monkeypatch.chdir(tmp_path)
     mod = {}
-    exec(emit_python(_plan(_build()), _emit_space()), mod)
+    exec(emit_python(cp, space), mod)
     par = {"V_5": 0.1, "ic0_V_1": np.array([1.0, 0.0])}
     y0 = mod["initial"](par)
     np.testing.assert_allclose(y0, [1.0, 0.0])
@@ -1453,6 +1457,18 @@ def test_code_endpoint(client):
     assert "function outputs(y, par, t)" in body["source"]
     assert "dy[1:2] = V_4 * V_3_lumped_capacity" in body["source"]
 
+    # ?target=data — the shared model_data.json the generated code
+    # loads (F's COO entries are 0-based; loaders shift per-language).
+    r = client.get("/api/instantiate/code",
+                   params={"graph": graph, "vars": graph,
+                           "target": "data"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] and body["target"] == "data"
+    data = json.loads(body["source"])
+    assert data["matrices"]["V_4"] == {
+        "m": 2, "n": 2, "i": [0, 1], "j": [0, 1], "v": [-1, 1]}
+
     r = client.get("/api/instantiate/code",
                    params={"graph": graph, "target": "cobol"})
     assert r.status_code == 400
@@ -1658,7 +1674,7 @@ def test_code_endpoint_values(client):
                            "target": "python"})
     assert r.status_code == 200, r.text
     src = r.json()["source"]
-    assert "V_5 = 1.5  # value cells" in src
+    assert 'V_5 = _tab("V_5")  # value cells' in src
     assert 'par["V_5"]' not in src
 
 

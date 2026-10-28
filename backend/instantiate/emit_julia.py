@@ -46,7 +46,7 @@ from backend.equation.compile_space import CompileSpace
 from .emit_common import (
     Dialect,
     T0Layout,
-    bound_dims,
+    data_kinds,
     emit_plan,
     inst_name,
     loop_layout,
@@ -63,49 +63,43 @@ class _Julia(Dialect):
     index_base = 1
     no_rhs = "nothing  # no rhs"
 
-    @staticmethod
-    def _num(v) -> str:
-        """One cell value as a literal; missing cells are NaN."""
-        return "NaN" if v is None else repr(v)
-
-    @classmethod
-    def _array_lit(cls, flat: List, dims: List[int]) -> str:
-        """A flat C-order value table as a Julia array literal shaped
-        to the bound index sizes.  Julia is column-major: an n-D table
-        is reshaped to the reversed dims and permuted back so element
-        order matches the C-order coordinate enumeration
-        (convention: docs/value-cells.md)."""
-        items = ", ".join(cls._num(v) for v in flat)
-        if not dims:
-            return items or "NaN"
-        if len(dims) == 1:
-            return "[%s]" % items
-        n = len(dims)
-        rev = ", ".join(str(d) for d in reversed(dims))
-        perm = ", ".join(str(i) for i in range(n, 0, -1))
-        return ("permutedims(reshape([%s], %s), (%s))"
-                % (items, rev, perm))
-
-    @classmethod
-    def _sparse(cls, entries: List[Tuple[int, int, int]],
-                rows: int, cols: int) -> str:
-        """A COO entry list as a ``sparse(I, J, V, m, n)`` literal —
-        indices shifted to Julia's 1-based convention."""
-        ii = [str(r + 1) for r, _, _ in entries]
-        jj = [str(c + 1) for _, c, _ in entries]
-        vv = [str(s) for _, _, s in entries]
-        return ("sparse([%s], [%s], [%s], %d, %d)"
-                % (", ".join(ii), ", ".join(jj), ", ".join(vv),
-                   rows, cols))
 
     def header(self, cp: CodePlan) -> List[str]:
-        return ["using SparseArrays", ""]
+        kinds = data_kinds(cp)
+        out = ["using SparseArrays"]
+        if kinds:
+            # the shared data file — matrices + value/IC tables live
+            # in model_data.json next to this file (the language-
+            # neutral half of the data/code split).
+            out += ["using JSON", "",
+                    '_DATA = JSON.parsefile(joinpath(@__DIR__, '
+                    '"model_data.json"))']
+        if "matrices" in kinds:
+            out += ["", "function _mx(n)",
+                    "    e = _DATA[\"matrices\"][n]",
+                    "    return sparse(e[\"i\"] .+ 1, e[\"j\"] .+ 1, "
+                    "e[\"v\"], e[\"m\"], e[\"n\"])",
+                    "end"]
+        if {"values", "ics"} & kinds:
+            out += ["", "function _shape(e)",
+                    "    d = Int.(e[\"dims\"])",
+                    "    length(d) <= 1 && return e[\"flat\"]",
+                    "    # C-order flat → column-major: reshape the "
+                    "    # reversed dims, permute back",
+                    "    return permutedims(reshape(e[\"flat\"], "
+                    "        reverse(d)...), reverse(1:length(d)))",
+                    "end"]
+        if "values" in kinds:
+            out += ["", '_tab(n) = _shape(_DATA["values"][n])']
+        if "ics" in kinds:
+            out += ["", '_ictab(n) = _shape(_DATA["ics"][n])']
+        out.append("")
+        return out
 
     def matrix(self, mx, space: CompileSpace) -> str:
-        return "%s = %s  # F over [%d x %d]" % (
-            mx.name or inst_name(mx.instance),
-            self._sparse(mx.entries, len(mx.rows), len(mx.cols)),
-            len(mx.rows), len(mx.cols))
+        nm = mx.name or inst_name(mx.instance)
+        return '%s = _mx("%s")  # F over [%d x %d]' % (
+            nm, nm, len(mx.rows), len(mx.cols))
 
     def fn_open(self, cp: CodePlan) -> List[str]:
         if cp.outputs:
@@ -121,8 +115,7 @@ class _Julia(Dialect):
     def param(self, p, space: CompileSpace) -> str:
         nm = p.name or inst_name(p.instance)
         if p.values is not None:
-            return "    %s = %s  # value cells" % (
-                nm, self._array_lit(p.values, bound_dims(p.indices)))
+            return '    %s = _tab("%s")  # value cells' % (nm, nm)
         return "    %s = par.%s" % (nm, nm)
 
     def gather(self, g, space: CompileSpace) -> str:
@@ -196,8 +189,7 @@ class _Julia(Dialect):
         used as the residual's rhs term in a non-steady solve."""
         nm = st.name or inst_name(st.instance)
         if st.ic_source == "cells":
-            return self._array_lit(st.ic_values or [],
-                                   bound_dims(st.indices))
+            return '_ictab("%s")' % nm
         return "par.ic0_%s" % nm
 
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,

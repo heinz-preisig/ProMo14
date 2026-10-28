@@ -10,9 +10,10 @@ than a 200-line copy of the traversal.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from backend.equation.checker import check
 from backend.equation.codegen import Renderer
@@ -320,3 +321,44 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
         d.initial(out, cp, t0_layout(cp), space)
     d.footer(out, cp, space)
     return "\n".join(out)
+
+
+def data_kinds(cp: CodePlan) -> set:
+    """Which ``model_data.json`` sections are populated — dialects
+    emit only the matching loader helpers."""
+    kinds = set()
+    if cp.matrices:
+        kinds.add("matrices")
+    if any(p.values is not None for p in cp.params + cp.inputs):
+        kinds.add("values")
+    if any(s.ic_source == "cells" and s.ic_values is not None
+           for s in cp.states):
+        kinds.add("ics")
+    return kinds
+
+
+def emit_data(cp: CodePlan, space: CompileSpace) -> str:
+    """The shared ``model_data.json`` — the language-neutral half of
+    the data/code split: incidence matrices plus the value and IC
+    tables, keyed by the emitted identifiers the generated code
+    references (``_mx``/``_tab``/``_ictab``)."""
+    out: Dict[str, Any] = {"matrices": {}, "values": {}, "ics": {}}
+    for mx in cp.matrices:
+        nm = mx.name or inst_name(mx.instance)
+        out["matrices"][nm] = {"m": len(mx.rows), "n": len(mx.cols),
+                               "i": [r for r, _, _ in mx.entries],
+                               "j": [c for _, c, _ in mx.entries],
+                               "v": [s for _, _, s in mx.entries]}
+    for p in cp.params + cp.inputs:
+        if p.values is None:
+            continue
+        nm = p.name or inst_name(p.instance)
+        out["values"][nm] = {"flat": p.values,
+                             "dims": bound_dims(p.indices)}
+    for st in cp.states:
+        if st.ic_source != "cells" or st.ic_values is None:
+            continue
+        nm = st.name or inst_name(st.instance)
+        out["ics"][nm] = {"flat": st.ic_values,
+                          "dims": bound_dims(st.indices)}
+    return json.dumps(out, indent=1)

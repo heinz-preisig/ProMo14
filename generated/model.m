@@ -1,5 +1,5 @@
-V_25_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, sparse([1; 1], [1; 2], [1; -1], 1, 2));  % F over [1 x 2]
-V_25_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, sparse([1], [1], [1], 1, 1));  % F over [1 x 1]
+V_25_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, _mx("V_25_convection_transport"));  % F over [1 x 2]
+V_25_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, _mx("V_25_lumped"));  % F over [1 x 1]
 
 function dy = derivative(t, y, par)
   dy = zeros(3, 1);
@@ -104,4 +104,20 @@ end
 function v = _mdv_value(x)
   if isa(x, 'MultiDimVar'), x = x.value; end
   v = x;
+end
+
+% the shared data file — the language-neutral half
+% of the data/code split (parsed once, persistent)
+function d = _model_data()
+  persistent d_
+  if isempty(d_)
+    d_ = jsondecode(fileread(fullfile(fileparts(mfilename('fullpath')), 'model_data.json')));
+  end
+  d = d_;
+end
+
+function a = _mx(n)
+  d = _model_data();
+  e = d.matrices.(n);
+  a = sparse(e.i + 1, e.j + 1, e.v, e.m, e.n);
 end

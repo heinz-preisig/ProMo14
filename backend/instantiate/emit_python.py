@@ -32,14 +32,14 @@ without reshape; loop initial guesses are zeros.
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List
 
 from backend.equation.compile_space import CompileSpace
 
 from .emit_common import (
     Dialect,
     T0Layout,
-    bound_dims,
+    data_kinds,
     emit_plan,
     inst_name,
     loop_layout,
@@ -54,37 +54,9 @@ class _Python(Dialect):
     target = "python"
     no_rhs = "None  # no rhs"
 
-    @staticmethod
-    def _num(v) -> str:
-        """One cell value as a literal; missing cells are NaN."""
-        return "np.nan" if v is None else repr(v)
-
-    @classmethod
-    def _array_lit(cls, flat: List, dims: List[int]) -> str:
-        """A flat C-order value table as an ``np.array`` literal shaped
-        to the bound index sizes — the ν channel's codegen form
-        (convention: docs/value-cells.md)."""
-        items = ", ".join(cls._num(v) for v in flat)
-        if not dims:
-            return items or "np.nan"
-        arr = "np.array([%s])" % items
-        if len(dims) > 1:
-            arr += ".reshape((%s))" % ", ".join(str(d) for d in dims)
-        return arr
-
-    @staticmethod
-    def _coo(rows: int, cols: int,
-             entries: List[Tuple[int, int, int]]) -> str:
-        """A COO entry list as a ``scipy.sparse.coo_array`` literal —
-        incidence matrices are sparse by nature; the contraction
-        renderer emits ``@`` for patterns that support it."""
-        vv = ", ".join(str(s) for _, _, s in entries)
-        ii = ", ".join(str(r) for r, _, _ in entries)
-        jj = ", ".join(str(c) for _, c, _ in entries)
-        return ("scipy.sparse.coo_array(([%s], ([%s], [%s])), "
-                "shape=(%d, %d))" % (vv, ii, jj, rows, cols))
 
     def header(self, cp: CodePlan) -> List[str]:
+        kinds = data_kinds(cp)
         out = ["import numpy as np"]
         if cp.matrices:
             out.append("import scipy.sparse")
@@ -93,14 +65,37 @@ class _Python(Dialect):
             # backs ``scipy.optimize.fsolve`` inside root!() bodies.
             out.append("import scipy.optimize")
             out.append("from scipy.optimize import fsolve")
+        if kinds:
+            # the shared data file — matrices + value/IC tables live
+            # in model_data.json next to this file (the language-
+            # neutral half of the data/code split).
+            out += ["import json as _json", "import os.path as _osp", "",
+                    "_DIR = (_osp.dirname(_osp.abspath(__file__))"
+                    " if '__file__' in globals() else '')",
+                    "if '_DATA' not in globals():",
+                    '    _DATA = _json.load(open(_osp.join('
+                    '_DIR, "model_data.json")))']
+        if "matrices" in kinds:
+            out += ["", "def _mx(n):",
+                    "    e = _DATA['matrices'][n]",
+                    "    return scipy.sparse.coo_array("
+                    "        (e['v'], (e['i'], e['j'])),"
+                    "        shape=(e['m'], e['n']))"]
+        if "values" in kinds:
+            out += ["", "def _tab(n):",
+                    "    e = _DATA['values'][n]",
+                    "    return np.array(e['flat']).reshape(e['dims'])"]
+        if "ics" in kinds:
+            out += ["", "def _ictab(n):",
+                    "    e = _DATA['ics'][n]",
+                    "    return np.array(e['flat']).reshape(e['dims'])"]
         out.append("")
         return out
 
     def matrix(self, mx, space: CompileSpace) -> str:
-        return "%s = %s  # F over [%d x %d]" % (
-            mx.name or inst_name(mx.instance),
-            self._coo(len(mx.rows), len(mx.cols), mx.entries),
-            len(mx.rows), len(mx.cols))
+        nm = mx.name or inst_name(mx.instance)
+        return '%s = _mx("%s")  # F over [%d x %d]' % (
+            nm, nm, len(mx.rows), len(mx.cols))
 
     def fn_open(self, cp: CodePlan) -> List[str]:
         total = sum(s.size for s in cp.states)
@@ -116,8 +111,7 @@ class _Python(Dialect):
     def param(self, p, space: CompileSpace) -> str:
         nm = p.name or inst_name(p.instance)
         if p.values is not None:
-            return "    %s = %s  # value cells" % (
-                nm, self._array_lit(p.values, bound_dims(p.indices)))
+            return '    %s = _tab("%s")  # value cells' % (nm, nm)
         return '    %s = par["%s"]' % (nm, nm)
 
     def gather(self, g, space: CompileSpace) -> str:
@@ -208,8 +202,7 @@ class _Python(Dialect):
         used as the residual's rhs term in a non-steady solve."""
         nm = st.name or inst_name(st.instance)
         if st.ic_source == "cells":
-            return self._array_lit(st.ic_values or [],
-                                   bound_dims(st.indices))
+            return '_ictab("%s")' % nm
         return 'par["ic0_%s"]' % nm
 
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,

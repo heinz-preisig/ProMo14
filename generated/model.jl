@@ -1,7 +1,15 @@
 using SparseArrays
+using JSON
 
-V_25_convection_transport = sparse([1, 1], [1, 2], [1, -1], 1, 2)  # F over [1 x 2]
-V_25_lumped = sparse([1], [1], [1], 1, 1)  # F over [1 x 1]
+_DATA = JSON.parsefile(joinpath(@__DIR__, "model_data.json"))
+
+function _mx(n)
+    e = _DATA["matrices"][n]
+    return sparse(e["i"] .+ 1, e["j"] .+ 1, e["v"], e["m"], e["n"])
+end
+
+V_25_convection_transport = _mx("V_25_convection_transport")  # F over [1 x 2]
+V_25_lumped = _mx("V_25_lumped")  # F over [1 x 1]
 
 function derivative!(dy, y, par, t)
     V_31_convection_transport = @view y[1:2]
