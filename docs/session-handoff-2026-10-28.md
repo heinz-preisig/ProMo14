@@ -163,3 +163,11 @@ Composite/model-reuse semantics settled with the user and recorded as
 4. Deferred: cross-artefact consistency review.  (~~ν→codegen
    wiring~~ — stale: landed 2026-09-24, verified 2026-09-28; cells
    reach the emitters via `ParamSlot.values` → `model_data.json`.)
+
+## Session closed
+
+Day session: §21 move-engine implementation + codegen work (17
+commits).  Evening session: §22 referenced-composites design —
+design only, no code; docs pushed as `dafa57f`.  Working tree clean.
+Next machine: `git pull`, start at queue item 2 — §22
+implementation.
