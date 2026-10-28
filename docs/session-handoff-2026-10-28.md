@@ -92,7 +92,7 @@ still `closed`.  The audit also caught an engine bug — unknown
 equations were kept instead of pruned, then crashed the dedupe pass;
 fixed with a regression test.
 
-### Output channel in codegen (same day, commit pending)
+### Output channel in codegen (same day)
 
 §21 outputs are now plumbed end to end: `EntityInstantiation.outputs`
 (from the assignment) → `CodePlan.outputs` (`OutputSlot`) → emitted
@@ -102,6 +102,30 @@ julia `derivative!(...; outs=nothing)` + `outputs(y, par, t)`; matlab
 `[dy, outs]` multi-return (`.value` unwrap).  The ODE signatures stay
 backward-compatible — the channel is optional everywhere.  `/model`
 exposes `entity_types[].outputs`.
+
+## End-of-day update
+
+- **Indexed powers fixed:** the checker takes the ordered union of base
+  and exponent indices. Activity kinetics `a[S] ^ alpha[Q,S]` therefore
+  has indices `[S,Q]`, and `Product(a ^ alpha, S)` leaves `[Q]`.
+- **Axis alignment:** Python/NumPy and Julia code generation permute
+  dense operands into result-index order and insert singleton axes for
+  indexed powers and index-preserving products. Matlab continues to use
+  label-aware `MultiDimVar` operations.
+- **Value fills:** wildcard and sub-index selectors, coverage badges,
+  fill editing and per-binding problem badges are implemented. `/model`
+  runs `plan()` so bad-fill/fill-conflict problems reach the report.
+- **Design decision:** expression-valued cells were implemented and then
+  reverted (`e1ca09e`). Instantiation carries literal numbers only;
+  equations carry all relations. Computed values and initial conditions
+  belong in equation definitions (initialise-class equations for ICs),
+  not in cell expressions. The equation language remains symbolic, with
+  no numeric literals. `docs/value-expression.md` is currently empty;
+  this handoff records the rejection.
+- **Validation:** `uv run pytest backend/equation -x -q` — **198 passed**;
+  `uv run pytest backend/ -x -q` — **428 passed**. Dependency deprecation
+  warnings remain; `git diff --check` is clean. The final indexed-power
+  changes are backend-only; no frontend rebuild is required for them.
 
 ## Where to pick up — candidate queue
 

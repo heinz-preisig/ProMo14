@@ -212,6 +212,19 @@ def test_power_dimensionless():
     assert c.indices == ["http://promo.example/index/N"]
 
 
+def test_power_indexed_exponent_unions_indices():
+    """Activity kinetics: a[S] ^ α[Q,S] is [S,Q] (broadcast like the
+    index-preserving product), so Product(…, S) leaves [Q]."""
+    space = _space()
+    T = "http://promo.example/index/T"
+    N = "http://promo.example/index/N"
+    _add_var(space, "alpha", Units(), [T, N])
+    c = check(parse("N ^ alpha"), space)
+    assert c.indices == [N, T]
+    c = check(parse("Product(N ^ alpha, N)"), space)
+    assert c.indices == [T]
+
+
 def test_power_rejects_dimensioned_exponent():
     space = _space()
     node = parse("N ^ rho")

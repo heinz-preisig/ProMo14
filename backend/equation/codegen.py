@@ -204,6 +204,51 @@ class Renderer:
                 % (index_iri, checked.indices)
             )
 
+    def _align(self, src: str, c: Checked, result: List[str]) -> str:
+        """Lay an element-wise operand out on the result's axes.
+
+        numpy and julia broadcast by *position*, the checker by index
+        identity: permute the operand's axes into result order and
+        insert singletons for result axes it lacks (leading ones are
+        implicit in numpy, trailing ones in julia).  Matlab's
+        MultiDimVar aligns by label, sparse operands keep scipy's own
+        broadcasting.
+        """
+        ops = c.indices
+        if (not ops or ops == result or self._is_sparse(c)
+                or self.target not in ("python", "julia")):
+            return src
+        perm = [ops.index(i) for i in result if i in ops]
+        if perm != list(range(len(ops))):
+            if self.target == "python":
+                src = "np.transpose(%s, (%s))" % (
+                    src, ", ".join(str(p) for p in perm))
+            else:
+                src = "permutedims(%s, (%s))" % (
+                    src, ", ".join(str(p + 1) for p in perm))
+        present = [i in ops for i in result]
+        if self.target == "python":
+            while present and not present[0]:
+                present.pop(0)
+            if all(present):
+                return src
+            if not re.fullmatch(r"\w+", src):
+                src = "(%s)" % src
+            return "%s[%s]" % (
+                src, ", ".join(":" if p else "None" for p in present))
+        while present and not present[-1]:
+            present.pop()
+        if all(present):
+            return src
+        dims, k = [], 0
+        for p in present:
+            if p:
+                k += 1
+                dims.append("size(_x, %d)" % k)
+            else:
+                dims.append("1")
+        return "(_x -> reshape(_x, %s))(%s)" % (", ".join(dims), src)
+
     def _index_name(self, iri: str) -> str:
         return self.space.index_alias(iri)
 
@@ -296,13 +341,15 @@ class Renderer:
                     return "%s.multiply(np.asarray(%s))" % (left, right)
                 if rs:
                     return "%s.multiply(np.asarray(%s))" % (right, left)
-                return "%s * %s" % (left, right)
+                return "%s * %s" % (self._align(left, ch[0], c.indices),
+                                     self._align(right, ch[1], c.indices))
             if self.target == "matlab":
                 # einsum with no reduce labels: shared indices become
                 # element-wise "pages", disjoint ones outer-product.
                 return "einsum(%s, %s)" % (left, right)
             if self.target == "julia":
-                return "%s .* %s" % (left, right)
+                return "%s .* %s" % (self._align(left, ch[0], c.indices),
+                                      self._align(right, ch[1], c.indices))
             return r"%s \circ %s" % (left, right)
 
         if isinstance(node, Reduce):
@@ -310,6 +357,9 @@ class Renderer:
 
         if isinstance(node, Power):
             base, exp = self.render(ch[0]), self.render(ch[1])
+            if self.target in ("python", "julia"):
+                base = self._align(base, ch[0], c.indices)
+                exp = self._align(exp, ch[1], c.indices)
             if self.target == "python":
                 return "%s ** %s" % (base, exp)
             if self.target == "matlab":

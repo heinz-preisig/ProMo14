@@ -41,6 +41,8 @@ def _space():
             type="constant"),
         var("http://promo.example/var/half", "V_10", "half", Units(), [],
             type="constant", value="0.5"),
+        var("http://promo.example/var/alpha", "V_11", "alpha", Units(),
+            [T, N], type="parameter"),
     ]}
     indices = {i.iri: i for i in [t_idx, n_idx]}
     return CompileSpace(
@@ -95,6 +97,21 @@ def test_python_reduce_tensordot_axes():
 
 def test_python_power():
     assert gen("one ^ one", "python") == "V_8 ** V_8"
+
+
+def test_python_elementwise_alignment():
+    """numpy broadcasts by trailing position, so element-wise operands
+    are laid out on the checker's result axes: N[N] ^ alpha[t,N] is
+    [N,t] — N gains a trailing singleton, alpha is transposed."""
+    assert gen("N ^ alpha", "python") == \
+        "V_4[:, None] ** np.transpose(V_11, (1, 0))"
+    assert gen("N . alpha", "python") == \
+        "V_4[:, None] * np.transpose(V_11, (1, 0))"
+    # result [t,N]: N already aligns with the trailing axis
+    assert gen("alpha . N", "python") == "V_11 * V_4"
+    # activity kinetics shape: Product over N leaves [t]
+    assert gen("Product(N ^ alpha, N)", "python") == \
+        "np.prod(V_4[:, None] ** np.transpose(V_11, (1, 0)), axis=0)"
 
 
 def test_python_reduce_sum():
@@ -183,6 +200,16 @@ def test_matlab_reduce_einsum_labels():
 
 def test_matlab_power():
     assert gen("one ^ one", "matlab") == "power(V_8, V_8)"
+
+
+def test_julia_elementwise_alignment():
+    """julia broadcasts by leading position: permute into result
+    order, insert singletons for missing non-trailing axes."""
+    assert gen("N ^ alpha", "julia") == \
+        "V_4 .^ permutedims(V_11, (2, 1))"
+    assert gen("alpha . N", "julia") == \
+        "V_11 .* (_x -> reshape(_x, 1, size(_x, 1)))(V_4)"
+    assert gen("rho . v", "julia") == "V_1 .* V_2"
 
 
 def test_matlab_reduce_sum_labels():

@@ -1,6 +1,6 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-09-29
+**Last updated:** 2026-10-28
 
 ## Summary
 
@@ -8,15 +8,15 @@
 |--------|---------|----------|-------|--------|
 | Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork`, `PUT /pins`, `DELETE /artefact` | `backend/static/hub.html` at `/` (served no-cache) | covered by service tests | **Working** — artefact lines, all four pin kinds with editor, fork, open-in-app, delete with reference check |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
-| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 402 backend tests total | Backend and frontend functional; canonical RHS migrated where checkable |
-| Behaviour Linker | `PUT`/`GET`/`DELETE /api/behaviour/assignment`, `POST /evaluate` (closure engine) | Working SPA (:3003), modularised 2026-09-29 | 23 closure tests + service tests | Assignment artefact + closure live; guided-resolution UI, frontier suggestions, printable LaTeX |
+| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 198 equation tests; 428 backend tests total | Backend and frontend functional; indexed powers retain exponent indices; Python/Julia dense axis alignment |
+| Behaviour Linker | Assignment CRUD, `POST /evaluate`, `POST /move` (§21 move-based closure engine) | Working SPA (:3003), serialized move requests + output roles | closure and service tests | Canonical move-based selections, provider-cone pruning, explicit outputs and unconsumed-tip validation |
 | Modeller | `GET`/`PUT /api/modeller/model` (ADR-007), `GET /behaviour-entity-types` | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures, capability-gated server-side; palette filtered to entity types with closed assignments |
 | Species | `GET`/`PUT /api/species/species` | `/species` SPA (:3005) | covered by service tests | Named reaction schemes: components, allocations, reactions |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
 | Shared (`packages/ui`) | — | `GRAPH_IRI`/`sessionParam`, `withParams`/`apiFetch`, `useStoreDirty`, store status/save fetchers | `tsc` clean | Single source for session plumbing — apps re-export from `./api` (2026-09-25) |
 | Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope, value cells), catalogue, full ontology CRUD, `deps.py` graph-selection helpers | — | — | `graph_store` split into `vocab`/`persistence`/`seed` mixins (2026-09-25); legacy loader archived to `archive/loader.py` |
 | Model Reuse | — | — | — | Not started |
-| Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values`, `/initial` | value-cell editor + t=0 solve UI (:3006) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end; deps resolved from `usesLibrary`/`usesAssignment` pins |
+| Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values`, `/initial` | value-cell editor, fill editing, coverage/problem badges and t=0 solve UI (:3006; hub backend path) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end; deps resolved from `usesLibrary`/`usesAssignment` pins |
 | Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code` | — | emitter tests in `test_builder.py` | Derivative function emitted for all three targets; emitters share the `emit_common` dialect walker (2026-09-25) |
 
 ## Versioning & graph selection (2026-09-17)
@@ -234,8 +234,8 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `/arc-indices`, `/incidence`; `PUT`/`GET /api/instantiate/values`
   (the §20 ν value channel — `promo:ValueCell` tables on the model
   artefact, surfaced as `values` on each report binding).
-- **Frontend:** `apps/instantiation/` — scaffold (:3006; no `dev.sh`
-  service, hub opens it on the backend path).
+- **Frontend:** `apps/instantiation/` — value-cell editor, fill editing,
+  coverage/problem badges and t=0 solve UI (:3006; hub backend path).
 - **Dependency resolution (2026-09-29):** `/model`, `/code` and
   `/initial` read the model graph's `usesLibrary`/`usesAssignment`
   pins (`_model_dependencies`); `?vars=` still overrides as the
@@ -351,3 +351,26 @@ cd /home/heinz/1_Gits/CAM14/ProMo14
 npm install
 npm run dev:equation  # Vite dev server on http://localhost:3002
 ```
+
+## End-of-day checkpoint — 2026-10-28
+
+- **Behaviour Linker:** §21 move engine and explicit output roles are
+  implemented; stored assignments audited and re-saved via the API.
+  Outputs reach the Python, Julia and Matlab code-generation channels.
+- **Indexed powers:** checker indices are the ordered union of base and
+  exponent indices. `Product(a[S] ^ alpha[Q,S], S)` retains `[Q]`.
+  Python/NumPy and Julia align dense operand axes for powers and
+  index-preserving products; Matlab uses label-aware `MultiDimVar`.
+- **Instantiation:** literal value cells, wildcard/sub-index fills,
+  coverage badges, fill editing, per-binding problem badges and t=0 solve
+  UI are implemented. `/model` runs `plan()` to surface fill problems.
+- **Design boundary:** expression-valued cells were rejected and reverted.
+  Equations carry relations; instantiation carries literal numbers only.
+  Computed ICs belong in initialise-class equations.
+- **Validation:** `uv run pytest backend/ -x -q` — **428 passed**;
+  equation subset — **198 passed**. Dependency deprecation warnings remain.
+- **Deferred:** cross-artefact consistency review once all apps are
+  operational; reaction-domain equations, composites/reuse semantics,
+  and direction-aware donor selection remain follow-up candidates.
+- **Handoff:** `docs/session-handoff-2026-10-28.md` records implementation
+  details, decisions and the pickup queue.

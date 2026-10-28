@@ -217,7 +217,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         return Checked(
             node=node,
             units=base.units,
-            indices=base.indices,
+            indices=_union(base.indices, exp.indices),
             label=space.new_temp(),
             incidence=base.incidence | exp.incidence,
             children=[base, exp],
