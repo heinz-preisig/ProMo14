@@ -45,6 +45,7 @@ export interface Problem {
   kind: string
   message: string
   node: string | null
+  var?: string | null
   doc?: string | null
   entity_type: string | null
 }

@@ -359,6 +359,11 @@ function ValuesCard({
         const fillKeys = Object.keys(tbl).filter(
           (k) => !coordSet.has(k) && k !== '' && tbl[k].trim() !== '')
         const stored = Object.keys(v.values ?? {}).length
+        // fill problems mention this var? — flag the row, detail lives
+        // in the global Problems card.
+        const varProblems = report.problems.filter(
+          (p) => p.var === v.var
+            && (p.kind === 'bad-fill' || p.kind === 'fill-conflict'))
         // coverage: cells with a concrete entry or a matching fill —
         // provable now that fills exist (docs/value-fill.md).
         const covered = keys.filter(
@@ -392,6 +397,13 @@ function ValuesCard({
                   : covered > 0 ? '#f59e0b' : '#94a3b8')}>
                   {covered}/{keys.length}
                 </span>
+                {varProblems.map((p, i) => (
+                  <span key={i}
+                        title={p.message}
+                        style={{ ...S.badge('#dc2626'), marginLeft: 4 }}>
+                    {p.kind}
+                  </span>
+                ))}
               </span>
               <button
                 style={{ ...S.btn(false), float: 'right', padding: '2px 10px', fontSize: 11 }}

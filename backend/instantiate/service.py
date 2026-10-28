@@ -176,6 +176,7 @@ class ProblemOut(BaseModel):
     message: str
     node: Optional[str] = None
     entity_type: Optional[str] = None
+    var: Optional[str] = None    # variable context (e.g. fill problems)
     doc: Optional[str] = None    # catalogue anchor: /docs/<file>#<kind>
 
 
@@ -188,6 +189,7 @@ def _problem_out(p: "Problem") -> ProblemOut:
     return ProblemOut(
         kind=p.kind, message=p.message,
         node=p.node, entity_type=p.entity_type,
+        var=p.var,
         doc=_PROBLEM_DOC + p.kind)
 
 
