@@ -254,16 +254,15 @@ class _Matlab(Dialect):
 
     def footer(self, out: List[str], cp: CodePlan,
                space: CompileSpace) -> None:
-        """``_mdv_scalar`` — the scalar-unwrap referenced by
-        ``integral`` renders (an Integral's body may be a MultiDimVar
-        or a plain double, e.g. the integration var itself)."""
+        """``_mdv_value`` — the unwrap referenced by ``integral``
+        renders (an Integral's body may be a MultiDimVar or a plain
+        double, e.g. the integration var itself)."""
         if not any("integral(" in ln for ln in out):
             return
         out += ["",
-                "function s = _mdv_scalar(x)",
+                "function v = _mdv_value(x)",
                 "  if isa(x, 'MultiDimVar'), x = x.value; end",
-                "  s = x(1);  % scalar integrand — first (only) "
-                "element",
+                "  v = x;",
                 "end"]
 
     def pin_term(self, st, space: CompileSpace) -> str:

@@ -292,21 +292,19 @@ class Renderer:
         if isinstance(node, Integral):
             body, var, lo, hi = (self.render(x) for x in ch)
             if self.target == "python":
-                # quad wants a scalar-returning callable and yields
-                # (value, error) — coerce the integrand with .item()
-                # (errors loudly on a genuinely non-scalar body) and
-                # take the value.
-                return ("scipy.integrate.quad(lambda %s: "
-                        "np.asarray(%s).item(), %s, %s)[0]"
+                # quad_vec takes scalar or vector integrands and
+                # yields (value, error) — [0] takes the value.
+                return ("scipy.integrate.quad_vec(lambda %s: %s, "
+                        "%s, %s)[0]"
                         % (var, body, lo, hi))
             if self.target == "matlab":
-                # integral's fun must map each eval point to a scalar
-                # double; the body is (usually) a MultiDimVar, and it
-                # may not vectorise — arrayfun per point + _mdv_scalar
-                # unwrap (helper emitted at file end by the dialect).
-                return ("integral(@(%s) arrayfun(@(%s) _mdv_scalar(%s),"
-                        " %s), %s, %s)"
-                        % (var, var, body, var, lo, hi))
+                # 'ArrayValued': the fun receives a scalar per call
+                # and may return an array; _mdv_value unwraps a
+                # MultiDimVar body to its doubles (helper emitted at
+                # file end by the dialect).
+                return ("integral(@(%s) _mdv_value(%s), %s, %s, "
+                        "'ArrayValued', true)"
+                        % (var, body, lo, hi))
             if self.target == "julia":
                 # quadgk returns (I, E) — [1] takes I; vector-valued
                 # integrands are supported natively.
