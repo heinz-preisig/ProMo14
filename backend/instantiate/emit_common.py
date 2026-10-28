@@ -242,6 +242,12 @@ class Dialect:
         recorded outputs (``outputs(t, y, par)``)."""
         return
 
+    def footer(self, out: List[str], cp: CodePlan,
+               space: CompileSpace) -> None:
+        """Anything appended after the emitted functions — e.g. helper
+        functions the rendered expressions reference."""
+        return
+
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
                 space: CompileSpace) -> None:
         """Emit the ``initial(par, steady_state)`` t=0 solve —
@@ -299,4 +305,5 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
         d.outputs_fn(out, cp, space)
     if cp.states:
         d.initial(out, cp, t0_layout(cp), space)
+    d.footer(out, cp, space)
     return "\n".join(out)

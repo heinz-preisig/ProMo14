@@ -123,7 +123,8 @@ def test_python_constant_value_inlined():
 
 def test_python_integral():
     out = gen("Integral(M :: M in [one, one])", "python")
-    assert out == "scipy.integrate.quad(lambda V_3: V_3, V_8, V_8)"
+    assert out == ("scipy.integrate.quad(lambda V_3: "
+                   "np.asarray(V_3).item(), V_8, V_8)[0]")
 
 
 def test_python_root():
@@ -193,7 +194,8 @@ def test_matlab_product_reducemult():
 
 def test_matlab_integral():
     assert gen("Integral(M :: M in [one, one])", "matlab") == \
-        "integral(@(V_3) V_3, V_8, V_8)"
+        ("integral(@(V_3) arrayfun(@(V_3) _mdv_scalar(V_3), V_3), "
+         "V_8, V_8)")
 
 
 def test_matlab_root():
