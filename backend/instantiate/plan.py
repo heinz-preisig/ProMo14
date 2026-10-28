@@ -212,6 +212,18 @@ def plan(report: Instantiation, sched: Schedule,
         names.setdefault(et, {})[var] = emit_name(vb)
     out.names = names
 
+    # -- value tables (§20 ν channel) + expression cells ----------------
+    # Expanded once per slot binding, then expression cells evaluate
+    # over the scalar symbol environment (docs/value-expression.md).
+    tables: Dict[Tuple[str, str], Optional[List[Any]]] = {}
+    for e in report.entity_types:
+        for v in e.variables:
+            if v.var == e.state_variable or v.binding in (
+                    "constant", "parameter", "input", "fixed"):
+                tables[(e.entity_type, v.var)] = _value_table(
+                    v, values or {}, report.problems, subsets)
+    _resolve_cell_expressions(tables, bindings, names, report.problems)
+
     # -- states -------------------------------------------------------------
     offset = 0
     for e in report.entity_types:
@@ -223,8 +235,7 @@ def plan(report: Instantiation, sched: Schedule,
         size = 1
         for els in vb.indices.values():
             size *= max(1, len(els or []))
-        ic_values = _value_table(vb, values or {}, report.problems,
-                                 subsets)
+        ic_values = tables.get((e.entity_type, vb.var))
         init_lhs = {q.lhs for q in e.initial_equations}
         ic_source = ("cells" if ic_values is not None
                      else "initialise" if vb.var in init_lhs
@@ -274,15 +285,13 @@ def plan(report: Instantiation, sched: Schedule,
                     kind="constant" if v.binding == "fixed" else v.binding,
                     value=v.value,
                     indices=v.indices,
-                    values=_value_table(v, values or {}, report.problems,
-                                        subsets),
+                    values=tables.get((e.entity_type, v.var)),
                     name=names[e.entity_type][v.var]))
             elif v.binding in ("input", "fixed"):
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
                     indices=v.indices,
-                    values=_value_table(v, values or {}, report.problems,
-                                        subsets),
+                    values=tables.get((e.entity_type, v.var)),
                     name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
@@ -470,6 +479,70 @@ def _value_table(v: VarBinding,
                          "patterns (first: %s) — resolve explicitly"
                          % (n_conflict, first_conflict))))
     return out
+
+
+def _is_expr(cell: Any) -> bool:
+    """An expression-cell payload: exactly ``{"expr": str}``."""
+    return (isinstance(cell, dict) and set(cell) == {"expr"}
+            and isinstance(cell["expr"], str))
+
+
+def _resolve_cell_expressions(
+        tables: Dict[Tuple[str, str], Optional[List[Any]]],
+        bindings: Dict[Tuple[str, str], VarBinding],
+        names: Dict[str, Dict[str, str]],
+        problems: List[Problem]) -> None:
+    """Replace expression cells in ``tables`` (in place) by their
+    values — docs/value-expression.md, option 1: the symbol
+    environment is the emitted names of *scalar* bindings (no
+    indices) resolving to a number — constants with a pre-bound value,
+    literal cells, and expression cells resolved earlier in the
+    fixpoint.  Failed cells become ``None`` (unfilled) plus a
+    ``bad-cell`` / ``unresolved-cell`` / ``cell-cycle`` problem."""
+    from .cellexpr import resolve
+
+    env: Dict[str, float] = {}
+    provides: Dict[str, str] = {}
+    for (et, var), vb in bindings.items():
+        name = names[et][var]
+        if vb.value is not None and vb.binding in ("constant", "fixed"):
+            try:
+                env[name] = float(vb.value)
+                continue
+            except ValueError:
+                pass
+        tab = tables.get((et, var))
+        if vb.indices or not tab or len(tab) != 1:
+            continue
+        cell = tab[0]
+        if _is_expr(cell):
+            provides[name] = cell["expr"]
+        elif isinstance(cell, (int, float)) and not isinstance(cell, bool):
+            env[name] = float(cell)
+
+    if not any(isinstance(c, dict)
+               for tab in tables.values() for c in tab or []):
+        return
+    exprs = {c["expr"] for tab in tables.values() for c in tab or []
+             if _is_expr(c)}
+    results, failures = resolve(exprs, env, provides)
+
+    reported = set()
+    for (_, var), tab in tables.items():
+        for i, cell in enumerate(tab or []):
+            if not isinstance(cell, dict):
+                continue
+            if _is_expr(cell):
+                tab[i] = results.get(cell["expr"])
+                failure = failures.get(cell["expr"])
+            else:
+                tab[i] = None
+                failure = ("bad-cell", "cell carries both promo:value "
+                           "and promo:valueExpression")
+            if failure and (failure[0], var, failure[1]) not in reported:
+                reported.add((failure[0], var, failure[1]))
+                problems.append(Problem(kind=failure[0], var=var,
+                                        message=failure[1]))
 
 
 def _bound_elements(v: VarBinding, indices: Dict[str, IndexInfo],

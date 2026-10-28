@@ -1,6 +1,7 @@
 # Expression-valued cells — `promo:valueExpression`
 
-Status: **draft** — semantics proposed, not implemented.
+Status: **implemented** (option 1 below) — `backend/instantiate/cellexpr.py`,
+`plan._resolve_cell_expressions`.
 
 The §20 cell channel is literal-only today: `promo:value` carries a
 number.  An IC that is a *computed* quantity (e.g. "80 % of the tank
@@ -26,27 +27,38 @@ The cell expression is evaluated **numerically** at `plan()` time, so
 only the scalar fragment of the AST is meaningful:
 
 - `Var` — resolved against the *symbol environment* below
-- `Group`, `Add` (`+`/`-`), `Power` (`^`), unary `-`
-- `UFunc` (`sin`, `exp`, `sqrt`, …) — the `SymbolTable` builtins
-- `MaxMin` (`min`/`max`), `Call` — when all args evaluate
+- `Group`, `Add` (`+`/`-`), `Power` (`^`)
+- product operators `*`/`.`/`:` — every operand is a scalar in this
+  environment, so all three degenerate to plain multiplication
+- `UFunc` — `abs neg exp ln log sin cos tan asin acos atan sqrt inv
+  sign` (`log` is base 10, `ln` natural, as in codegen); negation is
+  `neg(x)`, division `x * inv(y)` — the language has neither unary
+  `-` nor `/`
+- `MaxMin` (`min`/`max`)
 
-Explicitly out of scope (a problem, not silent NaN):
+**No numeric literals.**  The expression language deliberately has
+none (`test_parser.py::test_no_numbers`); numbers enter through named
+constants or scalar parameter cells.  "80 % of the tank volume" is a
+scalar parameter `f` (cell `0.8`) and the expression `f * V_total`.
 
-- tensor operators `*`/`:`/`.` (`Reduce`/`Expand`/`IndexPreservingProduct`)
-  — they need index semantics that a scalar cell does not carry
+Explicitly out of scope (`bad-cell` at plan time, 400 at `PUT`):
+
+- `left`/`right`, `Call` (user functions) — no scalar meaning
 - `Instantiate`, `Integral`, `Product`, `ReduceSum`, `Root`,
   `TotalDiff`, `ParDiff` — symbolic constructs
+- numeric failures (domain errors, `inv(0)`, complex results)
 
 ## Symbol environment
 
-The only unresolved design question — three candidate scopes, ordered
-by surface area:
+Three candidate scopes, ordered by surface area — **option 1 is
+implemented**:
 
-1. **Params-only, scalar names** (recommended first cut): symbols are
+1. **Params-only, scalar names**: symbols are
    the *emitted names* of bindings that already resolved to a scalar
    literal — constants, literal params, and earlier-resolved expression
-   cells.  `V_total * 0.8` works; `m[i]` does not (an indexed param's
-   name is ambiguous — which element?).
+   cells.  `f * V_total` works; `m[i]` does not (an indexed param's
+   name is ambiguous — which element?) — an indexed binding's name is
+   an `unresolved-cell`.
 2. **+ indexed access**: allow `Var` to carry a coordinate
    (`m_a` resolves through a table lookup).  Needs index-structure
    resolution at eval time — meaningful work.
@@ -80,22 +92,32 @@ key) — stable, already what `par` uses.
   `ValueCellsOut.values` becomes `Dict[str, Any]`; the UI distinguishes
   by shape.  **This is the one API-surface change** — clients that
   assumed `number` read `expr` objects.
+- `PUT /values` rejects malformed payloads (anything but a number or
+  exactly `{"expr": str}`) and expressions that fail to parse or leave
+  the scalar subset — 400 with the reason.  Symbol resolution is
+  deferred to `plan()` (it depends on other variables' cells).
 - `plan()`/`_value_table` — after fill resolution, a second pass
   evaluates `expr` cells (per the fixpoint) into the same `flat` table.
   `model_data.json` and emitted code see only numbers — the contract
-  holds.
+  holds.  Failed cells stay unfilled (`None` → NaN).
+- `/model` runs `plan()` once so value-table problems (fills and
+  expression cells) reach the report — the cell editor badges them.
+- Instantiation app: a cell typed `=expr` is an expression cell and
+  reads back as `=expr`; anything else must be a number.
 
 ## What this removes
 
 The `initialise`-equation workaround for computed ICs: a state IC pin
-of `0.8 * V_total` becomes a cell, not an equation — consistent with
+of `f * V_total` becomes a cell, not an equation — consistent with
 ICs-as-data and with `ic`-flavoured fills.
 
 ## Non-goals
 
-- Expression cells as *fill* values — a fill carrying an expression
-  evaluated per covered coordinate is option 3 above; excluded
-  (cells-as-implicit-equations is a bigger design).
+- Coordinate-dependent fill expressions — a fill whose expression is
+  evaluated with each covered coordinate bound is option 3 above;
+  excluded (cells-as-implicit-equations is a bigger design).  A fill
+  *may* carry `promo:valueExpression` under option 1: it is
+  coordinate-independent, so every covered cell gets the same value.
 - Unit checking of cell expressions — the `checker` pass could type
   them against the var's declared unit; deferred until the channel
   proves out.

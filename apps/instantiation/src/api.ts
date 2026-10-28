@@ -1,4 +1,5 @@
 import type {
+  CellValue,
   CodeOut,
   InitialOut,
   InstantiationReport,
@@ -32,7 +33,7 @@ export async function generateCode(target: string): Promise<CodeOut> {
  *  "|"-joined index-element IRIs in indexStructure order. */
 export async function putValues(
   variable: string,
-  values: Record<string, number>,
+  values: Record<string, CellValue>,
 ): Promise<ValueCellsOut> {
   const res = await apiFetch('/api/instantiate/values', {
     method: 'PUT',

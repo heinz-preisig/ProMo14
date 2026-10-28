@@ -717,6 +717,21 @@ def put_values(
     model data, not var/expr vocabulary.  Replace semantics: the
     variable's whole cell set is rewritten.
     """
+    from .cellexpr import CellExprError, parse_cell
+    for key, val in body.values.items():
+        if not isinstance(val, dict):
+            continue
+        if set(val) != {"expr"} or not isinstance(val["expr"], str):
+            raise HTTPException(
+                status_code=400,
+                detail="cell %r: value must be a number or "
+                       "{\"expr\": <string>}" % key)
+        try:
+            parse_cell(val["expr"])
+        except CellExprError as e:
+            raise HTTPException(
+                status_code=400,
+                detail="cell %r: %s" % (key, e))
     store = get_store()
     graph = resolve_graph(store, graph_iri)
     store.set_value_cells(graph, body.variable, body.values)
@@ -833,6 +848,13 @@ def model_instantiation(
             message=(f"algebraic loop {i}: "
                      + ", ".join(_frag(q) for _t, q in scc))))
     _filter_fixed_unbound(store, model_graph, report)
+    # value-table problems (bad-fill/fill-conflict, expression cells)
+    # arise at plan() time — lower once so the report carries them
+    # for the cell editor; the plan itself is discarded.
+    plan(report, sched, inc, equations, indices,
+         values={v.var: store.value_cells(model_graph, v.var)
+                 for e in report.entity_types for v in e.variables},
+         canonicals=canonicals)
 
     return InstantiationReportOut(
         model=str(model_graph.identifier),

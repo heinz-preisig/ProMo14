@@ -850,6 +850,56 @@ def test_value_fills_sub_index():
     assert flat == [1.5, 9.0, 0.0]
 
 
+def test_value_expression_cells():
+    """docs/value-expression.md: an expression cell evaluates over the
+    emitted names of scalar bindings — here the IC of m (fill) from the
+    scalar parameter k's literal cell; the plan carries numbers only."""
+    m, k = _var("m"), _var("k")
+    rep = _build()
+    cp = _plan(rep, values={k: {"": 3.0},
+                            m: {"*": {"expr": "V_5 * V_5"},
+                                "c2": {"expr": "sqrt(V_5 + V_5)"}}})
+    st = cp.states[0]
+    assert st.ic_source == "cells"
+    assert st.ic_values == [9.0, pytest.approx(6.0 ** 0.5)]
+    assert not [p for p in rep.problems if p.kind.endswith("-cell")]
+
+    # k := V_5 names itself — a cycle; m's fill depends on it.
+    rep = _build()
+    cp = _plan(rep, values={k: {"": {"expr": "V_5"}},
+                            m: {"*": {"expr": "V_5"}}})
+    assert cp.states[0].ic_values == [None, None]
+    kinds = sorted({(p.kind, p.var) for p in rep.problems
+                    if p.kind.endswith("-cell") or p.kind == "cell-cycle"})
+    assert kinds == [("cell-cycle", k), ("cell-cycle", m)]
+    assert any("V_5 -> V_5" in p.message for p in rep.problems)
+
+
+def test_value_expression_problems():
+    """Unknown or indexed symbols → unresolved-cell; numeric failures
+    → bad-cell; failed cells stay unfilled (None)."""
+    m, k = _var("m"), _var("k")
+    rep = _build()
+    cp = _plan(rep, values={k: {"": 1.0},
+                            m: {"c1": {"expr": "V_99"},
+                                "c2": {"expr": "sqrt(neg(V_5))"}}})
+    assert cp.states[0].ic_values == [None, None]
+    by_kind = {p.kind: p for p in rep.problems
+               if p.kind in ("unresolved-cell", "bad-cell")}
+    assert "V_99" in by_kind["unresolved-cell"].message
+    assert by_kind["unresolved-cell"].var == m
+    assert by_kind["bad-cell"].var == m
+
+    # m is indexed — its name is not a scalar symbol.
+    rep = _build()
+    cp = _plan(rep, values={m: {"*": 1.0},
+                            k: {"": {"expr": "V_1"}}})
+    k_slot = next(p for p in cp.params if p.var == k)
+    assert k_slot.values == [None]
+    assert any(p.kind == "unresolved-cell" and p.var == k
+               for p in rep.problems)
+
+
 def test_emit_values_2d():
     """A 2-index table emits as a ``_tab`` reference; the data file
     carries the C-order flat list + bound dims (missing cell → null),
@@ -1705,6 +1755,21 @@ def test_values_endpoint(client):
     r = client.get("/api/instantiate/values",
                    params={"graph": graph, "variable": ids["k"]})
     assert r.json()["values"] == fills
+    # Expression cells (docs/value-expression.md): {"expr": ...}
+    # round-trips via promo:valueExpression, on cells and fills.
+    exprs = {"*|B": {"expr": "V_5 * V_5"}, "r1|C": 1.0}
+    r = client.put("/api/instantiate/values",
+                   json={"variable": ids["k"], "values": exprs})
+    assert r.status_code == 200, r.text
+    assert r.json()["values"] == exprs
+    r = client.get("/api/instantiate/values",
+                   params={"graph": graph, "variable": ids["k"]})
+    assert r.json()["values"] == exprs
+    for bad in ({"expr": "V_5 + 1"}, {"expr": "Root(V_5)"},
+                {"expr": 3}, {"value": 1.0}):
+        r = client.put("/api/instantiate/values",
+                       json={"variable": ids["k"], "values": {"r1|A": bad}})
+        assert r.status_code == 400, (bad, r.text)
     # restore the concrete table for the report check below
     client.put("/api/instantiate/values",
                json={"variable": ids["k"], "values": cells})
@@ -1745,6 +1810,18 @@ def test_code_endpoint_values(client):
     src = r.json()["source"]
     assert 'V_5 = _tab("V_5")  # value cells' in src
     assert 'par["V_5"]' not in src
+
+    # plan-time value problems reach the /model report (cell editor
+    # badges) — an expression over an unknown symbol.
+    r = client.put("/api/instantiate/values",
+                   json={"variable": ids["k"],
+                         "values": {"": {"expr": "V_99"}}})
+    assert r.status_code == 200, r.text
+    r = client.get("/api/instantiate/model",
+                   params={"graph": graph, "vars": graph})
+    assert r.status_code == 200, r.text
+    assert any(p["kind"] == "unresolved-cell" and p["var"] == ids["k"]
+               for p in r.json()["problems"])
 
 
 # ---------------------------------------------------------------------------
