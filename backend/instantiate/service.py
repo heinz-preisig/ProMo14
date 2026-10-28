@@ -683,6 +683,7 @@ def _assignments_collect(store, assignment_graph: Optional[str],
             state_variable=a.state_variable,
             instantiated=list(a.instantiated),
             ports=list(a.ports),
+            outputs=list(a.outputs),
             closed=a.closed,
         )
     return out

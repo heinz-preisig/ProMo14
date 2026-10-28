@@ -7,10 +7,14 @@ interface RolesPanelProps {
   eqs: Map<string, Equation>
   instantiated: string[]
   ports: string[]
+  outputs: string[]
   variables: Variable[]
   lab: (iri: string | null | undefined) => string
   onUnmark: (varIri: string) => void
-  onMark: (varIri: string, role: 'instantiated' | 'ports') => void
+  onMark: (
+    varIri: string,
+    role: 'instantiated' | 'ports' | 'outputs',
+  ) => void
   onResolve: (varIri: string, eqIri: string) => void
 }
 
@@ -19,6 +23,7 @@ export function RolesPanel({
   eqs,
   instantiated,
   ports,
+  outputs,
   variables,
   lab,
   onUnmark,
@@ -64,6 +69,38 @@ export function RolesPanel({
           ))}
           {instantiated.length === 0 && '—'}
         </div>
+        <div>
+          <b>outputs:</b>{' '}
+          {outputs.map((v) => (
+            <span key={v} style={{ marginRight: 8 }}>
+              <code>{lab(v)}</code>{' '}
+              <a
+                style={{ cursor: 'pointer', color: '#c00' }}
+                onClick={() => onUnmark(v)}
+              >
+                ✕
+              </a>
+            </span>
+          ))}
+          {outputs.length === 0 && '—'}
+        </div>
+        {(report?.unconsumed.length ?? 0) > 0 && (
+          <div style={{ color: '#c80' }}>
+            <b>unconsumed:</b>{' '}
+            {report!.unconsumed.map((v) => (
+              <span key={v} style={{ marginRight: 8 }}>
+                <code>{lab(v)}</code>
+                <button
+                  style={{ ...btn, marginLeft: 4 }}
+                  title="declare output"
+                  onClick={() => onMark(v, 'outputs')}
+                >
+                  output
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {(report?.auto_instantiated.length ?? 0) > 0 && (
           <div>
             <b>constants/parameters:</b>{' '}
@@ -116,6 +153,20 @@ export function RolesPanel({
             }}
           >
             <option value="">port…</option>
+            {variables.map((v) => (
+              <option key={v.iri} value={v.iri}>
+                {v.label}
+              </option>
+            ))}
+          </select>{' '}
+          <select
+            style={{ fontSize: 13 }}
+            value=""
+            onChange={(e) => {
+              if (e.target.value) onMark(e.target.value, 'outputs')
+            }}
+          >
+            <option value="">output…</option>
             {variables.map((v) => (
               <option key={v.iri} value={v.iri}>
                 {v.label}

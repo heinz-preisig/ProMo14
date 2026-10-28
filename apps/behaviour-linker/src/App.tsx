@@ -53,11 +53,15 @@ export default function App() {
               <ComputationSequencePanel
                 sequence={bl.sequence}
                 baseEquation={bl.baseEquation}
+                outputs={bl.outputs}
                 report={bl.report}
                 eqs={bl.eqs}
                 lab={bl.lab}
                 onRemove={bl.removeEq}
                 onMove={bl.move}
+                onToggleOutput={(v) =>
+                  bl.outputs.includes(v) ? bl.unmark(v) : bl.mark(v, 'outputs')
+                }
                 dragIri={bl.dragIri}
                 setDragIri={bl.setDragIri}
                 dropTarget={bl.dropTarget}
@@ -83,6 +87,7 @@ export default function App() {
                 eqs={bl.eqs}
                 instantiated={bl.instantiated}
                 ports={bl.ports}
+                outputs={bl.outputs}
                 variables={bl.ctx?.variables ?? []}
                 lab={bl.lab}
                 onUnmark={bl.unmark}

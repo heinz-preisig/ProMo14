@@ -8,11 +8,16 @@ Endpoints backing the behaviour linker
 - ``POST /evaluate``    — run the closure engine on a selection and
                           return the full status report (drives the
                           UI's pick-by-pick feedback loop).
+- ``POST /move``       — apply a §21 move (pick/exchange, delete,
+                          mark/unmark, reorder, pick/unpick base) and
+                          return the re-closed selection + report —
+                          the UI's only mutation channel.
 - ``GET  /assignment``  — read the stored assignment for an entity type.
-- ``PUT  /assignment``  — persist a selection as the entity type's
-                          assignment artefact (§13): an ``rdf:List``
-                          equation sequence plus state/port/instantiated
-                          role predicates in an ``Assignment`` graph.
+- ``PUT  /assignment``  — re-close then persist a selection as the
+                          entity type's assignment artefact (§13): an
+                          ``rdf:List`` equation sequence plus
+                          state/port/instantiated/output role
+                          predicates in an ``Assignment`` graph.
 - ``DELETE /assignment``— drop an entity type's assignment.
 
 The assignment artefact lives in a derived named graph
@@ -38,7 +43,12 @@ from backend.equation.document import _rhs_latex, _var_symbol
 from backend.core.deps import editable_param, graph_param
 from backend.ontology.rdf_context import scoped_context
 
-from .closure import EquationInfo, Selection, evaluate
+from .closure import (
+    EquationInfo,
+    Selection,
+    apply_move,
+    evaluate,
+)
 
 router = APIRouter()
 
@@ -96,6 +106,16 @@ class SelectionIn(BaseModel):
     base_equation: Optional[str] = None
     instantiated: List[str] = Field(default_factory=list)
     ports: List[str] = Field(default_factory=list)
+    outputs: List[str] = Field(default_factory=list)
+
+
+class MoveIn(SelectionIn):
+    """A §21 move over a posted selection."""
+
+    kind: str
+    variable: Optional[str] = None
+    equation: Optional[str] = None
+    role: Optional[str] = None
 
 
 class AssignmentOut(BaseModel):
@@ -105,6 +125,7 @@ class AssignmentOut(BaseModel):
     state_variable: Optional[str] = None
     instantiated: List[str] = Field(default_factory=list)
     ports: List[str] = Field(default_factory=list)
+    outputs: List[str] = Field(default_factory=list)
     closed: bool = False
 
 
@@ -221,6 +242,8 @@ def _read_assignment(graph, res: URIRef) -> Optional[AssignmentOut]:
                       graph.objects(res, PROMO["hasInstantiatedVariable"])],
         ports=[str(v) for v in
                graph.objects(res, PROMO["hasPortVariable"])],
+        outputs=[str(v) for v in
+                 graph.objects(res, PROMO["hasOutputVariable"])],
         closed=bool(closed) if closed is not None else False,
     )
 
@@ -281,24 +304,88 @@ def context_endpoint(
     )
 
 
+def _to_engine(selection: SelectionIn) -> Selection:
+    return Selection(
+        sequence=list(selection.sequence),
+        base_equation=selection.base_equation,
+        instantiated=set(selection.instantiated),
+        ports=set(selection.ports),
+        outputs=set(selection.outputs),
+    )
+
+
+def _from_engine(sel: Selection, entity_type: str,
+                 state_variable: Optional[str] = None,
+                 closed: bool = False) -> AssignmentOut:
+    return AssignmentOut(
+        entity_type=entity_type,
+        sequence=list(sel.sequence),
+        base_equation=sel.base_equation,
+        state_variable=state_variable,
+        instantiated=sorted(sel.instantiated),
+        ports=sorted(sel.ports),
+        outputs=sorted(sel.outputs),
+        closed=closed,
+    )
+
+
 @router.post("/evaluate")
 def evaluate_endpoint(
     selection: SelectionIn,
     graph_iri: Optional[str] = Depends(graph_param),
 ) -> dict:
-    """Evaluate a selection — the UI calls this after every pick."""
+    """Evaluate a selection — read-only; the mutation channel is
+    ``POST /move``."""
     store = get_store()
     ctx = scoped_context(store, graph_iri)
     variables, equations, auto = _collect(ctx)
-    report = evaluate(equations, Selection(
-        sequence=list(selection.sequence),
-        base_equation=selection.base_equation,
-        instantiated=set(selection.instantiated),
-        ports=set(selection.ports),
-    ), auto_instantiated=auto)
+    report = evaluate(equations, _to_engine(selection),
+                      auto_instantiated=auto)
     out = asdict(report)
     out["labels"] = _labels(variables, equations)
     return out
+
+
+@router.post("/move")
+def move_endpoint(
+    body: MoveIn,
+    graph_iri: Optional[str] = Depends(graph_param),
+) -> dict:
+    """Apply a §21 move and return the re-closed selection + report.
+
+    The engine computes the minimal invariant-restoring sequence
+    change: dead cones prune to the reachability roots (base equation
+    + declared outputs; stateless tips), unique-candidate definers
+    pull in on ``pick``/``mark``, and the order re-derives
+    lower-triangularly.  ``reorder`` moves pass a desired sequence as
+    position hints.
+    """
+    store = get_store()
+    ctx = scoped_context(store, graph_iri)
+    variables, equations, auto = _collect(ctx)
+    try:
+        result = apply_move(equations, _to_engine(body),
+                            kind=body.kind,
+                            variable=body.variable,
+                            equation=body.equation,
+                            sequence=list(body.sequence),
+                            role=body.role,
+                            auto_instantiated=auto)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    sel = result["selection"]
+    report = evaluate(equations, sel, auto_instantiated=auto)
+    out = asdict(report)
+    out["labels"] = _labels(variables, equations)
+    return {
+        "selection": _from_engine(
+            sel, body.entity_type,
+            state_variable=report.state_variable,
+            closed=report.closed).model_dump(),
+        "report": out,
+        "pulled": result["pulled"],
+        "pruned": result["pruned"],
+    }
 
 
 @router.get("/assignments", response_model=List[AssignmentOut])
@@ -349,12 +436,17 @@ def put_assignment(
     store = get_store()
     ctx = scoped_context(store, graph_iri)
     variables, equations, auto = _collect(ctx)
-    report = evaluate(equations, Selection(
-        sequence=list(selection.sequence),
-        base_equation=selection.base_equation,
-        instantiated=set(selection.instantiated),
-        ports=set(selection.ports),
-    ), auto_instantiated=auto)
+    # Persist the canonical (re-closed) selection — a PUT that never
+    # went through /move still lands lower-triangular and pruned.
+    try:
+        result = apply_move(equations, _to_engine(selection),
+                            kind="reorder",
+                            sequence=list(selection.sequence),
+                            auto_instantiated=auto)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    sel = result["selection"]
+    report = evaluate(equations, sel, auto_instantiated=auto)
 
     g = _assignment_graph(store, graph_iri)
     res = _assignment_res(store, graph_iri, selection.entity_type)
@@ -368,32 +460,28 @@ def put_assignment(
 
     g.add((res, RDF.type, PROMO["BehaviourAssignment"]))
     g.add((res, PROMO["forEntityType"], URIRef(selection.entity_type)))
-    if selection.base_equation:
+    if sel.base_equation:
         g.add((res, PROMO["hasBaseEquation"],
-               URIRef(selection.base_equation)))
+               URIRef(sel.base_equation)))
     if report.state_variable:
         g.add((res, PROMO["hasStateVariable"],
                URIRef(report.state_variable)))
     head = BNode()
-    Collection(g, head, [URIRef(e) for e in selection.sequence])
+    Collection(g, head, [URIRef(e) for e in sel.sequence])
     g.add((res, PROMO["hasEquationSequence"], head))
-    for var in selection.instantiated:
+    for var in sel.instantiated:
         g.add((res, PROMO["hasInstantiatedVariable"], URIRef(var)))
-    for var in selection.ports:
+    for var in sel.ports:
         g.add((res, PROMO["hasPortVariable"], URIRef(var)))
+    for var in sel.outputs:
+        g.add((res, PROMO["hasOutputVariable"], URIRef(var)))
     g.add((res, PROMO["closed"],
            Literal(report.closed, datatype=XSD.boolean)))
     store.declare_vocabulary(g)
 
-    return AssignmentOut(
-        entity_type=selection.entity_type,
-        sequence=list(selection.sequence),
-        base_equation=selection.base_equation,
-        state_variable=report.state_variable,
-        instantiated=list(selection.instantiated),
-        ports=list(selection.ports),
-        closed=report.closed,
-    )
+    return _from_engine(sel, selection.entity_type,
+                        state_variable=report.state_variable,
+                        closed=report.closed)
 
 
 @router.delete("/assignment", status_code=204)

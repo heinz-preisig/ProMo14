@@ -1,6 +1,7 @@
 import { renderToString } from 'katex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  applyMove,
   deleteAssignment,
   evaluate,
   listAssignments,
@@ -15,10 +16,14 @@ import type {
   EntityType,
   Equation,
   EvaluateReport,
+  Move,
+  Selection,
 } from '../types'
 import { buildPrintableLatex, escapeHtml } from '../utils/latex'
 import { frag } from '../utils/iri'
 import { useStoreDirty } from '@promo/ui'
+
+type EndpointRole = 'instantiated' | 'ports' | 'outputs'
 
 export interface BehaviourLinkerState {
   ctx: BehaviourContext | null
@@ -28,6 +33,7 @@ export interface BehaviourLinkerState {
   baseMode: 'state' | 'stateless'
   instantiated: string[]
   ports: string[]
+  outputs: string[]
   report: EvaluateReport | null
   saveMsg: string
   copied: boolean
@@ -56,7 +62,7 @@ export interface BehaviourLinkerState {
   removeEq: (eqIri: string) => void
   move: (eqIri: string, dir: -1 | 1) => void
   dropOn: (target: string) => void
-  mark: (varIri: string, role: 'instantiated' | 'ports') => void
+  mark: (varIri: string, role: EndpointRole) => void
   unmark: (varIri: string) => void
   save: () => Promise<void>
   remove: () => Promise<void>
@@ -74,6 +80,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
   const [lastSaved, setLastSaved] = useState<Assignment | null>(null)
   const [instantiated, setInstantiated] = useState<string[]>([])
   const [ports, setPorts] = useState<string[]>([])
+  const [outputs, setOutputs] = useState<string[]>([])
   const [report, setReport] = useState<EvaluateReport | null>(null)
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [saveMsg, setSaveMsg] = useState('')
@@ -83,7 +90,9 @@ export function useBehaviourLinker(): BehaviourLinkerState {
   const [dragIri, setDragIri] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const { dirty, refresh } = useStoreDirty()
-  const evalTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Moves are serialized — each posts the state the previous move
+  // produced, so rapid clicks cannot interleave.
+  const moveChain = useRef<Promise<void>>(Promise.resolve())
 
   const eqs = useMemo(() => {
     const m = new Map<string, Equation>()
@@ -105,6 +114,39 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     [eqs, lab],
   )
 
+  const selRef = useRef<Selection>({
+    entity_type: '',
+    sequence: [],
+    base_equation: null,
+    instantiated: [],
+    ports: [],
+    outputs: [],
+  })
+  selRef.current = {
+    entity_type: entityType ?? '',
+    sequence,
+    base_equation: baseEquation,
+    instantiated,
+    ports,
+    outputs,
+  }
+
+  const applySelection = useCallback(
+    (a: Assignment, syncMode = false) => {
+      setSequence(a.sequence)
+      setBaseEquation(a.base_equation)
+      // Move responses keep the user's picker mode unless they carry
+      // a base — loading an artefact resets it authoritatively.
+      if (a.base_equation || syncMode) {
+        setBaseMode(a.base_equation ? 'state' : 'stateless')
+      }
+      setInstantiated(a.instantiated)
+      setPorts(a.ports)
+      setOutputs(a.outputs ?? [])
+    },
+    [],
+  )
+
   // -- data loading --------------------------------------------------------
 
   useEffect(() => {
@@ -112,149 +154,128 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     listAssignments().then(setAssignments).catch(() => {})
   }, [])
 
-  // Selecting an entity type loads its stored assignment (if any) and
-  // normalises the base equation to the end of the sequence.
+  // Selecting an entity type loads its stored assignment (if any), then
+  // sends a `reorder` move with the stored order — the engine returns
+  // the canonical §21 selection (pruned + topologically ordered) plus
+  // the report in one roundtrip.  Falls back to plain evaluate if the
+  // move channel is unavailable.
   useEffect(() => {
     if (!entityType) return
     loadAssignment(entityType).then((a) => {
-      let assignment = a ?? {
+      const assignment = a ?? {
         entity_type: entityType,
         sequence: [],
         base_equation: null,
         state_variable: null,
         instantiated: [],
         ports: [],
+        outputs: [],
         closed: false,
       }
-      if (
-        assignment.base_equation &&
-        assignment.sequence.indexOf(assignment.base_equation) !==
-          assignment.sequence.length - 1
-      ) {
-        assignment = {
-          ...assignment,
-          sequence: [
-            ...assignment.sequence.filter((e) => e !== assignment.base_equation),
-            assignment.base_equation,
-          ],
-        }
-      }
-      setSequence(assignment.sequence)
-      setBaseEquation(assignment.base_equation)
-      setBaseMode(assignment.base_equation ? 'state' : 'stateless')
-      setInstantiated(assignment.instantiated)
-      setPorts(assignment.ports)
-      setLastSaved(assignment)
-    })
-  }, [entityType])
-
-  // Keep the base-equation mode selector aligned with the actual selection.
-  useEffect(() => {
-    if (baseEquation) setBaseMode('state')
-  }, [baseEquation])
-
-  // Every selection change re-evaluates (debounced).
-  useEffect(() => {
-    if (!entityType) return
-    if (evalTimer.current) clearTimeout(evalTimer.current)
-    evalTimer.current = setTimeout(() => {
-      evaluate({
-        entity_type: entityType,
-        sequence,
-        base_equation: baseEquation,
-        instantiated,
-        ports,
+      applyMove({
+        ...assignment,
+        kind: 'reorder',
+        sequence: assignment.sequence,
       })
         .then((r) => {
-          setReport(r)
-          setLabels((prev) => ({ ...prev, ...r.labels }))
+          applySelection(r.selection, true)
+          setReport(r.report)
+          setLabels((prev) => ({ ...prev, ...r.report.labels }))
+          // The saved snapshot follows the reclosed form — a legacy
+          // artefact shows "modified" iff the engine changed anything.
+          setLastSaved(
+            a
+              ? {
+                  ...a,
+                  sequence: r.selection.sequence,
+                  base_equation: r.selection.base_equation,
+                  instantiated: r.selection.instantiated,
+                  ports: r.selection.ports,
+                  outputs: r.selection.outputs,
+                }
+              : null,
+          )
         })
-        .catch(() => setReport(null))
-    }, 250)
-    return () => {
-      if (evalTimer.current) clearTimeout(evalTimer.current)
+        .catch(() => {
+          applySelection(assignment, true)
+          setLastSaved(assignment)
+          evaluate(assignment)
+            .then((r) => {
+              setReport(r)
+              setLabels((prev) => ({ ...prev, ...r.labels }))
+            })
+            .catch(() => setReport(null))
+        })
+    })
+  }, [entityType, applySelection])
+
+  // -- §21 moves -----------------------------------------------------------
+
+  const flash = useCallback((pulled: string[], pruned: string[]) => {
+    const bits: string[] = []
+    if (pulled.length)
+      bits.push(`pulled ${pulled.map((e) => frag(e)).join(', ')}`)
+    if (pruned.length)
+      bits.push(`pruned ${pruned.map((e) => frag(e)).join(', ')}`)
+    if (bits.length) {
+      setSaveMsg(bits.join(' · '))
+      setTimeout(() => setSaveMsg(''), 4000)
     }
-  }, [entityType, sequence, baseEquation, instantiated, ports])
+  }, [])
 
-  // -- selection mutations -------------------------------------------------
-
-  const insertPos = useCallback(
-    (forVar: string | null): number => {
-      if (!forVar) return sequence.length
-      const baseIdx = baseEquation ? sequence.indexOf(baseEquation) : -1
-      if (
-        baseIdx >= 0 &&
-        baseEquation &&
-        eqs.get(baseEquation)?.incidence.includes(forVar)
-      ) {
-        return baseIdx
-      }
-      let earliest = -1
-      sequence.forEach((eqIri, i) => {
-        if (eqIri === baseEquation) return
-        const eq = eqs.get(eqIri)
-        if (eq?.incidence.includes(forVar) && (earliest < 0 || i < earliest))
-          earliest = i
+  const queueMove = useCallback(
+    (patch: Partial<Move> & Pick<Move, 'kind'>) => {
+      moveChain.current = moveChain.current.then(async () => {
+        try {
+          const r = await applyMove({ ...selRef.current, ...patch })
+          applySelection(r.selection)
+          setReport(r.report)
+          setLabels((prev) => ({ ...prev, ...r.report.labels }))
+          flash(r.pulled, r.pruned)
+        } catch {
+          setSaveMsg('move rejected')
+          setTimeout(() => setSaveMsg(''), 3000)
+        }
       })
-      return earliest < 0 ? sequence.length : earliest
     },
-    [sequence, baseEquation, eqs],
+    [applySelection, flash],
   )
 
-  const pickBase = (eqIri: string | null) => {
-    setBaseEquation(eqIri)
-    if (eqIri) {
-      setSequence((s) => [...s.filter((e) => e !== eqIri), eqIri])
-    }
-  }
+  const pickBase = (eqIri: string | null) =>
+    queueMove({ kind: 'pick_base', equation: eqIri })
 
-  const resolveWith = (varIri: string, eqIri: string) => {
-    setSequence((s) => {
-      if (s.includes(eqIri)) return s
-      const at = insertPos(varIri)
-      return [...s.slice(0, at), eqIri, ...s.slice(at)]
-    })
-  }
+  const resolveWith = (varIri: string, eqIri: string) =>
+    queueMove({ kind: 'pick', variable: varIri, equation: eqIri })
 
-  const removeEq = (eqIri: string) => {
-    setSequence((s) => s.filter((e) => e !== eqIri))
-    if (eqIri === baseEquation) setBaseEquation(null)
-  }
+  const removeEq = (eqIri: string) =>
+    queueMove({ kind: 'delete', equation: eqIri })
 
   const move = (eqIri: string, dir: -1 | 1) => {
-    setSequence((s) => {
-      const i = s.indexOf(eqIri)
-      const j = i + dir
-      if (i < 0 || j < 0 || j >= s.length) return s
-      const next = [...s]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
-    })
+    const s = selRef.current.sequence
+    const i = s.indexOf(eqIri)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= s.length) return
+    const desired = [...s]
+    ;[desired[i], desired[j]] = [desired[j], desired[i]]
+    queueMove({ kind: 'reorder', sequence: desired })
   }
 
   const dropOn = (target: string) => {
+    const s = selRef.current.sequence
     if (!dragIri || dragIri === target) return
-    setSequence((s) => {
-      const from = s.indexOf(dragIri)
-      const to = s.indexOf(target)
-      if (from < 0 || to < 0) return s
-      const next = s.filter((e) => e !== dragIri)
-      next.splice(next.indexOf(target), 0, dragIri)
-      return next
-    })
+    const from = s.indexOf(dragIri)
+    const to = s.indexOf(target)
+    if (from < 0 || to < 0) return
+    const desired = s.filter((e) => e !== dragIri)
+    desired.splice(desired.indexOf(target), 0, dragIri)
+    queueMove({ kind: 'reorder', sequence: desired })
   }
 
-  const mark = (varIri: string, role: 'instantiated' | 'ports') => {
-    const set = role === 'instantiated' ? setInstantiated : setPorts
-    const other = role === 'instantiated' ? setPorts : setInstantiated
-    set((s) => (s.includes(varIri) ? s : [...s, varIri]))
-    other((s) => s.filter((v) => v !== varIri))
-  }
+  const mark = (varIri: string, role: EndpointRole) =>
+    queueMove({ kind: 'mark', variable: varIri, role })
 
-  const unmark = (varIri: string) => {
-    setInstantiated((s) => s.filter((v) => v !== varIri))
-    setPorts((s) => s.filter((v) => v !== varIri))
-  }
+  const unmark = (varIri: string) =>
+    queueMove({ kind: 'unmark', variable: varIri })
 
   // -- persistence ---------------------------------------------------------
 
@@ -264,7 +285,8 @@ export function useBehaviourLinker(): BehaviourLinkerState {
       sequence.length === 0 &&
       !baseEquation &&
       instantiated.length === 0 &&
-      ports.length === 0
+      ports.length === 0 &&
+      outputs.length === 0
     ) {
       setSaveMsg('nothing to save')
       setTimeout(() => setSaveMsg(''), 3000)
@@ -277,6 +299,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
         base_equation: baseEquation,
         instantiated,
         ports,
+        outputs,
       })
       await saveStore()
       setLastSaved(saved)
@@ -297,6 +320,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     setBaseEquation(null)
     setInstantiated([])
     setPorts([])
+    setOutputs([])
     setLastSaved(null)
     listAssignments().then(setAssignments).catch(() => {})
     refresh()
@@ -317,7 +341,8 @@ export function useBehaviourLinker(): BehaviourLinkerState {
         sequence.length > 0 ||
         baseEquation !== null ||
         instantiated.length > 0 ||
-        ports.length > 0
+        ports.length > 0 ||
+        outputs.length > 0
       )
     }
     if (lastSaved.base_equation !== baseEquation) return true
@@ -330,8 +355,17 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     }
     if (!eqSet(lastSaved.instantiated, instantiated)) return true
     if (!eqSet(lastSaved.ports, ports)) return true
+    if (!eqSet(lastSaved.outputs ?? [], outputs)) return true
     return false
-  }, [entityType, lastSaved, sequence, baseEquation, instantiated, ports])
+  }, [
+    entityType,
+    lastSaved,
+    sequence,
+    baseEquation,
+    instantiated,
+    ports,
+    outputs,
+  ])
 
   const selectedType = ctx?.entity_types.find((t) => t.iri === entityType)
 
@@ -346,6 +380,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
         base_equation: baseEquation,
         instantiated,
         ports,
+        outputs,
       },
       eqs,
       lab,
@@ -358,6 +393,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     sequence,
     instantiated,
     ports,
+    outputs,
     eqs,
     lab,
   ])
@@ -451,6 +487,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     baseMode,
     instantiated,
     ports,
+    outputs,
     report,
     saveMsg,
     copied,

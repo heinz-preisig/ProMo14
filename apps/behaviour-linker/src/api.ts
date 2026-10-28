@@ -2,6 +2,8 @@ import type {
   Assignment,
   BehaviourContext,
   EvaluateReport,
+  Move,
+  MoveResult,
   Selection,
 } from './types'
 import { apiFetch } from '@promo/ui'
@@ -20,6 +22,18 @@ export async function evaluate(sel: Selection): Promise<EvaluateReport> {
     body: JSON.stringify(sel),
   })
   return res.json() as Promise<EvaluateReport>
+}
+
+/** Apply a §21 move; the engine re-closes and returns the new
+ *  selection + report (§21 — the only mutation channel). */
+export async function applyMove(move: Move): Promise<MoveResult> {
+  const res = await apiFetch('/api/behaviour/move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(move),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<MoveResult>
 }
 
 export async function loadAssignment(

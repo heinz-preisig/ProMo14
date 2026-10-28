@@ -43,11 +43,25 @@ export interface Selection {
   base_equation: string | null
   instantiated: string[]
   ports: string[]
+  /** Declared outputs — external sinks; their definers are
+   *  reachability roots alongside the base equation (§21). */
+  outputs: string[]
+}
+
+/** A §21 move — the only mutation channel (POST /move). */
+export interface Move extends Selection {
+  kind: 'pick_base' | 'pick' | 'delete' | 'mark' | 'unmark' | 'reorder'
+  variable?: string | null
+  equation?: string | null
+  role?: 'instantiated' | 'ports' | 'outputs' | null
 }
 
 export interface UnresolvedVar {
   variable: string
   candidates: string[]
+  /** True when the variable is unresolved because an output mark
+   *  demands a definer (§21 output endpoint). */
+  as_output: boolean
 }
 
 export interface Conflict {
@@ -81,7 +95,22 @@ export interface EvaluateReport {
   order_violations: OrderViolation[]
   warnings: string[]
   closed: boolean
+  /** Resolved output marks (echo of the selection). */
+  outputs: string[]
+  /** Defined, non-state variables nothing consumes and no output
+   *  claims — dead code / pending output marks (§21). */
+  unconsumed: string[]
   labels: Record<string, string>
+}
+
+/** POST /move response — the re-closed selection + fresh report. */
+export interface MoveResult {
+  selection: Assignment
+  report: EvaluateReport
+  /** Equations the move pulled in (unique-candidate definers). */
+  pulled: string[]
+  /** Equations the move pruned (dead cones). */
+  pruned: string[]
 }
 
 export interface Assignment {
@@ -91,5 +120,6 @@ export interface Assignment {
   state_variable: string | null
   instantiated: string[]
   ports: string[]
+  outputs: string[]
   closed: boolean
 }

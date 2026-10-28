@@ -1,66 +1,81 @@
 # Behaviour Linker — Implementation Status
 
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-28
 
 ## Current state
 
-Backend core implemented (closure engine + assignment artefact
-endpoints, 23 tests).  Frontend SPA is functional and iterating.
-Design is resolved — see `behaviour-linker-design-discussion.md` §1–21.
+§21 move-based engine implemented end to end (backend + SPA, 40
+closure tests, full suite 421 green).  Design is resolved — see
+`behaviour-linker-design-discussion.md` §1–21.
 
 ## Backend
 
 `backend/behaviour/`:
 
-- `closure.py` — pure-Python closure engine (`evaluate`), no
-  rdflib/FastAPI deps.  Implements the §8/§12/§13 mechanics:
+- `closure.py` — pure-Python engine, no rdflib/FastAPI deps.
+  Implements §8/§12/§13 plus the **§21 move semantics**
+  (2026-10-28):
   - selection state = ordered equation `sequence` + `base_equation`
-    (state-defining, must head the sequence; `None` for stateless
-    entities like transport systems) + `instantiated` + `ports`;
-  - state is a user binding, not an ontology class: any selected
-    base equation's LHS becomes the privileged cycle variable;
-  - per-variable resolution: defined by a selected equation /
-    to-be-instantiated / external port, else *unresolved* with the
-    candidate equations that could define it;
-  - frontier suggestion: `report.frontier` lists equations that resolve
-    a currently unresolved variable and are reachable from the selected
-    base cone (or from the sequence when stateless);
-  - cycle check: only the loop through the state variable is allowed
-    (the integrator loop); every other back-edge is reported;
-  - conflicts: duplicate definition, defined+instantiated,
-    defined+port, instantiated+port, unknown equation;
-  - order check (§13 lower-triangular): non-base equations may only
-    consume state, earlier-defined, instantiated, or port variables;
-  - warnings (non-blocking): unused markings, equations unreachable
-    from the base cone;
+    (state-defining, pinned last; `None` for stateless entities like
+    transport systems) + `instantiated` + `ports` + `outputs`;
+  - **`apply_move(equations, selection, kind, …)`** — the only
+    mutation channel.  Kinds: `pick_base` (select/unselect; unpick
+    keeps the equation so the integrator loop surfaces as a reported
+    cycle), `pick` (definer for a variable; replaces a previous
+    definer = *exchange*, clears instantiated/port marks, keeps an
+    output mark), `delete` (drops the equation + its exclusive cone),
+    `mark`/`unmark` (endpoint roles, exclusive; marking
+    instantiated/port drops the variable's definer), `reorder`
+    (desired sequence as position hints only);
+  - `_reclose` restores the closed-subgraph invariant after every
+    move: drop unknown/dangling equations, prune everything outside
+    the **root cone** — the base equation plus definers of declared
+    outputs (stateless selections add their tips), pull in
+    uniquely-definable definers (`pick`/`mark` only), then emit the
+    stable topological order (base last, state edges exempt);
+  - four endpoint kinds (§21): **state**, **instantiated**,
+    **port**, **output** — an output is an external sink: its
+    variable must be *defined*, its definer is a reachability root,
+    and an unmatched output joins `unresolved` with `as_output`;
+  - per-variable resolution, frontier suggestions, cycle check
+    (integrator loop only), conflicts (incl. output+instantiated /
+    output+port), order check — unchanged in kind, all recomputed on
+    the reclosed selection by `evaluate`;
+  - `unconsumed`: defined non-state variables nothing consumes and
+    no output claims — dead code / pending output marks; they block
+    `closed` (a stateless entity's outputs are its interface);
   - `closed` requires some work — a non-empty sequence, instantiated,
-    or ports (role-only, equation-less assignments may close,
-    2026-09-29) — with no unresolved inputs, cycles, conflicts, or
-    order violations.
+    ports or outputs — with no unresolved inputs, cycles, conflicts,
+    order violations or unconsumed tips.
 - `service.py` — FastAPI router (`/api/behaviour`):
   - `GET /context?graph=` — entity types (with scale values),
     equations (lhs + incidence), variables of the scoped var/expr
     graph;
-  - `POST /evaluate?graph=` — runs the engine on a posted selection,
-    returns the report plus a `labels` map (IRI → display label);
+  - `POST /evaluate?graph=` — read-only evaluation of a posted
+    selection (+ `labels` map); not the mutation channel;
+  - `POST /move?graph=` — applies a §21 move to the posted selection
+    and returns `{selection, report, pulled, pruned}` — the SPA's only
+    mutation channel;
   - `GET /assignment?entity_type=&graph=` — read the stored assignment
     (404 if none);
-  - `PUT /assignment?graph=` — evaluates, then persists the §13
-    artefact: `promo:BehaviourAssignment` resource with
-    `forEntityType`, `hasBaseEquation`, `hasStateVariable`,
-    `hasEquationSequence` (`rdf:List`, discovery/computation order),
-    `hasPortVariable`, `hasInstantiatedVariable`, and a `closed` flag
-    so work-in-progress selections can be saved;
+  - `PUT /assignment?graph=` — re-closes (a `reorder` move) then
+    persists the canonical §13 artefact: `promo:BehaviourAssignment`
+    resource with `forEntityType`, `hasBaseEquation`,
+    `hasStateVariable`, `hasEquationSequence` (`rdf:List`,
+    topological computation order, base last), `hasPortVariable`,
+    `hasInstantiatedVariable`, `hasOutputVariable`, and a `closed`
+    flag so work-in-progress selections can be saved;
   - `DELETE /assignment?entity_type=&graph=`.
 - Assignment artefact graph: `{var/expr graph}/assignments`
   (`promo:Assignment` type; stamps the source graph's own
   `usesOntology` pins plus `usesLibrary` back to the source graph,
   2026-09-29); unscoped mode uses
   `https://w3id.org/promo/assignments`.  Created lazily on first PUT.
-- `test_closure.py` — 23 tests: engine semantics (state loop allowed,
-  any base equation yields the state variable, other cycles rejected,
-  conflicts, ordering, warnings, auto-instantiation) + endpoint
-  roundtrips incl. rdf:List replacement on re-PUT.
+- `test_closure.py` — 40 tests: engine semantics + §21 moves
+  (pick/exchange/delete cascade/mark-drop-definer/unpick-cycle/
+  reorder/output demand/rooting/unmark prune/exclusivity) + endpoint
+  roundtrips incl. `/move` reclosure and `hasOutputVariable`
+  persistence.
 
 `backend/instantiate/` (new, 2026-09-22) — §16 membership resolution:
 
@@ -151,20 +166,26 @@ Design is resolved — see `behaviour-linker-design-discussion.md` §1–21.
 - Base-equation picker with two modes:
   - **with state** — all equations shown, state-class equations sorted to
     the top as hints; selecting any equation makes its LHS the state;
-  - **without state** — only "none — entity without state" is offered.
-- Computation sequence list with ↑/↓ reorder and remove.
+  - **without state** — unpicks the base (`pick_base(null)`); the
+    integrator loop then surfaces as a reported cycle until deleted.
+- Computation sequence list with ↑/↓ reorder, drag-drop, remove, and a
+  per-row **out** toggle declaring the row's LHS an output endpoint.
+- **All mutations go through `POST /move`** (serialized per client):
+  every pick/exchange/delete/mark/reorder is a re-closure — the engine
+  returns the canonical selection, and the UI flashes pulled/pruned
+  equations.  Load normalizes legacy artefacts via a `reorder` move.
 - **Suggested next equations** panel driven by the engine's `frontier`
   list: one-click addition of equations that resolve an open variable
   and stay inside the selected base cone.
-- Unresolved-inputs panel driven by `POST /evaluate` (debounced on
-  every change): each unresolved variable offers its candidate
-  equations (`+ E_n` inserts before the earliest non-base consumer,
-  keeping the §13 lower-triangular order), plus "instantiate" and
-  "port" markings.
-- Roles panel (state / ports / instantiated with unmark), problems
-  panel (cycles, conflicts, order violations, warnings), header
-  open/closed badge + store-dirty badge + assignment-level **modified**
-  badge + Save (PUT assignment, then store save) and Delete.
+- Unresolved-inputs panel: each unresolved variable offers its
+  candidate equations plus "instantiate" and "port" markings;
+  output demands are badged `(output)`.
+- Roles panel (state / ports / instantiated / **outputs** with
+  unmark; an **unconsumed** row offers one-click output marks),
+  problems panel (cycles, conflicts, order violations, warnings),
+  header open/closed badge + store-dirty badge + assignment-level
+  **modified** badge + Save (PUT assignment, then store save) and
+  Delete.
 - **Printable representation** card: KaTeX-rendered preview of the
   current assignment, a **Print** button (opens a clean print window),
   a **Copy LaTeX** button, and an on-demand **Show source** toggle.
@@ -177,13 +198,18 @@ Role is defined in ADR-004; the full mechanics are resolved in
 validation scope, §13 assignment artefact, §14 tokens/ports, §15
 reference coordinates, §16 arc sub-indices, §17 scale regimes/seed
 contract, §18 variable mutability, §19 model instantiation, §20
-species allocation, **§21 admissibility** — designed 2026-10-27:
-the selection is a lower-triangular sequence maintained by moves
-(pick / exchange / delete / unmark output), each move re-closing the
-subgraph; four endpoint kinds — state, instantiated, port, **output**
-(external sink, reachability root); `lhs_class` becomes a candidate
-filter, not a gate.  **Not yet implemented** — `closure.py` is still
-evaluate-driven.
+species allocation, **§21 admissibility** — designed 2026-10-27,
+**implemented 2026-10-28**: the selection is a lower-triangular
+sequence maintained by moves (pick / exchange / delete / mark /
+unmark / reorder / pick base), each move re-closing the subgraph;
+four endpoint kinds — state, instantiated, port, **output** (external
+sink, reachability root, persisted as `promo:hasOutputVariable`);
+`lhs_class` is a candidate hint, not a gate.  Delete semantics:
+dependents reopen (no silent cascade through *consumers*); the
+deleted equation's exclusive provider cone prunes.  Migration note:
+pre-§21 artefacts may hold dead-code equations or lack output marks —
+the first `reorder` (load or PUT) re-closes them; a stateless
+assignment without output marks no longer reports `closed`.
 
 ## Pending items
 
@@ -210,9 +236,12 @@ evaluate-driven.
    numeric matrices), per-contact port resolution, problem list.
    ~~Persisting an instantiation artefact~~ **Done (2026-10-17):**
    `promo:Instantiation` + pinned replay.
-   **New (2026-10-27):** §21 admissibility — rewrite `closure.py` from
-   `evaluate()` to invariant-restoring moves; add the output endpoint
-   (`promo:hasOutputVariable` on the assignment artefact, open).
+   ~~§21 admissibility~~ **Done (2026-10-28):** `closure.py` rewritten
+   to invariant-restoring moves (`apply_move` + `_reclose`), output
+   endpoint persisted (`promo:hasOutputVariable`), `POST /move`
+   channel, SPA mutations serialized through it; downstream tests
+   updated (donated vars now declare `outputs` — a stateless
+   transport's exported flow is an output).
 6. ~~§15 orientation capture~~ **Done (2026-09-22, modeller side):**
    `ModelArc.referenceFrom`/`referenceTo` persisted as
    `promo:referenceFrom`/`referenceTo` (token-flow arcs only);

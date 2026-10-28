@@ -110,6 +110,7 @@ class AssignmentInfo:
     state_variable: Optional[str] = None
     instantiated: List[str] = field(default_factory=list)
     ports: List[str] = field(default_factory=list)
+    outputs: List[str] = field(default_factory=list)    # §21 sinks
     closed: bool = False
 
 

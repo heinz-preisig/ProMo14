@@ -37,6 +37,9 @@ export function UnresolvedInputsPanel({
           }}
         >
           <code style={{ minWidth: 90 }}>{lab(u.variable)}</code>
+          {u.as_output && (
+            <span style={{ color: '#06c' }}>(output)</span>
+          )}
           {u.candidates.map((c) => {
             const cand = eqs.get(c)
             return (

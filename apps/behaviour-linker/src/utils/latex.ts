@@ -40,7 +40,7 @@ export function buildPrintableLatex(args: {
   report: EvaluateReport
   assignment: Pick<
     Assignment,
-    'sequence' | 'base_equation' | 'instantiated' | 'ports'
+    'sequence' | 'base_equation' | 'instantiated' | 'ports' | 'outputs'
   >
   eqs: Map<string, Equation>
   lab: (iri: string | null | undefined) => string
@@ -49,7 +49,7 @@ export function buildPrintableLatex(args: {
     entityType,
     entityLabel,
     report,
-    assignment: { sequence, base_equation, instantiated, ports },
+    assignment: { sequence, base_equation, instantiated, ports, outputs },
     eqs,
     lab,
   } = args
@@ -80,6 +80,11 @@ export function buildPrintableLatex(args: {
   if (ports.length > 0) {
     meta.push(
       `\\text{ports: } ${ports.map((v) => esc(lab(v))).join(', ')}`,
+    )
+  }
+  if (outputs.length > 0) {
+    meta.push(
+      `\\text{outputs: } ${outputs.map((v) => esc(lab(v))).join(', ')}`,
     )
   }
   if (report.auto_instantiated.length > 0) {

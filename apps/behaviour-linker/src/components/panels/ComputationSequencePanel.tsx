@@ -6,11 +6,13 @@ import type { Equation, EvaluateReport } from '../../types'
 interface ComputationSequencePanelProps {
   sequence: string[]
   baseEquation: string | null
+  outputs: string[]
   report: EvaluateReport | null
   eqs: Map<string, Equation>
   lab: (iri: string | null | undefined) => string
   onRemove: (iri: string) => void
   onMove: (iri: string, dir: -1 | 1) => void
+  onToggleOutput: (varIri: string) => void
   dragIri: string | null
   setDragIri: Dispatch<SetStateAction<string | null>>
   dropTarget: string | null
@@ -21,11 +23,13 @@ interface ComputationSequencePanelProps {
 export function ComputationSequencePanel({
   sequence,
   baseEquation,
+  outputs,
   report,
   eqs,
   lab,
   onRemove,
   onMove,
+  onToggleOutput,
   dragIri,
   setDragIri,
   dropTarget,
@@ -92,6 +96,19 @@ export function ComputationSequencePanel({
                 <span style={{ color: '#06c' }}> (base)</span>
               )}
             </span>
+            {e && (
+              <button
+                style={{
+                  ...btn,
+                  color: outputs.includes(e.lhs) ? '#06c' : undefined,
+                  fontWeight: outputs.includes(e.lhs) ? 700 : 400,
+                }}
+                title="toggle output endpoint on the LHS variable"
+                onClick={() => onToggleOutput(e.lhs)}
+              >
+                out
+              </button>
+            )}
             <button style={btn} onClick={() => onMove(eqIri, -1)}>
               ↑
             </button>

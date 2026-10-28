@@ -1303,6 +1303,9 @@ def test_model_endpoint(client):
         "sequence": [ids["e_bal"], ids["e_prop"]],
         "base_equation": ids["e_bal"],
         "ports": [ids["j"]],
+        # p is computed for the transport's effort port — a donated
+        # variable, declared output under §21 (else its definer prunes).
+        "outputs": [ids["p"]],
     })
     assert r.status_code == 200, r.text
     r = client.put("/api/behaviour/assignment", json={
@@ -1310,9 +1313,11 @@ def test_model_endpoint(client):
         "sequence": [ids["e_flow"]],
         # no base_equation: stateless transport — otherwise the closure
         # would stamp J as state variable and the scheduler would treat
-        # it as integrator output.
+        # it as integrator output.  §21: J is the exported flow — an
+        # output; without the mark the tip blocks closure.
         "instantiated": [ids["k"]],
         "ports": [ids["pin"]],
+        "outputs": [ids["j"]],
     })
     assert r.status_code == 200, r.text
 
@@ -1343,9 +1348,9 @@ def test_model_endpoint(client):
     assert tr_vars[ids["k"]]["binding"] == "parameter"
     assert tr_vars[ids["pin"]]["binding"] == "port"
 
-    # Equation sequence preserved.
+    # Equation sequence: canonical topological order, base last.
     assert [e["equation"] for e in cap["equations"]] == [
-        ids["e_bal"], ids["e_prop"]]
+        ids["e_prop"], ids["e_bal"]]
 
     # Ports: transport's effort port bound per contact; capacity's
     # flow port bound at the arc element.
@@ -1382,12 +1387,17 @@ def test_model_endpoint_requires_graph(client):
 
 
 def _seed_assignments(client, ids):
-    """The two behaviour assignments for the seeded model."""
+    """The two behaviour assignments for the seeded model.
+
+    §21: donated variables are declared outputs — ``p`` feeds the
+    transport's effort port, ``J`` is the transport's exported flow.
+    """
     r = client.put("/api/behaviour/assignment", json={
         "entity_type": _et("lumped_capacity"),
         "sequence": [ids["e_bal"], ids["e_prop"]],
         "base_equation": ids["e_bal"],
         "ports": [ids["j"]],
+        "outputs": [ids["p"]],
     })
     assert r.status_code == 200, r.text
     r = client.put("/api/behaviour/assignment", json={
@@ -1395,6 +1405,7 @@ def _seed_assignments(client, ids):
         "sequence": [ids["e_flow"]],
         "instantiated": [ids["k"]],
         "ports": [ids["pin"]],
+        "outputs": [ids["j"]],
     })
     assert r.status_code == 200, r.text
 
