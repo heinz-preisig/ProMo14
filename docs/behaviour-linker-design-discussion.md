@@ -2050,3 +2050,117 @@ and that state never persists past a move.
 - Whether output endpoints persist as `promo:hasOutputVariable` on the
   assignment artefact (symmetric with `hasInstantiatedVariable` /
   `hasPortVariable`).
+
+## 22. Referenced composites — model reuse (2026-10-28)
+
+### Premise
+
+All models share one data model (same `promo:Model` /
+`promo:ModelNode` / `promo:ModelArc` / `promo:Composite` machinery),
+which makes any model usable as a building block.  A reused model
+appears in the host modeller as a composite whose content is a
+**reference** to another model artefact — not inline children.
+
+### Refer, don't copy
+
+A referenced composite carries `refersTo` → model artefact IRI plus
+an **override map**; children stay empty.  Copying at save time is
+rejected: copies fork evolution silently, lose provenance, and
+duplicate the artefact-level Fork gesture that already exists.
+Live reference gives propagating fixes — instantiations are computed
+anyway, so every host picks up submodel changes on next build.
+Reproducibility is a pin concern (freeze the referenced artefact at a
+version), orthogonal to the mechanism.
+
+References nest recursively — a referenced model may itself contain
+referenced composites.  Resolution walks the reference DAG; a
+transitive self-reference is a `reference-cycle` problem.
+Referrer discipline: the catalogue reports "N models reference this"
+before delete/interface-breaking edits.
+
+### Interface — declared in the referenced artefact
+
+The referenced model's **open arcs are its interface**, captured at
+save time: each boundary terminal carries arc type + carrier token +
+direction (§15 sign convention across the boundary).  On insert, the
+terminals surface as the composite's connectable endpoints; the
+modeller's `resolve-connection` answers admissibility of host node ↔
+terminal connections from the same rule machinery — the artefact
+declares, the ontology adjudicates.
+
+### Per-occurrence instantiation
+
+The unit of instantiation is the **use site**, not the artefact:
+
+- Each composite occurrence instantiates independently — two uses of
+  the same submodel yield two instances with disjoint emitted names.
+- Instance paths extend the `<internal_id>@<entity-type frag>` scheme
+  hierarchically: `exchanger_1/pipe_3@lumped`.
+- **Effective context** = submodel's own pins (ontology, library,
+  species, saved value/fix defaults) + per-occurrence **override
+  map** on the composite (absent key → submodel default).
+- Overrides must still *cover* the referenced artefact: a substitute
+  species scheme must provide compatible components for the
+  submodel's placements; a substitute var/expr graph must define the
+  referenced assignments' symbols.
+- **Boundary check**: species crossing a port must exist on both
+  sides — same class of check as token comparability.
+- The host's `promo:Instantiation` carries one sub-plan per
+  occurrence keyed by occurrence path (`generatedFrom` → host).
+  A standalone submodel instantiation is the degenerate case
+  (occurrence path = root).
+- Codegen stays call-style (approach 2): each level instantiates
+  against its own index element sets; only port values cross the
+  boundary.
+
+### Modification of an embedded submodel
+
+The reference is **not an editing channel**.  Three operations, no
+structural overlay:
+
+- **Parameterize** — per-occurrence overrides only.
+- **Edit the artefact** — open the referenced model itself; changes
+  propagate to all referrers (catalogue warns).
+- **Fork + re-point** — hub Fork produces a private variant; re-point
+  `refersTo` to the fork.  The per-occurrence delta is an artefact
+  identity change, never a hidden diff.
+
+Plus one escape hatch:
+
+- **Dissolve** — one-way conversion replacing the referenced
+  composite with an *inline* composite containing a copy of the
+  referenced content (nodes, arcs, knots, open-arc terminals).
+  Existing external arcs remap onto the copied terminals so the
+  host topology is preserved; active overrides fold in as explicit
+  content (the copy gets its own `usesSpecies` pin etc.).
+  `dissolvedFrom` records source artefact + version.  From then on
+  it is ordinary host content — the link is severed.
+
+A host-stored patch/overlay on top of a reference is **rejected**:
+silently breaks on submodel evolution, duplicates topology ownership,
+needs merge machinery that Fork already provides.
+
+### Gestures implied
+
+1. **Save-as-composite** — lasso/subtree selection → new model
+   artefact; boundary-crossing arcs become its open arcs (extraction
+   decision per save; outside peers are dropped).
+2. **Library pick** — catalogue lists model artefacts with
+   label/pins/interface summary (open-arc count, token, direction).
+3. **Insert** — places a referenced composite; the saved model's open
+   arcs materialise as terminals.
+4. **Connect** — host arc ↔ terminal via `resolve-connection`.
+5. **Override** — per-composite override map editor (species, values,
+   pins).
+6. **Dissolve** — flatten reference to inline content.
+
+### Open
+
+- Predicate name for the reference (`promo:refersTo` vs a
+  `promo:usesModel` pin-kind per composite) — pin set on the host
+  graph may additionally list all referenced models for dependency
+  tracking.
+- Whether save-as-composite copies the selection into the new
+  artefact (host keeps originals) or moves it (host gets a
+  referenced composite in place — "refactor into submodel").
+- Versioned/frozen references: pin policy shape.

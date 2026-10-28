@@ -416,8 +416,14 @@ overloads them. This list is normative for new documentation.
 Tracked here so the document stays honest about what is built vs.
 designed:
 
-- Composite/reuse semantics: referenced-model composites, port surfacing
-  (behaviour-linker-design-discussion §8; codegen approach 2).
+- Composite/reuse semantics — **designed 2026-10-28**
+  (behaviour-linker-design-discussion §22): referenced composites —
+  `refersTo` + per-occurrence override map on the composite, open arcs
+  as the declared interface, per-use-site instantiation keyed by
+  occurrence path, refer-don't-copy (fork + re-point or one-way
+  dissolve for modification), recursive references with
+  `reference-cycle` detection. Remaining: implementation (save /
+  library-pick / insert / connect / override / dissolve gestures).
 - Meshing (distributed-systems-design.md).
 - Empirical model selection artefact (energy-function + EOS pattern).
 - Instantiation artefact — done 2026-10-17: `promo:Instantiation`

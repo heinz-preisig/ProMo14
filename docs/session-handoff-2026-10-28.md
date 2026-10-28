@@ -127,12 +127,38 @@ exposes `entity_types[].outputs`.
   warnings remain; `git diff --check` is clean. The final indexed-power
   changes are backend-only; no frontend rebuild is required for them.
 
+## Evening design session — §22 referenced composites
+
+Composite/model-reuse semantics settled with the user and recorded as
+**§22** in `behaviour-linker-design-discussion.md`.  Decisions:
+
+- **Refer, don't copy** — `refersTo` + per-occurrence override map on
+  the composite; live reference gives propagating fixes; copy exists
+  already as hub Fork.
+- **Interface declared in the referenced artefact** — its open arcs
+  (arc type + token + §15 direction) surface as connectable terminals;
+  `resolve-connection` adjudicates host↔terminal links.
+- **Per-occurrence instantiation** — use-site keyed; instance paths
+  `comp/inner@frag`; effective context = submodel pins + overrides
+  (must cover the submodel's placements/symbols); species crossing a
+  port checked on both sides; host `promo:Instantiation` nests one
+  sub-plan per occurrence; codegen stays call-style.
+- **Modification menu** — parameterize (overrides) / edit the artefact /
+  fork + re-point / **dissolve** (one-way flatten to inline content,
+  external arcs remap onto copied terminals, `dissolvedFrom`
+  provenance).  Host-side structural overlays rejected.
+- Gestures: save-as-composite, library pick (interface summary),
+  insert, connect, override, dissolve.  Open: predicate name,
+  copy-vs-move on extraction, frozen-reference pin shape.
+
 ## Where to pick up — candidate queue
 
 1. ~~Re-save legacy assignments~~ — done above; `data/assignments.trig`
    is §21-canonical.
-2. Composites/reuse semantics (design-discussion §8; codegen
-   approach 2).
+2. Composites/reuse — **designed 2026-10-28 as §22** (referenced
+   composites: `refersTo` + override map, open-arc interface,
+   per-occurrence instantiation, dissolve/fork for modification).
+   Implementation is the next step.
 3. Direction-aware donor selection for chained port `c` (§15).
 4. Deferred: cross-artefact consistency review.  (~~ν→codegen
    wiring~~ — stale: landed 2026-09-24, verified 2026-09-28; cells
