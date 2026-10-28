@@ -109,6 +109,20 @@ class ParamSlot:
 
 
 @dataclass
+class OutputSlot:
+    """A §21 output sink — a defined variable computed for
+    observation.  Its value already exists as an emitted local inside
+    the derivative; the slot names it for the dialect's output
+    channel (``out`` arg / ``outs`` struct / multi-return)."""
+
+    var: str
+    instance: str
+    entity_type: str
+    name: str = ""                        # emitted identifier
+    indices: Dict[str, List[str]] = field(default_factory=dict)
+
+
+@dataclass
 class PlanBlock:
     """One equation block in evaluation order."""
 
@@ -135,6 +149,7 @@ class CodePlan:
     matrices: List[MatrixLit] = field(default_factory=list)
     params: List[ParamSlot] = field(default_factory=list)
     inputs: List[ParamSlot] = field(default_factory=list)
+    outputs: List[OutputSlot] = field(default_factory=list)
     levels: List[List[PlanBlock]] = field(default_factory=list)
     loops: List[List[Tuple[str, str]]] = field(default_factory=list)
     #: t=0 layer: the ``initialise``-class equation blocks (one
@@ -299,6 +314,17 @@ def plan(report: Instantiation, sched: Schedule,
             elements=elements, map=gmap,
             scalar=not vb.indices, indices=vb.indices))
 
+    # -- outputs (§21 observation sinks) -------------------------------------
+    for e in report.entity_types:
+        for v_iri in e.outputs:
+            vb = bindings.get((e.entity_type, v_iri))
+            if vb is None:
+                continue
+            out.outputs.append(OutputSlot(
+                var=v_iri, instance=vb.instance,
+                entity_type=e.entity_type, indices=vb.indices,
+                name=names[e.entity_type][v_iri]))
+
     # -- blocks in schedule order ---------------------------------------------
     for lvl in sched.levels:
         out_lvl: List[PlanBlock] = []
@@ -404,6 +430,7 @@ def code_plan_from_dict(d: Dict[str, Any]) -> CodePlan:
         m.entries = [tuple(e) for e in m.entries]
     cp.params = [_mk(ParamSlot, p) for p in d.get("params", [])]
     cp.inputs = [_mk(ParamSlot, p) for p in d.get("inputs", [])]
+    cp.outputs = [_mk(OutputSlot, o) for o in d.get("outputs", [])]
     cp.levels = [[_mk(PlanBlock, b) for b in lvl]
                  for lvl in d.get("levels", [])]
     cp.loops = [[tuple(pair) for pair in scc]

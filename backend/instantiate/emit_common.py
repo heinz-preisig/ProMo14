@@ -227,6 +227,21 @@ class Dialect:
         """Emit one algebraic loop (solver-specific)."""
         raise NotImplementedError
 
+    def output_tap(self, out: List[str], cp: CodePlan,
+                   space: CompileSpace) -> None:
+        """In-body lines recording each §21 ``cp.outputs`` slot into
+        the dialect's observation channel — emitted just before the
+        function's ``return``, so every local is already bound.
+        No-op when the dialect exposes outputs differently (e.g. a
+        second return value initialised in ``fn_open``)."""
+
+    def outputs_fn(self, out: List[str], cp: CodePlan,
+                   space: CompileSpace) -> None:
+        """Optional observation wrapper after ``fn_close`` — calls
+        the derivative once with the channel open and returns the
+        recorded outputs (``outputs(t, y, par)``)."""
+        return
+
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
                 space: CompileSpace) -> None:
         """Emit the ``initial(par, steady_state)`` t=0 solve —
@@ -277,7 +292,11 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
                 out.extend(d.assign(b, rhs))
         for loop_id, blocks in sorted(loops_here.items()):
             d.loop(out, loop_id, blocks, space, cp)
+    if cp.outputs:
+        d.output_tap(out, cp, space)
     out.extend(d.fn_close())
+    if cp.outputs:
+        d.outputs_fn(out, cp, space)
     if cp.states:
         d.initial(out, cp, t0_layout(cp), space)
     return "\n".join(out)

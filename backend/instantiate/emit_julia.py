@@ -108,6 +108,9 @@ class _Julia(Dialect):
             len(mx.rows), len(mx.cols))
 
     def fn_open(self, cp: CodePlan) -> List[str]:
+        if cp.outputs:
+            return ["function derivative!(dy, y, par, t; "
+                    "outs=nothing)"]
         return ["function derivative!(dy, y, par, t)"]
 
     def state_unpack(self, st, space: CompileSpace) -> str:
@@ -164,6 +167,29 @@ class _Julia(Dialect):
 
     def fn_close(self) -> List[str]:
         return ["    return nothing", "end", ""]
+
+    def output_tap(self, out, cp: CodePlan, space: CompileSpace
+                   ) -> None:
+        """``outs[:name] = name`` per §21 output — the optional
+        ``outs`` kwarg is a side channel; the OrdinaryDiffEq call
+        signature stays ``derivative!(dy, y, par, t)``."""
+        out.append("    if outs !== nothing  # §21 outputs")
+        for o in cp.outputs:
+            nm = o.name or inst_name(o.instance)
+            out.append("        outs[:%s] = %s" % (nm, nm))
+        out.append("    end")
+
+    def outputs_fn(self, out, cp: CodePlan, space: CompileSpace
+                   ) -> None:
+        """``outputs(y, par, t)`` — one derivative! call into a
+        scratch dy, returns the recorded outputs Dict."""
+        out.append("function outputs(y, par, t)")
+        out.append("    outs = Dict{Symbol,Any}()")
+        out.append("    derivative!(zeros(length(y)), y, par, t; "
+                   "outs=outs)")
+        out.append("    return outs")
+        out.append("end")
+        out.append("")
 
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,

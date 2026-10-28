@@ -159,8 +159,10 @@ class _Matlab(Dialect):
 
     def fn_open(self, cp: CodePlan) -> List[str]:
         total = sum(s.size for s in cp.states)
-        return ["function dy = derivative(t, y, par)",
-                "  dy = zeros(%d, 1);" % total]
+        sig = ("function [dy, outs] = derivative(t, y, par)"
+               if cp.outputs
+               else "function dy = derivative(t, y, par)")
+        return [sig, "  dy = zeros(%d, 1);" % total]
 
     def state_unpack(self, st, space: CompileSpace) -> str:
         return "  %s = %s;" % (
@@ -237,6 +239,18 @@ class _Matlab(Dialect):
 
     def fn_close(self) -> List[str]:
         return ["end", ""]
+
+    def output_tap(self, out, cp: CodePlan, space: CompileSpace
+                   ) -> None:
+        """``outs.<name> = <name>.value`` per §21 output — the
+        second return value exposes the recorded locals; callers
+        using ``dy = derivative(t, y, par)`` are unaffected.  The
+        ``.value`` unwrap yields plain numerics, matching ``dy`` and
+        ``y0`` conventions."""
+        for o in cp.outputs:
+            nm = o.name or inst_name(o.instance)
+            out.append("  outs.%s = %s.value;  %% §21 output"
+                       % (nm, nm))
 
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,

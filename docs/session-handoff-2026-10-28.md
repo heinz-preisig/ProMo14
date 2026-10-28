@@ -92,6 +92,17 @@ still `closed`.  The audit also caught an engine bug — unknown
 equations were kept instead of pruned, then crashed the dedupe pass;
 fixed with a regression test.
 
+### Output channel in codegen (same day, commit pending)
+
+§21 outputs are now plumbed end to end: `EntityInstantiation.outputs`
+(from the assignment) → `CodePlan.outputs` (`OutputSlot`) → emitted
+output channel per dialect — python `derivative(t, y, par, out=None)`
+records `out["name"] = name` plus an `outputs(t, y, par)` wrapper;
+julia `derivative!(...; outs=nothing)` + `outputs(y, par, t)`; matlab
+`[dy, outs]` multi-return (`.value` unwrap).  The ODE signatures stay
+backward-compatible — the channel is optional everywhere.  `/model`
+exposes `entity_types[].outputs`.
+
 ## Where to pick up — candidate queue
 
 1. ~~Re-save legacy assignments~~ — done above; `data/assignments.trig`
@@ -99,6 +110,5 @@ fixed with a regression test.
 2. Composites/reuse semantics (design-discussion §8; codegen
    approach 2).
 3. Direction-aware donor selection for chained port `c` (§15).
-4. Deferred: cross-artefact consistency review, `promo:fix`/`fix`-style
-   binding for output slots in codegen (outputs currently carried but
-   unused downstream — candidate emitters for measured signals).
+4. Deferred: cross-artefact consistency review, ν→codegen wiring
+   (value cells into `plan()`/emitters' `par` lookups).

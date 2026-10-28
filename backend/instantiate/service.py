@@ -149,6 +149,8 @@ class EntityInstantiationOut(BaseModel):
     has_assignment: bool = False
     closed: bool = False
     state_variable: Optional[str] = None
+    #: §21 output sinks from the behaviour assignment.
+    outputs: List[str] = Field(default_factory=list)
     variables: List[VarBindingOut] = Field(default_factory=list)
     equations: List[EqBindingOut] = Field(default_factory=list)
     # ``initialise``-class equations on this type's bound variables —
@@ -840,6 +842,7 @@ def model_instantiation(
             has_assignment=e.has_assignment,
             closed=e.closed,
             state_variable=e.state_variable,
+            outputs=e.outputs,
             variables=[VarBindingOut(
                 var=v.var, role=v.role, binding=v.binding,
                 instance=v.instance, indices=v.indices,

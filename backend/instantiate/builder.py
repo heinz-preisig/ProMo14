@@ -160,6 +160,9 @@ class EntityInstantiation:
     has_assignment: bool = False
     closed: bool = False
     state_variable: Optional[str] = None
+    #: §21 output sinks — defined vars computed for observation;
+    #: codegen exposes them on the output channel.
+    outputs: List[str] = field(default_factory=list)
     variables: List[VarBinding] = field(default_factory=list)
     equations: List[EqBinding] = field(default_factory=list)
     #: ``initialise``-class equations on this type's bound variables —
@@ -401,6 +404,7 @@ def build(nodes: Dict[str, NodeInfo],
         inst.has_assignment = True
         inst.closed = asg.closed
         inst.state_variable = asg.state_variable
+        inst.outputs = list(asg.outputs)
         if not asg.closed:
             problems.append(Problem(
                 kind="assignment-open",

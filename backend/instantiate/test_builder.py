@@ -1425,13 +1425,22 @@ def test_code_endpoint(client):
     body = r.json()
     assert body["ok"] and body["target"] == "python"
     src = body["source"]
-    assert "def derivative(t, y, par):" in src
+    assert "def derivative(t, y, par, out=None):" in src
     assert "V_1 = y[0:2]" in src
     assert 'V_5 = par["V_5"]' in src
     assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     assert ("dy[0:2] = np.tensordot(V_4, V_3_lumped_capacity, "
             "axes=([1], [0]))" in src)
+    # §21 outputs — p (lumped, V_2) and j (transport export,
+    # V_3_diffusion_transport) ride the out channel; the wrapper
+    # returns the recorded dict.
+    assert "if out is not None:  # §21 outputs" in src
+    assert 'out["V_2"] = V_2' in src
+    assert ('out["V_3_diffusion_transport"] = V_3_diffusion_transport'
+            in src)
+    assert "def outputs(t, y, par):" in src
+    assert "derivative(t, y, par, out=_o)" in src
 
     r = client.get("/api/instantiate/code",
                    params={"graph": graph, "vars": graph,
@@ -1439,7 +1448,11 @@ def test_code_endpoint(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] and body["target"] == "julia"
-    assert "function derivative!(dy, y, par, t)" in body["source"]
+    assert ("function derivative!(dy, y, par, t; outs=nothing)"
+            in body["source"])
+    assert "outs[:V_2] = V_2" in body["source"]
+    assert "outs[:V_3_diffusion_transport]" in body["source"]
+    assert "function outputs(y, par, t)" in body["source"]
     assert "dy[1:2] = V_4 * V_3_lumped_capacity" in body["source"]
 
     r = client.get("/api/instantiate/code",

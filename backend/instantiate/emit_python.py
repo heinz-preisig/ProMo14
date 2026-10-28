@@ -99,8 +99,9 @@ class _Python(Dialect):
 
     def fn_open(self, cp: CodePlan) -> List[str]:
         total = sum(s.size for s in cp.states)
-        return ["def derivative(t, y, par):",
-                "    dy = np.zeros(%d)" % total]
+        sig = ("def derivative(t, y, par, out=None):" if cp.outputs
+               else "def derivative(t, y, par):")
+        return [sig, "    dy = np.zeros(%d)" % total]
 
     def state_unpack(self, st, space: CompileSpace) -> str:
         return "    %s = y[%d:%d]" % (
@@ -151,6 +152,26 @@ class _Python(Dialect):
 
     def fn_close(self) -> List[str]:
         return ["    return dy", ""]
+
+    def output_tap(self, out, cp: CodePlan, space: CompileSpace
+                   ) -> None:
+        """``out["name"] = name`` per §21 output — the optional
+        ``out`` dict is populated as a side channel without breaking
+        the ODE signature (``derivative(t, y, par)`` still works)."""
+        out.append("    if out is not None:  # §21 outputs")
+        for o in cp.outputs:
+            nm = o.name or inst_name(o.instance)
+            out.append('        out["%s"] = %s' % (nm, nm))
+
+    def outputs_fn(self, out, cp: CodePlan, space: CompileSpace
+                   ) -> None:
+        """``outputs(t, y, par)`` — one derivative call, returns the
+        recorded outputs dict (dy is discarded)."""
+        out.append("def outputs(t, y, par):")
+        out.append("    _o = {}")
+        out.append("    derivative(t, y, par, out=_o)")
+        out.append("    return _o")
+        out.append("")
 
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,

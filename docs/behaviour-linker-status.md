@@ -144,6 +144,11 @@ closure tests, full suite 421 green).  Design is resolved — see
   primary (Tullio/DifferentialEquations), NumPy baseline, Matlab
   legacy.  `EqInfo.rhs` carries the expression text; the `Renderer`
   takes a `names` override for per-instance identifiers.
+  **§21 outputs (2026-10-28):** `EntityInstantiation.outputs` →
+  `CodePlan.outputs` (`OutputSlot`) → an observation channel per
+  dialect — python `out=None` arg + `outputs()` wrapper, julia
+  `outs=nothing` kwarg + `outputs()`, matlab `[dy, outs]`; the ODE
+  signatures stay backward-compatible.
 - **Auto-instantiated endpoints (2026-09-22):** variables of a
   bound-value class (`INSTANTIATE_CLASSES` = constant/parameter) or
   carrying a pre-bound `promo:value` terminate the subgraph search
