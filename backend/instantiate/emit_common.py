@@ -166,8 +166,11 @@ class Dialect:
     #: to pick sparse-safe op forms (python only).
     sparse_names = frozenset()
     #: §22 call-style: emit same-occurrence block runs as helper
-    #: functions + call sites (python only so far).
+    #: functions + call sites.
     occ_fns = False
+    #: Matlab: local functions must follow the main function, so
+    #: extracted helpers splice after the body instead of before it.
+    occ_fns_at_end = False
 
     def render_rhs(self, block: PlanBlock, space: CompileSpace,
                    names: Dict[str, str]) -> str:
@@ -216,8 +219,11 @@ class Dialect:
         host's own content) in the emitted source."""
         return "%s%s --- %s ---" % (self.indent, self.comment, label)
 
-    def occ_fn_open(self, name: str, params: List[str]) -> List[str]:
-        """Header lines of an extracted occurrence helper function."""
+    def occ_fn_open(self, name: str, params: List[str],
+                    returns: List[str]) -> List[str]:
+        """Header lines of an extracted occurrence helper function.
+        ``returns`` is needed up front for signature-style languages
+        (Matlab ``function [a, b] = f(x)``)."""
         raise NotImplementedError
 
     def occ_fn_close(self, returns: List[str]) -> List[str]:
@@ -379,7 +385,7 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
                 if nm not in defined and nm not in ext:
                     ext.append(nm)
         occ_fns.append(d.comment + " " + occ_label.get(occ, occ))
-        occ_fns.extend(d.occ_fn_open(fn, ext))
+        occ_fns.extend(d.occ_fn_open(fn, ext, defined))
         for b in members:
             rhs = d.render_rhs(b, space, cp.names.get(b.entity_type, {}))
             occ_fns.extend(d.assign(b, rhs))
@@ -433,8 +439,12 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
     if cp.outputs:
         d.output_tap(body, cp, space)
     body.extend(d.fn_close())
-    out.extend(occ_fns)
-    out.extend(body)
+    if d.occ_fns_at_end:
+        out.extend(body)
+        out.extend(occ_fns)
+    else:
+        out.extend(occ_fns)
+        out.extend(body)
     if cp.outputs:
         d.outputs_fn(out, cp, space)
     if cp.states:

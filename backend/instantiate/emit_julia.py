@@ -62,7 +62,25 @@ class _Julia(Dialect):
     target = "julia"
     index_base = 1
     no_rhs = "nothing  # no rhs"
+    occ_fns = True
 
+    def occ_fn_open(self, name: str, params: List[str],
+                    returns: List[str]) -> List[str]:
+        return ["function %s(%s)" % (name, ", ".join(params))]
+
+    def occ_fn_close(self, returns: List[str]) -> List[str]:
+        if not returns:
+            return ["    return nothing", "end"]
+        if len(returns) == 1:
+            return ["    return %s" % returns[0], "end"]
+        return ["    return (%s)" % ", ".join(returns), "end"]
+
+    def occ_fn_call(self, name: str, args: List[str],
+                    returns: List[str]) -> str:
+        if not returns:
+            return "    %s(%s)" % (name, ", ".join(args))
+        return "    %s = %s(%s)" % (", ".join(returns), name,
+                                    ", ".join(args))
 
     def header(self, cp: CodePlan) -> List[str]:
         kinds = data_kinds(cp)

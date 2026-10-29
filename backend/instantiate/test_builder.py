@@ -960,12 +960,10 @@ def _loop_plan() -> CodePlan:
     )
 
 
-def test_emit_python_occurrence_fn():
-    """§22 call-style: an occurrence's non-loop blocks lift into a
-    helper function — the call site binds the produced locals and the
-    consumed externals become the signature.  Scheduling order is
-    unchanged; this is emission formatting."""
-    cp = CodePlan(
+def _occ_plan() -> CodePlan:
+    """A hand-built plan with one referenced occurrence owning two
+    same-level blocks (``V_2 = V_1``, ``V_3 = V_2``)."""
+    return CodePlan(
         occurrences=[{
             "path": "MODEL/Composite_2",
             "comp": "MODEL/Composite_2",
@@ -985,7 +983,14 @@ def test_emit_python_occurrence_fn():
                       occurrence="MODEL/Composite_2"),
         ]],
     )
-    src = emit_python(cp, _emit_space())
+
+
+def test_emit_python_occurrence_fn():
+    """§22 call-style: an occurrence's non-loop blocks lift into a
+    helper function — the call site binds the produced locals and the
+    consumed externals become the signature.  Scheduling order is
+    unchanged; this is emission formatting."""
+    src = emit_python(_occ_plan(), _emit_space())
     # helper emitted before the main function; consumed externals in
     # the signature, produced locals returned
     assert "def _occ_2_L0(V_1):" in src
@@ -996,6 +1001,28 @@ def test_emit_python_occurrence_fn():
     # the occurrence marker labels the call segment
     assert "--- occurrence Composite_2 (https://example.org/sub) ---" \
         in src
+
+
+def test_emit_julia_occurrence_fn():
+    """Same extraction in Julia — function/end blocks before
+    ``derivative!``, tuple destructure at the call site."""
+    src = emit_julia(_occ_plan(), _emit_space())
+    assert "function _occ_2_L0(V_1)" in src
+    assert src.index("function _occ_2_L0") < src.index(
+        "function derivative!")
+    assert "    V_2 = V_1\n    V_3 = V_2\n    return (V_2, V_3)\nend" \
+        in src
+    assert "    V_2, V_3 = _occ_2_L0(V_1)" in src
+
+
+def test_emit_matlab_occurrence_fn():
+    """Same extraction in Matlab — returns named in the signature;
+    local functions live after the main function's ``end``."""
+    src = emit_matlab(_occ_plan(), _emit_space())
+    assert "function [V_2, V_3] = _occ_2_L0(V_1)" in src
+    main_end = src.index("  dy = zeros")
+    assert src.index("function [V_2, V_3] = _occ_2_L0") > main_end
+    assert "  [V_2, V_3] = _occ_2_L0(V_1);" in src
 
 
 def test_emit_julia_algebraic_loop():

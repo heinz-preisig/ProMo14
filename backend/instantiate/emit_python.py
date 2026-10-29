@@ -55,7 +55,8 @@ class _Python(Dialect):
     no_rhs = "None  # no rhs"
     occ_fns = True
 
-    def occ_fn_open(self, name: str, params: List[str]) -> List[str]:
+    def occ_fn_open(self, name: str, params: List[str],
+                    returns: List[str]) -> List[str]:
         return ["def %s(%s):" % (name, ", ".join(params))]
 
     def occ_fn_close(self, returns: List[str]) -> List[str]:

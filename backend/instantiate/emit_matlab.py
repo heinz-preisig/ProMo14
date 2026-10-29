@@ -75,6 +75,32 @@ class _Matlab(Dialect):
     comment = "%"
     stmt_end = ";"
     no_rhs = "[]  % no rhs"
+    occ_fns = True
+    #: local functions must follow the main function in a .m file.
+    occ_fns_at_end = True
+
+    def occ_fn_open(self, name: str, params: List[str],
+                    returns: List[str]) -> List[str]:
+        if not returns:
+            return ["function %s(%s)" % (name, ", ".join(params))]
+        if len(returns) == 1:
+            return ["function %s = %s(%s)"
+                    % (returns[0], name, ", ".join(params))]
+        return ["function [%s] = %s(%s)"
+                % (", ".join(returns), name, ", ".join(params))]
+
+    def occ_fn_close(self, returns: List[str]) -> List[str]:
+        return ["end"]
+
+    def occ_fn_call(self, name: str, args: List[str],
+                    returns: List[str]) -> str:
+        if not returns:
+            return "  %s(%s);" % (name, ", ".join(args))
+        if len(returns) == 1:
+            return "  %s = %s(%s);" % (returns[0], name,
+                                      ", ".join(args))
+        return "  [%s] = %s(%s);" % (", ".join(returns), name,
+                                    ", ".join(args))
 
     # -- MultiDimVar labelling helpers ----------------------------------
 
