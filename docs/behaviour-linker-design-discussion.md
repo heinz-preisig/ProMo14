@@ -2305,6 +2305,20 @@ The new split puts each fact where it intrinsically lives:
 - **Comparability is ancestry** (§14): `observation` ports accept
   arcs licensed for `signal`, mass subtokens match `mass`.
 
+### Tagging convention (settled 2026-10-29)
+
+The thermodynamic fundamental relation `U(S, V, n, …)` is the
+organising principle: the extensive arguments name the token
+networks — `S` → entropy, `V` → **mass** (the space token is tied
+to the mass network; volume and pressure form its work pair), each
+`n_i` → **component_mass**, `U`/`T` → energy, mechanical frame
+quantities (`r_x`, `r_y`, `r_z`, `Axy`) → momentum.  Secondary
+variables ride the token of their network (`rho`, `fm_conv`,
+`k_conv` → mass; `Mm`, `dndt`, `fn_conv` → component_mass).  Vars
+that are not token quantities — direction flags, times — carry no
+tag at all.  The first sweep applied this to the seeded library:
+26 vars tagged (`4fb2628`).
+
 ### The cost
 
 - **Annotation burden** — port variables want `carriesToken` or the
