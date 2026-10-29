@@ -2197,3 +2197,37 @@ needs merge machinery that Fork already provides.
 - **Deferred**: nested `promo:Instantiation` sub-plans + call-style
   codegen (approach 2) — flat merged plan works; per-occurrence
   function extraction is a codegen feature.
+
+### Codegen architecture — resolved 2026-10-29
+
+The global-equation vs block-sequential debate dissolves into
+levels: **merge cones for analysis, parallelise for execution**.
+
+- **Analysis is global.**  Reference expansion (§22) makes all
+  occurrence cones one equation set with shared IRIs — a port is
+  *one* variable one side defines and the other consumes, not a
+  cut-variable pair needing a connection equation (the Modelica
+  cut-equation machinery is unnecessary — IRIs already bind across
+  the boundary).  The scheduler sees true global dependencies and
+  finds every coupling loop, including boundary-crossing ones.
+- **Parallelism comes from the schedule, not the artefact
+  boundary.**  Blocks at the same scheduler level are independent
+  by construction — host and occurrences at one level evaluate
+  concurrently with no per-artefact awareness.  Inside an SCC the
+  cone structure pays differently: the Jacobian is block-sparse
+  *by cone*, interior variables eliminate locally (Schur
+  complement), and only boundary variables enter the outer
+  iteration — conservation's linearity confines nonlinearity to
+  the cone interiors.
+- **Call-style is emission formatting.**  The artefact boundary
+  matters for the generated *source* (per-artefact functions for
+  readability/reuse), not for scheduling — it never constrains
+  the dependency analysis.  Emitters: blocks within a level emit
+  as independent tasks (`Threads.@spawn` / `parfor`-style);
+  SCC blocks emit a `SolveRoot` over the cone-blocked Jacobian.
+
+Terminology: **interior cone** (entity's closed assignment
+subgraph — the codegen unit), **boundary coupling** (the shared
+port variables), **conservation network** (the sparse `F[N,A]`
+outer system), **coupling loop** (algebraic loop crossing a
+composite boundary).
