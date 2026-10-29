@@ -61,6 +61,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    tear_loop,
 )
 from .plan import CodePlan, PlanBlock
 
@@ -189,39 +190,51 @@ class _Matlab(Dialect):
 
     def loop(self, out: List[str], loop_id: int, blocks, space,
              cp: CodePlan) -> None:
-        """One algebraic loop as an ``fsolve`` residual block — a
-        nested function (shares the parent's workspace) whose guesses
-        wrap as MultiDimVars and whose residuals unwrap via
-        ``.value``."""
-        names, sizes = loop_layout(blocks)
+        """One algebraic loop, cone-blocked: torn vars only are
+        ``fsolve`` unknowns (MultiDimVar-wrapped guesses); interior
+        blocks sweep forward inside the nested residual and once
+        more after the solve to bind them."""
+        tears, sweep = tear_loop(blocks)
+        names, sizes = loop_layout(tears)
         total = sum(sizes)
         out.append("  function r = _loop%d(x)  %% algebraic loop %d"
                    % (loop_id, loop_id))
         off = 0
-        for b, nm, sz in zip(blocks, names, sizes):
+        for b, nm, sz in zip(tears, names, sizes):
             out.append("    %s = %s;"
                        % (nm, self._mdv(b.lhs_indices, space,
                                         "x(%d:%d)" % (off + 1,
                                                       off + sz))))
             off += sz
-        for i, (b, nm) in enumerate(zip(blocks, names)):
+        for b in sweep:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("    %s = %s;" % (nm, rhs))
+        for i, (b, nm) in enumerate(zip(tears, names)):
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
             out.append("    _r%d = (%s) - %s;" % (i, rhs, nm))
         out.append("    r = [%s];"
                    % "; ".join("_r%d.value" % i
-                               for i in range(len(blocks))))
+                               for i in range(len(tears))))
         out.append("  end")
         out.append("  _x%d = fsolve(@_loop%d, zeros(%d, 1));"
                    % (loop_id, loop_id, total))
         off = 0
-        for b, nm, sz in zip(blocks, names, sizes):
+        for b, nm, sz in zip(tears, names, sizes):
             out.append("  %s = %s;"
                        % (nm, self._mdv(b.lhs_indices, space,
                                         "_x%d(%d:%d)"
                                         % (loop_id, off + 1,
                                            off + sz))))
             off += sz
+        # bind eliminated vars at the solved tear values
+        for b in sweep:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("  %s = %s;" % (nm, rhs))
 
     def fn_close(self) -> List[str]:
         return ["end", ""]

@@ -22,6 +22,7 @@ from backend.equation.parser import parse
 from backend.equation.syntax import Var
 
 from .plan import CodePlan, PlanBlock, StateSlot
+from .scheduler import _sccs
 
 
 def inst_name(instance: str) -> str:
@@ -41,6 +42,75 @@ def loop_layout(blocks: List[PlanBlock]) -> Tuple[List[str], List[int]]:
     """Names + flat sizes of an algebraic loop's unknowns."""
     names = [b.lhs_name or inst_name(b.lhs_instance) for b in blocks]
     return names, [block_size(b) for b in blocks]
+
+
+def tear_loop(blocks: List[PlanBlock]
+              ) -> Tuple[List[PlanBlock], List[PlanBlock]]:
+    """Cone-blocked tearing for one algebraic loop.
+
+    Returns ``(tears, sweep)``: ``tears`` are the blocks whose lhs
+    vars become the iterated unknowns of the outer solve; ``sweep``
+    is the remaining blocks in evaluation order — they recompute
+    forward once the torn vars are bound (Schur-style interior
+    elimination).
+
+    Candidate tears are the producers of *boundary-crossing* edges —
+    intra-loop dependencies where producer and consumer belong to
+    different occurrences — because the shared port variable is the
+    smallest honest cut.  They are added one at a time until the
+    residual graph is acyclic (a 2-block coupling needs only one);
+    any remaining interior cycle is broken by greedy feedback on the
+    smallest remaining SCC.
+    """
+    produced = {b.lhs: i for i, b in enumerate(blocks)}
+    deps = {i: [produced[v] for v in b.inputs if v in produced]
+            for i, b in enumerate(blocks)}
+
+    def acyclic(torn: set) -> bool:
+        alive = [i for i in range(len(blocks)) if i not in torn]
+        pos = {i: p for p, i in enumerate(alive)}
+        succ: Dict[int, set] = {i: set() for i in alive}
+        for i in alive:
+            for p in deps[i]:
+                if p in pos:
+                    succ[p].add(i)
+        return not _sccs(succ)
+
+    torn: set = set()
+    # Boundary producers first — but only as many as needed.
+    candidates = [i for i in range(len(blocks))
+                  if any(blocks[c].occurrence != blocks[i].occurrence
+                         for c in range(len(blocks))
+                         if i in deps[c])]
+    for i in candidates:
+        if acyclic(torn):
+            break
+        torn.add(i)
+    while not acyclic(torn):
+        alive = [i for i in range(len(blocks)) if i not in torn]
+        pos = {i: p for p, i in enumerate(alive)}
+        succ = {i: set() for i in alive}
+        for i in alive:
+            for p in deps[i]:
+                if p in pos:
+                    succ[p].add(i)
+        scc = min(_sccs(succ), key=len)
+        torn.add(sorted(scc)[0])
+
+    # Topological sweep over the non-torn blocks (deps to torn vars
+    # are already bound).
+    alive = [i for i in range(len(blocks)) if i not in torn]
+    rest = set(alive)
+    order: List[int] = []
+    while rest:
+        ready = [i for i in sorted(rest)
+                 if not any(p in rest for p in deps[i])]
+        if not ready:                       # pragma: no cover
+            break                           # acyclic() guarantees
+        order.extend(ready)
+        rest.difference_update(ready)
+    return ([blocks[i] for i in sorted(torn)],
+            [blocks[i] for i in order])
 
 
 def bound_dims(indices: Dict[str, List[str]]) -> List[int]:

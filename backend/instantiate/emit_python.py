@@ -43,6 +43,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    tear_loop,
 )
 from .plan import CodePlan
 
@@ -154,10 +155,13 @@ class _Python(Dialect):
 
     def loop(self, out: List[str], loop_id: int, blocks, space,
              cp: CodePlan) -> None:
-        """One algebraic loop as an ``fsolve`` residual block: the
-        loop's lhs vars are the unknowns (packed flat), each residual
-        is ``rhs - lhs`` evaluated with the guesses bound."""
-        names, sizes = loop_layout(blocks)
+        """One algebraic loop, cone-blocked: only the *torn* vars
+        (boundary-crossing producers, then greedy feedback) are
+        ``fsolve`` unknowns — interior blocks evaluate as a forward
+        sweep inside the residual.  After the solve the sweep re-runs
+        once at top level to bind the eliminated vars."""
+        tears, sweep = tear_loop(blocks)
+        names, sizes = loop_layout(tears)
         total = sum(sizes)
         out.append("    def _loop%d(x):  # algebraic loop %d"
                    % (loop_id, loop_id))
@@ -165,7 +169,12 @@ class _Python(Dialect):
         for nm, sz in zip(names, sizes):
             out.append("        %s = x[%d:%d]" % (nm, off, off + sz))
             off += sz
-        for b, nm in zip(blocks, names):
+        for b in sweep:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("        %s = %s" % (nm, rhs))
+        for b, nm in zip(tears, names):
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
             out.append("        _r_%s = (%s) - %s"
@@ -180,6 +189,12 @@ class _Python(Dialect):
             out.append("    %s = _x%d[%d:%d]"
                        % (nm, loop_id, off, off + sz))
             off += sz
+        # bind eliminated vars at the solved tear values
+        for b in sweep:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("    %s = %s" % (nm, rhs))
 
     def fn_close(self) -> List[str]:
         return ["    return dy", ""]

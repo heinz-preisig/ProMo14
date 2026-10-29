@@ -50,6 +50,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    tear_loop,
 )
 from .plan import CodePlan
 
@@ -162,10 +163,11 @@ class _Julia(Dialect):
 
     def loop(self, out: List[str], loop_id: int, blocks, space,
              cp: CodePlan) -> None:
-        """One algebraic loop as an in-place ``nlsolve`` residual
-        block: ``_loopN!(r, x)`` writes ``rhs - lhs`` into ``r``
-        slices, the guesses unpack 1-based."""
-        names, sizes = loop_layout(blocks)
+        """One algebraic loop, cone-blocked: torn vars only are
+        ``nlsolve`` unknowns; interior blocks sweep forward inside
+        the residual and once more after the solve to bind them."""
+        tears, sweep = tear_loop(blocks)
+        names, sizes = loop_layout(tears)
         total = sum(sizes)
         out.append("    function _loop%d!(r, x)  # algebraic loop %d"
                    % (loop_id, loop_id))
@@ -174,8 +176,13 @@ class _Julia(Dialect):
             out.append("        %s = x[%d:%d]"
                        % (nm, off + 1, off + sz))
             off += sz
+        for b in sweep:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("        %s = %s" % (nm, rhs))
         off = 0
-        for b, nm, sz in zip(blocks, names, sizes):
+        for b, nm, sz in zip(tears, names, sizes):
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
             out.append("        r[%d:%d] = (%s) .- %s"
@@ -190,6 +197,12 @@ class _Julia(Dialect):
             out.append("    %s = _x%d[%d:%d]"
                        % (nm, loop_id, off + 1, off + sz))
             off += sz
+        # bind eliminated vars at the solved tear values
+        for b in sweep:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            nm = b.lhs_name or inst_name(b.lhs_instance)
+            out.append("    %s = %s" % (nm, rhs))
 
     def fn_close(self) -> List[str]:
         return ["    return nothing", "end", ""]

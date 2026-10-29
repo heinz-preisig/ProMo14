@@ -932,13 +932,15 @@ def test_emit_python_algebraic_loop():
     src = emit_python(cp, _emit_space())
     assert "from scipy.optimize import fsolve" in src
     assert "def _loop0(x):  # algebraic loop 0" in src
+    # cone-blocked: V_2 is the torn unknown; V_3 sweeps inside the
+    # residual — the solve is 2-dim, not 4
     assert "V_2 = x[0:2]" in src
-    assert "V_3 = x[2:4]" in src
-    assert "_r_V_2 = (V_3) - V_2" in src
-    assert "_r_V_3 = (V_2) - V_3" in src
-    assert "_x0 = fsolve(_loop0, np.zeros(4))" in src
+    assert "        V_3 = V_2\n        _r_V_2 = (V_3) - V_2" in src
+    assert "_r_V_3" not in src
+    assert "_x0 = fsolve(_loop0, np.zeros(2))" in src
     assert "V_2 = _x0[0:2]" in src
-    assert "V_3 = _x0[2:4]" in src
+    # eliminated var re-binds at the solved tear values
+    assert "    V_3 = V_2\n    return dy" in src
 
 
 def _loop_plan() -> CodePlan:
@@ -1061,31 +1063,57 @@ def test_emit_matlab_occurrence_fn():
     assert "  [V_2, V_3] = _occ_2_L0(V_1);" in src
 
 
+def test_tear_loop_boundary_first():
+    """§22 cone-blocked solve: on a coupling loop that crosses the
+    artefact boundary, the torn unknown is a *boundary* producer —
+    the shared port var — and the occurrence's interior blocks sweep.
+    A 2-block coupling needs only one tear."""
+    from backend.instantiate.emit_common import tear_loop
+    n2 = {_idx("idx_node"): ["c1", "c2"]}
+    blocks = [
+        PlanBlock(entity_type="et", equation="e1", lhs=_var("p"),
+                  lhs_instance="V_2@et", lhs_name="V_2", lhs_indices=n2,
+                  inputs=[_var("J")], rhs="V_3", loop=0,
+                  occurrence="MODEL/Composite_2"),
+        PlanBlock(entity_type="et", equation="e2", lhs=_var("J"),
+                  lhs_instance="V_3@et", lhs_name="V_3", lhs_indices=n2,
+                  inputs=[_var("p")], rhs="V_2", loop=0),
+    ]
+    tears, sweep = tear_loop(blocks)
+    assert len(tears) == 1
+    # the producer consumed across the boundary is the tear — the
+    # host-side J (boundary var) or the occurrence's p; whichever
+    # side, exactly one boundary var is iterated, the rest sweeps
+    torn = tears[0]
+    assert torn.lhs_name in {"V_2", "V_3"}
+    assert len(sweep) == 1 and sweep[0] is not torn
+
+
 def test_emit_julia_algebraic_loop():
     """The Julia loop: in-place _loopN!(r, x) residual, nlsolve,
     1-based slices."""
     src = emit_julia(_loop_plan(), _emit_space())
     assert "function _loop0!(r, x)  # algebraic loop 0" in src
+    # torn: V_2 is the unknown; V_3 sweeps inside the residual
     assert "V_2 = x[1:2]" in src
-    assert "V_3 = x[3:4]" in src
-    assert "r[1:2] = (V_3) .- V_2" in src
-    assert "r[3:4] = (V_2) .- V_3" in src
-    assert "_x0 = nlsolve(_loop0!, zeros(4))" in src
+    assert "V_3 = x" not in src
+    assert "        V_3 = V_2\n        r[1:2] = (V_3) .- V_2" in src
+    assert "_x0 = nlsolve(_loop0!, zeros(2))" in src
     assert "V_2 = _x0[1:2]" in src
-    assert "V_3 = _x0[3:4]" in src
 
 
 def test_emit_matlab_algebraic_loop():
-    """The Matlab loop: nested function, MultiDimVar-wrapped guesses,
-    .value residuals, fsolve."""
+    """The Matlab loop: nested function, MultiDimVar-wrapped torn
+    guess, interior sweep, .value residual, fsolve."""
     src = emit_matlab(_loop_plan(), _emit_space())
     assert "function r = _loop0(x)  % algebraic loop 0" in src
     assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, x(1:2));" in src)
-    assert ("V_3 = MultiDimVar({'N'}, 2, {'N'}, x(3:4));" in src)
+    assert "x(3:4)" not in src
+    assert "    V_3 = V_2;" in src
     assert "_r0 = (V_3) - V_2;" in src
-    assert "_r1 = (V_2) - V_3;" in src
-    assert "r = [_r0.value; _r1.value];" in src
-    assert "_x0 = fsolve(@_loop0, zeros(4, 1));" in src
+    assert "_r1" not in src
+    assert "r = [_r0.value];" in src
+    assert "_x0 = fsolve(@_loop0, zeros(2, 1));" in src
     assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, _x0(1:2));" in src)
 
 
