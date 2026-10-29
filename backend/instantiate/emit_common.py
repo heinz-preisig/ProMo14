@@ -165,6 +165,9 @@ class Dialect:
     #: :func:`emit_plan` from ``cp.matrices``; the renderer uses it
     #: to pick sparse-safe op forms (python only).
     sparse_names = frozenset()
+    #: §22 call-style: emit same-occurrence block runs as helper
+    #: functions + call sites (python only so far).
+    occ_fns = False
 
     def render_rhs(self, block: PlanBlock, space: CompileSpace,
                    names: Dict[str, str]) -> str:
@@ -212,6 +215,20 @@ class Dialect:
         of blocks belonging to one referenced occurrence (or the
         host's own content) in the emitted source."""
         return "%s%s --- %s ---" % (self.indent, self.comment, label)
+
+    def occ_fn_open(self, name: str, params: List[str]) -> List[str]:
+        """Header lines of an extracted occurrence helper function."""
+        raise NotImplementedError
+
+    def occ_fn_close(self, returns: List[str]) -> List[str]:
+        """Return line of an occurrence helper (its produced locals)."""
+        raise NotImplementedError
+
+    def occ_fn_call(self, name: str, args: List[str],
+                    returns: List[str]) -> str:
+        """The call site inside the main function — binds the
+        helper's produced locals."""
+        raise NotImplementedError
 
     def state_unpack(self, st, space: CompileSpace) -> str:
         """Slice a state variable out of the packed state vector."""
@@ -297,13 +314,15 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
     if cp.occurrences:
         out.append("")
 
-    out.extend(d.fn_open(cp))
+    # main function prologue goes into ``body`` — extracted
+    # occurrence helpers splice between the registry and the def.
+    body: List[str] = list(d.fn_open(cp))
     for st in cp.states:
-        out.append(d.state_unpack(st, space))
+        body.append(d.state_unpack(st, space))
     for p in cp.params + cp.inputs:
         if p.kind == "constant" and p.value is not None:
             continue                      # inlined by the renderer
-        out.append(d.param(p, space))
+        body.append(d.param(p, space))
 
     state_lhs = {(s.entity_type, s.var): s for s in cp.states}
     emitted_gathers = set()
@@ -318,47 +337,104 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             frag, occ.get("refersTo") or occ["path"])
     occ_paths = set(occ_label) - {""}
     current_occ: Any = None    # sentinel: no segment labelled yet
+    occ_fns: List[str] = []    # extracted helpers, spliced pre-main
+
+    # var IRI → emitted local name, so an occurrence helper's
+    # signature can name the locals it consumes.
+    var_name: Dict[str, str] = {}
+    for slot in list(cp.params) + list(cp.inputs) + list(cp.gathers):
+        var_name[slot.var] = slot.name or inst_name(slot.instance)
+    for st in cp.states:
+        var_name[st.var] = st.name or inst_name(st.instance)
+    for lvl_ in cp.levels:
+        for b_ in lvl_:
+            var_name[b_.lhs] = b_.lhs_name or inst_name(b_.lhs_instance)
+
+    def _name_of(b: PlanBlock, var: str) -> str:
+        return (var_name.get(var)
+                or cp.names.get(b.entity_type, {}).get(var)
+                or inst_name(var))
 
     def _mark(path: str) -> None:
         nonlocal current_occ
         if path != current_occ:
             current_occ = path
-            out.append(d.occ_comment(occ_label.get(path, path)))
+            body.append(d.occ_comment(occ_label.get(path, path)))
 
+    def _extract(level: int, occ: str,
+                 members: List[PlanBlock]) -> None:
+        """Lift one occurrence's same-level blocks into a helper
+        function; emits the def into ``occ_fns`` and the call into
+        ``body``.  Same-level blocks are mutually independent, so
+        the call's placement within the level is free."""
+        frag = re.sub(r"\W", "_",
+                      occ.rsplit("/Composite_", 1)[-1] or occ)
+        fn = "_occ_%s_L%d" % (frag, level)
+        defined = [b.lhs_name or inst_name(b.lhs_instance)
+                   for b in members]
+        ext: List[str] = []
+        for b in members:
+            for v in b.inputs:
+                nm = _name_of(b, v)
+                if nm not in defined and nm not in ext:
+                    ext.append(nm)
+        occ_fns.append(d.comment + " " + occ_label.get(occ, occ))
+        occ_fns.extend(d.occ_fn_open(fn, ext))
+        for b in members:
+            rhs = d.render_rhs(b, space, cp.names.get(b.entity_type, {}))
+            occ_fns.extend(d.assign(b, rhs))
+        occ_fns.extend(d.occ_fn_close(defined))
+        occ_fns.append("")
+        _mark(occ)
+        body.append(d.occ_fn_call(fn, ext, defined))
+
+    extractable = d.occ_fns and bool(occ_paths)
     for level, lvl in enumerate(cp.levels):
-        out.append(d.level_comment(level))
+        body.append(d.level_comment(level))
         consumed = {v for b in lvl for v in b.inputs}
         for g in cp.gathers:
             if g.var in consumed and g.instance not in emitted_gathers:
                 emitted_gathers.add(g.instance)
-                out.append(d.gather(g, space))
+                body.append(d.gather(g, space))
         loops_here: Dict[int, List[PlanBlock]] = {}
+        groups: Dict[str, List[PlanBlock]] = {}
         for b in lvl:
             if b.loop >= 0:
                 loops_here.setdefault(b.loop, []).append(b)
+                continue
+            # loop-free non-state blocks of a referenced occurrence
+            # lift into a helper function; state/loop blocks stay
+            # inline (dy writes and global solves are not cones).
+            if (extractable and b.occurrence
+                    and (b.entity_type, b.lhs) not in state_lhs):
+                groups.setdefault(b.occurrence, []).append(b)
                 continue
             if occ_paths:
                 _mark(b.occurrence)
             rhs = d.render_rhs(b, space, cp.names.get(b.entity_type, {}))
             st = state_lhs.get((b.entity_type, b.lhs))
             if st is not None:
-                out.extend(d.state_assign(st, b, rhs, space))
+                body.extend(d.state_assign(st, b, rhs, space))
             else:
-                out.extend(d.assign(b, rhs))
+                body.extend(d.assign(b, rhs))
+        for occ, members in groups.items():
+            _extract(level, occ, members)
         for loop_id, blocks in sorted(loops_here.items()):
             if occ_paths:
                 span = sorted({b.occurrence for b in blocks})
                 if len(span) == 1:
                     _mark(span[0])
                 else:
-                    out.append(d.occ_comment(
+                    body.append(d.occ_comment(
                         "coupling loop across " + " + ".join(
                             occ_label.get(p, p) for p in span)))
                     current_occ = None
-            d.loop(out, loop_id, blocks, space, cp)
+            d.loop(body, loop_id, blocks, space, cp)
     if cp.outputs:
-        d.output_tap(out, cp, space)
-    out.extend(d.fn_close())
+        d.output_tap(body, cp, space)
+    body.extend(d.fn_close())
+    out.extend(occ_fns)
+    out.extend(body)
     if cp.outputs:
         d.outputs_fn(out, cp, space)
     if cp.states:

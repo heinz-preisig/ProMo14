@@ -960,6 +960,44 @@ def _loop_plan() -> CodePlan:
     )
 
 
+def test_emit_python_occurrence_fn():
+    """§22 call-style: an occurrence's non-loop blocks lift into a
+    helper function — the call site binds the produced locals and the
+    consumed externals become the signature.  Scheduling order is
+    unchanged; this is emission formatting."""
+    cp = CodePlan(
+        occurrences=[{
+            "path": "MODEL/Composite_2",
+            "comp": "MODEL/Composite_2",
+            "refersTo": "https://example.org/sub",
+            "overrides": {}}],
+        params=[ParamSlot(var=_var("m"), instance="V_1@et",
+                          kind="parameter", name="V_1")],
+        names={"et": {}},
+        levels=[[
+            PlanBlock(entity_type="et", equation="e1", lhs=_var("p"),
+                      lhs_instance="V_2@et", lhs_name="V_2",
+                      inputs=[_var("m")], rhs="V_1",
+                      occurrence="MODEL/Composite_2"),
+            PlanBlock(entity_type="et", equation="e2", lhs=_var("J"),
+                      lhs_instance="V_3@et", lhs_name="V_3",
+                      inputs=[_var("p")], rhs="V_2",
+                      occurrence="MODEL/Composite_2"),
+        ]],
+    )
+    src = emit_python(cp, _emit_space())
+    # helper emitted before the main function; consumed externals in
+    # the signature, produced locals returned
+    assert "def _occ_2_L0(V_1):" in src
+    assert src.index("def _occ_2_L0") < src.index("def derivative")
+    assert "    V_2 = V_1\n    V_3 = V_2\n    return V_2, V_3" in src
+    # call site binds the produced locals
+    assert "    V_2, V_3 = _occ_2_L0(V_1)" in src
+    # the occurrence marker labels the call segment
+    assert "--- occurrence Composite_2 (https://example.org/sub) ---" \
+        in src
+
+
 def test_emit_julia_algebraic_loop():
     """The Julia loop: in-place _loopN!(r, x) residual, nlsolve,
     1-based slices."""
