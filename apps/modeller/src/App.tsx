@@ -7,6 +7,8 @@ import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSu
 import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
+import { fetchPortSatisfaction } from './api'
+import type { PortSatisfaction } from './api'
 import { deserializeState, hasContent, serializeState } from './modelPersistence'
 import type { Command } from './state/ModelState'
 import { computeGraphView } from './tree/computeGraphView'
@@ -248,14 +250,24 @@ export default function App() {
     return () => { cancelled = true }
   }, [state.selectedVisibleNodeId, state.modelNodes, graphView])
 
+  // --- Gesture pair (source entity type + hovered leaf) ---
+  // Shared by the resolve-connection memo and the §13/§14
+  // port-satisfaction fetch below.
+  const gestureSourceEt = pendingConnection?.sourceEntityType
+    ?? (state.selectedVisibleNodeId
+      ? graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)?.entityType
+      : undefined)
+  const hoveredLeaf = hoveredNodeId
+    ? graphView.nodes.find((n) => n.id === hoveredNodeId)
+    : undefined
+  const gestureTargetEt =
+    hoveredLeaf?.type === 'leaf' ? hoveredLeaf.entityType : undefined
+  const gestureHasSource = !!(pendingConnection || state.selectedVisibleNodeId)
+
   // --- Compute connection-rule feedback for hovered target ---
   const { hoveredHighlight, validConnections } = useMemo(() => {
-    // Use pendingConnection as source if set (cross-view), else selectedVisibleNodeId (same-view)
-    const sourceEntityType = pendingConnection?.sourceEntityType
-      ?? (state.selectedVisibleNodeId
-        ? graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)?.entityType
-        : undefined)
-    const hasSource = !!(pendingConnection || state.selectedVisibleNodeId)
+    const sourceEntityType = gestureSourceEt
+    const hasSource = gestureHasSource
     if (!hasSource || !hoveredNodeId || sourceEntityType === undefined) {
       return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
@@ -289,6 +301,28 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump])
+
+  // §13/§14 port-satisfaction: adjudicate the hovered pair.  Union
+  // over all licensed carriers until the user picks an arc type, then
+  // narrowed to that carrier so `unlicensed` reflects the choice.
+  const [portSat, setPortSat] = useState<PortSatisfaction | null>(null)
+  useEffect(() => {
+    if (!gestureHasSource || !gestureSourceEt || !gestureTargetEt
+        || (pendingConnection
+            && hoveredLeaf?.modelNodeIri === pendingConnection.sourceModelIri)) {
+      setPortSat(null)
+      return
+    }
+    const carrier = validConnections.some(
+        (c) => c.arcTypeIri === activeArcType)
+      ? activeArcType : undefined
+    let cancelled = false
+    fetchPortSatisfaction(gestureSourceEt, gestureTargetEt, carrier)
+      .then((s) => { if (!cancelled) setPortSat(s) })
+      .catch(() => { if (!cancelled) setPortSat(null) })
+    return () => { cancelled = true }
+  }, [gestureHasSource, gestureSourceEt, gestureTargetEt, hoveredLeaf,
+      pendingConnection, activeArcType, validConnections])
 
   // --- Three-panel zone boundaries ---
   const leftZoneX = -stageSize.width / 2 + 80
@@ -793,6 +827,39 @@ export default function App() {
                   </button>
                 )
               })}
+            </div>
+          )}
+          {/* §13/§14 port demands this connection would feed (advisory) */}
+          {portSat && [portSat.source, portSat.target].some(
+              (s) => s.ports.length > 0) && (
+            <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 8 }}>
+              <strong style={{ fontSize: 12 }}>Ports</strong>
+              {[portSat.source, portSat.target].map((side) =>
+                side.ports.length === 0 ? null : (
+                  <div key={side.entity_type} style={{ marginTop: 2 }}>
+                    <span style={{ color: '#666' }}>
+                      {side.entity_type.split(/[/#]/).pop()}
+                    </span>
+                    {side.ports.map((p) => {
+                      const frag = (iri: string) =>
+                        iri.split(/[/#]/).pop() ?? iri
+                      const colour = p.status === 'satisfied'
+                        ? '#2e7d32' : '#c62828'
+                      return (
+                        <div key={p.var} style={{ color: colour, paddingLeft: 6 }}>
+                          {p.label || frag(p.var)}
+                          {p.status === 'satisfied' &&
+                            ` ← ${p.candidates.map(frag).join(', ')}`}
+                          {p.status === 'ambiguous' &&
+                            ` ? ${p.candidates.map(frag).join(', ')}`}
+                          {p.status === 'unbound' &&
+                            ` — no supply${p.state_hidden ? ' (state not exported)' : ''}`}
+                          {p.status === 'unlicensed' && ' — not carried'}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
             </div>
           )}
           {hoveredHighlight === 'invalid' && (

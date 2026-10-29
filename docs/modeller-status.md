@@ -154,3 +154,18 @@ Or via the orchestrator: `./dev.sh start modeller` (ensures backend too)
 - Default dev server port: 3000
 - `NODE_RADIUS = 24`, `STROKE_WIDTH = 2`, `ARROW_SIZE = 10`
 - Palette width: 140px
+
+## §13/§14 Port satisfaction at connect time (2026-10-29)
+
+- `GET /api/modeller/port-satisfaction?source=<etype>&target=<etype>[&arc_type=<carrier>]`:
+  advisory adjudication of a proposed connection — each side's BL
+  `hasPortVariable` demands judged against the peer's exportable
+  variables, licensed through `resolve-connection`'s `matched_tokens`.
+- Statuses: `satisfied` / `ambiguous` / `unbound` (with `state_hidden`
+  hint when the peer's unflagged state is the only comparable) /
+  `unlicensed` (no carried token comparable to the port's tokens).
+- Shared semantics with instantiation: `builder.readable_vars` +
+  `builder._comparable`; engine in `backend/instantiate/satisfy.py`.
+- Sidebar shows the hovered pair's port demands under the valid arc
+  types (green = fed `label ← candidate`, red = unfed); never blocks
+  the gesture.  Fetch is per entity-type pair, union over carriers.

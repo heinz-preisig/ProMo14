@@ -245,6 +245,24 @@ def _node_like(idx: Optional[IndexInfo],
     return False
 
 
+def readable_vars(asg: AssignmentInfo,
+                  equations: Dict[str, EqInfo]) -> Set[str]:
+    """An entity type's readable/exportable variables: equation-defined
+    lhs, the state variable, and instantiated vars — a port reads a
+    value, and an instantiated var has one (it is bound data, not a
+    hidden internal).  Shared by the builder's peer resolution and the
+    connect-time port-satisfaction adjudicator."""
+    out: Set[str] = set()
+    if asg.state_variable:
+        out.add(asg.state_variable)
+    out.update(asg.instantiated)
+    for eq_iri in asg.sequence:
+        eq = equations.get(eq_iri)
+        if eq is not None:
+            out.add(eq.lhs)
+    return out
+
+
 def _comparable(t1: str, t2: str, token_parents: Dict[str, str]) -> bool:
     """Token comparability: shared ``promo:parent`` ancestry (either
     direction — a plain ``signal`` var matches ``observation`` and
@@ -587,22 +605,22 @@ def build(nodes: Dict[str, NodeInfo],
             return None
 
         def peer_defined(peer: str) -> Set[str]:
-            """The peer's readable variables: equation-defined lhs,
-            the state variable, and instantiated vars — a port reads
-            a value, and an instantiated var has one (it is bound
-            data, not a hidden internal)."""
+            """The peer's readable (exportable) variables — see
+            :func:`readable_vars`."""
             peer_asg = assignments.get(nodes[peer].entity_type or "")
             if peer_asg is None:
                 return set()
-            out: Set[str] = set()
-            if peer_asg.state_variable:
-                out.add(peer_asg.state_variable)
-            out.update(peer_asg.instantiated)
-            for eq_iri in peer_asg.sequence:
-                eq = equations.get(eq_iri)
-                if eq is not None:
-                    out.add(eq.lhs)
-            return out
+            return readable_vars(peer_asg, equations)
+
+        def _carried(var: VarInfo) -> bool:
+            """A carried-through (convected) quantity: token-indexed
+            (e.g. species concentration riding the mass flow).  Only
+            carried vars donate upstream per §15 — flows and efforts
+            are contact quantities, direction-blind."""
+            return any(
+                (idx := indices.get(i)) is not None
+                and idx.source == "token"
+                for i in var.index_structures)
 
         def emit_port(pb: PortBinding, var: VarInfo,
                       state_hidden: bool = False) -> None:
@@ -645,6 +663,8 @@ def build(nodes: Dict[str, NodeInfo],
                         nodes[peer].entity_type or "")
                     state = (peer_asg.state_variable
                              if peer_asg else None)
+                    upstream = (arcs[a_iri].reference_from
+                                or arcs[a_iri].source)
                     raw: List[Tuple[str, str]] = []
                     hidden = False
                     for w_iri in sorted(peer_defined(peer)):
@@ -657,6 +677,14 @@ def build(nodes: Dict[str, NodeInfo],
                                 _comparable(t, wt, token_parents)
                                 for t in var.tokens
                                 for wt in w.tokens):
+                            continue
+                        # §15: an identical CARRIED variable (a species
+                        # riding the flow) donates only from the
+                        # upstream (reference_from) end of the arc.
+                        # Other candidates — efforts, flows — are
+                        # contact quantities and stay direction-blind.
+                        if (w_iri == v_iri and _carried(var)
+                                and upstream != peer):
                             continue
                         if w_iri == state and not w.port_variable:
                             hidden = True   # accumulation stays internal
@@ -755,6 +783,52 @@ def build(nodes: Dict[str, NodeInfo],
     # variable as a port, the value is whatever that port resolved to.
     # Boundary values (e.g. an environment's instantiated p/c) thus
     # propagate through the chain to downstream capacities.
+    #
+    # §15 direction-aware donor selection: the donor lies UPSTREAM of
+    # the contact — the ``reference_from`` end of the arc (draw order
+    # when no orientation is stored).  When the port's own node is
+    # upstream, the chained donor is the node's own resolved export of
+    # the same variable (transit through its other contacts, or its
+    # own readable variable).  Direct per-contact reads
+    # (``candidates_at``) stay direction-blind: an effort variable is
+    # equal at the contact whichever way the flow convention points.
+
+    def _upstream_of(a_iri: str) -> Optional[str]:
+        arc = arcs[a_iri]
+        return arc.reference_from or arc.source
+
+    def _is_upstream(pb: PortBinding) -> bool:
+        """True when the port's own node is the upstream end of its
+        contact(s) — the donor then lives on the node's own side."""
+        if pb.arc is not None:
+            return _upstream_of(pb.arc) == pb.node
+        inc = incident.get(pb.node, [])
+        return bool(inc) and all(
+            _upstream_of(a) == pb.node for a in inc)
+
+    def _self_supply(pb: PortBinding) -> Optional[str]:
+        """The node's own instance of the port variable — an upstream
+        node donates its own exported value (a capacity's own ``c``).
+        Identity only: a merely-comparable var (a flow, an effort) is
+        not a donor for a carried-through quantity, and the unflagged
+        state stays internal as on the peer side."""
+        asg = assignments.get(nodes[pb.node].entity_type or "")
+        if asg is None:
+            return None
+        w = pb.var
+        if (w not in readable_vars(asg, equations) or w not in variables
+                or (w == asg.state_variable
+                    and not variables[w].port_variable)):
+            return None
+        return w
+
+    def _drop_unbound(pb: PortBinding) -> None:
+        report.problems = [
+            p for p in report.problems
+            if not (p.kind == "unbound-port" and p.node == pb.node
+                    and p.message.startswith(
+                        f"port {variables[pb.var].label or _frag(pb.var)} "))]
+
     changed = True
     while changed:
         changed = False
@@ -762,13 +836,31 @@ def build(nodes: Dict[str, NodeInfo],
         for pb in report.ports:
             if pb.status != "unbound":
                 continue
+            carried = _carried(variables[pb.var])
             if pb.arc is not None:
-                peers = [peer_of(pb.arc, pb.node)]
+                if carried and _is_upstream(pb):
+                    # Transit: the donor is the node's other resolved
+                    # contact carrying the same variable.
+                    chained = [b for b in bound
+                               if b.node == pb.node
+                               and b.arc != pb.arc
+                               and b.peer_var == pb.var]
+                else:
+                    chained = [b for b in bound
+                               if b.node == peer_of(pb.arc, pb.node)
+                               and b.peer_var == pb.var]
             else:
-                peers = [peer_of(a, pb.node)
-                         for a in incident.get(pb.node, [])]
-            chained = [b for b in bound
-                       if b.node in peers and b.peer_var == pb.var]
+                if carried and _is_upstream(pb):
+                    # n is a pure source: upstream peers plus its own
+                    # resolved ports (transit) donate.
+                    ups = {_upstream_of(a)
+                           for a in incident.get(pb.node, [])}
+                    donors = {pb.node} | ups
+                else:
+                    donors = {peer_of(a, pb.node)
+                              for a in incident.get(pb.node, [])}
+                chained = [b for b in bound
+                           if b.node in donors and b.peer_var == pb.var]
             if len(chained) == 1:
                 src = chained[0]
                 pb.status = "bound"
@@ -776,10 +868,20 @@ def build(nodes: Dict[str, NodeInfo],
                 pb.peer_var = src.peer_var
                 pb.element = src.element
                 changed = True
-                report.problems = [
-                    p for p in report.problems
-                    if not (p.kind == "unbound-port" and p.node == pb.node
-                            and p.message.startswith(
-                                f"port {variables[pb.var].label or _frag(pb.var)} "))]
+                _drop_unbound(pb)
+            elif carried and _is_upstream(pb):
+                own = _self_supply(pb)
+                if own is not None:
+                    w = variables[own]
+                    pb.status = "bound"
+                    pb.peer_node = pb.node
+                    pb.peer_var = own
+                    pb.element = (
+                        pb.arc if pb.arc is not None and any(
+                            _arc_like(indices.get(i), indices)
+                            for i in w.index_structures)
+                        else pb.node)
+                    changed = True
+                    _drop_unbound(pb)
 
     return report

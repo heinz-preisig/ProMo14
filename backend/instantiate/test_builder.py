@@ -494,6 +494,70 @@ def test_flag_disambiguates_same_token_vars():
                for p in ports)
 
 
+def test_chained_port_follows_reference_direction():
+    """§15 donor selection for a carried-through port (the chained
+    ``c`` issue): the donor is the UPSTREAM end of the contact arc —
+    ``reference_from`` (draw order when unset).  Forward a2
+    (t1→c2): env donates through the transport.  Reversed a2
+    (c2→t1): c2's own exported c donates."""
+    c_var = _var("c")
+    variables = dict(VARIABLES)
+    variables[c_var] = VarInfo(
+        c_var, "concentration", "V_7",
+        index_structures=[_idx("idx_arc_diffusion"),
+                          _idx("idx_species")],
+        tokens=[_tok("mass")], port_variable=True)
+    equations = dict(EQUATIONS)
+    equations[_eq("cc")] = EqInfo(_eq("cc"), c_var, [_var("m")], "E_7")
+    nodes = {
+        "env": NodeInfo("env", _et("environment")),
+        "t1": NODES["t1"],
+        "c2": NODES["c2"],
+    }
+    assignments = {
+        _et("environment"): AssignmentInfo(
+            entity_type=_et("environment"),
+            instantiated=[c_var], closed=True),
+        _et("diffusion_transport"): AssignmentInfo(
+            entity_type=_et("diffusion_transport"),
+            ports=[c_var], closed=True),
+        _et("lumped_capacity"): AssignmentInfo(
+            entity_type=_et("lumped_capacity"),
+            sequence=[_eq("cc")], ports=[c_var], closed=True),
+    }
+
+    def _arcs(forward: bool):
+        return {
+            "a1": ArcInfo("a1", "env", "t1", "token-flow"),
+            "a2": ArcInfo("a2", "t1", "c2", "token-flow",
+                          reference_from="t1" if forward else "c2",
+                          reference_to="c2" if forward else "t1"),
+        }
+
+    def _donor(rep, node, arc):
+        return next(p for p in rep.ports
+                    if p.node == node and p.var == c_var and p.arc == arc)
+
+    # Forward: env's instantiated c propagates env → t1@a1 → t1@a2 → c2.
+    rep = _build(nodes=nodes, arcs=_arcs(True),
+                 assignments=assignments,
+                 variables=variables, equations=equations)
+    assert _donor(rep, "t1", "a1").peer_node == "env"
+    assert _donor(rep, "t1", "a2").peer_node == "env"
+    assert _donor(rep, "c2", "a2").peer_node == "env"
+
+    # Reversed a2: c2 is upstream — its own defined c donates, and the
+    # transport's a2 contact reads c2 instead of chaining to env.
+    rep = _build(nodes=nodes, arcs=_arcs(False),
+                 assignments=assignments,
+                 variables=variables, equations=equations)
+    assert _donor(rep, "c2", "a2").peer_node == "c2"
+    assert _donor(rep, "c2", "a2").peer_var == c_var
+    assert _donor(rep, "t1", "a2").peer_node == "c2"
+    # a1's contact is unaffected: env still donates there.
+    assert _donor(rep, "t1", "a1").peer_node == "env"
+
+
 def test_signal_token_comparability():
     """A port carrying plain `signal` matches an `observation` export
     (ancestor comparability, §14) — through a reference arc."""

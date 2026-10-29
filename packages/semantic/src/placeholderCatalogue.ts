@@ -168,10 +168,6 @@ class PlaceholderCatalogue implements SemanticCatalogue {
     return undefined
   }
 
-  getInterface(): undefined {
-    return undefined
-  }
-
   getGraphicalDefinition(iri: Iri): GraphicalDefinition | undefined {
     return this.graphicals.get(iri)
   }

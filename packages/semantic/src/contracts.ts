@@ -26,21 +26,6 @@ export interface TokenDefinition {
   attributes: SemanticAttribute[]
 }
 
-export type PortDirection = 'input' | 'output' | 'bidirectional'
-
-export interface InterfacePortDefinition {
-  iri: Iri
-  label: string
-  direction: PortDirection
-  tokenTypeIris: Iri[]
-  attributes: SemanticAttribute[]
-}
-
-export interface EntityInterfaceDefinition {
-  iri: Iri
-  ports: InterfacePortDefinition[]
-}
-
 export interface BaseEntityDefinition {
   iri: Iri
   label: string
@@ -52,7 +37,6 @@ export interface BaseEntityDefinition {
   /** Entity-type taxonomy link (promo:parent) — walk it for is-a
    *  checks (e.g. "is this entity type a transport system?"). */
   parentIri?: Iri
-  interfaceIri?: Iri
   graphicalDefinitionIri?: Iri
   classifications: Classification[]
   attributes: SemanticAttribute[]
@@ -130,7 +114,6 @@ export interface SemanticCatalogue {
   getArcType(iri: Iri): ArcTypeDefinition | undefined
   getDomain(iri: Iri): DomainDefinition | undefined
   getToken(iri: Iri): TokenDefinition | undefined
-  getInterface(iri: Iri): EntityInterfaceDefinition | undefined
   getGraphicalDefinition(iri: Iri): GraphicalDefinition | undefined
 }
 

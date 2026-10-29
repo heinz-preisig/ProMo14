@@ -3,7 +3,6 @@ import type {
   ArcTypeDefinition,
   BaseEntityDefinition,
   DomainDefinition,
-  EntityInterfaceDefinition,
   GraphicalDefinition,
   SemanticAttribute,
   SemanticCatalogue,
@@ -203,10 +202,6 @@ export class RemoteCatalogue implements SemanticCatalogue {
 
   getToken(iri: Iri): TokenDefinition | undefined {
     return this.tokens.get(iri)
-  }
-
-  getInterface(_iri: Iri): EntityInterfaceDefinition | undefined {
-    return undefined
   }
 
   getGraphicalDefinition(iri: Iri): GraphicalDefinition | undefined {

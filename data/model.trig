@@ -27,6 +27,9 @@
     promo:ValueCell a rdfs:Class ;
         promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
 
+    promo:ValueFill a rdfs:Class ;
+        promo:doc "A fill rule covering many cells of a variable's value table at once — the '*' selector mechanism for mostly-uniform tables.  The variable links it via promo:valueFill; the fill carries promo:fillPattern (JSON list of element IRIs and '*' segments in indexStructure order) and promo:value.  Resolved to concrete cells at plan() time.  See docs/value-fill.md." .
+
     promo:Version a rdfs:Class .
 
     promo:arcCounter a rdf:Property .
@@ -44,6 +47,9 @@
     promo:doc a rdf:Property .
 
     promo:entityType a rdf:Property .
+
+    promo:fillPattern a rdf:Property ;
+        promo:doc "On a promo:ValueFill: JSON list like promo:coordinate but with '*' allowed per segment — '*' matches every element on that axis.  The most specific matching selector wins; equal-specificity overlaps are fill-conflict problems.  See docs/value-fill.md." .
 
     promo:generatedFrom a rdf:Property .
 
@@ -77,6 +83,9 @@
 
     promo:valueCell a rdf:Property ;
         promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
+
+    promo:valueFill a rdf:Property ;
+        promo:doc "Variable → promo:ValueFill: a fill rule covering a region of the variable's value table.  See docs/value-fill.md." .
 
     promo:versionInfo a rdf:Property .
 

@@ -102,12 +102,17 @@ _start_backend() {
     cd "$REPO"
     nohup uv run uvicorn backend.main:app --port $BACKEND_PORT --reload \
         > "$BACKEND_LOG" 2>&1 &
-    sleep 1
-    if _is_running $BACKEND_PORT; then
-        echo "  Backend started."
-    else
-        echo "  Backend failed to start — check $BACKEND_LOG"
-    fi
+    # Ready when the port answers /api/health — startup takes longer
+    # than the old fixed sleep (store load + seed migrations).
+    for _ in $(seq 1 30); do
+        if curl -s -m 1 -o /dev/null \
+                "http://localhost:$BACKEND_PORT/api/health"; then
+            echo "  Backend started."
+            return 0
+        fi
+        sleep 1
+    done
+    echo "  Backend failed to start — check $BACKEND_LOG"
 }
 
 _ensure_backend() {

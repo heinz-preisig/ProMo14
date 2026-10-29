@@ -48,6 +48,14 @@ from backend.behaviour.service import _read_assignment
 from backend.core.gestures import violations as gesture_violations
 from backend.core.graph_store import PROMO, get_store
 from backend.core.deps import editable_param, graph_param, resolve_graph
+from backend.instantiate.satisfy import port_satisfaction
+from backend.instantiate.service import (
+    _assignments_collect,
+    _model_dependencies,
+    _token_taxonomy,
+    _vars_collect,
+)
+from backend.ontology.service import resolve_connection
 
 from . import router
 from .references import reference_cycles, reference_dag
@@ -192,6 +200,115 @@ def behaviour_entity_types(
             if assignment and assignment.closed and assignment.entity_type:
                 entity_types.add(assignment.entity_type)
     return sorted(entity_types)
+
+
+# ---------------------------------------------------------------------------
+# §13/§14 Port satisfaction — connect-time adjudication
+# ---------------------------------------------------------------------------
+
+
+class PortDemandOut(BaseModel):
+    var: str
+    label: str = ""
+    tokens: List[str] = Field(default_factory=list)
+    #: satisfied|ambiguous|unbound|unlicensed
+    status: str
+    candidates: List[str] = Field(default_factory=list)
+    state_hidden: bool = False
+
+
+class PortSideOut(BaseModel):
+    entity_type: str
+    has_assignment: bool = True
+    ports: List[PortDemandOut] = Field(default_factory=list)
+    unsatisfied: List[str] = Field(default_factory=list)
+
+
+class PortSatisfactionOut(BaseModel):
+    source: PortSideOut
+    target: PortSideOut
+    carrier: Optional[str] = None
+    #: None = token licensing not applicable (domains unresolved)
+    matched_tokens: Optional[List[str]] = None
+
+
+def _etype_domain(store, model_graph, entity_type: str) -> Optional[str]:
+    """The top-level domain IRI for an entity type's ``branch`` label —
+    the IRI ``resolve-connection`` matches rules against."""
+    et = URIRef(entity_type)
+    branch: Optional[str] = None
+    for giri in store.resolution_scope(model_graph.identifier):
+        g = store.dataset.graph(giri)
+        b = g.value(et, PROMO["branch"])
+        if b is not None:
+            branch = str(b)
+            break
+    if branch is None:
+        return None
+    for giri in store.resolution_scope(model_graph.identifier):
+        g = store.dataset.graph(giri)
+        for d in g.subjects(RDF.type, PROMO["Domain"]):
+            if str(g.value(d, PROMO["branch"])) == branch:
+                return str(d)
+    return None
+
+
+@router.get("/port-satisfaction", response_model=PortSatisfactionOut)
+def port_satisfaction_endpoint(
+    source: str,
+    target: str,
+    arc_type: Optional[str] = None,
+    vars: Optional[str] = None,
+    graph_iri: Optional[str] = Depends(graph_param),
+) -> PortSatisfactionOut:
+    """Adjudicate a proposed ``source``↔``target`` entity-type
+    connection: which of each side's BL port demands an arc would feed
+    (§13 connect-time check; advisory — never blocks the gesture).
+
+    ``arc_type`` (an ``promo:ArcType/<carrier>`` IRI or a bare carrier
+    fragment) narrows token licensing to that rule's carrier; absent,
+    every rule licensed for the pair contributes.  Ports whose tokens
+    no carried token can satisfy report ``unlicensed``; the remaining
+    statuses mirror instantiation's ``bound|ambiguous|unbound``.
+    """
+    store = get_store()
+    model_graph = resolve_graph(store, graph_iri)
+    library, assignment_graph = _model_dependencies(model_graph, vars)
+    variables, equations, _idx, var_labels, _c = _vars_collect(
+        store, library)
+    assignments = _assignments_collect(
+        store, assignment_graph, var_labels)
+    token_parents, _kinds = _token_taxonomy(store, model_graph)
+
+    carrier = arc_type.rsplit("/", 1)[-1] if arc_type else None
+    matched = None
+    src_dom = _etype_domain(store, model_graph, source)
+    tgt_dom = _etype_domain(store, model_graph, target)
+    if src_dom and tgt_dom:
+        res = resolve_connection(
+            src_dom, tgt_dom,
+            graph_iri=str(model_graph.identifier))
+        rules = res["rules"]
+        if carrier:
+            rules = [r for r in rules if r.get("carrier") == carrier]
+        matched = {t for r in rules for t in r.get("matched_tokens", [])}
+
+    src_side, tgt_side = port_satisfaction(
+        source, target, assignments, variables, equations,
+        token_parents, matched_tokens=matched)
+
+    def _out(side) -> PortSideOut:
+        return PortSideOut(
+            entity_type=side.entity_type,
+            has_assignment=side.has_assignment,
+            ports=[PortDemandOut(**p.__dict__) for p in side.ports],
+            unsatisfied=side.unsatisfied)
+
+    return PortSatisfactionOut(
+        source=_out(src_side), target=_out(tgt_side),
+        carrier=carrier,
+        matched_tokens=(sorted(matched) if matched is not None
+                        else None))
 
 
 @router.get("/references")

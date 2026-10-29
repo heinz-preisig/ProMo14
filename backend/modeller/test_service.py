@@ -540,3 +540,76 @@ def test_instantiation_reports_inadmissible_gestures(client):
     assert r.status_code == 200
     kinds = {p["kind"] for p in r.json()["problems"]}
     assert "inadmissible-gesture" in kinds
+
+
+# ---------------------------------------------------------------------------
+# §13/§14 port-satisfaction endpoint
+# ---------------------------------------------------------------------------
+
+TOK_MASS = f"{ONTO}#token_mass"
+
+
+def _seed_port_vars():
+    """Mass port on the lumped side, mass value exported by the
+    environment's instantiation."""
+    store = graph_store.get_store()
+    g = store.ontology_graph
+    store.add_variable_dict(g, {
+        "iri": f"{ONTO}#var_p", "label": "p",
+        "network": "physical", "variable_class": "state",
+        "tokens": [TOK_MASS]})
+    store.add_variable_dict(g, {
+        "iri": f"{ONTO}#var_n", "label": "n",
+        "network": "physical", "variable_class": "state",
+        "tokens": [TOK_MASS],
+        "equations": {"E_n": {
+            "iri": f"{ONTO}#eq_En", "internal_id": "E_n",
+            "rhs": "F", "incidence_list": [f"{ONTO}#var_p"]}}})
+    store.add_variable_dict(g, {
+        "iri": f"{ONTO}#var_p_env", "label": "p_env",
+        "network": "physical", "variable_class": "parameter",
+        "tokens": [TOK_MASS]})
+    # pin the model's derived assignment graph (requests carry
+    # ?graph=MODEL, so PUT /assignment writes to MODEL/assignments)
+    mg = store.dataset.graph(URIRef(MODEL))
+    mg.add((URIRef(MODEL), graph_store.PROMO["usesAssignment"],
+            URIRef(f"{MODEL}/assignments")))
+
+
+def test_port_satisfaction_endpoint(client):
+    """Connect-time adjudication: the lumped side's mass port is fed
+    by the environment's instantiated p_env through a token-flow arc;
+    a signal carrier licenses nothing."""
+    _seed_port_vars()
+    assert client.put("/api/behaviour/assignment", json={
+        "entity_type": ET_LUMPED,
+        "sequence": [f"{ONTO}#eq_En"],
+        "base_equation": f"{ONTO}#eq_En",
+        "ports": [f"{ONTO}#var_p"],
+    }).status_code == 200
+    assert client.put("/api/behaviour/assignment", json={
+        "entity_type": ET_ENV,
+        "sequence": [],
+        "instantiated": [f"{ONTO}#var_p_env"],
+    }).status_code == 200
+
+    r = client.get("/api/modeller/port-satisfaction", params={
+        "graph": MODEL, "source": ET_LUMPED, "target": ET_ENV})
+    assert r.status_code == 200
+    body = r.json()
+    assert TOK_MASS in body["matched_tokens"]
+    src = body["source"]
+    assert src["entity_type"] == ET_LUMPED
+    assert src["unsatisfied"] == []
+    p = next(p for p in src["ports"]
+             if p["var"] == f"{ONTO}#var_p")
+    assert p["status"] == "satisfied"
+    assert p["candidates"] == [f"{ONTO}#var_p_env"]
+
+    # Carrier filter: a reference arc carries signal, not mass.
+    r = client.get("/api/modeller/port-satisfaction", params={
+        "graph": MODEL, "source": ET_LUMPED, "target": ET_ENV,
+        "arc_type": "promo:ArcType/reference"})
+    p = next(p for p in r.json()["source"]["ports"]
+             if p["var"] == f"{ONTO}#var_p")
+    assert p["status"] == "unlicensed"

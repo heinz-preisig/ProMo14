@@ -272,3 +272,18 @@ assignment without output marks no longer reports `closed`.
   `scoped_context`, honours `?graph=` pin scoping).
 - Ontology (entity types, scale values, tokens, connection rules).
 - Graphic Object Editor (shared component, not yet built).
+8. ~~§13/§14 port satisfaction~~ **Done (2026-10-29, modeller side):**
+   `GET /api/modeller/port-satisfaction` adjudicates a proposed
+   entity-type connection — each side's port demands against the
+   peer's exportable variables, licensed through `matched_tokens`
+   (shared `readable_vars`/`_comparable` with the builder; engine
+   `instantiate/satisfy.py`).  Connect gesture shows fed/unfed ports
+   advisedly.  Still open: whether `carriesToken` is required for
+   `port_variable`.
+9. ~~§15 direction-aware donor selection~~ **Done (2026-10-29):**
+   chained/carried port reads donate upstream (`reference_from` end).
+   Carried = token-indexed var (species `c`); same-var downstream
+   candidates excluded, upstream node transits through its other
+   contacts or self-supplies.  Direct contact reads (efforts/flows)
+   stay direction-blind.  Regression test
+   `test_chained_port_follows_reference_direction`.

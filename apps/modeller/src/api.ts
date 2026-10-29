@@ -191,3 +191,45 @@ export async function fetchEntityVariables(
   if (!res.ok) return []
   return res.json()
 }
+
+// --- §13/§14 connect-time port satisfaction -----------------------------
+
+export interface PortDemand {
+  var: string
+  label: string
+  tokens: string[]
+  /** satisfied|ambiguous|unbound|unlicensed */
+  status: string
+  candidates: string[]
+  state_hidden: boolean
+}
+
+export interface PortSide {
+  entity_type: string
+  has_assignment: boolean
+  ports: PortDemand[]
+  unsatisfied: string[]
+}
+
+export interface PortSatisfaction {
+  source: PortSide
+  target: PortSide
+  carrier: string | null
+  matched_tokens: string[] | null
+}
+
+/** Adjudicate a proposed source↔target connection: which BL port
+ *  demands on each side an arc of ``arcType`` (optional) would feed.
+ *  Advisory — the gesture stays permissive. */
+export async function fetchPortSatisfaction(
+  source: string,
+  target: string,
+  arcType?: string,
+): Promise<PortSatisfaction | null> {
+  const path = withParams('/api/modeller/port-satisfaction', {
+    source, target, ...(arcType ? { arc_type: arcType } : {}),
+  })
+  const res = await fetch(path)
+  if (!res.ok) return null
+  return res.json()
+}

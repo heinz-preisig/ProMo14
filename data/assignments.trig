@@ -23,6 +23,9 @@
     promo:ValueCell a rdfs:Class ;
         promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
 
+    promo:ValueFill a rdfs:Class ;
+        promo:doc "A fill rule covering many cells of a variable's value table at once — the '*' selector mechanism for mostly-uniform tables.  The variable links it via promo:valueFill; the fill carries promo:fillPattern (JSON list of element IRIs and '*' segments in indexStructure order) and promo:value.  Resolved to concrete cells at plan() time.  See docs/value-fill.md." .
+
     promo:Version a rdfs:Class .
 
     promo:atIndexElement a rdf:Property ;
@@ -34,6 +37,9 @@
         promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
 
     promo:doc a rdf:Property .
+
+    promo:fillPattern a rdf:Property ;
+        promo:doc "On a promo:ValueFill: JSON list like promo:coordinate but with '*' allowed per segment — '*' matches every element on that axis.  The most specific matching selector wins; equal-specificity overlaps are fill-conflict problems.  See docs/value-fill.md." .
 
     promo:forEntityType a rdf:Property .
 
@@ -64,6 +70,9 @@
     promo:valueCell a rdf:Property ;
         promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
 
+    promo:valueFill a rdf:Property ;
+        promo:doc "Variable → promo:ValueFill: a fill rule covering a region of the variable's value table.  See docs/value-fill.md." .
+
     promo:versionInfo a rdf:Property .
 
     promo:versionOf a rdf:Property .
@@ -76,7 +85,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_16> ;
-        promo:hasEquationSequence _:N366da1b40fd649ad9d8d02286b1dd3ae ;
+        promo:hasEquationSequence _:nc5463161cec741afb80e055c7a4b3625b1 ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:F_conv>,
             <promo:k_conv>,
@@ -96,7 +105,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_13> ;
-        promo:hasEquationSequence _:n0fcb0c3772974ac5a49df214269db5f6b3 ;
+        promo:hasEquationSequence _:nc5463161cec741afb80e055c7a4b3625b3 ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:P>,
             <promo:k_conv>,
@@ -105,37 +114,37 @@
         promo:hasPortVariable <promo:c> ;
         promo:hasStateVariable <promo:n> .
 
-    _:N366da1b40fd649ad9d8d02286b1dd3ae rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:Nb20d0e91d8e14d45a156dbfd3580ea28 .
+    _:nc5463161cec741afb80e055c7a4b3625b1 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b4 .
 
-    _:N56d8f059d65744e9b82a9a1f4490ebbb rdf:first <https://w3id.org/promo/library/#E_15> ;
-        rdf:rest _:Nf7d3c010c73e4fa6959fc2617ea6a41e .
+    _:nc5463161cec741afb80e055c7a4b3625b10 rdf:first <https://w3id.org/promo/library/#E_17> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b11 .
 
-    _:Nb20d0e91d8e14d45a156dbfd3580ea28 rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:N56d8f059d65744e9b82a9a1f4490ebbb .
+    _:nc5463161cec741afb80e055c7a4b3625b11 rdf:first <https://w3id.org/promo/library/#E_18> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b12 .
 
-    _:Nf7d3c010c73e4fa6959fc2617ea6a41e rdf:first <https://w3id.org/promo/library/#E_16> ;
+    _:nc5463161cec741afb80e055c7a4b3625b12 rdf:first <https://w3id.org/promo/library/#E_13> ;
         rdf:rest () .
 
-    _:n0fcb0c3772974ac5a49df214269db5f6b3 rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b6 .
+    _:nc5463161cec741afb80e055c7a4b3625b3 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b7 .
 
-    _:n0fcb0c3772974ac5a49df214269db5f6b4 rdf:first <https://w3id.org/promo/library/#E_15> ;
-        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b5 .
+    _:nc5463161cec741afb80e055c7a4b3625b4 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b5 .
 
-    _:n0fcb0c3772974ac5a49df214269db5f6b5 rdf:first <https://w3id.org/promo/library/#E_16> ;
-        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b7 .
+    _:nc5463161cec741afb80e055c7a4b3625b5 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b6 .
 
-    _:n0fcb0c3772974ac5a49df214269db5f6b6 rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b4 .
-
-    _:n0fcb0c3772974ac5a49df214269db5f6b7 rdf:first <https://w3id.org/promo/library/#E_17> ;
-        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b8 .
-
-    _:n0fcb0c3772974ac5a49df214269db5f6b8 rdf:first <https://w3id.org/promo/library/#E_18> ;
-        rdf:rest _:n0fcb0c3772974ac5a49df214269db5f6b9 .
-
-    _:n0fcb0c3772974ac5a49df214269db5f6b9 rdf:first <https://w3id.org/promo/library/#E_13> ;
+    _:nc5463161cec741afb80e055c7a4b3625b6 rdf:first <https://w3id.org/promo/library/#E_16> ;
         rdf:rest () .
+
+    _:nc5463161cec741afb80e055c7a4b3625b7 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b8 .
+
+    _:nc5463161cec741afb80e055c7a4b3625b8 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b9 .
+
+    _:nc5463161cec741afb80e055c7a4b3625b9 rdf:first <https://w3id.org/promo/library/#E_16> ;
+        rdf:rest _:nc5463161cec741afb80e055c7a4b3625b10 .
 }
 

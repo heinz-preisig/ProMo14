@@ -878,30 +878,20 @@ the BL logic. The BL just builds subgraphs per entity type.
 
 ### Current state in the codebase
 
-The semantic contracts (`packages/semantic/src/contracts.ts`) already
-define:
+**Resolved (2026-10-29):** the static `EntityInterfaceDefinition` /
+`getInterface()` contract in `packages/semantic` was **removed** —
+it was never populated, had no callers, and sits on the wrong
+artefact layer: an entity's interface is not ontology catalogue
+data, it is **assignment-scoped** (which assignment the model pins
+decides which ports exist).  The real interface surfaces are:
 
-```typescript
-type PortDirection = 'input' | 'output' | 'bidirectional'
+- **BL ports** — `port_variable` demands bound by the assignment,
+  surfaced per connection at `GET /api/modeller/port-satisfaction`
+  (§14).
+- **§22 open-arc terminals** — a referenced composite's declared
+  interface (arc type + token + §15 direction).
 
-interface InterfacePortDefinition {
-  iri: Iri
-  label: string
-  direction: PortDirection
-  tokenTypeIris: Iri[]
-  attributes: SemanticAttribute[]
-}
-
-interface EntityInterfaceDefinition {
-  iri: Iri
-  ports: InterfacePortDefinition[]
-}
-```
-
-`VariableRecord` has `port_variable: bool`. But `getInterface()` in the
-placeholder catalogue returns `undefined` — not populated from RDF yet.
-
-This concept likely originates from CWA 17960 / old ProMo.
+`VariableRecord` has `port_variable: bool`.
 
 ### Do we need a special definition for cross-domain information?
 
@@ -942,10 +932,10 @@ become the entity's interface.
 
 ### Open question
 
-- The current `InterfacePortDefinition` has `tokenTypeIris` — should
-  this be populated from the variable's token tags, or from the
-  connection rules? (Likely both: the variable carries token tags, and
-  the connection rule validates that tokens match.)
+- ~~`InterfacePortDefinition.tokenTypeIris` population~~ — moot: the
+  contract was removed (see resolution above).  The live equivalent is
+  `carriesToken` on the variable + `matched_tokens` from the
+  connection rule (§13/§14).
 
 ## 11. Equation eligibility metadata (2026-09-13)
 
@@ -1167,9 +1157,10 @@ order — no topological sort needed at code generation time.
   yet.  Variables declare `promo:carriesToken` (the `tokens` field on
   `VariableRecord`) — which token the variable rides on.  A resolved
   connection rule exposes `matched_tokens` — the tokens licensed to flow
-  on that arc.  **Port satisfaction** is the check the Modeller does not
-  yet perform: a BL port variable is satisfied by an arc iff its token is
-  in (or comparable to) the arc's `matched_tokens`.
+  on that arc.  **Port satisfaction** is the check the Modeller now
+  performs at connect time (advisory — see §14 implementation note):
+  a BL port variable is satisfied by an arc iff its token is in (or
+  comparable to) the arc's `matched_tokens`.
 
   Semantics per carrier:
 
@@ -1264,9 +1255,20 @@ target entity.  The arc joins them.
 A BL port variable is satisfied by an arc iff its token is in (or
 comparable to) the arc's `matched_tokens`.  With `carriesToken`
 intrinsic, this check is definitional rather than annotation-
-dependent.  Remaining work for ADR-008: the Modeller-side check on
-connect, and whether `carriesToken` becomes required for
-`port_variable` variables.
+dependent.
+
+**Implemented (2026-10-29)**: `GET /api/modeller/port-satisfaction?
+source=&target=&arc_type=` adjudicates a proposed connection —
+each side's `hasPortVariable` demands against the peer's exportable
+variables (shared `readable_vars` helper in `builder.py`), licensed
+through `resolve-connection`'s `matched_tokens` for the pair
+(optionally narrowed to one carrier).  Statuses: `satisfied` /
+`ambiguous` / `unbound` (with `state_hidden` hint) / `unlicensed`.
+The check is **advisory** — the Modeller shows which port demands a
+hovered connection would feed without gating the gesture
+(`backend/instantiate/satisfy.py`, connect-gesture panel in the
+Modeller sidebar).  Still open: whether `carriesToken` becomes
+required for `port_variable` variables.
 
 ## 15. Reference coordinates for flow systems (2026-09-20)
 
@@ -1389,6 +1391,21 @@ worthwhile when the latter is implemented.
 >   leaf→composite→leaf); restored on `reconnectOpenArc`.
 > - `GET /api/instantiate/arc-indices` reports the effective
 >   `reference_from`/`reference_to` per arc — the F-builder input.
+>
+> **Port donor selection (2026-10-29):** chained/carried port reads
+> follow the reference direction — the donor lies at the
+> `reference_from` (upstream) end of the contact arc.  A variable is
+> *carried* iff it is **token-indexed** (`index.source == "token"`,
+> e.g. species concentration); only carried vars are direction-gated:
+>
+> - same-variable candidates on a DOWNSTREAM peer are excluded in
+>   `candidates_at` (a carried quantity is not read from the node the
+>   flow leaves for);
+> - an unbound carried port on an UPSTREAM node binds through its own
+>   other resolved contacts (transit) or its own readable instance of
+>   the same variable (`_self_supply`, unflagged state still hidden);
+> - efforts/flows and non-carried vars keep direction-blind contact
+>   semantics (an effort is equal at the contact).
 > - `GET /api/instantiate/incidence` emits the signed `F[N,A]`
 >   matrices (sparse COO, +1 at `reference_to`, −1 at
 >   `reference_from`): base over all token-flow arcs + one per
@@ -2231,3 +2248,84 @@ subgraph — the codegen unit), **boundary coupling** (the shared
 port variables), **conservation network** (the sparse `F[N,A]`
 outer system), **coupling loop** (algebraic loop crossing a
 composite boundary).
+
+## 23. The token model — who declares what (2026-10-29)
+
+Port satisfaction (§13/§14) and donor directionality (§15) both
+depend on knowing **which conserved or reference quantity a variable
+is**.  This section records the complete token model, because the
+declaration sits in a different place than in old ProMo.
+
+### The three levels
+
+Tokens appear at three layers of the artefact stack, each answering
+a different question:
+
+| Layer | Declaration | Answers |
+|-------|------------|---------|
+| **Ontology — connection rules** | `promo:sharedToken` on rules; `resolve-connection` returns `matched_tokens` | What *may* flow between these two domains? |
+| **Ontology — entity types** | implicit in the mechanism taxonomy (§16: `mass_transport` transports mass, `heat_transport` transports energy) | Which token does this transport *mechanism* move? |
+| **Var/expr — variables** | `promo:carriesToken` (`VariableRecord.tokens`) | Which token does *this variable* quantify? |
+
+Arcs carry **no token declaration** — arc type is only the carrier
+category (`token-flow` vs `reference`).  The token flowing on an arc
+is not chosen at connect time; it falls out of the entity types and
+the rules that licensed the connection.
+
+### Why the variable declares it
+
+In old ProMo the token was introduced **via the connection** — the
+arc was simultaneously topology, carrier, and token declaration.
+That overloaded the arc (multi-token contacts needed composite
+tokens or multiple arcs) and entangled it with direction, which is
+part of why §15 had to relocate orientation to per-contact
+`referenceFrom`/`referenceTo`.
+
+The new split puts each fact where it intrinsically lives:
+
+- A concentration **is** a mass quantity — `promo:c carriesToken
+  token_mass` completes the variable's own declaration; it is not
+  extra annotation, it is the variable's physical type.
+- The rule's `matched_tokens` say what *may* flow; `carriesToken`
+  says what the variable *is*.  Port satisfaction is the
+  comparability of the two (§14).
+- The arc stays minimal — bidirectional carrier only; direction and
+  token are both relocated to their owners.
+
+### The contract this creates
+
+- **`carriesToken` is what makes a port licensable.**  A
+  `port_variable` with no token is demand-shaped but semantically
+  untyped — `port-satisfaction` reports it `unlicensed` regardless
+  of the arc.  (Surfaced live on `promo:c`, 2026-10-29.)
+- **Consistency is checkable, not enforced.**  A variable's token
+  can disagree with the licensed tokens — the connect-time check
+  reports it rather than blocking.  The check exists precisely
+  because the declarations are now separate.
+- **Comparability is ancestry** (§14): `observation` ports accept
+  arcs licensed for `signal`, mass subtokens match `mass`.
+
+### The cost
+
+- **Annotation burden** — port variables want `carriesToken` or the
+  modeller cannot adjudicate them.  Old ProMo never asked for the
+  tag because it never asked the variable to type itself.
+- **Open policy** — whether `carriesToken` becomes *required* for
+  `port_variable` at authoring time (equation editor validation)
+  rather than discovered `unlicensed` at connect time.  Leaning
+  toward required: a port that cannot name its token is not a
+  usable demand.
+- **Guard interaction** — `tokens` is a §18 structural field;
+  adding `carriesToken` to an in-use variable is API-blocked (the
+  field is locked once equations reference the variable).  Whether
+  *adding* a token where none existed should be exempt is a
+  guard-policy question — today it requires a data-level edit.
+
+### Terminology note
+
+"Token" unifies what physics calls conserved quantities (mass,
+energy, momentum, charge, component-mass) with reference quantities
+(signal and its `observation`/`manipulation` subtokens).  Both
+travel through the same licensing machinery; the distinction lives
+in the token taxonomy's `promo:kind` (conserved vs reference), not
+in separate mechanisms.
