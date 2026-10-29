@@ -2154,13 +2154,46 @@ needs merge machinery that Fork already provides.
    pins).
 6. **Dissolve** — flatten reference to inline content.
 
-### Open
+### Open — resolved 2026-10-29
 
-- Predicate name for the reference (`promo:refersTo` vs a
-  `promo:usesModel` pin-kind per composite) — pin set on the host
-  graph may additionally list all referenced models for dependency
-  tracking.
-- Whether save-as-composite copies the selection into the new
-  artefact (host keeps originals) or moves it (host gets a
-  referenced composite in place — "refactor into submodel").
-- Versioned/frozen references: pin policy shape.
+- **Predicate — both.**  `promo:refersTo` on the `promo:Composite`
+  resource is the authoritative per-occurrence mechanism (sits next
+  to `openArcs`/override map).  `promo:usesModel` on the host graph
+  IRI is a *derived index* — rewritten on each save, same shape as
+  `usesSpecies` — so referrer-count and dependency queries stay
+  cheap without scanning every composite.
+- **Save-as-composite — move.**  Extraction replaces the selection
+  with a referenced composite in place ("refactor into submodel");
+  boundary arcs remap to terminals.  Copy is rejected — it
+  duplicates content that then drifts, and Fork already covers the
+  copy use case.  Gesture name: *Extract to submodel*; dissolve is
+  the undo path.
+- **Frozen references — deferred.**  Right granularity is
+  per-composite (`refersTo` + version qualifier — two uses may pin
+  different versions), but the pin shape depends on hub artefact
+  versioning, which does not exist yet (Fork only makes new IRIs).
+  To be designed with the versioning model — probably
+  commit/tag-style IRIs rather than mutable artefact IRIs.
+
+### Status — implemented 2026-10-29
+
+- **Persistence**: `refersTo`/`overrides`/`dissolvedFrom` on
+  `promo:Composite`; derived `promo:usesModel` rebuilt on PUT.
+- **Extract/dissolve**: `POST /api/modeller/extract-submodel` (move
+  semantics, boundary arcs → open arcs both sides) and
+  `POST /api/modeller/dissolve` (flatten + provenance).
+- **Resolution**: `GET /api/modeller/references` (DAG + cycles);
+  catalogue `usesModel`/`referencedBy` + delete guard.
+- **Modeller UI**: submodel palette (insert → declared interface as
+  terminal stubs), terminal connect adjudicated via
+  resolve-connection using the declared `externalEntityType`,
+  override editor, extract/dissolve actions.
+- **Instantiation**: `_collect` expands references into per-
+  occurrence instance paths (`comp/inner`), boundary arcs re-point
+  at occurrence instances; `_occurrence_contexts` merges each
+  occurrence's effective context (submodel pins re-pointed by
+  overrides) into vars/assignments/species/value-cells; problems:
+  `reference-cycle`, `uncovered-override`, `species-port-mismatch`.
+- **Deferred**: nested `promo:Instantiation` sub-plans + call-style
+  codegen (approach 2) — flat merged plan works; per-occurrence
+  function extraction is a codegen feature.

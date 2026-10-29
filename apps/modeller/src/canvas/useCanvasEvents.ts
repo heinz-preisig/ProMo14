@@ -375,8 +375,11 @@ export function useCanvasEvents(
           for (const [, list] of state.openArcs) {
             const oa = list.find((a) => a.iri === obj.openArcIri)
             if (!oa) continue
+            // §22 terminal: externalIri may live in the referenced
+            // artefact — the declared interface entity type stands in.
             const externalNode = state.modelNodes.get(oa.externalIri)
             const externalEntityType = externalNode?.entityType
+              ?? oa.externalEntityType
             if (!externalEntityType) break
 
             const sourceEntityType = oa.isSource ? targetNode.entityType : externalEntityType

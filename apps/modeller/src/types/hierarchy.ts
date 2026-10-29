@@ -113,6 +113,12 @@ export interface VisibleArc {
   /** §15: true when the reference direction runs target→source in this
    *  view's draw order — the arrowhead renders at the start end. */
   referenceReversed?: boolean
+  /** §22 terminal: the arc's external end lives inside a referenced
+   *  artefact, not in this model — the open end dangles at `freeEnd`
+   *  off the owning composite. */
+  terminal?: boolean
+  /** §22 terminal stub's free end (canvas coords, view-centred). */
+  freeEnd?: { x: number; y: number }
 }
 
 /** A computed GraphView for a specific tree node. Regenerated on demand. */
@@ -138,6 +144,29 @@ export interface OpenArc {
    *  Boundary-relative so it survives leaf→composite→leaf.  Undefined
    *  on non-token-flow arcs (their direction is inherent). */
   refToExternal?: boolean
+  /** §22: the external node's entity type — the terminal's declared
+   *  interface; used for host-side resolve-connection adjudication
+   *  when the node itself lives in another artefact. */
+  externalEntityType?: string
+}
+
+// ===========================================================================
+// §22 Referenced composites: a composite occurrence pointing at a model artefact
+// ===========================================================================
+
+/** A referenced composite: this tree node's content is a live reference
+ *  to another model artefact (refersTo), not inline children.  The
+ *  override map keys pin kinds (e.g. "species", "values") to artefact
+ *  IRIs; absent keys inherit the referenced artefact's own pins. */
+export interface CompositeRef {
+  /** Model artefact IRI the composite refers to.  Empty string for a
+   *  dissolved (once-referenced) composite carrying only provenance. */
+  refersTo: string
+  /** Per-occurrence override map: pin kind → artefact IRI. */
+  overrides: Record<string, string>
+  /** §22 dissolve provenance: artefact this composite was inlined
+   *  from (the link is severed — informational only). */
+  dissolvedFrom?: string
 }
 
 // ===========================================================================

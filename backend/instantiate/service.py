@@ -300,11 +300,34 @@ class InstantiationReportOut(BaseModel):
     labels: Dict[str, str] = Field(default_factory=dict)
 
 
-def _collect(store, model_graph):
-    """Adapt the model graph + its resolution scope into resolver input."""
+def _json_value(graph, s, pred, default):
+    """One JSON-decoded literal value of ``pred`` on ``s``."""
+    raw = graph.value(s, pred)
+    if raw is None:
+        return default
+    try:
+        return json.loads(str(raw))
+    except (ValueError, TypeError):
+        return default
+
+
+def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
+    """Adapt the model graph + its resolution scope into resolver input.
+
+    §22 reference expansion: every ``promo:Composite`` carrying
+    ``promo:refersTo`` merges the referenced artefact's topology into
+    this scope — each inner IRI re-homed under the occurrence path
+    ``{composite IRI}/{inner IRI}`` (the ``comp/inner@frag`` instance
+    path; nested references nest the path naturally).  Boundary arcs
+    (the composite's openArcs) keep the host's copy with the dangling
+    endpoint re-pointed at the occurrence instance.  Returns
+    ``(nodes, arcs, sub_indices, parents, labels, occurrences)`` —
+    occurrences carry ``refersTo``/``overrides``/``cycle`` for the
+    per-occurrence context merge."""
     nodes: Dict[str, NodeInfo] = {}
     arcs: Dict[str, ArcInfo] = {}
     labels: Dict[str, str] = {}
+    occurrences: List[Dict[str, Any]] = []
     for s in model_graph.subjects(RDF.type, PROMO["ModelNode"]):
         et = model_graph.value(s, PROMO["entityType"])
         nodes[str(s)] = NodeInfo(
@@ -357,7 +380,79 @@ def _collect(store, model_graph):
             )
             if short_name:
                 labels[iri] = short_name
-    return nodes, arcs, sub_indices, parents, labels
+
+    # -- §22 expand referenced composites ---------------------------------
+    seen = set(_seen) | {str(model_graph.identifier)}
+    for s in model_graph.subjects(RDF.type, PROMO["Composite"]):
+        ref = model_graph.value(s, PROMO["refersTo"])
+        if ref is None:
+            continue
+        ref_iri = str(ref)
+        prefix = str(s) + "/"
+        open_iris = {o.get("iri") for o in
+                     _json_value(model_graph, s, PROMO["openArcs"], [])}
+        occ = {
+            "comp": str(s), "path": prefix, "refersTo": ref_iri,
+            "overrides": _json_value(model_graph, s,
+                                     PROMO["overrides"], {}),
+            "arcs": open_iris,
+            "cycle": ref_iri in seen,
+        }
+        occurrences.append(occ)
+        if ref_iri in seen:
+            continue
+        sub_graph = store.dataset.graph(URIRef(ref_iri))
+        (sub_nodes, sub_arcs, sub_idx, sub_par,
+         sub_lbl, sub_occ) = _collect(store, sub_graph, tuple(seen))
+        sub_indices.update(sub_idx)
+        for k, v in sub_par.items():
+            parents.setdefault(k, v)
+
+        # boundary arcs: the host's copy keeps its IRI; the end that
+        # names a submodel node re-points at the occurrence instance
+        for ai in open_iris:
+            a = arcs.get(ai)
+            if a is None:
+                continue
+            if a.source in sub_nodes:
+                a.source = prefix + a.source
+            if a.target in sub_nodes:
+                a.target = prefix + a.target
+            if a.reference_from in sub_nodes:
+                a.reference_from = prefix + a.reference_from
+            if a.reference_to in sub_nodes:
+                a.reference_to = prefix + a.reference_to
+
+        # inner topology: re-home under the occurrence path; inner
+        # copies of boundary arcs are dropped (the host's copy wins)
+        for iri, n in sub_nodes.items():
+            nodes[prefix + iri] = NodeInfo(
+                iri=prefix + iri, entity_type=n.entity_type,
+                fixes=n.fixes)
+            if iri in sub_lbl:
+                labels[prefix + iri] = sub_lbl[iri]
+        for iri, a in sub_arcs.items():
+            if iri in arcs:
+                continue
+            if a.source not in sub_nodes or a.target not in sub_nodes:
+                continue
+            arcs[iri] = ArcInfo(
+                iri=iri,
+                source=prefix + a.source,
+                target=prefix + a.target,
+                carrier=a.carrier,
+                reference_from=prefix + a.reference_from
+                if a.reference_from in sub_nodes else a.reference_from,
+                reference_to=prefix + a.reference_to
+                if a.reference_to in sub_nodes else a.reference_to,
+            )
+
+        # nested occurrences join the host registry with full paths
+        for inner_occ in sub_occ:
+            inner_occ["path"] = prefix + inner_occ["path"]
+            occurrences.append(inner_occ)
+
+    return nodes, arcs, sub_indices, parents, labels, occurrences
 
 
 def _entity_capabilities(store, model_graph) -> Dict[str, Set[str]]:
@@ -501,7 +596,7 @@ def arc_indices(
     """Sub-index membership for every arc in the model artefact."""
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
-    nodes, arcs, sub_indices, parents, labels = _collect(
+    nodes, arcs, sub_indices, parents, labels, _occ = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     return ArcIndexReport(
@@ -529,7 +624,7 @@ def incidence(
     """
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
-    nodes, arcs, sub_indices, parents, labels = _collect(
+    nodes, arcs, sub_indices, parents, labels, _occ = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     report = build(nodes, arcs, memberships, sub_indices)
@@ -706,6 +801,128 @@ def _model_dependencies(model_graph, vars_override: Optional[str]):
     return library, assignment
 
 
+def _occurrence_contexts(store, model_graph, occurrences,
+                         variables, equations,
+                         indices, assignments, labels, canonicals,
+                         dist) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """§22 per-occurrence context merge.
+
+    Each referenced-composite occurrence resolves its content under
+    the *submodel's own pins* as re-pointed by its override map
+    (``library``/``species``/``values`` keys).  The resulting
+    variables, equations, indices and behaviour assignments union
+    into the host's scope keyed by IRI — entity types from the
+    occurrence's own library stay distinct, and a shared library is
+    idempotent.  The species distribution merges per occurrence
+    (node/reaction keys re-homed under the occurrence path; boundary
+    arc sets union, since both sides hold the same arc IRI).
+
+    Returns ``(ctx, cell_source)``: ``ctx["problems"]`` carries
+    ``reference-cycle`` and ``uncovered-override`` problems;
+    ``ctx["dist"]`` is the merged distribution; ``cell_source`` maps
+    each occurrence-supplied variable IRI to the graph whose value
+    cells apply (the override's ``values`` artefact or the submodel
+    itself)."""
+    problems: List[Problem] = []
+    cell_source: Dict[str, Any] = {}
+    for occ in occurrences:
+        if occ["cycle"]:
+            problems.append(Problem(
+                kind="reference-cycle",
+                message=(f"transitive self-reference at {occ['comp']}: "
+                         f"{occ['refersTo']} is already on the "
+                         "reference path")))
+            continue
+        ov = occ["overrides"]
+        sub_graph = store.dataset.graph(URIRef(occ["refersTo"]))
+
+        # var/expr + assignment scope: the submodel's pins re-pointed
+        # by the occurrence's override map
+        lib2, asg2 = _model_dependencies(sub_graph, ov.get("library"))
+        v2, e2, i2, l2, c2 = _vars_collect(store, lib2)
+        variables.update(v2)
+        equations.update(e2)
+        indices.update(i2)
+        labels.update(l2)
+        canonicals.update(c2)
+        assignments.update(
+            _assignments_collect(store, asg2, labels))
+
+        # value cells come from the effective values context
+        vals_graph = (store.dataset.graph(URIRef(ov["values"]))
+                      if ov.get("values") else sub_graph)
+        for v in v2:
+            cell_source[v] = vals_graph
+
+        # species: effective pin = occurrence override else the
+        # submodel's own pin; the distribution merges re-homed under
+        # the occurrence path
+        sg2 = ov.get("species") or _species_pin(sub_graph)
+        dist2 = _species_distribution(store, sub_graph, sg2)
+        if dist2 is not None:
+            # species crossing a port is checked both sides: each
+            # boundary arc's transport set must be coverable by the
+            # host vocabulary AND the submodel's effective vocabulary
+            if occ["arcs"]:
+                host_sg = _species_pin(model_graph)
+                vocab = {}
+                for tag, sg in (("host", host_sg), ("sub", sg2)):
+                    vocab[tag] = ({str(x) for x in resolve_graph(
+                        store, sg).subjects(RDF.type,
+                                            PROMO["Component"])}
+                                  if sg else set())
+                for ai in occ["arcs"]:
+                    crossing = dist2.arcs.get(ai, set())
+                    if not crossing:
+                        continue
+                    for tag in ("host", "sub"):
+                        missing = sorted(crossing - vocab[tag])
+                        if missing:
+                            problems.append(Problem(
+                                kind="species-port-mismatch",
+                                message=(f"occurrence {occ['comp']}: "
+                                         f"arc {ai} species "
+                                         + ", ".join(missing)
+                                         + f" not in {tag} vocabulary")))
+            if dist is None:
+                dist = SpeciesDistribution()
+            for k, sp in dist2.nodes.items():
+                dist.nodes.setdefault(
+                    occ["path"] + k, set()).update(sp)
+            for k, sp in dist2.arcs.items():
+                dist.arcs.setdefault(k, set()).update(sp)
+            for k, rx in dist2.reactions.items():
+                dist.reactions.setdefault(
+                    occ["path"] + k, set()).update(rx)
+
+        # overrides must COVER the submodel's placements: every
+        # component/allocation/reaction the submodel references has
+        # to exist in the effective species artefact
+        if ov.get("species") and sg2:
+            eff = resolve_graph(store, sg2)
+            have = {str(x)
+                    for t in ("Component", "Allocation", "Reaction")
+                    for x in eff.subjects(RDF.type, PROMO[t])}
+            needed = set()
+            for sn in sub_graph.subjects(RDF.type, PROMO["ModelNode"]):
+                for pred in (PROMO["speciesAllocation"],
+                             PROMO["hostsReaction"]):
+                    needed |= {str(o) for o in
+                               sub_graph.objects(sn, pred)}
+            for sa in sub_graph.subjects(RDF.type, PROMO["ModelArc"]):
+                needed |= {str(o) for o in
+                           sub_graph.objects(sa, PROMO["permeable"])}
+            missing = sorted(needed - have)
+            if missing:
+                problems.append(Problem(
+                    kind="uncovered-override",
+                    message=(f"occurrence {occ['comp']}: override "
+                             f"species artefact {sg2} lacks "
+                             + ", ".join(missing))))
+
+    return {"problems": problems, "dist": dist}, cell_source
+
+
 @router.put("/values", response_model=ValueCellsOut)
 def put_values(
     body: ValueCellsIn,
@@ -773,7 +990,7 @@ def model_instantiation(
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
     library, assignment_graph = _model_dependencies(model_graph, vars)
-    nodes, arcs, sub_indices, parents, labels = _collect(
+    nodes, arcs, sub_indices, parents, labels, occurrences = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
@@ -788,6 +1005,17 @@ def model_instantiation(
     # ?species= param overrides the artefact's usesSpecies pin.
     sg_iri = species or _species_pin(model_graph)
     dist = _species_distribution(store, model_graph, sg_iri)
+
+    # §22 per-occurrence context: each referenced composite resolves
+    # its content under the submodel's own pins as re-pointed by the
+    # override map; the resulting vars/assignments/species union into
+    # the host's scope keyed by IRI.
+    occ_ctx, cell_source = _occurrence_contexts(
+        store, model_graph, occurrences,
+        variables, equations, indices, assignments,
+        labels, canonicals, dist)
+    dist = occ_ctx["dist"]
+
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
     reaction_index = _reaction_index_iri(store, model_graph) \
@@ -826,6 +1054,7 @@ def model_instantiation(
     for msg in graph_violations(store, model_graph):
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))
+    report.problems.extend(occ_ctx["problems"])
     sched = schedule(report)
     for i, scc in enumerate(sched.loops):
         report.problems.append(Problem(
@@ -856,7 +1085,8 @@ def model_instantiation(
                 var=v.var, role=v.role, binding=v.binding,
                 instance=v.instance, indices=v.indices,
                 matrix=v.matrix, value=v.value,
-                values=store.value_cells(model_graph, v.var))
+                values=store.value_cells(
+                    cell_source.get(v.var, model_graph), v.var))
                 for v in e.variables],
             equations=[EqBindingOut(
                 equation=q.equation, lhs=q.lhs, inputs=q.inputs)
@@ -910,7 +1140,7 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
     library, assignment_graph = _model_dependencies(model_graph, vars)
-    nodes, arcs, sub_indices, parents, labels = _collect(
+    nodes, arcs, sub_indices, parents, labels, occurrences = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
@@ -925,6 +1155,14 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     # ?species= param overrides the artefact's usesSpecies pin.
     dist = _species_distribution(
         store, model_graph, species or _species_pin(model_graph))
+
+    # §22 per-occurrence context merge (see model_instantiation).
+    occ_ctx, cell_source = _occurrence_contexts(
+        store, model_graph, occurrences,
+        variables, equations, indices, assignments,
+        labels, canonicals, dist)
+    dist = occ_ctx["dist"]
+
     species_index = _species_index_iri(store, model_graph) \
         if dist is not None else None
     reaction_index = _reaction_index_iri(store, model_graph) \
@@ -939,12 +1177,14 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     for msg in graph_violations(store, model_graph):
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))
+    report.problems.extend(occ_ctx["problems"])
     sched = schedule(report)
     _filter_fixed_unbound(store, model_graph, report)
     # §20 ν channel: stored value-cell tables on the model artefact,
     # keyed by variable IRI — plan() expands them over each binding's
     # element sets; emitters render them as literals.
-    values = {v.var: store.value_cells(model_graph, v.var)
+    values = {v.var: store.value_cells(
+                  cell_source.get(v.var, model_graph), v.var)
               for e in report.entity_types for v in e.variables}
     cp = plan(report, sched, inc, equations, indices, values=values,
               canonicals=canonicals)

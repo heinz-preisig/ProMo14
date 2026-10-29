@@ -57,6 +57,8 @@ def _new_line(iri: str) -> Dict[str, Any]:
         "usesLibrary": [],
         "usesAssignment": [],
         "usesSpecies": [],
+        "usesModel": [],
+        "referencedBy": [],
         "seedFloor": None,
         "staleFloor": False,
     }
@@ -100,6 +102,8 @@ def catalogue() -> Dict[str, Any]:
                 str(o) for o in g.objects(gid, PROMO["usesAssignment"])]
             line["usesSpecies"] = [
                 str(o) for o in g.objects(gid, PROMO["usesSpecies"])]
+            line["usesModel"] = [
+                str(o) for o in g.objects(gid, PROMO["usesModel"])]
             if atype == "ontology":
                 # Seed-floor staleness (hub ticket #7): a draft
                 # ontology whose floor stamp predates the current
@@ -111,8 +115,16 @@ def catalogue() -> Dict[str, Any]:
                 line["seedFloor"] = str(floor) if floor else None
                 line["staleFloor"] = str(floor) != SEED_FLOOR
 
+    # §22 referrer index — "N models reference this" for the hub.
+    for line in lines.values():
+        for ref in line["usesModel"]:
+            target = lines.get(ref)
+            if target is not None:
+                target["referencedBy"].append(line["iri"])
+
     for line in lines.values():
         line["versions"].sort(key=lambda v: v["version"])
+        line["referencedBy"].sort()
     return {"seedFloor": SEED_FLOOR,
             "lines": sorted(lines.values(), key=lambda l: l["iri"])}
 
@@ -216,7 +228,7 @@ def delete_artefact(iri: str) -> Dict[str, str]:
             continue
         for predicate in (PROMO["usesOntology"], PROMO["usesLibrary"],
                           PROMO["usesAssignment"], PROMO["usesSpecies"],
-                          PROMO["versionOf"]):
+                          PROMO["usesModel"], PROMO["versionOf"]):
             if (None, predicate, gid) in candidate:
                 references.append(str(candidate.identifier))
                 break

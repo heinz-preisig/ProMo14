@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AppState } from './state/ModelState'
-import type { Knot, ModelArc, ModelNode, OpenArc, Tree, TreeNode } from './types'
+import type { CompositeRef, Knot, ModelArc, ModelNode, OpenArc, Tree, TreeNode } from './types'
 
 export interface ModelNodeDoc {
   iri: string
@@ -44,6 +44,12 @@ export interface CompositeDoc {
    *  on each GraphView, so knots are keyed by view, not by arc). */
   knots: Record<string, Knot[]>
   openArcs: OpenArc[]
+  /** §22 referenced composite: artefact IRI this occurrence refers to. */
+  refersTo?: string
+  /** §22 per-occurrence override map: pin kind → artefact IRI. */
+  overrides?: Record<string, string>
+  /** §22 dissolve provenance: artefact this composite was inlined from. */
+  dissolvedFrom?: string
 }
 
 export interface ModelDocument {
@@ -57,6 +63,8 @@ export interface ModelDocument {
   speciesAliases?: Record<string, string>
   /** §20 species-artefact pin(s) on the graph IRI (artefact metadata). */
   usesSpecies?: string[]
+  /** §22 derived index (server-computed): all referenced model IRIs. */
+  usesModel?: string[]
 }
 
 export function serializeState(state: AppState): ModelDocument {
@@ -92,6 +100,9 @@ export function serializeState(state: AppState): ModelDocument {
       layout: Object.fromEntries(state.layoutStore.get(n.id) ?? []),
       knots: Object.fromEntries(state.knotStore.get(n.id) ?? []),
       openArcs: state.openArcs.get(n.id) ?? [],
+      refersTo: state.compositeRefs.get(n.id)?.refersTo,
+      overrides: state.compositeRefs.get(n.id)?.overrides,
+      dissolvedFrom: state.compositeRefs.get(n.id)?.dissolvedFrom,
     }))
 
   return {
@@ -166,6 +177,15 @@ export function deserializeState(doc: ModelDocument): AppState {
   const openArcs = new Map<number, OpenArc[]>(
     doc.composites.filter((c) => c.openArcs.length > 0).map((c) => [c.treeId, c.openArcs]),
   )
+  const compositeRefs = new Map<number, CompositeRef>(
+    doc.composites
+      .filter((c) => c.refersTo || c.dissolvedFrom)
+      .map((c) => [c.treeId, {
+        refersTo: c.refersTo ?? '',
+        overrides: c.overrides ?? {},
+        dissolvedFrom: c.dissolvedFrom,
+      }]),
+  )
 
   return {
     modelNodes,
@@ -180,6 +200,7 @@ export function deserializeState(doc: ModelDocument): AppState {
     arcCounter: doc.arcCounter,
     speciesAliases: new Map(Object.entries(doc.speciesAliases ?? {})),
     speciesPin: doc.usesSpecies?.[0] ?? null,
+    compositeRefs,
   }
 }
 

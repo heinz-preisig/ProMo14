@@ -241,6 +241,42 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
 
   // --- Open arcs ---
   for (const arc of graphView.openArcs) {
+    if (arc.terminal && arc.freeEnd) {
+      // §22 terminal stub: composite rim → free end; the arrow honours
+      // the submodel-declared direction (isSource) and §15 reference.
+      const comp = nodeMap.get(arc.openEndId!)
+      if (!comp) continue
+      const g = resolveArcGraphical(arc.modelArcType, catalogue)
+      const rim = rimPointForNode(comp, arc.freeEnd.x, arc.freeEnd.y)
+      // isSource: the submodel end is the source → stub points outward.
+      // referenceReversed flags ref-vs-draw disagreement on the stub.
+      const points = [rim.x, rim.y, arc.freeEnd.x, arc.freeEnd.y]
+      const outAngle = Math.atan2(arc.freeEnd.y - rim.y, arc.freeEnd.x - rim.x)
+      const arrowAtFree = !arc.referenceReversed
+      const obj: SceneOpenArc = {
+        id: `open-arc-${arc.modelArcIri}`,
+        kind: 'openArc',
+        points,
+        arrowX: arrowAtFree ? arc.freeEnd.x : rim.x,
+        arrowY: arrowAtFree ? arc.freeEnd.y : rim.y,
+        arrowAngle: arrowAtFree ? outAngle : outAngle + Math.PI,
+        arrowReversed: !arrowAtFree,
+        stroke: g?.stroke ?? '#333',
+        strokeWidth: g?.strokeWidth ?? 2,
+        dash: g?.dash,
+        hitStrokeWidth: 12,
+        openEndId: arc.openEndId ?? '',
+        openEndTreeNodeId: arc.openEndTreeNodeId ?? 0,
+        interactions: {
+          clickable: false,
+          draggable: false,
+          doubleClickable: false,
+          rightClickable: false,
+        },
+      }
+      objects.push(obj)
+      continue
+    }
     const geom = getArcGeometry(arc, nodeMap)
     if (!geom) continue
     const g = resolveArcGraphical(arc.modelArcType, catalogue)
@@ -304,6 +340,36 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
 
   // --- Open arc handles (top layer) ---
   for (const arc of graphView.openArcs) {
+    if (arc.terminal && arc.freeEnd) {
+      const comp = nodeMap.get(arc.openEndId!)
+      if (!comp) continue
+      const rim = rimPointForNode(comp, arc.freeEnd.x, arc.freeEnd.y)
+      const isDraggingThis = draggingOpenArc?.openArcIri === arc.modelArcIri
+      const handleX = isDraggingThis ? draggingOpenArc.currentX : arc.freeEnd.x
+      const handleY = isDraggingThis ? draggingOpenArc.currentY : arc.freeEnd.y
+      objects.push({
+        id: `handle-${arc.modelArcIri}`,
+        kind: 'openArcHandle',
+        x: handleX,
+        y: handleY,
+        radius: 10,
+        fill: '#c0392b',
+        stroke: '#fff',
+        strokeWidth: 3,
+        openArcIri: arc.modelArcIri,
+        fixedX: rim.x,
+        fixedY: rim.y,
+        openX: arc.freeEnd.x,
+        openY: arc.freeEnd.y,
+        interactions: {
+          clickable: true,
+          draggable: true,
+          doubleClickable: false,
+          rightClickable: false,
+        },
+      } as SceneHandle)
+      continue
+    }
     const geom = getArcGeometry(arc, nodeMap)
     if (!geom) continue
     const isOpenEndSource = arc.sourceId === arc.openEndId

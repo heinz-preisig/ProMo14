@@ -3,8 +3,8 @@ import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
-import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, fetchBehaviourEntityTypes, fetchEntityCapabilities, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, saveModel, saveOntology } from './api'
-import type { EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
+import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
+import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { deserializeState, hasContent, serializeState } from './modelPersistence'
@@ -46,6 +46,7 @@ export default function App() {
   const [capabilities, setCapabilities] = useState<Map<string, string[]>>(new Map())
   const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
   const [fixVars, setFixVars] = useState<EntityVariable[]>([])
+  const [modelArtefacts, setModelArtefacts] = useState<CatalogueLine[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -115,6 +116,50 @@ export default function App() {
       console.error('Failed to save model:', err)
     }
   }, [state])
+
+  const reload = useCallback(async () => {
+    const doc = await loadModel()
+    if (hasContent(doc)) dispatch({ type: 'loadState', state: deserializeState(doc) })
+  }, [])
+
+  // §22 library pick: model artefacts usable as referenced composites
+  useEffect(() => {
+    let cancelled = false
+    fetchCatalogueLines().then((lines) => {
+      if (!cancelled) setModelArtefacts(lines.filter((l) => l.type === 'model'))
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // §22 insert: materialize the referenced artefact's declared interface
+  // (its root composite's open arcs) as this occurrence's terminals.
+  const insertReferenced = useCallback(async (line: CatalogueLine) => {
+    try {
+      const doc = await loadModelDoc(line.iri)
+      const root = doc.composites.find((c) => c.treeId === doc.rootTreeId)
+      const entityOf = new Map(doc.nodes.map((n) => [n.iri, n.entityType]))
+      dispatch({
+        type: 'insertReferencedComposite',
+        id: state.tree.nextId + 1,
+        label: line.label,
+        parentViewNodeId: state.currentViewNodeId,
+        x: 0,
+        y: 0,
+        refersTo: line.iri,
+        terminals: (root?.openArcs ?? []).map((o) => ({
+          iri: o.iri,
+          externalIri: o.externalIri,
+          arcType: o.arcType,
+          isSource: o.isSource,
+          refToExternal: o.refToExternal,
+          externalEntityType: o.externalEntityType
+            ?? entityOf.get(o.externalIri),
+        })),
+      })
+    } catch (err) {
+      console.error('Failed to insert referenced composite:', err)
+    }
+  }, [state.tree.nextId, state.currentViewNodeId])
 
   const NODE_TYPES = useMemo(() => catalogue.getBaseEntities()
     .filter((entity) => behaviourEntityTypes.has(entity.iri))
@@ -280,6 +325,36 @@ export default function App() {
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
   const selectedArc = graphView.arcs.find((a) => a.modelArcIri === state.selectedModelArcIri)
 
+  // §22 extract to submodel (move): the selected composite's subtree
+  // moves to a new artefact; the host keeps a referenced composite.
+  const extractSelected = useCallback(async () => {
+    if (selectedVisibleNode?.treeNodeId === undefined) return
+    const treeId = selectedVisibleNode.treeNodeId
+    const iri = window.prompt('New submodel artefact IRI:', `${GRAPH_IRI}/submodel`)
+    if (!iri) return
+    const label = window.prompt('Label:', selectedVisibleNode.label) ?? selectedVisibleNode.label
+    try {
+      await extractSubmodel(iri, [treeId], label)
+      await reload()
+    } catch (err) {
+      console.error('Extract failed:', err)
+    }
+  }, [selectedVisibleNode, reload])
+
+  // §22 dissolve: one-way flatten — the referenced artefact's content
+  // is inlined; external arcs remap onto the copied terminals.
+  const dissolveSelected = useCallback(async () => {
+    const treeId = selectedVisibleNode?.treeNodeId
+    if (treeId === undefined) return
+    if (!window.confirm('Dissolve this reference into inline content? This cannot be undone.')) return
+    try {
+      await dissolveComposite(treeId)
+      await reload()
+    } catch (err) {
+      console.error('Dissolve failed:', err)
+    }
+  }, [selectedVisibleNode, reload])
+
   // Derived arc token display: the arc carries no declared token — the
   // licensed token set comes from resolve-connection's matched_tokens
   // for its endpoint entity types (cache-backed sync read).
@@ -416,7 +491,51 @@ export default function App() {
           </div>
 
           <div style={{ marginTop: 8, borderTop: '1px solid #ccc', paddingTop: 8 }}>
+            <strong style={{ fontSize: 12 }}>Submodels</strong>
+            <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Click to insert a referenced composite</div>
+            {modelArtefacts.map((l) => (
+              <button
+                key={l.iri}
+                onClick={() => insertReferenced(l)}
+                title={`${l.iri}${l.referencedBy.length ? ` — referenced by ${l.referencedBy.length}` : ''}`}
+                style={{
+                  fontSize: 12,
+                  padding: '6px 8px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  background: '#e8e8e8',
+                  border: '1px solid #bbb',
+                  borderRadius: 4,
+                  width: '100%',
+                }}
+              >
+                {l.label}
+              </button>
+            ))}
+            {modelArtefacts.length === 0 && (
+              <div style={{ fontSize: 11, color: '#999' }}>no model artefacts</div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 8, borderTop: '1px solid #ccc', paddingTop: 8 }}>
             <strong style={{ fontSize: 12 }}>Actions</strong>
+            <button
+              onClick={extractSelected}
+              disabled={selectedVisibleNode?.type !== 'composite'}
+              title="Move the selected composite into a new artefact; the host keeps a reference"
+              style={{
+                fontSize: 12,
+                padding: '6px 8px',
+                width: '100%',
+                cursor: selectedVisibleNode?.type === 'composite' ? 'pointer' : 'not-allowed',
+                background: selectedVisibleNode?.type === 'composite' ? '#e8f4fd' : '#eee',
+                border: '1px solid #bbb',
+                borderRadius: 4,
+                marginTop: 4,
+              }}
+            >
+              Extract to submodel
+            </button>
             <button
               onClick={groupSelectedNodes}
               disabled={!state.selectedVisibleNodeId}
@@ -551,6 +670,56 @@ export default function App() {
                     <span style={{ color: '#999' }}> · {v.role}</span>
                   </label>
                 ))}
+              </div>
+            )
+          })()}
+          {selectedVisibleNode?.treeNodeId !== undefined &&
+            !!state.compositeRefs.get(selectedVisibleNode.treeNodeId)?.refersTo && (() => {
+            const ref = state.compositeRefs.get(selectedVisibleNode.treeNodeId!)!
+            const terminals = state.openArcs.get(selectedVisibleNode.treeNodeId!) ?? []
+            const kinds = ['ontology', 'library', 'assignment', 'species', 'values']
+            return (
+              <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
+                <strong style={{ fontSize: 12 }}>Reference</strong>
+                <div style={{ wordBreak: 'break-all', color: '#555' }}>{ref.refersTo}</div>
+                <div style={{ color: '#888' }}>{terminals.length} terminal(s)</div>
+                <strong style={{ fontSize: 12 }}>Overrides</strong>
+                {kinds.map((k) => (
+                  <label key={k} style={{ display: 'block', marginTop: 2 }}>
+                    {k}:{' '}
+                    <input
+                      style={{ width: '100%', fontSize: 11, boxSizing: 'border-box' }}
+                      value={ref.overrides[k] ?? ''}
+                      placeholder="inherit"
+                      onChange={(e) => dispatch({
+                        type: 'setCompositeRef',
+                        treeNodeId: selectedVisibleNode.treeNodeId!,
+                        ref: {
+                          refersTo: ref.refersTo,
+                          overrides: e.target.value
+                            ? { ...ref.overrides, [k]: e.target.value }
+                            : Object.fromEntries(
+                                Object.entries(ref.overrides).filter(([key]) => key !== k)),
+                        },
+                      })}
+                    />
+                  </label>
+                ))}
+                <button
+                  onClick={dissolveSelected}
+                  style={{
+                    fontSize: 12,
+                    width: '100%',
+                    marginTop: 6,
+                    padding: '4px 6px',
+                    cursor: 'pointer',
+                    background: '#fff3e0',
+                    border: '1px solid #ffb74d',
+                    borderRadius: 4,
+                  }}
+                >
+                  Dissolve (inline content)
+                </button>
               </div>
             )
           })()}

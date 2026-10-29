@@ -43,4 +43,5 @@ export type {
   GraphView,
   ModelState,
   OpenArc,
+  CompositeRef,
 } from './hierarchy'

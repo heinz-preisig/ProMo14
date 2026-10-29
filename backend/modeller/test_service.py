@@ -160,6 +160,244 @@ def test_uses_species_pin(client):
     assert got["usesSpecies"] == []
 
 
+def test_referenced_composite_roundtrip(client):
+    """§22: refersTo + override map round-trip on the composite; the
+    usesModel pin set on the graph IRI is derived on PUT — a stale or
+    incomplete client-sent list is ignored."""
+    doc = _doc()
+    doc["composites"][1]["refersTo"] = "https://example.org/submodel"
+    doc["composites"][1]["overrides"] = {
+        "species": "https://example.org/scheme-B"}
+    doc["usesModel"] = ["https://example.org/stale"]  # ignored on PUT
+
+    r = client.put("/api/modeller/model", json=doc)
+    assert r.status_code == 200
+    assert r.json()["usesModel"] == ["https://example.org/submodel"]
+
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    by_id = {c["treeId"]: c for c in got["composites"]}
+    assert by_id[2]["refersTo"] == "https://example.org/submodel"
+    assert by_id[2]["overrides"] == {
+        "species": "https://example.org/scheme-B"}
+    assert by_id[0]["refersTo"] is None
+    assert by_id[0]["overrides"] == {}
+    assert got["usesModel"] == ["https://example.org/submodel"]
+
+    # dropping the reference clears the derived pin
+    doc["composites"][1]["refersTo"] = None
+    doc["composites"][1]["overrides"] = {}
+    client.put("/api/modeller/model", json=doc)
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    assert got["usesModel"] == []
+
+
+def test_extract_submodel(client):
+    """§22 move semantics: subtree → new artefact; host gets a
+    referenced composite; boundary arcs become open arcs on both
+    sides; pins are inherited."""
+    doc = _doc()
+    # grow the doc: a composite (treeId 2) holding Node_2, plus a
+    # second arc Node_2 -> Node_1 inside... use the existing shape:
+    # composite 2 contains Node_2; Arc_1 Node_1->Node_2 crosses the
+    # boundary.
+    assert client.put("/api/modeller/model", json=doc).status_code == 200
+
+    r = client.post(f"/api/modeller/extract-submodel?graph={MODEL}",
+                    json={"iri": "https://example.org/sub",
+                          "treeNodeIds": [2], "label": "Inner"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["iri"] == "https://example.org/sub"
+    assert body["movedNodes"] == 1
+    assert body["boundaryArcs"] == 1
+    comp_id = body["compositeTreeId"]
+
+    # host: Node_2 gone, referenced composite in place, boundary arc
+    # stays as an open arc on the new composite
+    host = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    assert {n["iri"] for n in host["nodes"]} == {"promo:Model/Node_1"}
+    assert len(host["arcs"]) == 1  # boundary arc kept (dangling end)
+    by_id = {c["treeId"]: c for c in host["composites"]}
+    assert by_id[comp_id]["refersTo"] == "https://example.org/sub"
+    assert by_id[comp_id]["parentTreeId"] == 0
+    open_arc = by_id[comp_id]["openArcs"][0]
+    assert open_arc["iri"] == "promo:Arc/Arc_1"
+    assert open_arc["externalIri"] == "promo:Model/Node_1"
+    assert open_arc["isSource"] is False   # removed end was the target
+    # Arc_1 referenceTo = Node_1 (outside) → ref points to external
+    assert open_arc["refToExternal"] is True
+    assert host["usesModel"] == ["https://example.org/sub"]
+
+    # submodel: Node_2 moved, root composite carries its side of the
+    # boundary arc; pins inherited from the host artefact
+    sub = client.get(
+        "/api/modeller/model?graph=https://example.org/sub").json()
+    assert {n["iri"] for n in sub["nodes"]} == {"promo:Model/Node_2"}
+    sub_root = {c["treeId"]: c for c in sub["composites"]}[sub["rootTreeId"]]
+    assert len(sub_root["openArcs"]) == 1
+    s_open = sub_root["openArcs"][0]
+    assert s_open["iri"] == "promo:Arc/Arc_1"
+    assert s_open["externalIri"] == "promo:Model/Node_2"
+    assert s_open["isSource"] is True      # missing end was the source
+    assert s_open["refToExternal"] is False  # ref points away from inside
+    assert sub["usesSpecies"] == []
+
+    from backend.core.graph_store import PROMO, get_store
+    g = get_store().dataset.graph(URIRef("https://example.org/sub"))
+    assert (URIRef("https://example.org/sub"), PROMO["usesOntology"],
+            URIRef(str(get_store().ONTOLOGY_GRAPH_IRI))) in g
+
+
+def test_reference_dag_and_cycles(client):
+    """§22: /references walks the usesModel DAG and reports
+    transitive self-references as reference-cycle loops."""
+    store = graph_store.get_store()
+    for iri in ("https://example.org/m-a", "https://example.org/m-b"):
+        store.create_artefact_graph(iri, "Model")
+
+    def pin(iri, ref):
+        doc = {"nodes": [], "arcs": [],
+               "composites": [
+                   {"treeId": 0, "label": "Root", "parentTreeId": None,
+                    "children": [{"id": 1}],
+                    "layout": {}, "knots": {}, "openArcs": []},
+                   {"treeId": 1, "label": "sub", "parentTreeId": 0,
+                    "children": [], "layout": {}, "knots": {},
+                    "openArcs": [], "refersTo": ref}],
+               "rootTreeId": 0, "nextTreeId": 2, "arcCounter": 1}
+        assert client.put(
+            f"/api/modeller/model?graph={iri}", json=doc).status_code == 200
+
+    pin("https://example.org/m-a", "https://example.org/m-b")
+    pin("https://example.org/m-b", "https://example.org/m-a")
+
+    r = client.get("/api/modeller/references?graph=https://example.org/m-a")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["dag"]["https://example.org/m-a"] == ["https://example.org/m-b"]
+    assert body["dag"]["https://example.org/m-b"] == ["https://example.org/m-a"]
+    assert body["cycles"] == [
+        ["https://example.org/m-a", "https://example.org/m-b",
+         "https://example.org/m-a"]]
+
+
+def test_catalogue_referenced_by(client):
+    """The catalogue's referencedBy index lets the hub warn 'N models
+    reference this', and delete_artefact blocks on usesModel pins."""
+    doc = _doc()
+    doc["composites"][1]["refersTo"] = "https://example.org/used"
+    client.put("/api/modeller/model", json=doc)
+    graph_store.get_store().create_artefact_graph(
+        "https://example.org/used", "Model")
+    client.put("/api/modeller/model?graph=https://example.org/used",
+               json=_doc())
+
+    cat = client.get("/api/catalogue").json()
+    used = next(l for l in cat["lines"]
+                if l["iri"] == "https://example.org/used")
+    assert used["referencedBy"] == [MODEL]
+    host = next(l for l in cat["lines"] if l["iri"] == MODEL)
+    assert host["usesModel"] == ["https://example.org/used"]
+
+    r = client.delete("/api/catalogue/artefact?iri=https://example.org/used")
+    assert r.status_code == 409
+    assert MODEL in r.json()["detail"]
+
+
+def test_dissolve_roundtrip(client):
+    """§22: extract then dissolve restores the topology — nodes and
+    the boundary arc are whole again, the composite is inline with
+    dissolvedFrom provenance."""
+    doc = _doc()
+    client.put("/api/modeller/model", json=doc)
+    client.post(f"/api/modeller/extract-submodel?graph={MODEL}",
+                json={"iri": "https://example.org/sub",
+                      "treeNodeIds": [2], "label": "Inner"})
+    host = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    comp_id = next(c["treeId"] for c in host["composites"]
+                   if c.get("refersTo"))
+
+    r = client.post(f"/api/modeller/dissolve?graph={MODEL}",
+                    json={"treeNodeId": comp_id})
+    assert r.status_code == 200, r.text
+    assert r.json()["dissolved"] == "https://example.org/sub"
+
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    assert {n["iri"] for n in got["nodes"]} == {
+        "promo:Model/Node_1", "promo:Model/Node_2"}
+    assert len(got["arcs"]) == 1  # boundary arc, deduplicated by IRI
+    by_id = {c["treeId"]: c for c in got["composites"]}
+    comp = by_id[comp_id]
+    assert comp["refersTo"] is None
+    assert comp["dissolvedFrom"] == "https://example.org/sub"
+    assert comp["openArcs"] == []
+    # the extracted subtree is preserved: comp holds the nested
+    # "Inner" composite, which owns Node_2 as a leaf child
+    inner_id = comp["children"][0]["id"]
+    inner = by_id[inner_id]
+    assert inner["parentTreeId"] == comp_id
+    assert {ch.get("iri") for ch in inner["children"]} == {
+        "promo:Model/Node_2"}
+    assert got["usesModel"] == []
+
+    # dissolving an inline composite is a 422
+    r = client.post(f"/api/modeller/dissolve?graph={MODEL}",
+                    json={"treeNodeId": comp_id})
+    assert r.status_code == 422
+
+
+def test_extract_submodel_rejects(client):
+    client.put("/api/modeller/model", json=_doc())
+    # the root composite cannot be extracted
+    r = client.post(f"/api/modeller/extract-submodel?graph={MODEL}",
+                    json={"iri": "https://example.org/x",
+                          "treeNodeIds": [0]})
+    assert r.status_code == 422
+    # non-composite ids are rejected
+    r = client.post(f"/api/modeller/extract-submodel?graph={MODEL}",
+                    json={"iri": "https://example.org/x",
+                          "treeNodeIds": [99]})
+    assert r.status_code == 422
+
+
+def test_instantiation_expands_reference(client):
+    """§22 per-occurrence instantiation: the referenced artefact's
+    topology joins the host scope under comp/inner instance paths,
+    and the boundary arc's dangling end re-points at the occurrence
+    instance."""
+    client.put("/api/modeller/model", json=_doc())
+    client.post(f"/api/modeller/extract-submodel?graph={MODEL}",
+                json={"iri": "https://example.org/sub",
+                      "treeNodeIds": [2], "label": "Inner"})
+    host = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    comp_id = next(c["treeId"] for c in host["composites"]
+                   if c.get("refersTo"))
+    comp_iri = f"{MODEL}/Composite_{comp_id}"
+
+    r = client.get(f"/api/instantiate/incidence?graph={MODEL}")
+    assert r.status_code == 200, r.text
+    base = r.json()["base"]
+    occ_node = f"{comp_iri}/promo:Model/Node_2"
+    assert occ_node in base["nodes"]
+    # the boundary arc connects host Node_1 to the occurrence instance
+    row_nodes = base["nodes"]
+    assert "promo:Model/Node_1" in row_nodes
+    assert len(base["entries"]) == 2
+    touched = {row_nodes[r_] for r_, _, _ in base["entries"]}
+    assert touched == {"promo:Model/Node_1", occ_node}
+
+    # cycles report a reference-cycle problem instead of recursing
+    store = graph_store.get_store()
+    g = store.dataset.graph(URIRef("https://example.org/sub"))
+    comp = URIRef("https://example.org/sub/Composite_99")
+    g.add((comp, RDF.type, graph_store.PROMO["Composite"]))
+    g.add((comp, graph_store.PROMO["refersTo"], URIRef(MODEL)))
+    r = client.get(f"/api/instantiate/model?graph={MODEL}")
+    assert r.status_code == 200
+    kinds = {p["kind"] for p in r.json()["problems"]}
+    assert "reference-cycle" in kinds
+
+
 def test_put_rejects_uncreated_graph(client):
     """Hub #3: a write must not materialize an artefact — ``?graph=``
     naming a graph that was never created via ``/api/catalogue/new``

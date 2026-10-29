@@ -158,7 +158,32 @@ export function computeGraphView(
     if (!compositeVisibleId || !nodeMap.has(compositeVisibleId)) continue
     for (const openArc of openArcList) {
       const externalLeafId = findLeafForModelNode(openArc.externalIri, tree)
-      if (externalLeafId === null) continue
+      if (externalLeafId === null) {
+        // §22 terminal: the external node lives in the referenced
+        // artefact — dangle a stub off the composite, spread around
+        // its top edge, draggable like any open-arc handle.
+        const comp = nodeMap.get(compositeVisibleId)!
+        const idx = openArcsOut.filter((a) => a.terminal && a.openEndId === compositeVisibleId).length
+        const angle = -Math.PI / 2 + (idx - (openArcList.length - 1) / 2) * 0.55
+        const stubLen = 80
+        openArcsOut.push({
+          modelArcIri: openArc.iri,
+          sourceId: compositeVisibleId,
+          targetId: compositeVisibleId,
+          arcType: 'open',
+          modelArcType: openArc.arcType,
+          knots: [],
+          openEndId: compositeVisibleId,
+          openEndTreeNodeId: compositeId,
+          terminal: true,
+          freeEnd: {
+            x: comp.x + Math.cos(angle) * stubLen,
+            y: comp.y + Math.sin(angle) * stubLen,
+          },
+          referenceReversed: !(openArc.refToExternal ?? openArc.isSource),
+        })
+        continue
+      }
       const externalVisibleId = findVisibleId(externalLeafId, viewNodeId, tree)
       if (externalVisibleId && nodeMap.has(externalVisibleId)) {
         // §15: the external node is the visible target iff isSource;

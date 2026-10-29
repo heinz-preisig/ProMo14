@@ -41,6 +41,62 @@ export async function loadModel(): Promise<ModelDocument> {
   return getJson<ModelDocument>('/api/modeller/model')
 }
 
+/** Load any artefact's model document by graph IRI (§22 referenced
+ *  composites — interface reads go through this, not the session's
+ *  own artefact). */
+export async function loadModelDoc(iri: string): Promise<ModelDocument> {
+  return getJson<ModelDocument>(
+    `/api/modeller/model?graph=${encodeURIComponent(iri)}`)
+}
+
+// --- §22 referenced composites -------------------------------------
+
+export interface CatalogueLine {
+  iri: string
+  type: string
+  label: string
+  status: string
+  referencedBy: string[]
+}
+
+/** Artefact lines for the library pick (model artefacts only are
+ *  usable as referenced composites). */
+export async function fetchCatalogueLines(): Promise<CatalogueLine[]> {
+  const res = await fetch('/api/catalogue')
+  if (!res.ok) return []
+  const body = await res.json()
+  return (body.lines ?? []) as CatalogueLine[]
+}
+
+/** §22 extract-to-submodel: move the selected subtree roots into a
+ *  new model artefact; the host gets a referenced composite. */
+export async function extractSubmodel(
+  iri: string,
+  treeNodeIds: number[],
+  label?: string,
+): Promise<{ iri: string; compositeTreeId: number }> {
+  const res = await apiFetch('/api/modeller/extract-submodel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ iri, treeNodeIds, label }),
+  })
+  if (!res.ok) throw new Error(`extract failed: ${res.status}`)
+  return res.json()
+}
+
+/** §22 dissolve: flatten a referenced composite to inline content. */
+export async function dissolveComposite(
+  treeNodeId: number,
+): Promise<{ dissolved: string; compositeTreeId: number }> {
+  const res = await apiFetch('/api/modeller/dissolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ treeNodeId }),
+  })
+  if (!res.ok) throw new Error(`dissolve failed: ${res.status}`)
+  return res.json()
+}
+
 export async function saveModel(doc: ModelDocument): Promise<void> {
   const res = await apiFetch('/api/modeller/model', {
     method: 'PUT',

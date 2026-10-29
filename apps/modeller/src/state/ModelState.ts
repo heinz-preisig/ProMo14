@@ -1,4 +1,4 @@
-import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc, Knot } from '../types'
+import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc, Knot, CompositeRef } from '../types'
 import { createTree, TreeOps } from '../tree/Tree'
 import { arcCarrier, ModelGraphOps } from '../model/ModelGraph'
 
@@ -21,6 +21,9 @@ export interface AppState {
   /** §20 species-artefact pin (promo:usesSpecies on the graph IRI) —
    *  which scheme this model draws its species vocabulary from. */
   speciesPin: string | null
+  /** §22 referenced composites: composite tree id → refersTo +
+   *  override map (content lives in the referenced artefact). */
+  compositeRefs: Map<number, CompositeRef>
 }
 
 export const initialState: AppState = {
@@ -36,6 +39,7 @@ export const initialState: AppState = {
   arcCounter: 1,
   speciesAliases: new Map(),
   speciesPin: null,
+  compositeRefs: new Map(),
 }
 
 // ─── Commands (discriminated union) ───
@@ -59,6 +63,8 @@ export type Command =
   | { type: 'setSpeciesAlias'; componentIri: string; alias: string }
   | { type: 'setSpeciesPin'; iri: string | null }
   | { type: 'toggleNodeFix'; iri: string; varIri: string }
+  | { type: 'setCompositeRef'; treeNodeId: number; ref: CompositeRef | null }
+  | { type: 'insertReferencedComposite'; id: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[] }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -134,11 +140,19 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const nextTree = new TreeOps(state.tree)
       nextTree.removeNode(cmd.treeNodeId)
 
+      // §22: a referenced composite may leave ref/terminal state behind
+      const compositeRefs = new Map(state.compositeRefs)
+      compositeRefs.delete(cmd.treeNodeId)
+      const nextOpenArcs = new Map(state.openArcs)
+      nextOpenArcs.delete(cmd.treeNodeId)
+
       return {
         ...state,
         modelNodes: modelGraph.getNodes(),
         modelArcs: modelGraph.getArcs(),
         tree: nextTree.getState(),
+        compositeRefs,
+        openArcs: nextOpenArcs,
         selectedVisibleNodeId: null,
         selectedModelArcIri: null,
       }
@@ -238,6 +252,44 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         modelNodes.set(cmd.iri, { ...n, fixes: [...fixes] })
       }
       return { ...state, modelNodes }
+    }
+
+    case 'setCompositeRef': {
+      const compositeRefs = new Map(state.compositeRefs)
+      if (cmd.ref) compositeRefs.set(cmd.treeNodeId, cmd.ref)
+      else compositeRefs.delete(cmd.treeNodeId)
+      return { ...state, compositeRefs }
+    }
+
+    case 'insertReferencedComposite': {
+      // §22 library pick: a composite occurrence referring to another
+      // model artefact.  Its declared interface (the artefact's open
+      // arcs, copied verbatim — externalIri is the submodel-internal
+      // endpoint, which never resolves in this tree → renders as a
+      // terminal stub) becomes its connectable terminals.
+      const nextTree = new TreeOps(state.tree)
+      nextTree.addChild(cmd.parentViewNodeId, cmd.label, undefined, cmd.id)
+
+      const compositeRefs = new Map(state.compositeRefs)
+      compositeRefs.set(cmd.id, { refersTo: cmd.refersTo, overrides: {} })
+
+      const nextOpenArcs = new Map(state.openArcs)
+      if (cmd.terminals.length) nextOpenArcs.set(cmd.id, cmd.terminals)
+
+      const nextLayouts = new Map(state.layoutStore)
+      const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
+      viewLayouts.set(String(cmd.id), { x: cmd.x, y: cmd.y })
+      nextLayouts.set(cmd.parentViewNodeId, viewLayouts)
+
+      return {
+        ...state,
+        tree: nextTree.getState(),
+        compositeRefs,
+        openArcs: nextOpenArcs,
+        layoutStore: nextLayouts,
+        selectedVisibleNodeId: String(cmd.id),
+        selectedModelArcIri: null,
+      }
     }
 
     case 'groupNodes': {
