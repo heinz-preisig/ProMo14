@@ -1015,6 +1015,42 @@ def test_emit_julia_occurrence_fn():
     assert "    V_2, V_3 = _occ_2_L0(V_1)" in src
 
 
+def test_emit_julia_level_parallel():
+    """§22 level-parallel: two independent units at one schedule
+    level emit as spawned tasks; the fetch barrier binds every
+    produced name before later levels consume them."""
+    cp = CodePlan(
+        occurrences=[{
+            "path": "MODEL/Composite_2",
+            "comp": "MODEL/Composite_2",
+            "refersTo": "https://example.org/sub",
+            "overrides": {}}],
+        params=[ParamSlot(var=_var("m"), instance="V_1@et",
+                          kind="parameter", name="V_1")],
+        names={"et": {}},
+        levels=[[
+            PlanBlock(entity_type="et", equation="e1", lhs=_var("p"),
+                      lhs_instance="V_2@et", lhs_name="V_2",
+                      inputs=[_var("m")], rhs="V_1"),
+            PlanBlock(entity_type="et", equation="e2", lhs=_var("J"),
+                      lhs_instance="V_3@et", lhs_name="V_3",
+                      inputs=[_var("m")], rhs="V_1",
+                      occurrence="MODEL/Composite_2"),
+        ]],
+    )
+    src = emit_julia(cp, _emit_space())
+    assert "_t0 = Threads.@spawn V_1" in src
+    # the occurrence call is a spawned unit too
+    assert "_t1 = Threads.@spawn _occ_2_L0(V_1)" in src
+    assert "V_2 = fetch(_t0)" in src
+    assert "V_3 = fetch(_t1)" in src
+    # barrier after all spawns
+    assert src.index("Threads.@spawn") < src.index("fetch(_t0)")
+    # same plan stays sequential on the other targets
+    assert "Threads" not in emit_python(cp, _emit_space())
+    assert "@spawn" not in emit_matlab(cp, _emit_space())
+
+
 def test_emit_matlab_occurrence_fn():
     """Same extraction in Matlab — returns named in the signature;
     local functions live after the main function's ``end``."""

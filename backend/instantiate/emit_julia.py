@@ -63,6 +63,21 @@ class _Julia(Dialect):
     index_base = 1
     no_rhs = "nothing  # no rhs"
     occ_fns = True
+    #: same-level units are independent — spawn them; fetches
+    #: barrier before any loop (a global solve) consumes results.
+    level_tasks = True
+
+    def task_spawn(self, tid: int, expr: str) -> str:
+        return "    _t%d = Threads.@spawn %s" % (tid, expr)
+
+    def task_fetch(self, tid: int, binds: List[str], st) -> str:
+        if st is not None:
+            # the dy write happens at the barrier, not in the task
+            return "    dy[%d:%d] = fetch(_t%d)" % (
+                st.offset + 1, st.offset + st.size, tid)
+        if binds:
+            return "    %s = fetch(_t%d)" % (", ".join(binds), tid)
+        return "    fetch(_t%d)" % tid
 
     def occ_fn_open(self, name: str, params: List[str],
                     returns: List[str]) -> List[str]:

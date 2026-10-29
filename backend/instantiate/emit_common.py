@@ -171,6 +171,10 @@ class Dialect:
     #: Matlab: local functions must follow the main function, so
     #: extracted helpers splice after the body instead of before it.
     occ_fns_at_end = False
+    #: §22 level-parallel: emit a level's independent units as
+    #: spawned tasks with a fetch barrier before loop emission.
+    #: Only meaningful where tasks actually parallelise (Julia).
+    level_tasks = False
 
     def render_rhs(self, block: PlanBlock, space: CompileSpace,
                    names: Dict[str, str]) -> str:
@@ -367,12 +371,11 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             current_occ = path
             body.append(d.occ_comment(occ_label.get(path, path)))
 
-    def _extract(level: int, occ: str,
-                 members: List[PlanBlock]) -> None:
-        """Lift one occurrence's same-level blocks into a helper
-        function; emits the def into ``occ_fns`` and the call into
-        ``body``.  Same-level blocks are mutually independent, so
-        the call's placement within the level is free."""
+    def _extract_def(level: int, occ: str,
+                     members: List[PlanBlock]):
+        """Emit one occurrence's same-level blocks as a helper
+        function into ``occ_fns``; returns ``(fn, ext, defined)``
+        for the call site (sequential or spawned)."""
         frag = re.sub(r"\W", "_",
                       occ.rsplit("/Composite_", 1)[-1] or occ)
         fn = "_occ_%s_L%d" % (frag, level)
@@ -391,8 +394,12 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             occ_fns.extend(d.assign(b, rhs))
         occ_fns.extend(d.occ_fn_close(defined))
         occ_fns.append("")
-        _mark(occ)
-        body.append(d.occ_fn_call(fn, ext, defined))
+        return fn, ext, defined
+
+    def _call_expr(fn: str, ext: List[str]) -> str:
+        """Bare call expression — used both by the sequential call
+        site hook and as a task body when a level is parallel."""
+        return "%s(%s)" % (fn, ", ".join(ext))
 
     extractable = d.occ_fns and bool(occ_paths)
     for level, lvl in enumerate(cp.levels):
@@ -404,6 +411,7 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
                 body.append(d.gather(g, space))
         loops_here: Dict[int, List[PlanBlock]] = {}
         groups: Dict[str, List[PlanBlock]] = {}
+        inlines: List[PlanBlock] = []
         for b in lvl:
             if b.loop >= 0:
                 loops_here.setdefault(b.loop, []).append(b)
@@ -414,17 +422,56 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             if (extractable and b.occurrence
                     and (b.entity_type, b.lhs) not in state_lhs):
                 groups.setdefault(b.occurrence, []).append(b)
-                continue
-            if occ_paths:
-                _mark(b.occurrence)
-            rhs = d.render_rhs(b, space, cp.names.get(b.entity_type, {}))
-            st = state_lhs.get((b.entity_type, b.lhs))
-            if st is not None:
-                body.extend(d.state_assign(st, b, rhs, space))
             else:
-                body.extend(d.assign(b, rhs))
-        for occ, members in groups.items():
-            _extract(level, occ, members)
+                inlines.append(b)
+        # §22 level-parallel: >=2 independent units in a level spawn
+        # as tasks; the fetch barrier binds every produced name
+        # before any loop (a global solve) runs.  dy writes happen at
+        # the barrier so tasks share no mutable state.
+        parallel = d.level_tasks and (
+            len(inlines) + len(groups)) > 1
+        if parallel:
+            spawns: List[str] = []
+            fetches: List[Tuple[int, List[str], Any]] = []
+            tid = 0
+            for b in inlines:
+                if occ_paths:
+                    _mark(b.occurrence)
+                rhs = d.render_rhs(b, space,
+                                   cp.names.get(b.entity_type, {}))
+                st = state_lhs.get((b.entity_type, b.lhs))
+                if st is not None:
+                    spawns.append(d.task_spawn(tid, rhs))
+                    fetches.append((tid, [], st))
+                else:
+                    spawns.append(d.task_spawn(tid, rhs))
+                    nm = b.lhs_name or inst_name(b.lhs_instance)
+                    fetches.append((tid, [nm], None))
+                tid += 1
+            for occ, members in groups.items():
+                fn, ext, defined = _extract_def(level, occ, members)
+                _mark(occ)
+                spawns.append(d.task_spawn(tid, _call_expr(fn, ext)))
+                fetches.append((tid, defined, None))
+                tid += 1
+            body.extend(spawns)
+            for tid_, binds, st_ in fetches:
+                body.append(d.task_fetch(tid_, binds, st_))
+        else:
+            for b in inlines:
+                if occ_paths:
+                    _mark(b.occurrence)
+                rhs = d.render_rhs(b, space,
+                                   cp.names.get(b.entity_type, {}))
+                st = state_lhs.get((b.entity_type, b.lhs))
+                if st is not None:
+                    body.extend(d.state_assign(st, b, rhs, space))
+                else:
+                    body.extend(d.assign(b, rhs))
+            for occ, members in groups.items():
+                fn, ext, defined = _extract_def(level, occ, members)
+                _mark(occ)
+                body.append(d.occ_fn_call(fn, ext, defined))
         for loop_id, blocks in sorted(loops_here.items()):
             if occ_paths:
                 span = sorted({b.occurrence for b in blocks})
