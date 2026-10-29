@@ -397,6 +397,14 @@ def test_instantiation_expands_reference(client):
     kinds = {p["kind"] for p in r.json()["problems"]}
     assert "reference-cycle" in kinds
 
+    # §22 call-style emission: generated code carries the occurrence
+    # registry header; segment markers group blocks when present.
+    r = client.get(
+        f"/api/instantiate/code?graph={MODEL}&target=python")
+    assert r.status_code == 200, r.text
+    assert "occurrence " in r.json()["source"]
+    assert "https://example.org/sub" in r.json()["source"]
+
 
 def test_put_rejects_uncreated_graph(client):
     """Hub #3: a write must not materialize an artefact — ``?graph=``

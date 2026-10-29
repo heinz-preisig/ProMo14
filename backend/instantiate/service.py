@@ -1187,7 +1187,7 @@ def _plan_for(graph_iri: str, vars: Optional[str],
                   cell_source.get(v.var, model_graph), v.var)
               for e in report.entity_types for v in e.variables}
     cp = plan(report, sched, inc, equations, indices, values=values,
-              canonicals=canonicals)
+              canonicals=canonicals, occurrences=occurrences)
     return cp, report, store
 
 

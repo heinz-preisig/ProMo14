@@ -207,6 +207,12 @@ class Dialect:
     def level_comment(self, level: int) -> str:
         return "%s%s level %d" % (self.indent, self.comment, level)
 
+    def occ_comment(self, label: str) -> str:
+        """§22 call-style grouping marker — labels the contiguous run
+        of blocks belonging to one referenced occurrence (or the
+        host's own content) in the emitted source."""
+        return "%s%s --- %s ---" % (self.indent, self.comment, label)
+
     def state_unpack(self, st, space: CompileSpace) -> str:
         """Slice a state variable out of the packed state vector."""
         raise NotImplementedError
@@ -282,6 +288,15 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
     if cp.matrices:
         out.append("")
 
+    # §22: the referenced-model registry the plan was built from —
+    # per-occurrence segment markers inside the body refer to these.
+    for occ in cp.occurrences:
+        frag = occ.get("comp", "").rsplit("/", 1)[-1] or occ["path"]
+        out.append("%s occurrence %s -> %s" % (
+            d.comment, frag, occ.get("refersTo") or occ["path"]))
+    if cp.occurrences:
+        out.append("")
+
     out.extend(d.fn_open(cp))
     for st in cp.states:
         out.append(d.state_unpack(st, space))
@@ -292,6 +307,24 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
 
     state_lhs = {(s.entity_type, s.var): s for s in cp.states}
     emitted_gathers = set()
+
+    # §22 call-style markers: contiguous block runs labelled by the
+    # occurrence that owns them — the artefact boundary shows up in
+    # the emitted source without constraining the global schedule.
+    occ_label = {"": "host model"}
+    for occ in cp.occurrences:
+        frag = occ.get("comp", "").rsplit("/", 1)[-1] or occ["path"]
+        occ_label[occ["path"]] = "occurrence %s (%s)" % (
+            frag, occ.get("refersTo") or occ["path"])
+    occ_paths = set(occ_label) - {""}
+    current_occ: Any = None    # sentinel: no segment labelled yet
+
+    def _mark(path: str) -> None:
+        nonlocal current_occ
+        if path != current_occ:
+            current_occ = path
+            out.append(d.occ_comment(occ_label.get(path, path)))
+
     for level, lvl in enumerate(cp.levels):
         out.append(d.level_comment(level))
         consumed = {v for b in lvl for v in b.inputs}
@@ -304,6 +337,8 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             if b.loop >= 0:
                 loops_here.setdefault(b.loop, []).append(b)
                 continue
+            if occ_paths:
+                _mark(b.occurrence)
             rhs = d.render_rhs(b, space, cp.names.get(b.entity_type, {}))
             st = state_lhs.get((b.entity_type, b.lhs))
             if st is not None:
@@ -311,6 +346,15 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             else:
                 out.extend(d.assign(b, rhs))
         for loop_id, blocks in sorted(loops_here.items()):
+            if occ_paths:
+                span = sorted({b.occurrence for b in blocks})
+                if len(span) == 1:
+                    _mark(span[0])
+                else:
+                    out.append(d.occ_comment(
+                        "coupling loop across " + " + ".join(
+                            occ_label.get(p, p) for p in span)))
+                    current_occ = None
             d.loop(out, loop_id, blocks, space, cp)
     if cp.outputs:
         d.output_tap(out, cp, space)

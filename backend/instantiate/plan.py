@@ -139,6 +139,10 @@ class PlanBlock:
     #: The lhs needs an initial guess (a ``SolveRoot`` body in the
     #: canonical RHS) — emitters seed the nested solve with it.
     guess: bool = False
+    #: §22 occurrence path this block lives in — `""` = the host
+    #: artefact's own content; non-empty = a `comp/inner` instance
+    #: path.  Emission grouping only — scheduling stays global.
+    occurrence: str = ""
 
 
 @dataclass
@@ -159,6 +163,23 @@ class CodePlan:
     #: entity_type → var IRI → emitted identifier (the renderer's
     #: name override — per-type instance names, not bare ids).
     names: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    #: §22 referenced-composite occurrences in this plan, ordered
+    #: host-first.  Each entry: ``{path, comp, refersTo,
+    #: overrides}`` — the keys emitters group blocks by when
+    #: emitting call-style per-artefact functions.
+    occurrences: List[Dict[str, Any]] = field(default_factory=list)
+
+
+def _occ_of(instance: str, occurrences: List[Dict[str, Any]]) -> str:
+    """The occurrence path owning an instance IRI — the longest
+    `occ.path` prefix of the instance's node part (`comp/inner@type`)."""
+    node = instance.split("@")[0]
+    best = ""
+    for occ in occurrences:
+        p = occ.get("path", "")
+        if p and node.startswith(p) and len(p) > len(best):
+            best = p
+    return best
 
 
 def plan(report: Instantiation, sched: Schedule,
@@ -166,7 +187,8 @@ def plan(report: Instantiation, sched: Schedule,
          equations: Dict[str, EqInfo],
          indices: Dict[str, IndexInfo],
          values: Optional[Dict[str, Dict[str, Any]]] = None,
-         canonicals: Optional[Dict[str, Any]] = None
+         canonicals: Optional[Dict[str, Any]] = None,
+         occurrences: Optional[List[Dict[str, Any]]] = None
          ) -> CodePlan:
     """Lower an instantiation report + schedule into a CodePlan.
 
@@ -179,6 +201,11 @@ def plan(report: Instantiation, sched: Schedule,
     from backend.equation.canonical import ic_targets
 
     out = CodePlan()
+    out.occurrences = [
+        {"path": o.get("path", ""), "comp": o.get("comp", ""),
+         "refersTo": o.get("refersTo", ""),
+         "overrides": o.get("overrides", {})}
+        for o in (occurrences or []) if not o.get("cycle")]
     canonicals = canonicals or {}
     # element-class selectors: sub-index IRI → its element set, so a
     # fill-pattern segment can name a sub-index and match the members
@@ -354,7 +381,9 @@ def plan(report: Instantiation, sched: Schedule,
                 inputs=list(eq.inputs) if eq else [],
                 rhs=eq.rhs if eq else "",
                 loop=b.loop,
-                guess=needs_guess))
+                guess=needs_guess,
+                occurrence=_occ_of(vb.instance if vb else b.lhs,
+                                   out.occurrences)))
         out.levels.append(out_lvl)
     out.loops = sched.loops
 
@@ -372,7 +401,9 @@ def plan(report: Instantiation, sched: Schedule,
                           or (vb.instance if vb else q.lhs)),
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else list(q.inputs),
-                rhs=eq.rhs if eq else ""))
+                rhs=eq.rhs if eq else "",
+                occurrence=_occ_of(vb.instance if vb else q.lhs,
+                                   out.occurrences)))
     return out
 
 
@@ -519,4 +550,5 @@ def code_plan_from_dict(d: Dict[str, Any]) -> CodePlan:
                 for scc in d.get("loops", [])]
     cp.initials = [_mk(PlanBlock, b) for b in d.get("initials", [])]
     cp.names = {et: dict(m) for et, m in d.get("names", {}).items()}
+    cp.occurrences = list(d.get("occurrences", []))
     return cp
