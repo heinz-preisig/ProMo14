@@ -294,6 +294,7 @@
         promo:hasOperation promolg:PartialDerivative .
 
     <promo:an_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "an_conv" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_function_flow> ;
@@ -331,6 +332,7 @@
         promo:variableClass "state" .
 
     <promo:c_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "c_conv" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
         promo:doc "concentration in a convective flow" ;
@@ -362,6 +364,7 @@
         promo:variableClass "state" .
 
     <promo:dndt> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "dndt" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
@@ -381,6 +384,7 @@
         promo:variableClass "state" .
 
     <promo:fV> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "fV" ;
         promo:aliases "{\"latex\": \"\\\\hat{V}\", \"global_ID\": \"promo:fV\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
@@ -399,6 +403,7 @@
         promo:variableClass "state" .
 
     <promo:fn_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "fn_conv" ;
         promo:aliases "{\"latex\": \"\\\\hat{n}_{conv}\", \"global_ID\": \"promo:fn_conv\"}" ;
         promo:doc "convective species mass flow" ;
@@ -416,6 +421,7 @@
         promo:variableClass "state" .
 
     <promo:n> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "n" ;
         promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
         promo:doc "species in mole" ;
@@ -433,6 +439,7 @@
         promo:variableClass "state" .
 
     <promo:rho> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "rho" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_extensity_intensive>,
@@ -450,6 +457,7 @@
         promo:variableClass "state" .
 
     <promo:P> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "p" ;
         promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:P\"}" ;
         promo:doc "Thermodynamic pressure" ;
@@ -465,6 +473,7 @@
         promo:variableClass "effort" .
 
     <promo:V> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "V" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
@@ -481,6 +490,7 @@
         promo:variableClass "state" .
 
     <promo:F_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "F_conv" ;
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
         promo:doc "incidence matrix for convective flows" ;

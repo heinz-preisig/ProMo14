@@ -620,6 +620,7 @@
     <https://w3id.org/promo/ontology#versionOf> a rdf:Property .
 
     <promo:r_z> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
         rdfs:label "r_z" ;
         promo:doc "z-coordinate" ;
         promo:imported false ;
@@ -910,6 +911,7 @@
         promo:tokenKind "reference" .
 
     <promo:F_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "F_conv" ;
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
         promo:doc "incidence matrix for convective flow" ;
@@ -924,6 +926,7 @@
         promo:variableClass "network" .
 
     <promo:Mm> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "Mm" ;
         promo:doc "molecular mass" ;
         promo:imported false ;
@@ -937,6 +940,7 @@
         promo:variableClass "parameter" .
 
     <promo:S> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_entropy> ;
         rdfs:label "S" ;
         promo:doc "Entropy" ;
         promo:imported false ;
@@ -950,6 +954,7 @@
         promo:variableClass "state" .
 
     <promo:T> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
         rdfs:label "T" ;
         promo:doc "Temperature" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_1> ;
@@ -964,6 +969,7 @@
         promo:variableClass "effort" .
 
     <promo:V> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "V" ;
         promo:doc "volume" ;
         promo:imported false ;
@@ -976,6 +982,7 @@
         promo:variableClass "state" .
 
     <promo:fm_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "fm_conv" ;
         promo:doc "convective mass flow" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_4> ;
@@ -991,6 +998,7 @@
         promo:variableClass "transport" .
 
     <promo:k_conv> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "k_conv" ;
         promo:doc "convective conductivity" ;
         promo:imported false ;
@@ -1004,6 +1012,7 @@
         promo:variableClass "transport" .
 
     <promo:n> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
         rdfs:label "n" ;
         promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
         promo:doc "species in mole" ;
@@ -1019,6 +1028,7 @@
         promo:variableClass "state" .
 
     <promo:r_x> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
         rdfs:label "r_x" ;
         promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"promo:r_x\"}" ;
         promo:doc "x-coordinate" ;
@@ -1033,6 +1043,7 @@
         promo:variableClass "frame" .
 
     <promo:r_y> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
         rdfs:label "r_y" ;
         promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"promo:r_y\"}" ;
         promo:doc "y-coordinate" ;
@@ -1156,6 +1167,7 @@
         promo:tokenKind "conserved" .
 
     <promo:Axy> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
         rdfs:label "Axy" ;
         promo:doc "contact area in x-y plane" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_3> ;
@@ -1170,6 +1182,7 @@
         promo:variableClass "transport" .
 
     <promo:P> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "p" ;
         promo:aliases "{\"latex\": \"P\", \"global_ID\": \"promo:P\"}" ;
         promo:doc "Thermodynamic pressure" ;
@@ -1185,6 +1198,7 @@
         promo:variableClass "effort" .
 
     <promo:U> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
         rdfs:label "U" ;
         promo:doc "Internal energy" ;
         promo:imported false ;
@@ -1198,6 +1212,7 @@
         promo:variableClass "state" .
 
     <promo:dmdt> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "dmdt" ;
         promo:doc "mass accumulation" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_6> ;
@@ -1287,6 +1302,7 @@
         promo:tokenKind "conserved" .
 
     <promo:m> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         rdfs:label "m" ;
         promo:aliases "{\"latex\": \"m\", \"global_ID\": \"promo:m\"}" ;
         promo:doc "mass" ;
