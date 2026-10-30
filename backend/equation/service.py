@@ -51,6 +51,7 @@ from .document import (
 from .errors import VarError
 from .parser import ParseError, parse
 from .syntax import Instantiate, Node, Var
+from .tokens import TokenVec
 from .units import Units
 
 import copy
@@ -129,6 +130,7 @@ class VariableIn(BaseModel):
     doc: str = ""
     port_variable: bool = False
     tokens: List[str] = Field(default_factory=list)
+    token_vector: Optional[Dict[str, int]] = None  # §24 algebraic signature
     value: Optional[str] = None  # pre-bound promo:value (constants)
     equations: Dict[str, EquationIn] = Field(default_factory=dict)
     # Multi-axis classifications: axis IRI -> axis term IRI.
@@ -184,6 +186,11 @@ class CheckResponse(BaseModel):
     indices: Optional[List[str]] = None
     incidence: Optional[List[str]] = None
     label: Optional[str] = None
+    # §24 token algebra: computed sparse exponent map (None = untracked)
+    # and non-fatal advisories collected while checking.
+    tokens: Optional[Dict[str, int]] = None
+    tokens_pretty: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
     error: Optional[str] = None
     error_kind: Optional[str] = None
     candidates: Optional[List[Dict[str, Any]]] = None  # AmbiguousVariableError
@@ -250,6 +257,7 @@ def context_endpoint(
                 doc=v.doc,
                 port_variable=v.port_variable,
                 tokens=v.tokens,
+                token_vector=getattr(v, "token_vector", None),
                 value=getattr(v, "value", None),
                 equations=getattr(v, "equations", {}),
                 classifications=getattr(v, "classifications", {}),
@@ -312,6 +320,7 @@ def _build_space(req: CheckRequest) -> CompileSpace:
             doc=v.doc,
             port_variable=v.port_variable,
             tokens=v.tokens,
+            token_vector=getattr(v, "token_vector", None),
             value=v.value,
         )
         for v in req.variables
@@ -341,6 +350,46 @@ def _build_space(req: CheckRequest) -> CompileSpace:
     )
 
 
+def _token_advisories(checked, space, lhs_label):
+    """(tokens_map, tokens_pretty, warnings) for a checked expression.
+
+    §24 advisories — never a gate:
+    - any warnings the checker itself collected (sum/maxmin mismatches,
+      unsupported roots) via ``space.warnings``;
+    - an empty computed signature means the expression is a basis change
+      (same information in two networks), not a relation;
+    - a computed signature that differs from the LHS variable's declared
+      ``tokenVector``.
+    """
+    warnings = list(space.warnings)
+    tokens_map = None
+    tokens_pretty = None
+    if checked.tokens is None:
+        return tokens_map, tokens_pretty, warnings
+    tokens_map = checked.tokens.as_dict()
+    tokens_pretty = checked.tokens.pretty()
+    if checked.tokens.is_empty():
+        warnings.append(
+            "token signature is empty — the expression is a basis "
+            "change (same information in two networks), not a "
+            "relation (§24)"
+        )
+    if lhs_label:
+        try:
+            lhs_var = space.resolve(lhs_label).variable
+        except VarError:
+            lhs_var = None
+        if lhs_var is not None and lhs_var.token_vector:
+            declared = TokenVec.from_dict(lhs_var.token_vector)
+            if checked.tokens != declared:
+                warnings.append(
+                    "token signature %r does not match the declared "
+                    "tokenVector %r of '%s'"
+                    % (tokens_pretty, declared.pretty(), lhs_label)
+                )
+    return tokens_map, tokens_pretty, warnings
+
+
 @router.post("/check", response_model=CheckResponse)
 def check_endpoint(req: CheckRequest) -> CheckResponse:
     space = _build_space(req)
@@ -359,6 +408,10 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
             resp.candidates = e.candidates
         return resp
 
+    tokens_map, tokens_pretty, warnings = _token_advisories(
+        checked, space, req.lhs
+    )
+
     return CheckResponse(
         ok=True,
         units=checked.units.as_list(),
@@ -366,6 +419,9 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
         indices=checked.indices,
         incidence=sorted(checked.incidence),
         label=checked.label,
+        tokens=tokens_map,
+        tokens_pretty=tokens_pretty,
+        warnings=warnings,
     )
 
 
@@ -579,6 +635,11 @@ def _canonicalise_equations(
             continue
         equation.incidence_list = sorted(checked.incidence)
         equation.rhs_latex = latex
+        # §24 advisories travel with the equation record so the editor sees
+        # them on save, not only via /check.
+        _, _, equation.warnings = _token_advisories(
+            checked, space, record.label
+        )
         canonical[equation.iri] = expression
     return canonical
 
@@ -959,6 +1020,9 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
         ("tokens",
          sorted(getattr(old, "tokens", [])),
          sorted(record.tokens)),
+        ("token_vector",
+         dict(getattr(old, "token_vector", None) or {}),
+         dict(record.token_vector or {})),
         ("classifications",
          dict(getattr(old, "classifications", {})),
          dict(record.classifications)),

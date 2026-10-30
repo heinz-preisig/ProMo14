@@ -50,6 +50,21 @@ def _literal_list(graph, subject, predicate) -> List[str]:
     return [str(o) for o in graph.objects(subject, predicate)]
 
 
+def _token_vector(graph, subject) -> Optional[Dict[str, int]]:
+    """Parse the ``promo:tokenVector`` JSON literal — sparse exponent map
+    ``{token IRI or fragment: int}``; ``None`` = untracked by the algebra."""
+    raw = graph.value(subject, PROMO["tokenVector"])
+    if raw is None:
+        return None
+    try:
+        parsed = json.loads(str(raw))
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return {str(k): int(v) for k, v in parsed.items()}
+
+
 def _one_literal(graph, subject, predicate, default: str = "") -> str:
     value = graph.value(subject, predicate, default=None)
     return str(value) if value is not None else default
@@ -264,6 +279,7 @@ class RdfContext(EquationContext):
             or iri,
             aliases=aliases,
             tokens=_literal_list(graph, s, PROMO["carriesToken"]),
+            token_vector=_token_vector(graph, s),
             value=_one_literal(graph, s, PROMO["value"]) or None,
         )
         setattr(var, "classifications", classifications)

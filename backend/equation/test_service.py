@@ -73,3 +73,68 @@ def test_check_instantiate_state_var_rejected(client):
     body = r.json()
     assert body["ok"] is False
     assert "constant" in body["error"] or "parameter" in body["error"]
+
+
+def test_check_token_empty_signature_warns_basis_change(client):
+    """§24: an expression collapsing to {} is a basis change, not a
+    relation — warn, never block.  `c` (component_mass/mass) times `Mm`
+    (mass/component_mass) is token-neutral."""
+    r = client.post("/api/equation/check", json={
+        "text": "( c . Mm )",
+        "lhs": "rho",
+        "variables": [
+            _var("V_c", label="c",
+                 token_vector={"token_component_mass": 1, "token_mass": -1}),
+            _var("V_Mm", label="Mm",
+                 token_vector={"token_mass": 1, "token_component_mass": -1}),
+            _var("V_rho", label="rho"),
+        ],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["tokens"] == {}
+    assert any("basis change" in w for w in body["warnings"])
+
+
+def test_check_token_mismatch_warns_vs_declared(client):
+    """§24: computed signature differing from the LHS variable's declared
+    tokenVector is an advisory."""
+    r = client.post("/api/equation/check", json={
+        "text": "( m . h )",
+        "lhs": "e_dot",
+        "variables": [
+            _var("V_m", label="m",
+                 token_vector={"token_mass": 1, "token_time": -1}),
+            _var("V_h", label="h",
+                 token_vector={"token_energy": 1, "token_mass": -1}),
+            _var("V_e_dot", label="e_dot",
+                 token_vector={"token_energy": 1, "token_entropy": -1}),
+        ],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["tokens"] == {"token_energy": 1, "token_time": -1}
+    assert body["tokens_pretty"] == "energy time^-1"
+    assert any("does not match the declared" in w for w in body["warnings"])
+
+
+def test_check_token_matching_declared_no_warning(client):
+    """No advisory when the computed signature equals the declaration."""
+    r = client.post("/api/equation/check", json={
+        "text": "( m . h )",
+        "lhs": "e_dot",
+        "variables": [
+            _var("V_m", label="m",
+                 token_vector={"token_mass": 1, "token_time": -1}),
+            _var("V_h", label="h",
+                 token_vector={"token_energy": 1, "token_mass": -1}),
+            _var("V_e_dot", label="e_dot",
+                 token_vector={"token_energy": 1, "token_time": -1}),
+        ],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["warnings"] == []

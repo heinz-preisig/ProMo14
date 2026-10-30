@@ -90,7 +90,7 @@
             <promo:F_conv>,
             <promo:k_conv>,
             <promo:rho> ;
-        promo:hasPortVariable <promo:P>,
+        promo:hasPortVariable <promo:p_mech>,
             <promo:c> ;
         promo:hasStateVariable <promo:fn_conv> .
 
@@ -98,7 +98,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_environment> ;
         promo:hasEquationSequence [ ] ;
-        promo:hasInstantiatedVariable <promo:P>,
+        promo:hasInstantiatedVariable <promo:p_mech>,
             <promo:c> .
 
     <https://w3id.org/promo/library/assignments#assignment_etype_lumped> a promo:BehaviourAssignment ;
@@ -107,7 +107,7 @@
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_13> ;
         promo:hasEquationSequence _:nc5463161cec741afb80e055c7a4b3625b3 ;
         promo:hasInstantiatedVariable <promo:Axy>,
-            <promo:P>,
+            <promo:p_term>,
             <promo:k_conv>,
             <promo:rho>,
             <promo:t> ;

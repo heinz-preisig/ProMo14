@@ -86,6 +86,9 @@ class Variable:
     internal_id: Optional[str] = None  # e.g. "V_12"
     aliases: Dict[str, str] = field(default_factory=dict)
     tokens: List[str] = field(default_factory=list)  # token-type IRIs
+    #: Algebraic token signature (``promo:tokenVector`` JSON map); ``None``
+    #: means the variable is untracked by the token algebra (§24).
+    token_vector: Optional[Dict[str, int]] = None
     value: Optional[str] = None  # pre-bound promo:value (universal constants)
 
     def __post_init__(self) -> None:
@@ -142,6 +145,10 @@ class CompileSpace:
             else {expression_definition_network}
         )
         self.network_tree = network_tree or {}
+        #: Non-fatal semantic advisories collected during checking —
+        #: currently token-algebra mismatches (§24).  Warnings never block
+        #: checking; they surface to the caller in CheckResponse.warnings.
+        self.warnings: List[str] = []
         # Reverse map: child -> parent, used for nearest-ancestor resolution.
         self._parent_of: Dict[str, str] = {}
         for parent, children in self.network_tree.items():

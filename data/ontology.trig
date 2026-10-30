@@ -621,6 +621,7 @@
 
     <promo:r_z> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "r_z" ;
         promo:doc "z-coordinate" ;
         promo:imported false ;
@@ -658,7 +659,7 @@
         promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:U\", \"promo:V\"]" ;
         promo:internalID "E_2" ;
-        promo:lhs <promo:P> ;
+        promo:lhs <promo:p_term> ;
         promo:modified "2026-09-21T11:31:22.783Z" ;
         promo:network "physical" ;
         promo:rhs "ParDiff( U, V )" ;
@@ -692,12 +693,12 @@
         promo:doc "" ;
         promo:equationClass "generic" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:P\", \"promo:k_conv\"]" ;
+        promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:p_mech\", \"promo:k_conv\"]" ;
         promo:internalID "E_4" ;
         promo:lhs <promo:fm_conv> ;
         promo:modified "2026-09-21T13:17:05.082Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "( ( ( geometry!Axy * properties!k_conv ) . physical!F_conv ) . physical!p )" ;
+        promo:rhs "( ( ( geometry!Axy * properties!k_conv ) . physical!F_conv ) . physical!p_mech )" ;
         promo:rhsExpression <https://w3id.org/promo/ontology#E_4/expression> ;
         promo:rhsLatex "\\sum_{N} {Axy}_{N} \\, {k}_{N} \\circ {F}_{A\\_conv} \\circ {P}_{N}" .
 
@@ -912,6 +913,7 @@
 
     <promo:F_conv> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1}" ;
         rdfs:label "F_conv" ;
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
         promo:doc "incidence matrix for convective flow" ;
@@ -927,6 +929,7 @@
 
     <promo:Mm> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_mass\": 1, \"token_component_mass\": -1}" ;
         rdfs:label "Mm" ;
         promo:doc "molecular mass" ;
         promo:imported false ;
@@ -941,6 +944,7 @@
 
     <promo:S> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_entropy> ;
+        promo:tokenVector "{\"token_entropy\": 1}" ;
         rdfs:label "S" ;
         promo:doc "Entropy" ;
         promo:imported false ;
@@ -955,6 +959,7 @@
 
     <promo:T> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_entropy\": -1}" ;
         rdfs:label "T" ;
         promo:doc "Temperature" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_1> ;
@@ -970,6 +975,7 @@
 
     <promo:V> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1}" ;
         rdfs:label "V" ;
         promo:doc "volume" ;
         promo:imported false ;
@@ -983,6 +989,7 @@
 
     <promo:fm_conv> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
         rdfs:label "fm_conv" ;
         promo:doc "convective mass flow" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_4> ;
@@ -1013,6 +1020,7 @@
 
     <promo:n> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1}" ;
         rdfs:label "n" ;
         promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
         promo:doc "species in mole" ;
@@ -1029,6 +1037,7 @@
 
     <promo:r_x> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "r_x" ;
         promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"promo:r_x\"}" ;
         promo:doc "x-coordinate" ;
@@ -1044,6 +1053,7 @@
 
     <promo:r_y> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "r_y" ;
         promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"promo:r_y\"}" ;
         promo:doc "y-coordinate" ;
@@ -1166,8 +1176,14 @@
         rdfs:label "Momentum" ;
         promo:tokenKind "conserved" .
 
+    <https://w3id.org/promo/ontology#token_time> a promo:Token ;
+        rdfs:label "Time" ;
+        promo:tokenKind "basis" ;
+        promo:doc "Algebraic basis element for rates — a flow over network X has tokenVector {X:+1, time:-1}.  Not a network: never used in carriesToken." .
+
     <promo:Axy> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "Axy" ;
         promo:doc "contact area in x-y plane" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_3> ;
@@ -1181,17 +1197,34 @@
         promo:unitVector "[0, 2, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "transport" .
 
-    <promo:P> a promo:Variable ;
+    <promo:p_term> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
-        rdfs:label "p" ;
-        promo:aliases "{\"latex\": \"P\", \"global_ID\": \"promo:P\"}" ;
-        promo:doc "Thermodynamic pressure" ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_mass\": -1}" ;
+        rdfs:label "p_term" ;
+        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:p_term\"}" ;
+        promo:doc "Thermodynamic pressure — -dU/dV conjugate to V (p*V work pair); EoS/-del A/del V at the molecular level." ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_10" ;
-        promo:latex "P" ;
+        promo:latex "p" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "effort" .
+
+    <promo:p_mech> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_momentum\": -1}" ;
+        rdfs:label "p_mech" ;
+        promo:aliases "{\"latex\": \"p_{\\mathrm{m}}\", \"global_ID\": \"promo:p_mech\"}" ;
+        promo:doc "Mechanical pressure — momentum-flux/stress-tensor trace; drives transport (virial pressure at the molecular level).  Equals p_term at equilibrium." ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_34" ;
+        promo:latex "p_{\\mathrm{m}}" ;
         promo:network "physical" ;
         promo:portVariable false ;
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
@@ -1199,6 +1232,7 @@
 
     <promo:U> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
+        promo:tokenVector "{\"token_energy\": 1}" ;
         rdfs:label "U" ;
         promo:doc "Internal energy" ;
         promo:imported false ;
@@ -1213,6 +1247,7 @@
 
     <promo:dmdt> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
         rdfs:label "dmdt" ;
         promo:doc "mass accumulation" ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_6> ;
@@ -1303,6 +1338,7 @@
 
     <promo:m> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1}" ;
         rdfs:label "m" ;
         promo:aliases "{\"latex\": \"m\", \"global_ID\": \"promo:m\"}" ;
         promo:doc "mass" ;
@@ -1469,7 +1505,7 @@
     _:n45fbf77aeff34463a69b3e73fcc08affb23 rdf:first <promo:r_y> ;
         rdf:rest () .
 
-    _:n45fbf77aeff34463a69b3e73fcc08affb24 rdf:first <promo:P> ;
+    _:n45fbf77aeff34463a69b3e73fcc08affb24 rdf:first <promo:p_mech> ;
         rdf:rest () .
 
     _:n45fbf77aeff34463a69b3e73fcc08affb3 rdf:first <promo:r_x> ;

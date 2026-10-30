@@ -140,12 +140,12 @@
         promo:doc "" ;
         promo:equationClass "generic" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:incidenceList "[\"promo:F_conv\", \"promo:P\"]" ;
+        promo:incidenceList "[\"promo:F_conv\", \"promo:p_mech\"]" ;
         promo:internalID "E_11" ;
         promo:lhs <promo:d> ;
         promo:modified "2026-09-25T13:03:39.862Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "sign( ( physical!F_conv * physical!p ) )" ;
+        promo:rhs "sign( ( physical!F_conv * physical!p_mech ) )" ;
         promo:rhsExpression <https://w3id.org/promo/library/#E_11/expression> ;
         promo:rhsLatex "\\mathrm{sign}\\left( \\sum_{N} {F}_{A\\_conv,N} \\, {p}_{N} \\right)" .
 
@@ -212,12 +212,12 @@
         promo:doc "" ;
         promo:equationClass "generic" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:P\", \"promo:k_conv\", \"promo:rho\"]" ;
+        promo:incidenceList "[\"promo:Axy\", \"promo:F_conv\", \"promo:p_mech\", \"promo:k_conv\", \"promo:rho\"]" ;
         promo:internalID "E_15" ;
         promo:lhs <promo:fV> ;
         promo:modified "2026-09-25T13:29:43.746Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "( ( ( ( inv( properties!rho ) . properties!k_conv ) . geometry!Axy ) . physical!F_conv ) . physical!p )" ;
+        promo:rhs "( ( ( ( inv( properties!rho ) . properties!k_conv ) . geometry!Axy ) . physical!F_conv ) . physical!p_mech )" ;
         promo:rhsExpression <https://w3id.org/promo/library/#E_15/expression> ;
         promo:rhsLatex "{{\\rho}_{N}}^{-1} \\circ {k}_{N} \\circ {Axy}_{N} \\circ {F}_{A\\_conv,N} \\circ {p}_{N}" .
 
@@ -282,7 +282,7 @@
         promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:incidenceList "[\"promo:U\", \"promo:V\"]" ;
         promo:internalID "E_2" ;
-        promo:lhs <promo:P> ;
+        promo:lhs <promo:p_term> ;
         promo:modified "2026-09-21T11:31:22.783Z" ;
         promo:network "physical" ;
         promo:rhs "ParDiff( U, V )" ;
@@ -295,6 +295,7 @@
 
     <promo:an_conv> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1}" ;
         rdfs:label "an_conv" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_function_flow> ;
@@ -318,6 +319,7 @@
             <https://w3id.org/promo/ontology#term_extensity_intensive>,
             <https://w3id.org/promo/ontology#term_function_secondary_state> ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1, \"token_mass\": -1}" ;
         promo:doc "molar concentration" ;
         promo:hasEquation <https://w3id.org/promo/library/#E_10> ;
         promo:imported false ;
@@ -333,6 +335,7 @@
 
     <promo:c_conv> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1, \"token_mass\": -1}" ;
         rdfs:label "c_conv" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
         promo:doc "concentration in a convective flow" ;
@@ -365,6 +368,7 @@
 
     <promo:dndt> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1, \"token_time\": -1}" ;
         rdfs:label "dndt" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
@@ -385,6 +389,7 @@
 
     <promo:fV> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
         rdfs:label "fV" ;
         promo:aliases "{\"latex\": \"\\\\hat{V}\", \"global_ID\": \"promo:fV\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
@@ -404,6 +409,7 @@
 
     <promo:fn_conv> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1, \"token_time\": -1}" ;
         rdfs:label "fn_conv" ;
         promo:aliases "{\"latex\": \"\\\\hat{n}_{conv}\", \"global_ID\": \"promo:fn_conv\"}" ;
         promo:doc "convective species mass flow" ;
@@ -422,6 +428,7 @@
 
     <promo:n> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:tokenVector "{\"token_component_mass\": 1}" ;
         rdfs:label "n" ;
         promo:aliases "{\"latex\": \"n\", \"global_ID\": \"promo:n\"}" ;
         promo:doc "species in mole" ;
@@ -456,11 +463,11 @@
         promo:unitVector "[0, -3, 0, 1, 0, 0, 0, 0]" ;
         promo:variableClass "state" .
 
-    <promo:P> a promo:Variable ;
+    <promo:p_term> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
-        rdfs:label "p" ;
-        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:P\"}" ;
-        promo:doc "Thermodynamic pressure" ;
+        rdfs:label "p_term" ;
+        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:p_term\"}" ;
+        promo:doc "Thermodynamic pressure — -dU/dV conjugate to V (p*V work pair); EoS/-del A/del V at the molecular level." ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
@@ -472,8 +479,25 @@
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
         promo:variableClass "effort" .
 
+    <promo:p_mech> a promo:Variable ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_momentum\": -1}" ;
+        rdfs:label "p_mech" ;
+        promo:aliases "{\"latex\": \"p_{\\mathrm{m}}\", \"global_ID\": \"promo:p_mech\"}" ;
+        promo:doc "Mechanical pressure — momentum-flux/stress-tensor trace; drives transport (virial pressure at the molecular level).  Equals p_term at equilibrium." ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_34" ;
+        promo:latex "p_{\\mathrm{m}}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
+        promo:variableClass "effort" .
+
     <promo:V> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1}" ;
         rdfs:label "V" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
@@ -491,6 +515,7 @@
 
     <promo:F_conv> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_mass\": 1}" ;
         rdfs:label "F_conv" ;
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"promo:F_conv\"}" ;
         promo:doc "incidence matrix for convective flows" ;
@@ -557,7 +582,7 @@
     _:naa37ba4d79414f1e9d34875db2326b31b23 rdf:first <promo:F_conv> ;
         rdf:rest _:naa37ba4d79414f1e9d34875db2326b31b24 .
 
-    _:naa37ba4d79414f1e9d34875db2326b31b24 rdf:first <promo:P> ;
+    _:naa37ba4d79414f1e9d34875db2326b31b24 rdf:first <promo:p_mech> ;
         rdf:rest () .
 
     _:naa37ba4d79414f1e9d34875db2326b31b25 rdf:first _:naa37ba4d79414f1e9d34875db2326b31b26 ;
@@ -633,7 +658,7 @@
         promo:hasArguments _:naa37ba4d79414f1e9d34875db2326b31b43 ;
         promo:hasOperation promolg:inv .
 
-    _:naa37ba4d79414f1e9d34875db2326b31b45 rdf:first <promo:P> ;
+    _:naa37ba4d79414f1e9d34875db2326b31b45 rdf:first <promo:p_mech> ;
         rdf:rest () .
 
     _:naa37ba4d79414f1e9d34875db2326b31b46 rdf:first <promo:fV> ;

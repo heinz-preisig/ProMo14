@@ -77,6 +77,9 @@ class EquationRecord(BaseModel):
     network: str = "universe"  # legacy/display domain name
     domain_iri: Optional[str] = None  # authoritative promo:inDomain target
     incidence_list: List[str] = Field(default_factory=list)  # derived, cached
+    #: Non-fatal §24 advisories from the token algebra, refreshed at
+    #: canonicalisation time alongside ``incidence_list``.
+    warnings: List[str] = Field(default_factory=list)
     doc: str = ""
     created: Optional[str] = None
     modified: Optional[str] = None
@@ -103,6 +106,9 @@ class VariableRecord(BaseModel):
     doc: str = ""
     units: List[int] = Field(default_factory=lambda: [0] * 8)
     tokens: List[str] = Field(default_factory=list)
+    # Algebraic token signature (§24): sparse exponent map over token IRIs;
+    # absent/{} means untracked by the token algebra.
+    token_vector: Optional[Dict[str, int]] = None
     # Pre-bound value slot — universal constants carry it permanently;
     # parameters get it at the instantiation stage (ADR-008).
     value: Optional[str] = None
