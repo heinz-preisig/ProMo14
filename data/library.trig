@@ -465,6 +465,7 @@
 
     <promo:p_term> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_mass\": -1}" ;
         rdfs:label "p_term" ;
         promo:aliases "{\"latex\": \"p\", \"global_ID\": \"promo:p_term\"}" ;
         promo:doc "Thermodynamic pressure — -dU/dV conjugate to V (p*V work pair); EoS/-del A/del V at the molecular level." ;
