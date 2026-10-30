@@ -620,8 +620,6 @@
     <https://w3id.org/promo/ontology#versionOf> a rdf:Property .
 
     <promo:r_z> a promo:Variable ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
-        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "r_z" ;
         promo:doc "z-coordinate" ;
         promo:imported false ;
@@ -630,7 +628,7 @@
         promo:internalID "V_16" ;
         promo:latex "r_z" ;
         promo:network "physical" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
 
@@ -1036,8 +1034,6 @@
         promo:variableClass "state" .
 
     <promo:r_x> a promo:Variable ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
-        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "r_x" ;
         promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"promo:r_x\"}" ;
         promo:doc "x-coordinate" ;
@@ -1047,13 +1043,11 @@
         promo:internalID "V_14" ;
         promo:latex "{r_x}" ;
         promo:network "physical" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
 
     <promo:r_y> a promo:Variable ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
-        promo:tokenVector "{\"token_momentum\": 1}" ;
         rdfs:label "r_y" ;
         promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"promo:r_y\"}" ;
         promo:doc "y-coordinate" ;
@@ -1063,7 +1057,7 @@
         promo:internalID "V_15" ;
         promo:latex "{r_y}" ;
         promo:network "physical" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
 

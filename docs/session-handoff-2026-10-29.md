@@ -103,7 +103,11 @@
    `tokens_pretty` + warnings).  Flag fixes: `t`, `Mm`, `k_conv`
    → `portVariable false` (`t` was frame-class with no token;
    `Mm`/`k_conv` are parameter/transport — never ports; removes
-   the `p`-port `ambiguous ← k_conv, n` supply collision).
+   the `p`-port `ambiguous ← k_conv, n` supply collision).  Frame
+   vars (`t`, `r_x`/`r_y`/`r_z`) are the free coordinates — now
+   all `portVariable false` and carriesToken/tokenVector-free
+   (a coordinate isn't a token quantity; the token belongs to
+   what lives *in* the domain).
    Additive exemption (§18): declaring carriesToken/tokenVector
    on a previously untracked referenced var is no longer a
    structural change; altering existing declarations stays
