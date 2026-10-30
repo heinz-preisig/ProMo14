@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, Variable } from '../types'
+import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, TokenRecord, Variable } from '../types'
 import { equationClassLabel } from '../variableUtils'
 import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
@@ -17,6 +17,8 @@ export interface VariableDetailDialogProps {
   domains: Domain[]
   /** EquationClass nodes — maps stored class IRIs to labels. */
   equationClasses?: EquationClass[]
+  /** promo:Token catalogue for the carriesToken/tokenVector pickers. */
+  tokenCatalogue?: TokenRecord[]
   /** Persist the edited variable (POST /variables). Throws on failure. */
   onSave: (v: Variable) => Promise<void>
   /** Open the equation editor to attach another equation (§18). */
@@ -37,6 +39,7 @@ export default function VariableDetailDialog({
   axes,
   domains,
   equationClasses = [],
+  tokenCatalogue = [],
   onSave,
   onAddEquation,
   onClose,
@@ -52,6 +55,14 @@ export default function VariableDetailDialog({
   const [units, setUnits] = useState<number[]>(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
   const [selectedIndices, setSelectedIndices] = useState<Set<string>>(
     new Set(variable.index_structures ?? []),
+  )
+  // §24 token declarations: carriesToken (network membership, port
+  // licensing) and tokenVector (algebraic signature, exponent map).
+  const [carriesTokens, setCarriesTokens] = useState<Set<string>>(
+    new Set(variable.tokens ?? []),
+  )
+  const [tokenVector, setTokenVector] = useState<Record<string, number>>(
+    variable.token_vector ?? {},
   )
   const [msg, setMsg] = useState('')
   // §18 usage lock — units and index structures remain locked while used;
@@ -69,6 +80,8 @@ export default function VariableDetailDialog({
     setVariableClass(variable.type ?? '')
     setUnits(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
     setSelectedIndices(new Set(variable.index_structures ?? []))
+    setCarriesTokens(new Set(variable.tokens ?? []))
+    setTokenVector(variable.token_vector ?? {})
     setMsg('')
   }, [variable])
 
@@ -83,6 +96,24 @@ export default function VariableDetailDialog({
       const next = new Set(prev)
       if (next.has(iri)) next.delete(iri)
       else next.add(iri)
+      return next
+    })
+  }
+
+  const toggleToken = (iri: string) => {
+    setCarriesTokens((prev) => {
+      const next = new Set(prev)
+      if (next.has(iri)) next.delete(iri)
+      else next.add(iri)
+      return next
+    })
+  }
+
+  const setTokenExponent = (iri: string, value: string) => {
+    setTokenVector((prev) => {
+      const next = { ...prev }
+      if (value.trim() === '' || Number(value) === 0) delete next[iri]
+      else next[iri] = Number(value)
       return next
     })
   }
@@ -114,6 +145,8 @@ export default function VariableDetailDialog({
       index_structures: Array.from(selectedIndices),
       aliases,
       doc: doc.trim(),
+      tokens: Array.from(carriesTokens),
+      token_vector: Object.keys(tokenVector).length ? { ...tokenVector } : undefined,
       equations,
     }
   }
@@ -343,6 +376,60 @@ export default function VariableDetailDialog({
               ))}
             </div>
           </div>
+
+          {tokenCatalogue.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Tokens</span>
+              <div style={{ fontSize: 11, color: '#777' }}>
+                carriesToken = network membership (port licensing);
+                tokenVector = algebraic signature (exponent per token,
+                e.g. energy +1 · mass −1; empty = untracked).
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  maxHeight: 140,
+                  overflowY: 'auto',
+                  border: '1px solid #ccc',
+                  borderRadius: 4,
+                  padding: 8,
+                }}
+              >
+                {tokenCatalogue.map((t) => (
+                  <div
+                    key={t.iri}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={carriesTokens.has(t.iri)}
+                        onChange={() => toggleToken(t.iri)}
+                      />
+                      <span>
+                        {t.label}{t.kind ? ` (${t.kind})` : ''}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      title={`tokenVector exponent for ${t.label}`}
+                      placeholder="exp"
+                      value={tokenVector[t.iri] ?? ''}
+                      onChange={(e) => setTokenExponent(t.iri, e.target.value)}
+                      style={{ width: 52 }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ fontSize: 12, color: '#555' }}>
             <strong>Port variable:</strong> {variable.port_variable ? 'yes' : 'no'} ·{' '}

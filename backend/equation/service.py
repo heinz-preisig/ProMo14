@@ -1010,6 +1010,17 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
     incoming record.  ``global_ID`` falls back to the IRI fragment (the
     reader's convention), so an absent alias is not a change."""
     fragment = record.iri.split("#")[-1].split("/")[-1]
+    # Additive token declarations are exempt: declaring carriesToken /
+    # tokenVector on a previously untracked variable adds metadata —
+    # it changes no equation semantics.  Removing or *altering* existing
+    # declarations remains a locked structural change.
+    old_tokens = sorted(getattr(old, "tokens", []))
+    new_tokens = sorted(record.tokens)
+    old_tv = dict(getattr(old, "token_vector", None) or {})
+    new_tv = dict(record.token_vector or {})
+    # additive: previously untracked -> declared; report as no change
+    tokens_pair = (old_tokens, new_tokens) if old_tokens else (old_tokens, old_tokens)
+    tv_pair = (old_tv, new_tv) if old_tv else (old_tv, old_tv)
     pairs = [
         ("units",
          old.units.as_list() if getattr(old, "units", None) else [0] * 8,
@@ -1017,12 +1028,8 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
         ("index_structures",
          sorted(getattr(old, "index_structures", [])),
          sorted(record.index_structures)),
-        ("tokens",
-         sorted(getattr(old, "tokens", [])),
-         sorted(record.tokens)),
-        ("token_vector",
-         dict(getattr(old, "token_vector", None) or {}),
-         dict(record.token_vector or {})),
+        ("tokens", tokens_pair[0], tokens_pair[1]),
+        ("token_vector", tv_pair[0], tv_pair[1]),
         ("classifications",
          dict(getattr(old, "classifications", {})),
          dict(record.classifications)),

@@ -1,4 +1,4 @@
-import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, SavedEquation, Variable } from './types'
+import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, SavedEquation, TokenRecord, Variable } from './types'
 import { nextEquationId } from './variableUtils'
 import { apiFetch, withParams } from '@promo/ui'
 
@@ -35,6 +35,14 @@ export async function checkExpression(req: CheckRequest): Promise<CheckResponse>
     return { ok: false, error_kind: 'Request validation', error }
   }
   return body as CheckResponse
+}
+
+/** Token-type catalogue (promo:Token) for the carriesToken/tokenVector
+ *  pickers — ontology-scoped via ?graph, like the other endpoints. */
+export async function listTokens(): Promise<TokenRecord[]> {
+  const res = await apiFetch('/api/ontology/tokens')
+  if (!res.ok) throw await apiError(res, `Failed to list tokens: ${res.status}`)
+  return res.json() as Promise<TokenRecord[]>
 }
 
 export async function loadContext(): Promise<ContextResponse> {
@@ -81,6 +89,7 @@ export async function saveVariable(
     doc: v.doc ?? '',
     units: v.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
     tokens: v.tokens ?? [],
+    token_vector: v.token_vector ?? null,
     value: v.value ?? null,
     index_structures: v.index_structures ?? [],
     equations,

@@ -300,3 +300,34 @@ def test_references_endpoint(client):
     r = client.get(
         f"/api/equation/variables/{_iri_path(f'{BASE}#V_2')}/references")
     assert r.json()["used"] is True  # own defining equation
+
+
+def test_additive_token_declarations_exempt_when_referenced(client):
+    """Declaring carriesToken/tokenVector on a previously untracked but
+    referenced variable is additive metadata — not a structural change."""
+    _post(client, _var("V_1"))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    r = _put(client, _var(
+        "V_1",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={"token_mass": 1, "token_time": -1},
+    ))
+    assert r.status_code == 200, r.text
+
+
+def test_altering_token_declarations_blocked_when_referenced(client):
+    """Removing/changing an existing token declaration stays locked."""
+    _post(client, _var("V_1",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={"token_mass": 1}))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    r = _put(client, _var("V_1"))  # drops both declarations
+    assert r.status_code == 409
+    locked = r.json()["detail"]["locked_fields"]
+    assert "tokens" in locked and "token_vector" in locked

@@ -61,6 +61,11 @@ export default function ResultPanel({ result, loading, indices = [], label }: Re
         <div>
           <strong>Units:</strong> {result.units_pretty ?? result.units?.join(', ') ?? '—'}
         </div>
+        {result.tokens_pretty != null && (
+          <div>
+            <strong>Tokens:</strong> {result.tokens_pretty}
+          </div>
+        )}
         <div>
           <strong>Index structure:</strong>{' '}
           {result.indices && result.indices.length > 0
@@ -73,6 +78,16 @@ export default function ResultPanel({ result, loading, indices = [], label }: Re
         {(label ?? result.label) && (
           <div>
             <strong>Label:</strong> {label ?? result.label}
+          </div>
+        )}
+        {(result.warnings ?? []).length > 0 && (
+          <div style={{ color: '#8d6e00' }}>
+            <strong>Warnings:</strong>
+            <ul style={{ margin: '2px 0 0 16px', padding: 0 }}>
+              {result.warnings!.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

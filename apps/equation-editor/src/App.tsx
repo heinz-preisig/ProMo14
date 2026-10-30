@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
-import { deleteVariable, documentUrl, loadContext, saveOntology, saveVariable } from './api'
+import { deleteVariable, documentUrl, listTokens, loadContext, saveOntology, saveVariable } from './api'
 import { useStoreDirty } from '@promo/ui'
-import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, SavedEquation, Variable } from './types'
+import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
@@ -19,6 +19,7 @@ export default function App() {
   const [axes, setAxes] = useState<ClassificationAxis[]>([])
   const [domains, setDomains] = useState<Domain[]>([])
   const [equationClasses, setEquationClasses] = useState<EquationClass[]>([])
+  const [tokenCatalogue, setTokenCatalogue] = useState<TokenRecord[]>([])
   const [expressionNetwork, setExpressionNetwork] = useState('root')
 
   const [equations, setEquations] = useState<SavedEquation[]>([])
@@ -63,6 +64,7 @@ export default function App() {
         setDomains(ctx.domains ?? [])
         setEquationClasses(ctx.equation_classes ?? [])
         setPdfCapable(ctx.capabilities?.pdf ?? false)
+        listTokens().then(setTokenCatalogue).catch(() => {})
         // Rebuild SavedEquation list from persisted equations
         const saved: SavedEquation[] = []
         for (const v of ctx.variables) {
@@ -317,6 +319,7 @@ export default function App() {
           axes={axes}
           domains={domains}
           equationClasses={equationClasses}
+          tokenCatalogue={tokenCatalogue}
           onSave={saveEditedVariable}
           onAddEquation={(v) => {
             setDependentEditing(v)

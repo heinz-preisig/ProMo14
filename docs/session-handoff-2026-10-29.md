@@ -97,9 +97,19 @@
    mass:−1}`, `Mm` `{mass:+1,component_mass:−1}`.  Deliberately
    untracked: `rho` (m/V → `{}` token-neutral), `k_conv` (derived
    conductance, signature undecided).  Tests: `test_tokens.py`.
-   Follow-ups: editor token picker UI — note this sweep was
-   manual `.trig` editing, which the standing rule forbids for
-   app-mediated data.
+   Follow-ups done 2026-10-30: equation-editor token picker
+   (VariableDetailDialog — carriesToken checkboxes + per-token
+   exponent inputs via `/api/ontology/tokens`; ResultPanel shows
+   `tokens_pretty` + warnings).  Flag fixes: `t`, `Mm`, `k_conv`
+   → `portVariable false` (`t` was frame-class with no token;
+   `Mm`/`k_conv` are parameter/transport — never ports; removes
+   the `p`-port `ambiguous ← k_conv, n` supply collision).
+   Additive exemption (§18): declaring carriesToken/tokenVector
+   on a previously untracked referenced var is no longer a
+   structural change; altering existing declarations stays
+   locked.  Decision: `EquationRecord.warnings` stays transient
+   (editor-time only) — not persisted, not wired to `/model`;
+   revisit when `/model` gets a validation pass.
    **Density/fraction rule (user, 2026-10-30)**: normed by volume =
    density → space token at −1 (`c` = `{component_mass:+1,
    mass:−1}`).  Generalised: *any quantity normed by its own

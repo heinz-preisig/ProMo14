@@ -25,7 +25,11 @@ export interface Variable {
   aliases?: Record<string, string>
   doc?: string
   port_variable?: boolean
+  /** promo:carriesToken — network membership (port licensing). */
   tokens?: string[]
+  /** promo:tokenVector — §24 algebraic signature {token IRI: exponent}.
+   *  undefined/{} = untracked by the token algebra. */
+  token_vector?: Record<string, number>
   /** Pre-bound promo:value — universal constants carry it permanently. */
   value?: string | null
   equations?: Record<string, EquationRecord>
@@ -113,9 +117,22 @@ export interface CheckResponse {
   indices?: string[] | null
   incidence?: string[] | null
   label?: string | null
+  /** §24 computed token signature (null = untracked). */
+  tokens?: Record<string, number> | null
+  tokens_pretty?: string | null
+  /** §24 advisories — warnings never block. */
+  warnings?: string[]
   error?: string | null
   error_kind?: string | null
   candidates?: Array<Record<string, unknown>> | null
+}
+
+/** promo:Token catalogue entry (GET /api/ontology/tokens). */
+export interface TokenRecord {
+  iri: string
+  label: string
+  parent?: string | null
+  kind?: string | null
 }
 
 export type CodegenTarget = 'python' | 'matlab' | 'latex'

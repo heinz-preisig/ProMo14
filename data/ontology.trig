@@ -938,7 +938,7 @@
         promo:internalID "V_12" ;
         promo:latex "\\lambda" ;
         promo:network "properties" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[0, 0, -1, 1, 0, 0, 0, 0]" ;
         promo:variableClass "parameter" .
 
@@ -1014,7 +1014,7 @@
         promo:internalID "V_13" ;
         promo:latex "k" ;
         promo:network "properties" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[1, -1, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "transport" .
 
@@ -1399,7 +1399,7 @@
         promo:internalID "V_11" ;
         promo:latex "t" ;
         promo:network "universe" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
         promo:variableClass "frame" .
 
