@@ -227,3 +227,66 @@ def test_unsatisfied_list_excludes_satisfied():
         src, tgt, variables, {"e1": _eq("e1", "v_rho")},
         matched_tokens={MASS, ENERGY})
     assert src_side.unsatisfied == ["v_T"]
+
+
+def test_unidirectional_source_ports_unreachable():
+    """§14: on a unidirectional (signal/reference) arc the source's own
+    port demands can never be fed — the flow runs source→target."""
+    variables = {
+        "v_obs": _v("v_obs", ["promo#tok_observation"]),
+        "v_sig": _v("v_sig", [SIGNAL]),
+    }
+    src = _asg("et_sensor", ports=["v_obs"], instantiated=["v_obs"])
+    tgt = _asg("et_plant", sequence=["e1"], ports=["v_sig"])
+    src_side, tgt_side = port_satisfaction(
+        "et_sensor", "et_plant",
+        {"et_sensor": src, "et_plant": tgt},
+        variables, {"e1": _eq("e1", "v_sig")},
+        TOKEN_PARENTS, matched_tokens={"promo#tok_observation"},
+        unidirectional=True)
+    assert src_side.ports[0].status == "unreachable"
+    assert src_side.ports[0].var == "v_obs"
+    assert tgt_side.ports[0].status == "satisfied"
+    assert tgt_side.ports[0].candidates == ["v_obs"]
+    assert src_side.ports[0].candidates == []
+    assert src_side.unsatisfied == ["v_obs"]
+    assert tgt_side.unsatisfied == []
+
+
+def test_unidirectional_missing_assignment_flagged():
+    """Source without an assignment reports has_assignment=False, no ports."""
+    variables = {"v": _v("v", [SIGNAL])}
+    tgt = _asg("et_plant", ports=["v"])
+    src_side, tgt_side = port_satisfaction(
+        "et_sensor", "et_plant", {"et_plant": tgt},
+        variables, {}, TOKEN_PARENTS, unidirectional=True)
+    assert src_side.has_assignment is False
+    assert src_side.ports == []
+
+
+def test_bidirectional_default_keeps_both_sides():
+    """Default (physical) arcs still judge both directions."""
+    variables = {
+        "v_a": _v("v_a", [MASS]),
+        "v_b": _v("v_b", [MASS]),
+    }
+    src = _asg("et_a", ports=["v_a"], sequence=["e1"])
+    tgt = _asg("et_b", ports=["v_b"], sequence=["e2"])
+    src_side, tgt_side = port_satisfaction(
+        "et_a", "et_b", {"et_a": src, "et_b": tgt},
+        variables, {"e1": _eq("e1", "v_a"), "e2": _eq("e2", "v_b")},
+        TOKEN_PARENTS, matched_tokens={MASS})
+    assert src_side.ports[0].status == "satisfied"
+    assert tgt_side.ports[0].status == "satisfied"
+
+
+def test_unidirectional_source_unlicensed_token():
+    variables = {"v_mass": _v("v_mass", [MASS])}
+    src = _asg("et_source", ports=["v_mass"])
+    src_side, _ = port_satisfaction(
+        "et_source", "et_target", {"et_source": src},
+        variables, {}, TOKEN_PARENTS,
+        matched_tokens={SIGNAL}, unidirectional=True)
+    assert src_side.ports[0].status == "unlicensed"
+    assert src_side.ports[0].candidates == []
+    assert src_side.unsatisfied == ["v_mass"]

@@ -855,6 +855,7 @@ export default function App() {
                           {p.status === 'unbound' &&
                             ` — no supply${p.state_hidden ? ' (state not exported)' : ''}`}
                           {p.status === 'unlicensed' && ' — not carried'}
+                          {p.status === 'unreachable' && ' — one-way arc cannot feed source'}
                         </div>
                       )
                     })}

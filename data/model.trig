@@ -98,31 +98,43 @@
         promo:usesOntology <https://w3id.org/promo/ontology> .
 
     <https://w3id.org/promo/model/Model> a promo:Model ;
-        promo:arcCounter 3 ;
-        promo:nextTreeId 3 ;
+        promo:arcCounter 5 ;
+        promo:nextTreeId 9 ;
         promo:rootComposite <https://w3id.org/promo/model/Composite_0> .
-
-    <promo:Arc/Arc_1> a promo:ModelArc ;
-        promo:arcType <promo:ArcType/token-flow> ;
-        promo:internalID "Arc_1" ;
-        promo:referenceFrom <promo:Model/Node_1> ;
-        promo:referenceTo <promo:Model/Node_2> ;
-        promo:source <promo:Model/Node_1> ;
-        promo:target <promo:Model/Node_2> .
 
     <promo:Arc/Arc_2> a promo:ModelArc ;
         promo:arcType <promo:ArcType/token-flow> ;
         promo:internalID "Arc_2" ;
-        promo:referenceFrom <promo:Model/Node_2> ;
+        promo:referenceFrom <promo:Model/Node_1> ;
         promo:referenceTo <promo:Model/Node_3> ;
-        promo:source <promo:Model/Node_2> ;
+        promo:source <promo:Model/Node_1> ;
+        promo:target <promo:Model/Node_3> .
+
+    <promo:Arc/Arc_3> a promo:ModelArc ;
+        promo:arcType <promo:ArcType/token-flow> ;
+        promo:internalID "Arc_3" ;
+        promo:referenceFrom <promo:Model/Node_3> ;
+        promo:referenceTo <promo:Model/Node_2> ;
+        promo:source <promo:Model/Node_3> ;
+        promo:target <promo:Model/Node_2> .
+
+    <promo:Arc/Arc_4> a promo:ModelArc ;
+        promo:arcType <promo:ArcType/reference> ;
+        promo:internalID "Arc_4" ;
+        promo:source <promo:Model/Node_1> ;
         promo:target <promo:Model/Node_3> .
 
     <https://w3id.org/promo/model/Composite_0> a promo:Composite ;
         rdfs:label "Root" ;
         promo:children "[{\"id\": 1, \"iri\": \"promo:Model/Node_1\"}, {\"id\": 2, \"iri\": \"promo:Model/Node_2\"}, {\"id\": 3, \"iri\": \"promo:Model/Node_3\"}]" ;
         promo:internalID 0 ;
-        promo:layout "{\"1\": {\"x\": -166.0, \"y\": -455.5}, \"2\": {\"x\": -27.0, \"y\": -453.5}, \"3\": {\"x\": 105.0, \"y\": -458.5}}" .
+        promo:knots "{\"promo:Arc/Arc_4\": [{\"x\": -178.9166717529297, \"y\": -353.5}], \"promo:Arc/Arc_2\": [{\"x\": -179.9166717529297, \"y\": -242.5}]}" ;
+        promo:layout "{\"1\": {\"x\": -248.8333282470703, \"y\": -289.5}, \"2\": {\"x\": 33.08332824707031, \"y\": -295.5}, \"3\": {\"x\": -111.91667175292969, \"y\": -297.5}, \"4\": {\"x\": -88.91667175292969, \"y\": -287.5}, \"5\": {\"x\": -181.9166717529297, \"y\": -375.5}, \"6\": {\"x\": -141.9166717529297, \"y\": -247.5}, \"7\": {\"x\": -177.9166717529297, \"y\": -246.5}, \"8\": {\"x\": -167.9166717529297, \"y\": -326.5}, \"9\": {\"x\": -161.9166717529297, \"y\": -143.5}}" .
+
+    <promo:Model/Node_2> a promo:ModelNode ;
+        rdfs:label "Node 2" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_2" .
 
     <promo:Model/Node_1> a promo:ModelNode ;
         rdfs:label "Node 1" ;
@@ -131,12 +143,7 @@
 
     <promo:Model/Node_3> a promo:ModelNode ;
         rdfs:label "Node 3" ;
-        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
-        promo:internalID "Node_3" .
-
-    <promo:Model/Node_2> a promo:ModelNode ;
-        rdfs:label "Node 2" ;
         promo:entityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
-        promo:internalID "Node_2" .
+        promo:internalID "Node_3" .
 }
 

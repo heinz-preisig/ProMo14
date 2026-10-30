@@ -37,7 +37,7 @@ class PortDemand:
     var: str
     label: str = ""
     tokens: List[str] = field(default_factory=list)
-    #: satisfied|ambiguous|unbound|unlicensed
+    #: satisfied|ambiguous|unbound|unlicensed|unreachable
     status: str = "unbound"
     #: comparable exportable candidates on the peer (variable IRIs)
     candidates: List[str] = field(default_factory=list)
@@ -128,19 +128,50 @@ def port_satisfaction(
     equations: Dict[str, EqInfo],
     token_parents: Dict[str, str],
     matched_tokens: Optional[Set[str]] = None,
+    unidirectional: bool = False,
 ) -> Tuple[SideReport, SideReport]:
     """Adjudicate a proposed source↔target connection.  Both directions
-    are judged — a physical arc is bidirectional, so each side's ports
-    read from the other's exportable variables.  Entity types without
-    an assignment report ``has_assignment=False`` and no demands."""
+    are judged for bidirectional (token-flow) arcs — each side's ports
+    read from the other's exportable variables.  On a unidirectional
+    (signal/reference) arc the flow is source→target only: the target
+    side's ports are adjudicated, while the source side's ports can
+    never be fed and report ``unreachable`` (§14 direction).  Entity
+    types without an assignment report ``has_assignment=False`` and
+    no demands."""
     src_asg = assignments.get(source)
     tgt_asg = assignments.get(target)
-    source_side = (_adjudicate(src_asg, tgt_asg, variables, equations,
-                               token_parents, matched_tokens)
-                   if src_asg else SideReport(entity_type=source,
-                                              has_assignment=False))
+    source_side = _unreachable_side(src_asg, variables, source,
+                                    token_parents, matched_tokens) \
+        if unidirectional else (
+            _adjudicate(src_asg, tgt_asg, variables, equations,
+                        token_parents, matched_tokens)
+            if src_asg else SideReport(entity_type=source,
+                                       has_assignment=False))
     target_side = (_adjudicate(tgt_asg, src_asg, variables, equations,
                                token_parents, matched_tokens)
                    if tgt_asg else SideReport(entity_type=target,
                                               has_assignment=False))
     return source_side, target_side
+
+
+def _unreachable_side(asg: Optional[AssignmentInfo],
+                      variables: Dict[str, VarInfo],
+                      entity_type: str,
+                      token_parents: Dict[str, str],
+                      matched_tokens: Optional[Set[str]]) -> SideReport:
+    """Source side of a unidirectional arc: every declared port is
+    unreachable — the arc carries source→target only."""
+    if asg is None:
+        return SideReport(entity_type=entity_type, has_assignment=False)
+    side = SideReport(entity_type=entity_type)
+    for v_iri in asg.ports:
+        var = variables.get(v_iri)
+        side.ports.append(PortDemand(
+            var=v_iri,
+            label=var.label if var else "",
+            tokens=list(var.tokens) if var else [],
+            status=("unlicensed" if matched_tokens is not None and not any(
+                _comparable(t, m, token_parents)
+                for t in (var.tokens if var else [])
+                for m in matched_tokens) else "unreachable")))
+    return side

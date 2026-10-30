@@ -211,7 +211,7 @@ class PortDemandOut(BaseModel):
     var: str
     label: str = ""
     tokens: List[str] = Field(default_factory=list)
-    #: satisfied|ambiguous|unbound|unlicensed
+    #: satisfied|ambiguous|unbound|unlicensed|unreachable
     status: str
     candidates: List[str] = Field(default_factory=list)
     state_hidden: bool = False
@@ -282,6 +282,7 @@ def port_satisfaction_endpoint(
 
     carrier = arc_type.rsplit("/", 1)[-1] if arc_type else None
     matched = None
+    unidirectional = False
     src_dom = _etype_domain(store, model_graph, source)
     tgt_dom = _etype_domain(store, model_graph, target)
     if src_dom and tgt_dom:
@@ -292,10 +293,17 @@ def port_satisfaction_endpoint(
         if carrier:
             rules = [r for r in rules if r.get("carrier") == carrier]
         matched = {t for r in rules for t in r.get("matched_tokens", [])}
+        # §14: a signal/reference arc is unidirectional — only the
+        # target side's ports can be fed.  Applies when every
+        # contributing rule is unidirectional (mixed sets keep the
+        # bidirectional adjudication).
+        unidirectional = bool(rules) and all(
+            r.get("direction") == "unidirectional" for r in rules)
 
     src_side, tgt_side = port_satisfaction(
         source, target, assignments, variables, equations,
-        token_parents, matched_tokens=matched)
+        token_parents, matched_tokens=matched,
+        unidirectional=unidirectional)
 
     def _out(side) -> PortSideOut:
         return PortSideOut(
