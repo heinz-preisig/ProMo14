@@ -95,8 +95,15 @@
    `fV`/`fn_conv` `{tok:+1,time:−1}`; efforts `T`/`p_term`/`p_mech`
    `{energy:+1,net:−1}`; ratios `c`/`c_conv` `{component_mass:+1,
    mass:−1}`, `Mm` `{mass:+1,component_mass:−1}`.  Deliberately
-   untracked: `rho` (m/V → `{}` token-neutral), `k_conv` (derived
-   conductance, signature undecided).  Tests: `test_tokens.py`.
+   untracked: `rho` (m/V → `{}` token-neutral — now explicit
+   `tokenVector "{}"` = tracked-neutral, keeps carriesToken mass
+   as honest membership), `k_conv` — resolved 2026-10-30:
+   `{energy:−1, time:−1}` (inverse effort·time conductance,
+   verified vs `fV = k·ρ⁻¹·A·F·p_mech`); carriesToken dropped —
+   inverse signatures declare no membership.  **Bug found &
+   fixed**: `checker._leaf_tokens` treated explicit `{}` as
+   untracked (`if tv` falsy) — `inv(rho)` degraded the whole
+   product to untracked.  Tests: `test_tokens.py`.
    Follow-ups done 2026-10-30: equation-editor token picker
    (VariableDetailDialog — carriesToken checkboxes + per-token
    exponent inputs via `/api/ontology/tokens`; ResultPanel shows

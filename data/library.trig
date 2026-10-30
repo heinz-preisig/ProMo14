@@ -447,6 +447,7 @@
 
     <promo:rho> a promo:Variable ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{}" ;
         rdfs:label "rho" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_extensity_intensive>,

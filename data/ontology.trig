@@ -1003,7 +1003,7 @@
         promo:variableClass "transport" .
 
     <promo:k_conv> a promo:Variable ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:tokenVector "{\"token_energy\": -1, \"token_time\": -1}" ;
         rdfs:label "k_conv" ;
         promo:doc "convective conductivity" ;
         promo:imported false ;

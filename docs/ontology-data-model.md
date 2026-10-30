@@ -645,7 +645,16 @@ Two distinct declarations, both on `promo:Variable`:
   not a relation: `ρ = m/V` `{mass:+1, mass:−1}`, mole fractions
   `{component_mass:+1, component_mass:−1}`.  Generalised: *any
   quantity normed by its own network's extent is token-neutral.*
-  `/check` warns; never blocks.
+  `/check` warns; never blocks.  A `{}` variable may still declare
+  `carriesToken` — `ρ` is a mass-network quantity; membership is
+  honest even when the signature is neutral (the nonzero-exponent
+  rule governs *ports*, which need real signatures to match).
+  `tokenVector "{}"` (explicit) differs from absent: `{}` is tracked
+  and propagates; absent is `None`/untracked and absorbs.
+- **Inverse signatures** — conductance-class variables can carry
+  negative vectors: `k_conv` `{energy:−1, time:−1}` (conductance per
+  unit effort·time, verified against `fV = k·ρ⁻¹·A·F·p_mech`).  Such
+  vars declare no `carriesToken` — no exponent is positive membership.
 - **Space/time asymmetry** — time enters token space (as `−1` on
   flows) because every conserved quantity flows *in* time; space
   never enters it — spatial resolution lives in index structures and

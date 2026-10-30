@@ -51,7 +51,7 @@ from .units import Units
 def _leaf_tokens(var) -> Optional[TokenVec]:
     """Algebraic signature of a variable leaf; ``None`` = untracked."""
     tv = getattr(var, "token_vector", None)
-    return TokenVec.from_dict(tv) if tv else None
+    return TokenVec.from_dict(tv) if tv is not None else None
 
 #: Variable classes allowed on the LHS of ``Instantiate(proto)`` — an
 #: instance is a bound-value slot, not a computed quantity (ADR-008).
