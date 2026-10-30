@@ -608,6 +608,55 @@ promo:Hadamard a promo:Token ;
 `promo:parent` links subtokens; `promo:internal_code`/`promo:aliases`
 carry the surface-syntax aliases.
 
+### 3.7 Token algebra (§24)
+
+Two distinct declarations, both on `promo:Variable`:
+
+- **`promo:carriesToken`** — network *membership*, authoritative for
+  port licensing (arc supply matching).  A variable belongs to the
+  networks it declares.
+- **`promo:tokenVector`** — algebraic *signature*: a JSON sparse
+  exponent map `{token IRI or fragment: int}` propagated through
+  expressions by the checker (`backend/equation/tokens.py`,
+  `checker.py`).  `None` = untracked (absorbs, never gates).
+
+**Signature rules** — every declared `carriesToken` appears at a
+*nonzero* exponent in the variable's `tokenVector`:
+
+- **Extent variables** (the measure a network is counted over) carry
+  their own token at `+1`: `n` `{component_mass:+1}`, `V` `{mass:+1}`,
+  `Axy` `{momentum:+1}`.
+- **Intensive quantities** normed by an extent carry it at `−1`:
+  `c = n/V` `{component_mass:+1, mass:−1}`, `Mm = m/n`
+  `{mass:+1, component_mass:−1}`.
+- **Flows** divide by `token_time`: `fm_conv`
+  `{momentum:+1, time:−1}`.  **Efforts** are `d(extent)/d(extent')`:
+  `T` `{energy:+1, entropy:−1}`, `p_term` `{energy:+1, mass:−1}`,
+  `p_mech` `{energy:+1, momentum:−1}` — the effort·flow = energy·time⁻¹
+  conjugacy invariant follows.
+- **`token_time`** is `tokenKind "basis"`: an algebraic basis element,
+  never a `carriesToken` target — nothing is conserved per unit time.
+- **Frame variables** (`t`, `r_x`/`r_y`/`r_z`, class `frame`) are the
+  free coordinates — no `carriesToken`, no `tokenVector`,
+  `portVariable false`.  The token belongs to what lives *in* the
+  domain, not to the coordinate that locates it.
+- **`{}`-collapse** — a signature that collapses to empty means the
+  expression is a *basis change* (same information in two networks),
+  not a relation: `ρ = m/V` `{mass:+1, mass:−1}`, mole fractions
+  `{component_mass:+1, component_mass:−1}`.  Generalised: *any
+  quantity normed by its own network's extent is token-neutral.*
+  `/check` warns; never blocks.
+- **Space/time asymmetry** — time enters token space (as `−1` on
+  flows) because every conserved quantity flows *in* time; space
+  never enters it — spatial resolution lives in index structures and
+  domains instead.  A `token_space` basis element is deferred until
+  spatial modelling needs quantities normed by position.
+
+Advisories (`space.warnings` → `CheckResponse.warnings` →
+`EquationRecord.warnings`, transient) cover sum/`maxmin` signature
+mismatches, odd `sqrt` exponents, `{}`-collapse, and computed-vs-declared
+LHS mismatches.
+
 ## 4. Loader contract
 
 The graph-store provider is the seam between the ontology layer and the
