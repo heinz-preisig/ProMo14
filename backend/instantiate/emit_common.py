@@ -109,8 +109,53 @@ def tear_loop(blocks: List[PlanBlock]
             break                           # acyclic() guarantees
         order.extend(ready)
         rest.difference_update(ready)
-    return ([blocks[i] for i in sorted(torn)],
+    return (_tear_order(blocks, deps, torn),
             [blocks[i] for i in order])
+
+
+def _tear_order(blocks: List[PlanBlock], deps: Dict[int, List[int]],
+                torn: set) -> List[PlanBlock]:
+    """Ordinal-aware tear ordering (§22): the iterated unknowns
+    sequenced by their intra-torn dependency DAG — a tear consumed
+    by another tear's residual comes first, so the solver's Jacobian
+    is block-triangular wherever the torn structure allows.
+
+    Deps restricted to the torn set may still cycle (a genuine
+    minimum feedback inside the boundary), so the sequence is over
+    the SCC *condensation*: mutually dependent tears stay adjacent
+    as one dense diagonal block, acyclic links triangulate.
+    """
+    tsucc: Dict[int, set] = {i: set() for i in torn}
+    for i in torn:
+        for p in deps[i]:
+            if p in torn and p != i:
+                tsucc[p].add(i)          # producer → consumer
+    comps = [list(c) for c in _sccs(tsucc)]
+    grouped = {i for comp in comps for i in comp}
+    comps += [[i] for i in sorted(torn) if i not in grouped]
+    comp_of = {i: c for c, comp in enumerate(comps) for i in comp}
+    csucc: Dict[int, set] = {c: set() for c in range(len(comps))}
+    for i in torn:
+        for j in tsucc[i]:
+            a, b = comp_of[i], comp_of[j]
+            if a != b:
+                csucc[a].add(b)
+    # Kahn over the condensation; singletons/sccs keep index order.
+    indeg = {c: 0 for c in csucc}
+    for c in csucc:
+        for d in csucc[c]:
+            indeg[d] += 1
+    ready = sorted(c for c in csucc if not indeg[c])
+    out: List[int] = []
+    while ready:
+        c = ready.pop(0)
+        out.extend(sorted(comps[c]))
+        for d in sorted(csucc[c]):
+            indeg[d] -= 1
+            if not indeg[d]:
+                ready.append(d)
+        ready.sort()
+    return [blocks[i] for i in out]
 
 
 def bound_dims(indices: Dict[str, List[str]]) -> List[int]:

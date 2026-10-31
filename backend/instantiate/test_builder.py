@@ -57,6 +57,7 @@ from backend.instantiate.plan import (
     PlanBlock,
     code_plan_from_dict,
     plan,
+    sub_plan_slice,
 )
 from backend.instantiate.scheduler import schedule
 from backend.main import app
@@ -1049,6 +1050,69 @@ def _occ_plan() -> CodePlan:
                       occurrence="MODEL/Composite_2"),
         ]],
     )
+
+
+def test_sub_plan_slice_direct_ownership():
+    """§22 nested sub-plans: the slice keeps blocks and slots owned
+    directly by the occurrence; host content, nested occurrences and
+    boundary-crossing loops stay out."""
+    path = "MODEL/Composite_2"
+    inner = path + "/MODEL/Composite_9"
+    cp = _occ_plan()
+    cp.occurrences.append({
+        "path": inner, "comp": "MODEL/Composite_9",
+        "refersTo": "https://example.org/deep", "overrides": {}})
+    cp.levels[0].append(
+        PlanBlock(entity_type="et", equation="e3", lhs=_var("x"),
+                  lhs_instance="V_4@et", lhs_name="V_4",
+                  inputs=[], rhs="1", occurrence=inner))
+    cp.levels[0].append(
+        PlanBlock(entity_type="et", equation="e4", lhs=_var("y"),
+                  lhs_instance="V_5@et", lhs_name="V_5",
+                  inputs=[], rhs="1", occurrence=""))
+    sub = sub_plan_slice(cp, path)
+    lhs = {b.lhs for lvl in sub.levels for b in lvl}
+    assert lhs == {_var("p"), _var("J")}
+    # nested occurrence registers below the slice — deeper slices nest
+    assert [o["path"] for o in sub.occurrences] == [inner]
+    # the host-owned block is not part of the slice
+    assert _var("y") not in lhs
+    # the nested occurrence's own block is not either
+    assert _var("x") not in lhs
+
+
+def test_tear_order_topological():
+    """§22 ordinal-aware Jacobian: torn unknowns sequence producer-
+    before-consumer over their intra-torn DAG — residual i reads only
+    unknowns j<=i wherever the torn structure is acyclic; a mutually
+    dependent pair stays adjacent as one dense diagonal block."""
+    from backend.instantiate.emit_common import _tear_order
+    blocks = [PlanBlock(entity_type="et", equation=f"e{i}",
+                        lhs=_var(f"v{i}"), lhs_instance=f"V_{i}@et")
+              for i in range(4)]
+    # e1 consumes e2's var, e3 consumes e2's var; e0 unconsumed
+    deps = {0: [], 1: [2], 2: [], 3: [2]}
+    out = _tear_order(blocks, deps, {0, 1, 2, 3})
+    seq = [blocks.index(b) for b in out]
+    assert seq.index(2) < seq.index(1) and seq.index(2) < seq.index(3)
+    # mutually dependent tears stay adjacent (one dense block)
+    deps2 = {0: [1], 1: [0], 2: [], 3: [2]}
+    out2 = [blocks.index(b) for b in
+            _tear_order(blocks, deps2, {0, 1})]
+    assert out2 == [0, 1]
+
+
+def test_sub_plan_slice_loop_membership():
+    """A loop survives the slice only when every member is owned by
+    the occurrence — coupling loops belong to the host."""
+    cp = _loop_plan()
+    for b in cp.levels[0]:
+        b.occurrence = "O"
+    cp.occurrences = [{"path": "O", "comp": "O",
+                       "refersTo": "r", "overrides": {}}]
+    assert sub_plan_slice(cp, "O").loops == cp.loops
+    cp.levels[0][0].occurrence = ""
+    assert sub_plan_slice(cp, "O").loops == []
 
 
 def test_emit_python_occurrence_fn():

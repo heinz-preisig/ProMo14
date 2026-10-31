@@ -2211,9 +2211,17 @@ needs merge machinery that Fork already provides.
   occurrence's effective context (submodel pins re-pointed by
   overrides) into vars/assignments/species/value-cells; problems:
   `reference-cycle`, `uncovered-override`, `species-port-mismatch`.
-- **Deferred**: nested `promo:Instantiation` sub-plans + call-style
-  codegen (approach 2) — flat merged plan works; per-occurrence
-  function extraction is a codegen feature.
+- **Nested sub-plans — resolved 2026-10-31**: `POST
+  /api/instantiate/instantiations` writes one `promo:Instantiation`
+  per occurrence inside the host artefact — `hasSubPlan` link,
+  `occurrencePath`, `instantiates` → referred artefact, `overrides`
+  JSON, effective-pin provenance
+  (`usesLibrary`/`usesAssignment`/`usesSpecies`/`usesValues`, the
+  override-resolved context `_occurrence_contexts` computed against)
+  and a `promo:plan` JSON sliced by `sub_plan_slice` (direct
+  ownership only — nested occurrences own their content;
+  boundary-crossing loops stay with the host).  Call-style codegen
+  (approach 2) was already in the emitters.
 
 ### Codegen architecture — resolved 2026-10-29
 

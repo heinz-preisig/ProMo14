@@ -174,7 +174,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
                      PROMO["publishedOn"], PROMO["seedFloor"],
                      PROMO["valueCell"], PROMO["atIndexElement"],
                      PROMO["coordinate"], PROMO["valueFill"],
-                     PROMO["fillPattern"]):
+                     PROMO["fillPattern"],
+                     PROMO["hasSubPlan"], PROMO["occurrencePath"],
+                     PROMO["instantiates"], PROMO["overrides"],
+                     PROMO["usesValues"]):
             if (term, RDF.type, RDF.Property) not in graph:
                 graph.add((term, RDF.type, RDF.Property))
                 added += 1

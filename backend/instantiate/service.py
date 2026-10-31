@@ -79,7 +79,7 @@ from .distribute import (
     SpeciesNode,
     distribute,
 )
-from .plan import plan, code_plan_from_dict
+from .plan import plan, code_plan_from_dict, sub_plan_slice
 from .scheduler import schedule
 from .resolver import (
     ArcInfo,
@@ -854,6 +854,14 @@ def _occurrence_contexts(store, model_graph, occurrences,
         for v in v2:
             cell_source[v] = vals_graph
 
+        # §22 sub-plan provenance: the effective pins this occurrence
+        # instantiated under — persisted on the nested
+        # promo:Instantiation (see save_instantiation).
+        occ["pins"] = {
+            "library": lib2,
+            "assignment": asg2,
+            "values": str(vals_graph.identifier)}
+
         # species: effective pin = occurrence override else the
         # submodel's own pin; the distribution merges re-homed under
         # the occurrence path
@@ -1396,6 +1404,34 @@ def save_instantiation(
            Literal(datetime.now(timezone.utc).isoformat())))
     g.set((URIRef(iri), PROMO["problems"],
            Literal(json.dumps([p.kind for p in report.problems]))))
+
+    # §22 nested sub-plans: one promo:Instantiation per referenced-
+    # composite occurrence — provenance (instantiates + the effective
+    # pins + overrides) plus the sliced plan, so the submodel's
+    # contribution replays standalone and audits against its pins.
+    for i, occ in enumerate(cp.occurrences):
+        sub_iri = URIRef(f"{iri}#occ_{i}")
+        g.add((URIRef(iri), PROMO["hasSubPlan"], sub_iri))
+        g.add((sub_iri, RDF.type, PROMO["Instantiation"]))
+        g.set((sub_iri, PROMO["occurrencePath"],
+               Literal(occ["path"])))
+        if occ.get("refersTo"):
+            g.add((sub_iri, PROMO["instantiates"],
+                   URIRef(occ["refersTo"])))
+        if occ.get("overrides"):
+            g.set((sub_iri, PROMO["overrides"],
+                   Literal(json.dumps(occ["overrides"]))))
+        pins = occ.get("pins") or {}
+        for key, pred in (("library", "usesLibrary"),
+                          ("assignment", "usesAssignment"),
+                          ("species", "usesSpecies"),
+                          ("values", "usesValues")):
+            if pins.get(key):
+                g.add((sub_iri, PROMO[pred], URIRef(pins[key])))
+        g.set((sub_iri, PROMO["plan"],
+               Literal(json.dumps(
+                   asdict(sub_plan_slice(cp, occ["path"]))))))
+
     return InstantiationSaveOut(
         iri=iri, generated_from=str(model_iri),
         problems=[p.kind for p in report.problems])

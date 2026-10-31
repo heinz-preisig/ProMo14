@@ -204,7 +204,8 @@ def plan(report: Instantiation, sched: Schedule,
     out.occurrences = [
         {"path": o.get("path", ""), "comp": o.get("comp", ""),
          "refersTo": o.get("refersTo", ""),
-         "overrides": o.get("overrides", {})}
+         "overrides": o.get("overrides", {}),
+         "pins": o.get("pins", {})}
         for o in (occurrences or []) if not o.get("cycle")]
     canonicals = canonicals or {}
     # element-class selectors: sub-index IRI → its element set, so a
@@ -520,6 +521,41 @@ def _all_elements(v: VarBinding) -> List[str]:
     for els in v.indices.values():
         out.extend(els or [])
     return out
+
+
+def sub_plan_slice(cp: CodePlan, path: str) -> CodePlan:
+    """The per-occurrence slice of a merged plan (§22).
+
+    Slots and blocks owned *directly* by ``path`` — nested
+    occurrences own their own content, so deeper prefixes are
+    excluded.  Loops survive only when every member sits inside the
+    slice (a boundary-crossing coupling loop belongs to the host).
+    The nested-occurrence registry carries over so deeper slices
+    nest naturally.
+    """
+    sub = CodePlan()
+    sub.occurrences = [dict(o) for o in cp.occurrences
+                       if o.get("path", "").startswith(path + "/")]
+
+    def owns(instance: str) -> bool:
+        return _occ_of(instance, cp.occurrences) == path
+
+    sub.states = [s for s in cp.states if owns(s.instance)]
+    sub.params = [p for p in cp.params if owns(p.instance)]
+    sub.inputs = [p for p in cp.inputs if owns(p.instance)]
+    sub.gathers = [g for g in cp.gathers if owns(g.instance)]
+    sub.matrices = [m for m in cp.matrices if owns(m.instance)]
+    sub.outputs = [o for o in cp.outputs if owns(o.instance)]
+    members = {(b.entity_type, b.equation)
+               for lvl in cp.levels for b in lvl
+               if b.occurrence == path}
+    sub.levels = [lvl for lvl in
+                  ([b for b in lvl if b.occurrence == path]
+                   for lvl in cp.levels) if lvl]
+    sub.initials = [b for b in cp.initials if b.occurrence == path]
+    sub.loops = [scc for scc in cp.loops if set(scc) <= members]
+    sub.names = {et: dict(m) for et, m in cp.names.items()}
+    return sub
 
 
 # ---------------------------------------------------------------------------
