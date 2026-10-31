@@ -328,8 +328,7 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:tokenVector "{\"token_component_mass\": 1}" ;
-        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" .
 
     <promo:c> a promo:Variable ;
         rdfs:label "c" ;
@@ -348,8 +347,7 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:tokenVector "{\"token_component_mass\": 1, \"token_mass\": -1}" ;
-        promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" .
 
     <promo:c_conv> a promo:Variable ;
         rdfs:label "c_conv" ;
@@ -402,8 +400,7 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:tokenVector "{\"token_component_mass\": 1, \"token_time\": -1}" ;
-        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" .
 
     <promo:fV> a promo:Variable ;
         rdfs:label "fV" ;
@@ -422,8 +419,7 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
-        promo:unitVector "[-1, 3, 0, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[-1, 3, 0, 0, 0, 0, 0, 0]" .
 
     <promo:fn_conv> a promo:Variable ;
         rdfs:label "fn_conv" ;
@@ -495,8 +491,7 @@
         promo:network "properties" ;
         promo:portVariable false ;
         promo:tokenVector "{}" ;
-        promo:unitVector "[0, -3, 0, 1, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[0, -3, 0, 1, 0, 0, 0, 0]" .
 
     <promo:V> a promo:Variable ;
         rdfs:label "V" ;
@@ -513,8 +508,7 @@
         promo:network "physical" ;
         promo:portVariable true ;
         promo:tokenVector "{\"token_mass\": 1}" ;
-        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
 
     <promo:F_conv> a promo:Variable ;
         rdfs:label "F_conv" ;

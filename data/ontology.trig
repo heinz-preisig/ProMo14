@@ -1755,8 +1755,7 @@
         promo:network "physical" ;
         promo:portVariable true ;
         promo:tokenVector "{\"token_mass\": 1}" ;
-        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
 
     <promo:fm_conv> a promo:Variable ;
         rdfs:label "fm_conv" ;
