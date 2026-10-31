@@ -50,7 +50,6 @@ def _var(tag: str, **over):
         "internal_id": tag,
         "aliases": {"global_ID": tag},
         "network": "root",
-        "variable_class": "state",
         "units": [0] * 8,
         "tokens": [],
         "index_structures": [],
@@ -122,7 +121,6 @@ def test_role_edit_allowed_when_referenced(client):
 
     r = _put(client, _var(
         "V_1",
-        variable_class="parameter",
         classifications={"axis:function": "term:parameter"},
     ))
     assert r.status_code == 200, r.text
@@ -134,7 +132,8 @@ def test_own_equation_allows_role_change(client):
         "root": _eq("E_1", f"{BASE}#V_1", "2"),
     }))
 
-    r = _put(client, _var("V_1", variable_class="parameter"))
+    r = _put(client, _var(
+        "V_1", classifications={"axis:function": "term:parameter"}))
     assert r.status_code == 200, r.text
 
 

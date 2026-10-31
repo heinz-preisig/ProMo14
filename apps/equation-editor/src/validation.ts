@@ -15,15 +15,6 @@ export function isValidVariableName(name: string): boolean {
 export const VARIABLE_NAME_HINT =
   'Letters, digits and underscore; must not start with a digit'
 
-export const VARIABLE_CLASSES = [
-  'state',
-  'effort',
-  'transport',
-  'frame',
-  'network',
-  'constant',
-  'parameter',
-]
 
 /** Names are case-sensitive end-to-end (lexer, rdfs:label lookup and
  *  the minted IRI all preserve case).  This helper spots collisions a

@@ -37,8 +37,7 @@ from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS, XSD
 
 from backend.core.graph_store import PROMO, get_store
-from backend.equation.checker import INSTANTIATE_CLASSES
-from backend.equation.compile_space import CompileSpace
+from backend.equation.compile_space import BOUND_KINDS, CompileSpace
 from backend.equation.document import _rhs_latex, _var_symbol
 from backend.core.deps import editable_param, graph_param
 from backend.ontology.rdf_context import scoped_context
@@ -87,7 +86,7 @@ class VariableOut(BaseModel):
     iri: str
     label: str
     network: str = "root"
-    variable_class: str = "state"
+    type: str = ""                        # derived kind tag (§24)
     port_variable: bool = False
     tokens: List[str] = Field(default_factory=list)
 
@@ -139,7 +138,7 @@ def _collect(ctx):
 
     Also derives the auto-instantiated set: variables that are
     instantiation endpoints by nature — bound-value classes
-    (``INSTANTIATE_CLASSES``: constant/parameter) or carrying a
+    (``BOUND_KINDS``: constant/parameter) or carrying a
     pre-bound ``promo:value``.  The engine treats them as resolved
     without an explicit marking (hint/binding pattern).
     """
@@ -148,14 +147,14 @@ def _collect(ctx):
     auto: set = set()
     for iri, var in ctx.variables().items():
         variables[iri] = var
-        if (getattr(var, "type", None) in INSTANTIATE_CLASSES
+        if (getattr(var, "type", None) in BOUND_KINDS
                 or getattr(var, "value", None) is not None):
             auto.add(iri)
         for eq in getattr(var, "equations", {}).values():
             equations[eq["iri"]] = EquationInfo(
                 iri=eq["iri"],
                 lhs=eq["lhs"],
-                lhs_class=getattr(var, "type", "state"),
+                lhs_class=getattr(var, "type", ""),
                 incidence=list(eq.get("incidence_list") or []),
             )
     return variables, equations, auto
@@ -288,7 +287,7 @@ def context_endpoint(
             rhs=e.get("rhs") or "",
             rhs_latex=_rhs_latex(e, var, ctx),
             equation_class=e.get("equation_class"),
-            lhs_class=getattr(var, "type", "state"),
+            lhs_class=getattr(var, "type", ""),
             network=e.get("network"),
             incidence=list(e.get("incidence_list") or []),
         ) for iri, var in ctx.variables().items()
@@ -297,7 +296,7 @@ def context_endpoint(
             iri=iri,
             label=getattr(v, "label", iri),
             network=getattr(v, "network", "root"),
-            variable_class=getattr(v, "type", "state"),
+            type=getattr(v, "type", ""),
             port_variable=getattr(v, "port_variable", False),
             tokens=list(getattr(v, "tokens", []) or []),
         ) for iri, v in variables.items()],

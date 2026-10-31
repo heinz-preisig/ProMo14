@@ -119,7 +119,6 @@
 
     promo:value a rdf:Property .
 
-    promo:variableClass a rdf:Property .
 
     promo:versionInfo a rdf:Property .
 
@@ -135,7 +134,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0.5" ;
-        promo:variableClass "constant" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant> .
 
     <https://w3id.org/promo/ontology#const_one> a promo:Variable ;
         rdfs:label "one" ;
@@ -147,7 +146,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:value "1" ;
-        promo:variableClass "constant" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant> .
 
     <https://w3id.org/promo/ontology#const_zero> a promo:Variable ;
         rdfs:label "zero" ;
@@ -159,7 +158,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0" ;
-        promo:variableClass "constant" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant> .
 
     <https://w3id.org/promo/ontology#domain_control> a promo:Domain ;
         promo:branch "information" ;
@@ -1065,7 +1064,7 @@
         promo:network "physical" ;
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> .
 
     promo:aliases a rdf:Property .
 
@@ -1138,7 +1137,6 @@
     promo:value a rdf:Property ;
         promo:doc "Literal scalar payload — a constant's pre-bound value (ADR-008) or a promo:ValueCell's value.  Never an expression: computed values are promo:Expression trees behind promo:rhsExpression or 'initialise'-class equations." .
 
-    promo:variableClass a rdf:Property .
 
     promo:versionInfo a rdf:Property .
 
@@ -1324,7 +1322,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0.5" ;
-        promo:variableClass "constant" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant> .
 
     <https://w3id.org/promo/ontology#const_one> a promo:Variable ;
         rdfs:label "one" ;
@@ -1336,7 +1334,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:value "1" ;
-        promo:variableClass "constant" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant> .
 
     <https://w3id.org/promo/ontology#const_zero> a promo:Variable ;
         rdfs:label "zero" ;
@@ -1348,7 +1346,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:value "0" ;
-        promo:variableClass "constant" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant> .
 
     <https://w3id.org/promo/ontology#domain_control> a promo:Domain ;
         promo:branch "information" ;
@@ -1698,8 +1696,7 @@
         promo:network "physical" ;
         promo:portVariable true ;
         promo:tokenVector "{\"token_mass\": 1}" ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "network" .
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]"  .
 
     <promo:Mm> a promo:Variable ;
         rdfs:label "Mm" ;
@@ -1714,7 +1711,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1, \"token_component_mass\": -1}" ;
         promo:unitVector "[0, 0, -1, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "parameter" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_parameter> .
 
     <promo:S> a promo:Variable ;
         rdfs:label "S" ;
@@ -1729,7 +1726,7 @@
         promo:portVariable true ;
         promo:tokenVector "{\"token_entropy\": 1}" ;
         promo:unitVector "[-2, 2, 0, 1, -1, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
 
     <promo:T> a promo:Variable ;
         rdfs:label "T" ;
@@ -1745,7 +1742,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_energy\": 1, \"token_entropy\": -1}" ;
         promo:unitVector "[0, 0, 0, 0, 1, 0, 0, 0]" ;
-        promo:variableClass "effort" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_effort> .
 
     <promo:V> a promo:Variable ;
         rdfs:label "V" ;
@@ -1759,7 +1756,7 @@
         promo:portVariable true ;
         promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
 
     <promo:fm_conv> a promo:Variable ;
         rdfs:label "fm_conv" ;
@@ -1776,7 +1773,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
         promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "transport" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_flow> .
 
     <promo:k_conv> a promo:Variable ;
         rdfs:label "k_conv" ;
@@ -1790,7 +1787,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_energy\": -1, \"token_time\": -1}" ;
         promo:unitVector "[1, -1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "transport" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_flow> .
 
     <promo:n> a promo:Variable ;
         rdfs:label "n" ;
@@ -1807,7 +1804,7 @@
         promo:portVariable true ;
         promo:tokenVector "{\"token_component_mass\": 1}" ;
         promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
 
     <promo:p_mech> a promo:Variable ;
         rdfs:label "p_mech" ;
@@ -1823,7 +1820,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_energy\": 1, \"token_momentum\": -1}" ;
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "effort" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_effort> .
 
     <promo:p_term> a promo:Variable ;
         rdfs:label "p_term" ;
@@ -1840,7 +1837,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_energy\": 1, \"token_mass\": -1}" ;
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "effort" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_effort> .
 
     <promo:r_x> a promo:Variable ;
         rdfs:label "r_x" ;
@@ -1854,7 +1851,7 @@
         promo:network "physical" ;
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> .
 
     <promo:r_y> a promo:Variable ;
         rdfs:label "r_y" ;
@@ -1868,7 +1865,7 @@
         promo:network "physical" ;
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> .
 
     <https://w3id.org/promo/ontology> a promo:Ontology ;
         promo:seedFloor "2026-09-2" .
@@ -1899,7 +1896,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_momentum\": 1}" ;
         promo:unitVector "[0, 2, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "transport" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_flow> .
 
     <promo:U> a promo:Variable ;
         rdfs:label "U" ;
@@ -1914,7 +1911,7 @@
         promo:portVariable true ;
         promo:tokenVector "{\"token_energy\": 1}" ;
         promo:unitVector "[-2, 2, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
 
     <promo:dmdt> a promo:Variable ;
         rdfs:label "dmdt" ;
@@ -1930,7 +1927,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
         promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
 
     <promo:te> a promo:Variable ;
         rdfs:label "te" ;
@@ -1944,7 +1941,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "parameter" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_parameter> .
 
     <promo:to> a promo:Variable ;
         rdfs:label "to" ;
@@ -1958,7 +1955,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "parameter" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_parameter> .
 
     <https://w3id.org/promo/ontology#cap_reaction_host> a promo:Capability ;
         rdfs:label "reaction host" ;
@@ -2119,7 +2116,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:variableClass "state" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
 
     <https://w3id.org/promo/ontology#axis_extensity> a promo:ClassificationAxis ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
@@ -2189,7 +2186,7 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:variableClass "frame" .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> .
 
     <https://w3id.org/promo/ontology#etype_mass_transport> a promo:EntityType ;
         rdfs:label "Mass Transport" ;

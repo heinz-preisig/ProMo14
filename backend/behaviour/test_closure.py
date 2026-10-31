@@ -514,7 +514,10 @@ def _seed_vars():
     g = store.ontology_graph
     store.add_variable_dict(g, {
         "iri": "https://w3id.org/promo/ontology#var_s",
-        "label": "s", "network": "physical", "variable_class": "state",
+        "label": "s", "network": "physical",
+        "classifications": {
+            "https://w3id.org/promo/ontology#axis_function_physical":
+            "https://w3id.org/promo/ontology#term_function_state"},
         "equations": {"E_1": {
             "iri": "https://w3id.org/promo/ontology#eq_E1",
             "internal_id": "E_1", "rhs": "x",
@@ -523,7 +526,10 @@ def _seed_vars():
     })
     store.add_variable_dict(g, {
         "iri": "https://w3id.org/promo/ontology#var_x",
-        "label": "x", "network": "physical", "variable_class": "state",
+        "label": "x", "network": "physical",
+        "classifications": {
+            "https://w3id.org/promo/ontology#axis_function_physical":
+            "https://w3id.org/promo/ontology#term_function_state"},
         "equations": {"E_2": {
             "iri": "https://w3id.org/promo/ontology#eq_E2",
             "internal_id": "E_2", "rhs": "s",

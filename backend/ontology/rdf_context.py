@@ -21,7 +21,9 @@ from rdflib.namespace import RDF, RDFS
 from backend.core.graph_store import PROMO, RdfStore
 from backend.equation.canonical import to_source
 from backend.equation.canonical_rdf import read_rhs_expression
-from backend.equation.compile_space import CompileSpace, Index, Variable
+from backend.equation.compile_space import (
+    CompileSpace, Index, Variable, kind_tag,
+)
 from backend.equation.context import EquationContext
 from backend.equation.errors import VarError
 from backend.equation.units import Units
@@ -237,15 +239,21 @@ class RdfContext(EquationContext):
         # next to the variable, but the AxisTerm/hasAxis resources live in
         # the ontology graph — a per-graph lookup drops them.
         term_axis: Dict[str, str] = {}
+        term_label: Dict[str, str] = {}
         for graph in self._all_graphs():
             for term, axis in graph.subject_objects(PROMO["hasAxis"]):
                 term_axis[str(term)] = str(axis)
+            for term in graph.subjects(RDF.type, PROMO["AxisTerm"]):
+                label = graph.value(term, RDFS.label)
+                if label is not None:
+                    term_label[str(term)] = str(label)
         for graph in self._all_graphs():
             for s in graph.subjects(RDF.type, PROMO["Variable"]):
                 iri = str(s)
                 network, domain_iri = _domain_membership(graph, s)
                 var = self._build_variable(
-                    graph, s, iri, network, domain_iri, term_axis)
+                    graph, s, iri, network, domain_iri, term_axis,
+                    term_label)
                 existing = variables.get(iri)
                 if existing is None:
                     variables[iri] = var
@@ -259,7 +267,9 @@ class RdfContext(EquationContext):
 
     def _build_variable(self, graph, s, iri: str, network: str,
                         domain_iri: str,
-                        term_axis: Optional[Dict[str, str]] = None) -> Variable:
+                        term_axis: Optional[Dict[str, str]] = None,
+                        term_label: Optional[Dict[str, str]] = None
+                        ) -> Variable:
         aliases = _aliases(graph, s)
         fragment = iri.split("#")[-1].split("/")[-1]
         if fragment and "global_ID" not in aliases:
@@ -279,7 +289,7 @@ class RdfContext(EquationContext):
             label=_one_literal(graph, s, RDFS.label) or iri,
             network=network,
             domain_iri=domain_iri,
-            type=_one_literal(graph, s, PROMO["variableClass"], "state"),
+            type=kind_tag(classifications, term_label or {}),
             units=Units.from_list(
                 _one_unit_list(graph, s, PROMO["unitVector"])
             ),

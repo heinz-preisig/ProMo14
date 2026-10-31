@@ -556,18 +556,24 @@ def _seed_port_vars():
     g = store.ontology_graph
     store.add_variable_dict(g, {
         "iri": f"{ONTO}#var_p", "label": "p",
-        "network": "physical", "variable_class": "state",
+        "network": "physical",
+        "classifications": {f"{ONTO}#axis_function_physical":
+                            f"{ONTO}#term_function_state"},
         "tokens": [TOK_MASS]})
     store.add_variable_dict(g, {
         "iri": f"{ONTO}#var_n", "label": "n",
-        "network": "physical", "variable_class": "state",
+        "network": "physical",
+        "classifications": {f"{ONTO}#axis_function_physical":
+                            f"{ONTO}#term_function_state"},
         "tokens": [TOK_MASS],
         "equations": {"E_n": {
             "iri": f"{ONTO}#eq_En", "internal_id": "E_n",
             "rhs": "F", "incidence_list": [f"{ONTO}#var_p"]}}})
     store.add_variable_dict(g, {
         "iri": f"{ONTO}#var_p_env", "label": "p_env",
-        "network": "physical", "variable_class": "parameter",
+        "network": "physical",
+        "classifications": {f"{ONTO}#axis_function_physical":
+                            f"{ONTO}#term_function_parameter"},
         "tokens": [TOK_MASS]})
     # pin the model's derived assignment graph (requests carry
     # ?graph=MODEL, so PUT /assignment writes to MODEL/assignments)

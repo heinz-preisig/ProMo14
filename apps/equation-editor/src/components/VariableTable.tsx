@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { indexShortLabel } from '../latex'
-import type { EquationClass, Index, Variable } from '../types'
+import type { ClassificationAxis, EquationClass, Index, Variable } from '../types'
+import { kindSummary } from '../axisClassifications'
 import { equationClassLabel } from '../variableUtils'
 
 /** SI symbols matching UNIT_LABELS in the editors:
@@ -20,6 +21,8 @@ type SortKey = 'label' | 'type' | 'network' | 'eqs'
 export interface VariableTableProps {
   variables: Variable[]
   indices: Index[]
+  /** Classification axes — renders each variable's composite kind. */
+  axes?: ClassificationAxis[]
   /** EquationClass nodes — maps stored class IRIs to labels. */
   equationClasses?: EquationClass[]
   onSelect?: (v: Variable) => void
@@ -34,7 +37,7 @@ type EditCell = { iri: string; field: 'label' | 'doc' }
 /** Repository browser: sortable/filterable table of all variables with
  *  per-variable expandable equation rows.  Name and doc cells are
  *  click-to-edit when ``onSave`` is given. */
-export default function VariableTable({ variables, indices, equationClasses = [], onSelect, onSave }: VariableTableProps) {
+export default function VariableTable({ variables, indices, axes = [], equationClasses = [], onSelect, onSave }: VariableTableProps) {
   const [filter, setFilter] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('label')
   const [sortAsc, setSortAsc] = useState(true)
@@ -106,18 +109,21 @@ export default function VariableTable({ variables, indices, equationClasses = []
   const eqCount = (v: Variable) => Object.keys(v.equations ?? {}).length
 
   const rows = useMemo(() => {
+    const kind = (v: Variable) => kindSummary(axes, v.classifications ?? {})
     const q = filter.trim().toLowerCase()
     const filtered = q
       ? variables.filter(
           (v) =>
             v.label.toLowerCase().includes(q) ||
             (v.doc ?? '').toLowerCase().includes(q) ||
-            (v.type ?? '').toLowerCase().includes(q) ||
+            kind(v).toLowerCase().includes(q) ||
             (v.network ?? '').toLowerCase().includes(q),
         )
       : [...variables]
     const key = (v: Variable): string | number =>
-      sortKey === 'eqs' ? eqCount(v) : ((v[sortKey] as string | undefined) ?? '')
+      sortKey === 'eqs' ? eqCount(v)
+      : sortKey === 'type' ? kind(v)
+      : ((v[sortKey] as string | undefined) ?? '')
     filtered.sort((a, b) => {
       const ka = key(a)
       const kb = key(b)
@@ -178,7 +184,7 @@ export default function VariableTable({ variables, indices, equationClasses = []
           type="text"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by name, doc, class, network…"
+          placeholder="Filter by name, doc, kind, network…"
           style={{
             fontSize: 12,
             padding: '4px 6px',
@@ -206,7 +212,7 @@ export default function VariableTable({ variables, indices, equationClasses = []
             <tr>
               <th style={{ width: 24, borderBottom: '1px solid #ccc', background: '#f0f0f0', position: 'sticky', top: 0 }} />
               {header('Name', 'label')}
-              {header('Class', 'type')}
+              {header('Kind', 'type')}
               {header('Network', 'network')}
               <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid #ccc', background: '#f0f0f0', position: 'sticky', top: 0 }}>
                 Indices
@@ -279,7 +285,9 @@ export default function VariableTable({ variables, indices, equationClasses = []
                           )}
                       </td>
                       <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', color: '#555' }}>
-                        {v.type ?? '—'}
+                        {kindSummary(axes, v.classifications ?? {}) || (
+                          <span style={{ color: '#8d6e00', fontStyle: 'italic' }}>unclassified</span>
+                        )}
                       </td>
                       <td style={{ padding: '4px 8px', borderBottom: '1px solid #eee', color: '#555' }}>
                         {v.network}

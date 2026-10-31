@@ -45,7 +45,7 @@ class EquationInfo:
 
     iri: str
     lhs: str                              # variable IRI it defines
-    lhs_class: str = "state"              # variable class of LHS
+    lhs_class: str = ""                   # derived kind tag of LHS (§24)
     incidence: List[str] = field(default_factory=list)  # RHS var IRIs
 
 

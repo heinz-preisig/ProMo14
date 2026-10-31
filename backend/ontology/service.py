@@ -127,7 +127,7 @@ def _variable_to_record(v) -> Dict[str, Any]:
         "iri": v.iri,
         "label": v.label,
         "network": v.network,
-        "variable_class": getattr(v, "type", None),
+        "type": getattr(v, "type", ""),
         "classifications": getattr(v, "classifications", {}),
         "units": v.units.as_list(),
         "index_structures": v.index_structures,

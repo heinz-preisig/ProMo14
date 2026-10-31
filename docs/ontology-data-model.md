@@ -26,7 +26,7 @@ stable key.  Grouped by purpose, the fields are:
 
     "domain_iri": "domain_iri_V1",
     "network": "macroscopic",
-    "variable_class": "state",
+    "type": "state",
     "port_variable": false,
 
     "doc": "doc_V1",
@@ -94,11 +94,14 @@ parse time (label → IRI resolution).
   validated against the domain resource, not treated as a free-form foreign
   key.  The domain-tree root is `universe` with IRI fragment
   `domain_universe`.
-- `variable_class` — variable class chosen from those valid for the
-  selected domain (`state`, `effort`, `transport`, `frame`, `network`, ...).
-  In the old JSON this field is called `type`; in the Python dataclass it is
-  `Variable.type` because `class` is a reserved keyword.  The RDF predicate
-  should be `promo:variable_class`.
+- `classifications` — map of **axis IRI → axis-term IRI**, persisted as
+  `promo:axisValue` triples (the multi-axis scheme: `determination`,
+  `function`, `role`, `extensity`).  §24 (2026-10-31): this is the single
+  classification truth.  The legacy flat `variable_class` /
+  `promo:variableClass` predicate is **removed** — the flat kind tag
+  (`state`, `constant`, `flow`, …) survives only as a *derived* display
+  (`Variable.type` via `compile_space.kind_tag`), never stored.  In the
+  old JSON this field was called `type`.
 - `port_variable` — `true` for the fundamental quantities and constants
   that **are the foundation** of the var/expr graph.  Port variables are
   declared with a name, units, and index structure, but have **no defining
@@ -196,8 +199,7 @@ Grouped by purpose, a typical index carries:
   key.  The domain-tree root is `universe` with IRI fragment
   `domain_universe`.
 - `index_class` — `"index"` or `"block_index"`.  In the old JSON this field
-  is called `type`; renamed for consistency with `variable_class` /
-  `equation_class`.
+  is called `type`; renamed for consistency with `equation_class`.
 
 #### Token
 - `token` — the token type this index carries (e.g. `promo:species`).
@@ -453,8 +455,7 @@ Grouped by purpose, mirroring the ``Variable`` dataclass.
 |---|---|---|
 | `promo:inDomain` | `promo:Domain` IRI | `Variable.domain_iri` (authoritative) |
 | `promo:network` | xsd:string | `Variable.network` (compatibility/display name) |
-| `promo:variableClass` | xsd:string | `Variable.type` (Python field name; values: `state`, `effort`, ...) |
-| `promo:axisValue` | `promo:AxisTerm` (IRI, multiple) | multi-axis classification terms |
+| `promo:axisValue` | `promo:AxisTerm` (IRI, multiple) | `Variable.classifications` — axis IRI → term IRI; the single classification truth (§24).  `Variable.type` is a derived kind tag, never stored. |
 | `promo:portVariable` | xsd:boolean | `Variable.port_variable` |
 | `promo:imported` | xsd:boolean | ontology-only metadata — not in `EquationContext` |
 
@@ -474,7 +475,7 @@ mass, temperature, current, light, nil); the loader converts it to
 `Units`.
 
 The universal constants `zero`, `one`, `half` are seeded into every
-ontology (network `root`, class `constant`, deterministic IRIs
+ontology (network `root`, determination `constant`, deterministic IRIs
 `…#const_zero` / `…#const_one` / `…#const_half`) with `promo:value`
 pre-bound — see ADR-008.
 
@@ -636,7 +637,7 @@ Two distinct declarations, both on `promo:Variable`:
   conjugacy invariant follows.
 - **`token_time`** is `tokenKind "basis"`: an algebraic basis element,
   never a `carriesToken` target — nothing is conserved per unit time.
-- **Frame variables** (`t`, `r_x`/`r_y`/`r_z`, class `frame`) are the
+- **Frame variables** (`t`, `r_x`/`r_y`/`r_z`, function `frame`) are the
   free coordinates — no `carriesToken`, no `tokenVector`,
   `portVariable false`.  The token belongs to what lives *in* the
   domain, not to the coordinate that locates it.

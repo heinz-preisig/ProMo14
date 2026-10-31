@@ -51,7 +51,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
-from backend.equation.checker import INSTANTIATE_CLASSES
+from backend.equation.compile_space import BOUND_KINDS
 
 from .distribute import SpeciesDistribution
 from .resolver import (
@@ -84,7 +84,7 @@ class VarInfo:
     index_structures: List[str] = field(default_factory=list)
     tokens: List[str] = field(default_factory=list)
     value: Optional[str] = None
-    var_class: str = "state"
+    var_class: str = ""                    # derived kind tag (§24)
     port_variable: bool = False
 
 
@@ -514,7 +514,7 @@ def build(nodes: Dict[str, NodeInfo],
             elif v_iri in asg.ports:
                 role = "port"
             elif v_iri in asg.instantiated \
-                    or var.var_class in INSTANTIATE_CLASSES:
+                    or var.var_class in BOUND_KINDS:
                 role = "parameter"
             elif v_iri in defined:
                 role = "defined"

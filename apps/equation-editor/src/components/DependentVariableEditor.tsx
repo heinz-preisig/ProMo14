@@ -3,7 +3,7 @@ import { checkExpression, generateExpression, parseExpression } from '../api'
 import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, Index, NetworkTree, SavedEquation, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
-  deriveType,
+  kindTag,
   FIELD_LABEL_STYLE,
   findTermIri,
 } from '../axisClassifications'
@@ -17,14 +17,13 @@ import VariablePalette from './VariablePalette'
 import {
   findNameCollision,
   isValidVariableName,
-  VARIABLE_CLASSES,
   VARIABLE_NAME_HINT,
 } from '../validation'
 import { suggestLatexAlias, validateLatexAlias } from '../latex'
 
-/** Classes allowed on the LHS of ``Instantiate(proto)`` — an instance is
- *  a bound-value slot, not a computed quantity (ADR-008). */
-const INSTANTIATE_CLASSES = ['constant', 'parameter']
+/** Bound-value kinds allowed on the LHS of ``Instantiate(proto)`` — an
+ *  instance is a bound-value slot, not a computed quantity (§24). */
+const BOUND_KINDS = ['constant', 'parameter']
 
 /** Class the backend auto-assigns to ``Instantiate(proto)`` RHS — not a
  *  picker option; shown (disabled) when the RHS is an Instantiate. */
@@ -67,7 +66,6 @@ export default function DependentVariableEditor({
 }: DependentVariableEditorProps) {
   const [domain, setDomain] = useState(initialDomain)
   const [classifications, setClassifications] = useState<Record<string, string>>({})
-  const [variableClass, setVariableClass] = useState('')
   const [name, setName] = useState('')
   const [latexSym, setLatexSym] = useState('')
   const [latexError, setLatexError] = useState<string | null>(null)
@@ -91,7 +89,6 @@ export default function DependentVariableEditor({
       const cls = editing?.classifications ?? initialClassifications
       setDomain(editing?.network ?? initialDomain)
       setClassifications(cls)
-      setVariableClass(editing?.type ?? deriveType(axes, cls))
       setName(editing?.label ?? '')
       setLatexSym(editing?.aliases?.latex ?? '')
       setText('')
@@ -113,7 +110,7 @@ export default function DependentVariableEditor({
     setCheckResult(null)
     setError(null)
     setGenCode(null)
-  }, [name, domain, variableClass, text, latexSym])
+  }, [name, domain, classifications, text, latexSym])
 
   useEffect(() => {
     setLatexError(validateLatexAlias(latexSym))
@@ -137,12 +134,8 @@ export default function DependentVariableEditor({
   // Instantiate RHS pins the class; otherwise the picked value stands.
   const effectiveEqClass = isInstantiate ? instantiateClassIri : eqClass
   // Structural fields lock while the edited variable is used — the
-  // Instantiate class-forcing must not bypass the lock either.
+  // Instantiate kind-forcing must not bypass the lock either.
   const structuralLocked = !!editing && used
-  const effectiveClass =
-    !structuralLocked && isInstantiate && !INSTANTIATE_CLASSES.includes(variableClass)
-      ? 'parameter'
-      : variableClass
 
   // Names must be valid expression-language identifiers (lexer rule).
   const nameValid = isValidVariableName(name)
@@ -161,15 +154,14 @@ export default function DependentVariableEditor({
       const parseRes = await parseExpression(text)
       if (parseRes.ok && parseRes.ast) {
         setAst(parseRes.ast)
-        // Instantiate LHS must be constant|parameter — sync the
+        // Instantiate LHS must be a bound-value kind — sync the
         // function pick (parameter lives on the function axis) so the
-        // request below already carries an allowed class (ADR-008).
+        // request below already carries an allowed kind (ADR-008, §24).
         if (
           !structuralLocked &&
           parseRes.ast.type === 'Instantiate' &&
-          !INSTANTIATE_CLASSES.includes(variableClass)
+          !BOUND_KINDS.includes(kindTag(axes, classifications))
         ) {
-          setVariableClass('parameter')
           const hit = findTermIri(axes, 'function', 'parameter')
           if (hit) {
             setClassifications((prev) => ({ ...prev, [hit.axisIri]: hit.termIri }))
@@ -188,7 +180,7 @@ export default function DependentVariableEditor({
     } finally {
       setLoading(false)
     }
-  }, [text, variables, indices, domain, name, variableClass, networkTree])
+  }, [text, variables, indices, domain, name, classifications, networkTree])
 
   /** The draft LHS variable — shared by /check, /generate, accept and the
    *  LaTeX preview so all see the same record (incl. the latex alias).
@@ -209,7 +201,6 @@ export default function DependentVariableEditor({
       label: lhs,
       network: domain,
       domain_iri: selectedDomainIri,
-      type: effectiveClass,
       units: checkResult?.units ?? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
       index_structures: checkResult?.indices ?? editing?.index_structures ?? [],
       internal_id: editing?.internal_id ?? nextInternalId(variables),
@@ -218,7 +209,7 @@ export default function DependentVariableEditor({
       aliases,
       doc,
     }
-  }, [name, domain, effectiveClass, variables, checkResult, latexSym, doc, editing, classifications])
+  }, [name, domain, variables, checkResult, latexSym, doc, editing, classifications])
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
@@ -247,7 +238,7 @@ export default function DependentVariableEditor({
       lhs: lhs || null,
       network_tree: networkTree,
     }
-  }, [text, variables, indices, domain, name, variableClass, networkTree, contextVariables])
+  }, [text, variables, indices, domain, name, classifications, networkTree, contextVariables])
 
   const handleGenerate = useCallback(async () => {
     setGenLoading(true)
@@ -273,17 +264,15 @@ export default function DependentVariableEditor({
     ? `Invalid or missing name — ${VARIABLE_NAME_HINT}`
     : !domain
       ? 'Select a domain in the tree'
-      : !effectiveClass
-        ? 'Pick a class via the axis selections'
-        : latexError
-          ? `Invalid LaTeX symbol — ${latexError}`
-          : !checkResult?.ok
-            ? 'Run Check on the expression first'
-            : null
+      : latexError
+        ? `Invalid LaTeX symbol — ${latexError}`
+        : !checkResult?.ok
+          ? 'Run Check on the expression first'
+          : null
 
   const handleAccept = () => {
     const lhs = name.trim()
-    if (!lhs || !domain || !effectiveClass || latexError || !checkResult?.ok) return
+    if (!lhs || !domain || latexError || !checkResult?.ok) return
 
     const draft = draftVariable()
 
@@ -441,36 +430,23 @@ export default function DependentVariableEditor({
               </label>
 
               {applicableAxes(axes, domain, domains).length ? (
-                <AxisClassifications
-                  axes={axes}
-                  domain={domain}
-                  domains={domains}
-                  value={classifications}
-                  disabled={structuralLocked}
-                  onChange={(next) => {
-                    setClassifications(next)
-                    setVariableClass(deriveType(axes, next))
-                  }}
-                />
-              ) : (
-                <label
-                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                  title={structuralLocked ? 'Locked — variable is referenced by equations' : undefined}
-                >
-                  <span style={FIELD_LABEL_STYLE}>Class:</span>
-                  <select
-                    value={effectiveClass}
-                    onChange={(e) => setVariableClass(e.target.value)}
+                <>
+                  <AxisClassifications
+                    axes={axes}
+                    domain={domain}
+                    domains={domains}
+                    value={classifications}
                     disabled={structuralLocked}
-                  >
-                    <option value="">Select…</option>
-                    {(isInstantiate ? INSTANTIATE_CLASSES : VARIABLE_CLASSES).map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    onChange={setClassifications}
+                  />
+                  <span style={{ fontSize: 12, color: '#555' }}>
+                    kind: {kindTag(axes, classifications) || 'unclassified'}
+                  </span>
+                </>
+              ) : (
+                <span style={{ fontSize: 12, color: '#8d6e00' }}>
+                  No classification axes apply in this domain.
+                </span>
               )}
             </div>
           </div>

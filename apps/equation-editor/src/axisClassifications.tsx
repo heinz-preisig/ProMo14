@@ -68,20 +68,47 @@ function orderedTerms(axis: ClassificationAxis): { term: AxisTerm; depth: number
   return out
 }
 
-/** Derive the legacy variableClass from a classifications map — the
- *  backend applies the same rule on save (a term labelled
- *  constant|parameter wins; classified-but-neither means "state"). */
-export function deriveType(
+/** Derive the display ``kind`` from a classifications map (§24) —
+ *  a projection, never stored; the backend applies the same rule
+ *  (``compile_space.kind_tag``).  Bound-value terms win
+ *  (constant > parameter), else the ``function`` axis term's label,
+ *  else the first resolvable label, else ``''`` = unclassified. */
+export function kindTag(
   axes: ClassificationAxis[],
   classifications: Record<string, string>,
 ): string {
   const labelOf = new Map<string, string>()
   for (const a of axes) for (const t of a.terms) labelOf.set(t.iri, t.label)
-  for (const termIri of Object.values(classifications)) {
-    const label = labelOf.get(termIri)
-    if (label === 'constant' || label === 'parameter') return label
+  const labels = Object.values(classifications).map(
+    (t) => labelOf.get(t) ?? '',
+  )
+  for (const k of ['constant', 'parameter']) {
+    if (labels.includes(k)) return k
   }
-  return Object.keys(classifications).length ? 'state' : ''
+  const functionAxis = axes.find(
+    (a) => a.name === 'function' || a.iri.split('#').pop()?.includes('function'),
+  )
+  if (functionAxis && classifications[functionAxis.iri]) {
+    return labelOf.get(classifications[functionAxis.iri]) ?? ''
+  }
+  return labels.find((l) => l) ?? ''
+}
+
+/** Composite kind display (§24): the picked term labels joined in
+ *  axis-declared order, e.g. ``flow · intensive · variable``.  Empty
+ *  string when nothing is classified — callers render ``unclassified``. */
+export function kindSummary(
+  axes: ClassificationAxis[],
+  classifications: Record<string, string>,
+): string {
+  const parts: string[] = []
+  for (const a of axes) {
+    const termIri = classifications[a.iri]
+    if (!termIri) continue
+    const label = a.terms.find((t) => t.iri === termIri)?.label
+    if (label) parts.push(label)
+  }
+  return parts.join(' · ')
 }
 
 /** IRI of the term labelled ``label`` on the axis named ``axisName`` —

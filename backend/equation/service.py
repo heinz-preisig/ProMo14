@@ -36,9 +36,9 @@ from .canonical_rdf import (
     attach_rhs_expression,
     clear_expression,
 )
-from .checker import INSTANTIATE_CLASSES, check
+from .checker import check
 from .codegen import TARGETS, render
-from .compile_space import CompileSpace, Index, Variable
+from .compile_space import CompileSpace, Index, Variable, kind_tag
 from .context import DictContext
 from .document import (
     PdfCompileError,
@@ -122,7 +122,8 @@ class VariableIn(BaseModel):
     label: str
     network: str
     domain_iri: Optional[str] = None
-    type: str = "state"
+    #: §24 derived kind tag; ``None`` = derive from ``classifications``.
+    type: Optional[str] = None
     units: List[int] = Field(default_factory=lambda: [0] * 8)
     index_structures: List[str] = Field(default_factory=list)
     internal_id: Optional[str] = None
@@ -306,13 +307,15 @@ def parse_endpoint(req: ParseRequest) -> ParseResponse:
 
 def _build_space(req: CheckRequest) -> CompileSpace:
     """Assemble the ``CompileSpace`` a request's expression runs against."""
+    store = get_store()
     variables = {
         v.iri: Variable(
             iri=v.iri,
             label=v.label,
             network=v.network,
             domain_iri=v.domain_iri,
-            type=v.type,
+            type=v.type if v.type is not None
+                 else _kind_tag(store, v.classifications),
             units=Units.from_list(v.units),
             index_structures=v.index_structures,
             internal_id=v.internal_id,
@@ -544,21 +547,17 @@ def _link_instances(graph, var_iri: URIRef, protos: List[str],
             graph.add((var_iri, PROMO["instanceOf"], proto))
 
 
-def _class_from_classifications(graph, classifications) -> Optional[str]:
-    """Derive the legacy ``variableClass`` from the classifications map.
-
-    Any classified term labelled ``constant``|``parameter`` wins (the
-    same rule the lexer applies (parser.py): letters, digits, underscore,
-    not starting with a digit.  The ``!`` qualifier is for references,
-    never part of a variable's own label.
-    """
+def _kind_tag(store, classifications) -> str:
+    """Derived ``type`` kind tag (§24): bound-value terms win, else the
+    function term's label, else ``""`` for unclassified variables.
+    Term labels live in the ontology graph, not the artefact graph."""
     if not classifications:
-        return None
-    for term_iri in classifications.values():
-        label = graph.value(URIRef(term_iri), RDFS.label)
-        if label is not None and str(label) in INSTANTIATE_CLASSES:
-            return str(label)
-    return "state"
+        return ""
+    labels = {
+        str(t): str(l)
+        for t, l in store.ontology_graph.subject_objects(RDFS.label)
+    }
+    return kind_tag(classifications, labels)
 
 
 def _resolve_record_domains(store, graph_iri: Optional[str], record: VariableRecord) -> None:
@@ -603,7 +602,7 @@ def _canonicalise_equations(
         label=record.label,
         network=record.network,
         domain_iri=record.domain_iri,
-        type=effective_type or record.variable_class or "state",
+        type=effective_type or "",
         units=Units.from_list(record.units),
         index_structures=list(record.index_structures),
         doc=record.doc,
@@ -680,24 +679,14 @@ def create_variable(
                            domain_move_planned=bool(move_plan))
 
     protos = _instantiate_protos(record)
-    # Bridge: the legacy variableClass literal is what checker/builder
-    # read (INSTANTIATE_CLASSES).  Derive it from the classifications —
-    # a term labelled constant|parameter on any axis wins; classified
-    # but neither means a solved variable ("state").  Unclassified
-    # variables keep the explicit variable_class.
-    derived_class = _class_from_classifications(graph, record.classifications)
+    # §24: the flat ``type`` kind is derived from classifications —
+    # nothing class-like is stored beyond promo:axisValue.
     canonical = _canonicalise_equations(
         store, graph, graph_iri, record,
-        derived_class or record.variable_class,
+        _kind_tag(store, record.classifications),
     )
-    var = record.model_dump()
-    if derived_class is not None:
-        var["variable_class"] = derived_class
-        var["type"] = derived_class
-    elif var.get("variable_class"):
-        var["type"] = var["variable_class"]
     _remove_variable(graph, URIRef(record.iri))
-    var_iri = store.add_variable_dict(graph, var)
+    var_iri = store.add_variable_dict(graph, record.model_dump())
     _attach_canonical_equations(graph, canonical)
     _link_instances(graph, var_iri, protos, record.network)
     _apply_domain_move(graph, move_plan)
@@ -734,8 +723,7 @@ def update_variable(
         graph,
         graph_iri,
         record,
-        _class_from_classifications(graph, record.classifications)
-        or record.variable_class,
+        _kind_tag(store, record.classifications),
     )
     _remove_variable(graph, subject)
     var_iri = store.add_variable_dict(graph, record.model_dump())
@@ -988,7 +976,7 @@ def _guard_structural_edit(store, graph, iri: str,
     changed = _structural_changes(old, record) if old is not None else []
     refs = _variable_references(store, iri)
     foreign_refs = [ref for ref in refs if ref["via"] != "lhs"]
-    allowed = {"classifications", "variable_class"}
+    allowed = {"classifications"}
     if not foreign_refs or domain_move_planned:
         allowed.add("network")
         allowed.add("domain_iri")
@@ -1037,8 +1025,6 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
         ("classifications",
          dict(getattr(old, "classifications", {})),
          dict(record.classifications)),
-        ("variable_class", getattr(old, "type", None),
-         record.variable_class or None),
         ("port_variable", bool(getattr(old, "port_variable", False)),
          bool(record.port_variable)),
         ("network", getattr(old, "network", None), record.network),

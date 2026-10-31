@@ -2,7 +2,8 @@
 
 VariableRecord and EquationRecord extend the existing data model from
 ``docs/ontology-data-model.md`` — ``classifications`` is the only
- genuinely new field, replacing ``variable_class`` with a multi-axis map.
+ genuinely new field, replacing ``variable_class`` with a multi-axis map
+ (§24: the flat class is a derived display, never stored).
 """
 
 from __future__ import annotations
@@ -96,9 +97,9 @@ class VariableRecord(BaseModel):
     # Domain / location
     network: str = "universe"  # legacy/display domain name
     domain_iri: Optional[str] = None  # authoritative promo:inDomain target
+    #: Map of axis IRI -> axis term IRI (promo:axisValue) — §24: the
+    #: single classification truth; the flat ``type`` kind is derived.
     classifications: Dict[str, str] = Field(default_factory=dict)
-    # Replaces variable_class: map of axis IRI -> axis term IRI
-    variable_class: Optional[str] = None  # legacy, kept for backward compat
     port_variable: bool = False
     imported: bool = False  # ontology-editor metadata
 

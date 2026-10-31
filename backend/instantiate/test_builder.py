@@ -1555,7 +1555,19 @@ def _seed_endpoint_model(store):
         iri = URIRef(_var(frag))
         g.add((iri, RDF.type, PROMO["Variable"]))
         g.add((iri, RDFS.label, Literal(label)))
-        g.add((iri, PROMO["variableClass"], Literal(cls)))
+        # §24: cls is expressed as an axisValue triple on the real
+        # ontology terms — no flat variableClass literal exists anymore.
+        _CLASS_TERM = {
+            "constant": "term_determination_constant",
+            "parameter": "term_function_parameter",
+            "state": "term_function_state",
+            "effort": "term_function_effort",
+            "transport": "term_function_flow",
+            "frame": "term_function_frame",
+        }
+        if cls in _CLASS_TERM:
+            g.add((iri, PROMO["axisValue"],
+                   URIRef(BASE + "#" + _CLASS_TERM[cls])))
         if internal_id:
             g.add((iri, PROMO["internalID"], Literal(internal_id)))
         for i in indices:

@@ -3,8 +3,7 @@ import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, Tok
 import { equationClassLabel } from '../variableUtils'
 import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
-import { VARIABLE_CLASSES } from '../validation'
-import AxisClassifications, { applicableAxes, deriveType } from '../axisClassifications'
+import AxisClassifications, { applicableAxes, kindTag } from '../axisClassifications'
 import NetworkTreeSelect from './NetworkTreeSelect'
 
 const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current', 'light', 'nil']
@@ -51,7 +50,6 @@ export default function VariableDetailDialog({
   const [classifications, setClassifications] = useState<Record<string, string>>(
     variable.classifications ?? {},
   )
-  const [variableClass, setVariableClass] = useState(variable.type ?? '')
   const [units, setUnits] = useState<number[]>(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
   const [selectedIndices, setSelectedIndices] = useState<Set<string>>(
     new Set(variable.index_structures ?? []),
@@ -77,7 +75,6 @@ export default function VariableDetailDialog({
     setDoc(variable.doc ?? '')
     setNetwork(variable.network)
     setClassifications(variable.classifications ?? {})
-    setVariableClass(variable.type ?? '')
     setUnits(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
     setSelectedIndices(new Set(variable.index_structures ?? []))
     setCarriesTokens(new Set(variable.tokens ?? []))
@@ -89,7 +86,7 @@ export default function VariableDetailDialog({
   const foreignRefCount = references.filter((ref) => ref.via !== 'lhs').length
   const latexSuggestion = label.trim() ? suggestLatexAlias(label) : ''
   const latexError = validateLatexAlias(latexSym)
-  const canSave = label.trim() && network && variableClass && !latexError
+  const canSave = label.trim() && network && !latexError
 
   const toggleIndex = (iri: string) => {
     setSelectedIndices((prev) => {
@@ -139,7 +136,6 @@ export default function VariableDetailDialog({
       label: label.trim(),
       network,
       domain_iri: selectedDomainIri,
-      type: variableClass,
       classifications,
       units: [...units],
       index_structures: Array.from(selectedIndices),
@@ -289,9 +285,9 @@ export default function VariableDetailDialog({
                       padding: '6px 8px',
                     }}
                   >
-                    No role classifications are stored for this variable. Its legacy class
-                    “{variable.type || 'unknown'}” cannot determine the individual roles;
-                    select the applicable roles below.
+                    No classifications are stored for this variable — kind reads
+                    “{kindTag(axes, classifications) || 'unclassified'}”;
+                    pick terms below to give it a physical nature.
                   </div>
                 )}
                 <AxisClassifications
@@ -300,27 +296,16 @@ export default function VariableDetailDialog({
                   domains={domains}
                   value={classifications}
                   hiddenAxes={variable.port_variable ? ['determination'] : undefined}
-                  onChange={(next) => {
-                    setClassifications(next)
-                    setVariableClass(deriveType(axes, next))
-                  }}
+                  onChange={setClassifications}
                 />
+                <span style={{ fontSize: 12, color: '#555' }}>
+                  kind: {kindTag(axes, classifications) || 'unclassified'}
+                </span>
               </div>
             ) : (
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                Variable class <span style={{ color: '#c62828' }}>*</span>
-                <select
-                  value={variableClass}
-                  onChange={(e) => setVariableClass(e.target.value)}
-                >
-                  <option value="">Select a class…</option>
-                  {VARIABLE_CLASSES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <span style={{ fontSize: 12, color: '#8d6e00' }}>
+                No classification axes apply in this domain.
+              </span>
             )}
           </div>
 

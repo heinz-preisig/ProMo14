@@ -37,7 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import FrozenSet, List, Optional, Set
 
-from .compile_space import CompileSpace
+from .compile_space import BOUND_KINDS, CompileSpace
 from .errors import IndexStructureError, UnitError, VarError
 from .syntax import (
     Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
@@ -53,9 +53,9 @@ def _leaf_tokens(var) -> Optional[TokenVec]:
     tv = getattr(var, "token_vector", None)
     return TokenVec.from_dict(tv) if tv is not None else None
 
-#: Variable classes allowed on the LHS of ``Instantiate(proto)`` — an
-#: instance is a bound-value slot, not a computed quantity (ADR-008).
-INSTANTIATE_CLASSES = ("constant", "parameter")
+# Kept for readability: the LHS gate tests ``BOUND_KINDS`` (§24) — the
+# derived kind tags ``constant``/``parameter`` produced by ``kind_tag``.
+
 
 
 def _union(*seqs: List[str]) -> List[str]:
@@ -337,11 +337,11 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                 lhs_type = space.resolve(lhs.name).variable.type
             except VarError:
                 lhs_type = None
-            if lhs_type is not None and lhs_type not in INSTANTIATE_CLASSES:
+            if lhs_type is not None and lhs_type not in BOUND_KINDS:
                 raise VarError(
                     "Instantiate declares an instance — the LHS variable "
-                    "must be class 'constant' or 'parameter', got %r"
-                    % lhs_type
+                    "must have bound-value kind 'constant' or 'parameter', "
+                    "got %r" % lhs_type
                 )
         return Checked(
             node=node,

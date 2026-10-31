@@ -2351,3 +2351,140 @@ energy, momentum, charge, component-mass) with reference quantities
 travel through the same licensing machinery; the distinction lives
 in the token taxonomy's `promo:kind` (conserved vs reference), not
 in separate mechanisms.
+
+## 24. Variable classification — quantity-kinds, claims, and the physics vocabulary (2026-10-31)
+
+Two parallel systems classify variables today: the flat
+`promo:variableClass` (original vocabulary `state, effort,
+transport, frame, network, constant, parameter`) and the axis-based
+`promo:axisValue` (`determination`, `extensity`, `function`,
+`role`).  The `deriveType` bridge proved they are not two systems —
+the flat class is a *projection* of the axis state — while the UI
+let both write the same field, so two vocabularies fought over one
+string (a picked `transport` was silently overwritten by the
+bridge's `state`).  This section records the resolution: the
+terminology must serve physics and system theory, and modelling
+assumptions must be crystal clear — first-class, relaxable data —
+because engineering shorthand ("a transport element just
+transports") hides the capacity that is not incorporated, the cause
+of real modelling problems.
+
+### The canonical loop — nature vs position
+
+The basic diagram: an integrator takes a **state derivative** and
+generates a **state**; thermodynamics and geometry transform the
+state into **secondary states** (mostly intensive, some of which
+are effort variables); the secondary states compute **transport**
+and **reactions**; these come together into the state derivative.
+**Control** takes measurements from state and mostly secondary
+states and manipulates the flows.
+
+The axes record a variable's *nature* — what it physically is.
+Its *position* in this loop (integrator output, derivative input,
+law output) is structural — it falls out of the equations and the
+topology, and is never a class.
+
+### One stored truth
+
+- **`promo:axisValue` is the only write target.**  `variableClass`,
+  its dropdown, and `deriveType` go; the flat class survives only
+  as a *derived display* (`kind: flow · intensive ·
+  variable`), never stored.
+- **Legacy consumers all reduce to one test.**  The Instantiate
+  gate (`INSTANTIATE_CLASSES`), auto-instantiation, and the
+  behaviour `lhs_class` filter all mean "bound-value": `determination =
+  constant OR function = parameter`.
+- **Vocabulary fidelity is cheap** — axis terms are data; where the
+  old class and the function axis diverged the term follows the
+  variable's nature, not the legacy word (`flow`, not `transport` —
+  `transport` stays where it belongs: the phenomenon on the entity
+  side).
+
+### Function axis = quantity-kinds (one world)
+
+The six terms are mutually exclusive answers to "what kind of
+physical quantity is this variable":
+
+| Term | Nature |
+|------|--------|
+| `state` | coordinate of a state representation (see below) |
+| `effort` | intensive driving potential |
+| `flow` | throughput rate — conjugate to effort |
+| `reaction` | transformation rate |
+| `frame` | reference coordinate (time, space) |
+| `parameter` | constitutive characteristic, often embodying an assumption |
+
+`transport` and `reaction` also name *phenomena* — that is the
+other world, the entity side (§16 mechanism taxonomy).  A
+transport variable is the *flow produced by* a transport process,
+not the process itself; same words, different axes.
+
+### Entity side — reality vs claims
+
+Reality is distributed; everything else is a claim:
+
+- `+ lumped` — spatial simplification → storage capacity
+- `+ event-dynamic` — temporal simplification (very fast) →
+  **transport system** := distributed element + event-dynamic
+  claim, i.e. a *dissipation* element: it transports iff an effort
+  difference exists
+- `source` — boundary (environment); `junction` — arc balance;
+  `transduction` — reaction host
+
+`transport` is therefore introduced when *designing the basic
+entities* — a named composition, not a primitive kind.  The regime
+assumption is relaxable data (cf. §17 scale regimes and the
+event-dynamic bindings): drop the fast claim and the same element
+re-models as an accumulating distributed system — the neglected
+holdup was there all along.
+
+### State — resolved
+
+State is the core of a dynamic representation: infinitely many
+representations exist, but a **minimal dimension** does not change.
+In physics, the conserved quantities form this minimal state space.
+
+- **`fundamental-state`** — conserved quantity; candidate member of
+  the minimal set.
+- **`secondary-state`** — image of the states via thermo/geometry;
+  not a coordinate at all.
+- **bare `state`** — a legal non-conserved coordinate of a
+  representation (e.g. integrating `T` instead of `U`: same
+  dimension, transformed basis).
+- **State reduction is a claim**, already mechanized: "constant
+  volume" pins `V` → `determination: constant` at the occurrence —
+  the existing pin/override machinery *is* the state-reduction
+  machinery.  The minimal set is a derived readout on the
+  instantiated system: `{fundamental-states} − {pinned}`.
+
+### Unclassified — resolved
+
+The physical domain has no unclassified nature: every variable is
+*something*, so a missing `function` means **incomplete authoring** —
+a completeness marker (`needs classification`), and gates reject
+with "what is X?" rather than silently assuming `state` (the old
+reader default that hid `fV`'s real classification).  On the
+*information* branch the axis is simply inapplicable: a signal
+carries `role: input/output`, not a physical nature — inapplicable,
+not unanswered.
+
+### The unifying pattern
+
+The same machinery recurs at three levels: **reality vs claims
+about it** — distributed vs lumped (spatial), accumulating vs
+event-dynamic (temporal), conserved vs pinned (state reduction).
+Assumptions are inputs, not identities.
+
+### Open threads
+
+- **`effort`** — own function term, or `secondary-state` +
+  `intensive` + a driving-force *role*?
+- **Regime mechanics** — a `promo:regime`-style claim triple vs the
+  current event-dynamic entity-type bindings.
+- **Control side** — measured-vs-manipulated: does `role:
+  input/output` suffice, or does function want signal terms?
+- **Axis display names** — e.g. `determination` as "fixed or
+  varying" in the user's words.
+
+Implementation (variableClass removal, seed renames, gate rewrites,
+minimal-state readout) follows after this section is reviewed.

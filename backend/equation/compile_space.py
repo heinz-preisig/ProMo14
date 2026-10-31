@@ -39,6 +39,31 @@ TEMP_VARIABLE_TEMPLATE = "temp_%s"
 #: Index kinds recognised in the ``type`` field (old ``indices[i]["type"]``).
 INDEX_TYPES = ("index", "block_index")
 
+#: Bound-value kind tags (§24) — the only ``type`` values that license
+#: instantiation: a variable whose nature is fixed-before-computation
+#: (``determination: constant``) or is a constitutive characteristic
+#: (``function: parameter``).
+BOUND_KINDS = ("constant", "parameter")
+
+
+def kind_tag(classifications: Dict[str, str],
+             term_label: Dict[str, str]) -> str:
+    """Derive the flat ``type`` display kind from the classifications map
+    (§24) — a *projection*, never stored.
+
+    Precedence: bound-value terms win (``constant`` > ``parameter``),
+    else the ``function`` axis term's label (``state``, ``flow`` …),
+    else the first resolvable label, else ``""`` for unclassified.
+    """
+    labels = [term_label.get(t, "") for t in classifications.values()]
+    for kind in BOUND_KINDS:
+        if kind in labels:
+            return kind
+    for axis_iri, term_iri in classifications.items():
+        if "function" in axis_iri.split("#")[-1]:
+            return term_label.get(term_iri, "")
+    return next((l for l in labels if l), "")
+
 
 @dataclass
 class Index:
@@ -77,6 +102,9 @@ class Variable:
     iri: str
     label: str
     network: str
+    #: Derived display kind (§24): ``constant`` | ``parameter`` |
+    #: the function-term label | ``""`` when unclassified.  Bound-value
+    #: gates test membership in ``BOUND_KINDS``; ``""`` fails them all.
     type: str
     domain_iri: Optional[str] = None
     units: Units = field(default_factory=Units)

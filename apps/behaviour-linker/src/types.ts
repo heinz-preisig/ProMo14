@@ -25,7 +25,7 @@ export interface Variable {
   iri: string
   label: string
   network: string
-  variable_class: string
+  type: string // derived kind tag (§24)
   port_variable: boolean
   tokens: string[]
 }

@@ -304,6 +304,7 @@ export default function App() {
           <VariableTable
             variables={variables}
             indices={indices}
+            axes={axes}
             equationClasses={equationClasses}
             onSelect={setSelectedVariable}
             onSave={saveEditedVariable}

@@ -3,13 +3,12 @@ import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex
 import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
-  deriveType,
+  kindTag,
   FIELD_LABEL_STYLE,
 } from '../axisClassifications'
 import {
   findNameCollision,
   isValidVariableName,
-  VARIABLE_CLASSES,
   VARIABLE_NAME_HINT,
 } from '../validation'
 import { nextInternalId } from '../variableUtils'
@@ -49,7 +48,6 @@ export default function PortVariableEditor({
 }: PortVariableEditorProps) {
   const [domain, setDomain] = useState(initialDomain)
   const [classifications, setClassifications] = useState<Record<string, string>>({})
-  const [variableClass, setVariableClass] = useState('')
   const [name, setName] = useState('')
   const [latexSym, setLatexSym] = useState('')
   const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
@@ -63,7 +61,6 @@ export default function PortVariableEditor({
       const cls = { ...initialClassifications }
       setDomain(initialDomain)
       setClassifications(cls)
-      setVariableClass(deriveType(axes, cls))
       setName('')
       setLatexSym('')
       setUnits([0, 0, 0, 0, 0, 0, 0, 0])
@@ -94,16 +91,14 @@ export default function PortVariableEditor({
   const collision = findNameCollision(variables, name)
   const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
   const latexError = validateLatexAlias(latexSym)
-  const canAccept = nameValid && !!domain && !!variableClass && !latexError
+  const canAccept = nameValid && !!domain && !latexError
   /** Why Add is disabled — surfaced inline, since title tooltips
    *  don't reliably fire on disabled buttons. */
   const blockReason = !nameValid
     ? `Invalid or missing name — ${VARIABLE_NAME_HINT}`
     : !domain
       ? 'Select a domain in the tree'
-      : !variableClass
-        ? 'Pick a class via the axis selections'
-        : latexError
+      : latexError
           ? `Invalid LaTeX symbol — ${latexError}`
           : null
 
@@ -118,7 +113,6 @@ export default function PortVariableEditor({
       label: trimmed,
       network: domain,
       domain_iri: selectedDomainIri,
-      type: variableClass,
       units: [...units],
       index_structures: Array.from(selectedIndices),
       internal_id: nextInternalId(variables),
@@ -251,29 +245,23 @@ export default function PortVariableEditor({
               </label>
 
               {applicableAxes(axes, domain, domains).length ? (
-                <AxisClassifications
-                  axes={axes}
-                  domain={domain}
-                  domains={domains}
-                  value={classifications}
-                  hiddenAxes={['determination']}
-                  onChange={(next) => {
-                    setClassifications(next)
-                    setVariableClass(deriveType(axes, next))
-                  }}
-                />
+                <>
+                  <AxisClassifications
+                    axes={axes}
+                    domain={domain}
+                    domains={domains}
+                    value={classifications}
+                    hiddenAxes={['determination']}
+                    onChange={setClassifications}
+                  />
+                  <span style={{ fontSize: 12, color: '#555' }}>
+                    kind: {kindTag(axes, classifications) || 'unclassified'}
+                  </span>
+                </>
               ) : (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={FIELD_LABEL_STYLE}>Class:</span>
-                  <select value={variableClass} onChange={(e) => setVariableClass(e.target.value)}>
-                    <option value="">Select…</option>
-                    {VARIABLE_CLASSES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <span style={{ fontSize: 12, color: '#8d6e00' }}>
+                  No classification axes apply in this domain.
+                </span>
               )}
             </div>
           </div>

@@ -509,12 +509,9 @@ class RdfStore(PersistenceMixin, SeedMixin):
     def add_variable_dict(self, graph: Graph, var: dict) -> URIRef:
         """Add a variable record to the graph using the ProMo14 schema.
 
-        Supports both the legacy ``variable_class`` (string) and the new
-        ``classifications`` (map of axis IRI → axis term IRI) fields.
-        If ``classifications`` is present, each entry is stored as a
-        ``promo:axisValue`` triple.  If ``variable_class`` / ``type`` is
-        present (legacy), it is stored as ``promo:variableClass`` for
-        backward compatibility.
+        ``classifications`` (map of axis IRI → axis term IRI) is stored
+        as ``promo:axisValue`` triples — §24: the single classification
+        truth; the flat ``type`` kind is derived, never stored.
         """
         iri = URIRef(var["iri"])
         graph.add((iri, RDF.type, PROMO["Variable"]))
@@ -530,11 +527,6 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self._set_literal(
             graph, iri, PROMO["imported"], var.get("imported", False)
         )
-
-        # Legacy variable_class (string) — kept for backward compat.
-        vc = var.get("variable_class") or var.get("type")
-        if vc:
-            self._set_literal(graph, iri, PROMO["variableClass"], vc)
 
         # Pre-bound value slot (universal constants; ADR-008).
         self._set_literal(graph, iri, PROMO["value"], var.get("value"))

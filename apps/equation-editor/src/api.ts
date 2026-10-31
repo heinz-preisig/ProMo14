@@ -83,7 +83,6 @@ export async function saveVariable(
     aliases: v.aliases ?? {},
     network: v.network,
     classifications: v.classifications ?? {},
-    variable_class: v.type ?? null,
     port_variable: v.port_variable ?? false,
     imported: v.imported ?? false,
     doc: v.doc ?? '',

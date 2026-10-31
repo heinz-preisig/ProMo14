@@ -177,7 +177,7 @@ export default function VariablePalette({
                   // permanent fixtures of the ontology.
                   const bound = v.value != null && v.value !== ''
                   const display = bound ? `${label}=${v.value}` : label
-                  const title = `${v.iri}${v.type ? ' — class: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}${insert !== label ? ' — inserts as ' + insert : ''}`
+                  const title = `${v.iri}${v.type ? ' — kind: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}${insert !== label ? ' — inserts as ' + insert : ''}`
                   const style = {
                     fontSize: 12,
                     padding: '3px 6px',

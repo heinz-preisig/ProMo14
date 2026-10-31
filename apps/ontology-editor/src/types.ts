@@ -68,7 +68,7 @@ export interface VariableRecord {
   // Domain / location
   network: string
   classifications: Record<string, string> // axis IRI -> axis term IRI
-  variable_class: string | null // legacy, kept for backward compat
+  type: string | null // derived kind tag (§24)
   port_variable: boolean
   imported: boolean
 
