@@ -1786,7 +1786,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_energy\": -1, \"token_time\": -1}" ;
         promo:unitVector "[1, -1, 0, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_flow> .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_parameter> .
 
     <promo:n> a promo:Variable ;
         rdfs:label "n" ;
@@ -1803,7 +1803,7 @@
         promo:portVariable true ;
         promo:tokenVector "{\"token_component_mass\": 1}" ;
         promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_fundamental_state> .
 
     <promo:p_mech> a promo:Variable ;
         rdfs:label "p_mech" ;
@@ -1895,7 +1895,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_momentum\": 1}" ;
         promo:unitVector "[0, 2, 0, 0, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_flow> .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_parameter> .
 
     <promo:U> a promo:Variable ;
         rdfs:label "U" ;
@@ -1910,7 +1910,7 @@
         promo:portVariable true ;
         promo:tokenVector "{\"token_energy\": 1}" ;
         promo:unitVector "[-2, 2, 0, 1, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_fundamental_state> .
 
     <promo:dmdt> a promo:Variable ;
         rdfs:label "dmdt" ;
@@ -1926,7 +1926,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1, \"token_time\": -1}" ;
         promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_flow> .
 
     <promo:te> a promo:Variable ;
         rdfs:label "te" ;
@@ -2115,7 +2115,7 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 0, 0, 1, 0, 0, 0, 0]" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_state> .
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_fundamental_state> .
 
     <https://w3id.org/promo/ontology#axis_extensity> a promo:ClassificationAxis ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
