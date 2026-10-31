@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useReducer, useCallback } from 'react'
+import { useState, useEffect, useMemo, useReducer, useCallback, useRef } from 'react'
 import { Stage, Layer, Line, Group } from 'react-konva'
-import type { NodeType, ArcType } from './types'
+import type { NodeType, ArcType, OpenArc } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
 import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
@@ -131,6 +131,22 @@ export default function App() {
       if (!cancelled) setModelArtefacts(lines.filter((l) => l.type === 'model'))
     })
     return () => { cancelled = true }
+  }, [])
+
+  // §22 interface summary: lazily fetch each artefact's declared
+  // terminals (root composite open arcs) on first hover.
+  const [ifaceSummary, setIfaceSummary] =
+    useState<Map<string, OpenArc[]>>(new Map())
+  const ifaceRequested = useRef<Set<string>>(new Set())
+  const loadInterface = useCallback((iri: string) => {
+    if (ifaceRequested.current.has(iri)) return
+    ifaceRequested.current.add(iri)
+    loadModelDoc(iri).then((doc) => {
+      const root = doc.composites.find((c) => c.treeId === doc.rootTreeId)
+      setIfaceSummary((m) => new Map(m).set(iri, root?.openArcs ?? []))
+    }).catch(() => {
+      setIfaceSummary((m) => new Map(m).set(iri, []))
+    })
   }, [])
 
   // §22 insert: materialize the referenced artefact's declared interface
@@ -527,25 +543,40 @@ export default function App() {
           <div style={{ marginTop: 8, borderTop: '1px solid #ccc', paddingTop: 8 }}>
             <strong style={{ fontSize: 12 }}>Submodels</strong>
             <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Click to insert a referenced composite</div>
-            {modelArtefacts.map((l) => (
-              <button
-                key={l.iri}
-                onClick={() => insertReferenced(l)}
-                title={`${l.iri}${l.referencedBy.length ? ` — referenced by ${l.referencedBy.length}` : ''}`}
-                style={{
-                  fontSize: 12,
-                  padding: '6px 8px',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  background: '#e8e8e8',
-                  border: '1px solid #bbb',
-                  borderRadius: 4,
-                  width: '100%',
-                }}
-              >
-                {l.label}
-              </button>
-            ))}
+            {modelArtefacts.map((l) => {
+              const iface = ifaceSummary.get(l.iri)
+              const frag = (iri: string) => iri.split(/[/#]/).pop() ?? iri
+              return (
+                <button
+                  key={l.iri}
+                  onClick={() => insertReferenced(l)}
+                  onMouseEnter={() => loadInterface(l.iri)}
+                  title={`${l.iri}${l.referencedBy.length ? ` — referenced by ${l.referencedBy.length}` : ''}`}
+                  style={{
+                    fontSize: 12,
+                    padding: '6px 8px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    background: '#e8e8e8',
+                    border: '1px solid #bbb',
+                    borderRadius: 4,
+                    width: '100%',
+                  }}
+                >
+                  {l.label}
+                  {iface !== undefined && (
+                    <div style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
+                      {iface.length === 0
+                        ? 'closed — no declared terminals'
+                        : iface.map((o) =>
+                            `${o.isSource ? '→' : '←'} ${frag(o.arcType)}` +
+                            (o.externalEntityType ? ` · ${frag(o.externalEntityType)}` : '')
+                          ).join('  |  ')}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
             {modelArtefacts.length === 0 && (
               <div style={{ fontSize: 11, color: '#999' }}>no model artefacts</div>
             )}

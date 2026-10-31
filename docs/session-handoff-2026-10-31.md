@@ -65,14 +65,22 @@ via `tear_loop`.  **Bug caught by test**: `_sccs` returns only
 non-trivial components — singleton tears needed re-adding as
 their own components or the solve emptied (`np.zeros(0)`).
 
+### §22 interface summary in library pick
+
+Submodels palette buttons lazily fetch the artefact's root open
+arcs on first hover (`loadModelDoc`) and render a compact summary —
+`→/← arcType · entityType` per terminal, `closed — no declared
+terminals` for closed artefacts.  Modeller `tsc`/vite build clean,
+35 vitest tests pass; **rebuilt `dist` is served by the hub —
+refresh the browser to see it.**
+
 ## Open threads
 
 1. **§22 Jacobian remainder (if wanted)** — emit the block-level
    sparsity (`jac_prototype`/coloring) or DM-style matching for
    tear selection; ordering is done, pattern/matching is not.
-2. **§22 remainder** — interface summary in library pick, bundle
-   render, gas/pipe+regen on real assignments, cross-artefact
-   review.
+2. **§22 remainder** — bundle render, gas/pipe+regen on real
+   assignments, cross-artefact review.
 3. **`unreachable` live check** — needs a controller/sensor model
    (deferred).
 4. Broader deferred work per 2026-10-30 handoff (token/port policy,
