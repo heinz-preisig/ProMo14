@@ -50,7 +50,7 @@ licensed signal demand to exercise it).
 ## Verification
 
 - `uv run --with pytest --with httpx pytest backend/ -x -q
-  --disable-warnings`: **476 passed** (2 new `sub_plan_slice` tests).
+  --disable-warnings`: **478 passed**.
 - Modeller rebuild: `tsc` + `vite build` clean.
 
 ### §22 ordinal-aware tear ordering
@@ -74,15 +74,46 @@ terminals` for closed artefacts.  Modeller `tsc`/vite build clean,
 35 vitest tests pass; **rebuilt `dist` is served by the hub —
 refresh the browser to see it.**
 
+### §22 end-to-end referenced-composite validation
+
+`test_referenced_composite_endpoint` builds two real model artefact
+graphs in an isolated store (host with `refersTo` composite +
+`openArcs`, sub with transport+capacity) and exercises
+`/model` → `/code` → `POST /instantiations`.  Validates: occurrence
+content merged under `comp/` prefix, boundary arc re-pointed, ports
+bound across the boundary, nested sub-plan persisted with
+`occurrencePath`/`instantiates`/pin provenance.
+
+**Bug found + fixed**: `PlanBlock.occurrence` was derived from
+`vb.instance` (`V_1@etype_...` — no path prefix) so every block
+reported `occurrence=""`.  `_occ_of_elements` attributes blocks by
+bound element IRIs instead.
+
+**Deeper finding — Option A deferred**: with a shared library the
+merge unions bindings by var/entity-type IRI, so bindings span the
+boundary (transport `J` covers host b1 + sub a2; capacity `m`/`p`
+cover host c1 + occurrence c2) → no block is occurrence-owned →
+sub-plan slice empty and call-style helpers inert.  User chose
+Option A (split entity bindings per occurrence — `comp/inner@frag`
+instances) but **deferred it until a real referenced-composite
+case exists**; building the case needs authored gas/pipe equations
+(user content).  Test documents the current empty-slice semantics.
+
 ## Open threads
 
-1. **§22 Jacobian remainder (if wanted)** — emit the block-level
+1. **§22 Option A — per-occurrence binding split** (deferred,
+   user-approved direction): split `VarBinding`s so occurrence
+   nodes get path-keyed instances; unblocks non-empty sub-plans
+   and call-style helper extraction.  **Blocked on**: a real
+   referenced-composite example (gas/pipe+regen) — needs authored
+   equations; `extract-submodel` can produce the structure once
+   content exists.
+2. **§22 Jacobian remainder (if wanted)** — emit the block-level
    sparsity (`jac_prototype`/coloring) or DM-style matching for
    tear selection; ordering is done, pattern/matching is not.
-2. **§22 remainder** — bundle render, gas/pipe+regen on real
-   assignments, cross-artefact review.
-3. **`unreachable` live check** — needs a controller/sensor model
+3. **§22 remainder** — bundle render, cross-artefact review.
+4. **`unreachable` live check** — needs a controller/sensor model
    (deferred).
-4. Broader deferred work per 2026-10-30 handoff (token/port policy,
+5. Broader deferred work per 2026-10-30 handoff (token/port policy,
    `token_space` question, `carriesToken`-for-port policy, §14
    signal direction, cross-artefact review).

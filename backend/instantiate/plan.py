@@ -182,6 +182,23 @@ def _occ_of(instance: str, occurrences: List[Dict[str, Any]]) -> str:
     return best
 
 
+def _occ_of_elements(elements: List[str],
+                     occurrences: List[Dict[str, Any]]) -> str:
+    """The occurrence path owning a block's bound element set — the
+    path that prefixes *every* element IRI.  Blocks vectorise over
+    the merged element set, so a binding that spans the boundary
+    (e.g. a capacity type used both inside and outside the
+    submodel) stays host-owned; only wholly-occurrence blocks carry
+    the path."""
+    if not elements:
+        return ""
+    for p in sorted((o.get("path", "") for o in occurrences),
+                    key=len, reverse=True):
+        if p and all(el.startswith(p) for el in elements):
+            return p
+    return ""
+
+
 def plan(report: Instantiation, sched: Schedule,
          incidence: IncidenceReport,
          equations: Dict[str, EqInfo],
@@ -383,8 +400,10 @@ def plan(report: Instantiation, sched: Schedule,
                 rhs=eq.rhs if eq else "",
                 loop=b.loop,
                 guess=needs_guess,
-                occurrence=_occ_of(vb.instance if vb else b.lhs,
-                                   out.occurrences)))
+                occurrence=_occ_of_elements(
+                    [el for els in vb.indices.values() for el in els]
+                    if vb else [],
+                    out.occurrences)))
         out.levels.append(out_lvl)
     out.loops = sched.loops
 
@@ -403,8 +422,10 @@ def plan(report: Instantiation, sched: Schedule,
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else list(q.inputs),
                 rhs=eq.rhs if eq else "",
-                occurrence=_occ_of(vb.instance if vb else q.lhs,
-                                   out.occurrences)))
+                occurrence=_occ_of_elements(
+                    [el for els in vb.indices.values() for el in els]
+                    if vb else [],
+                    out.occurrences)))
     return out
 
 

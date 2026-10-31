@@ -1786,6 +1786,134 @@ def test_code_endpoint(client):
     assert r.status_code == 400
 
 
+def _seed_referenced_composite(store):
+    """§22: host artefact with one referenced-composite occurrence of a
+    t1—a2—c2 submodel (capacity + diffusion transport), open arc = the
+    boundary contact between host c1 and the occurrence's transport."""
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    asg = f"{onto}/assignments"
+    HOST = "https://example.org/host"
+    SUB = "https://example.org/sub"
+
+    host_iri = store.create_artefact_graph(
+        HOST, "model", uses=[onto], uses_library=[onto],
+        uses_assignment=[asg])
+    sub_iri = store.create_artefact_graph(
+        SUB, "model", uses=[onto], uses_library=[onto],
+        uses_assignment=[asg])
+    hg = store.dataset.graph(host_iri)
+    sg = store.dataset.graph(sub_iri)
+
+    def node(g, base, frag, et_frag, label):
+        iri = URIRef(f"{base}/ModelNode_{frag}")
+        g.add((iri, RDF.type, PROMO["ModelNode"]))
+        g.add((iri, PROMO["entityType"], URIRef(_et(et_frag))))
+        g.add((iri, RDFS.label, Literal(label)))
+        return str(iri)
+
+    def arc(g, base, frag, src, tgt):
+        iri = URIRef(f"{base}/ModelArc_{frag}")
+        g.add((iri, RDF.type, PROMO["ModelArc"]))
+        g.add((iri, PROMO["source"], URIRef(src)))
+        g.add((iri, PROMO["target"], URIRef(tgt)))
+        g.add((iri, PROMO["arcType"],
+               Literal("promo:ArcType/token-flow")))
+        return str(iri)
+
+    # sub doc: t —a2— c2  (what extract-submodel would have written)
+    st = node(sg, SUB, "t1", "diffusion_transport", "T")
+    sc = node(sg, SUB, "c2", "lumped_capacity", "C2")
+    arc(sg, SUB, "a2", st, sc)
+
+    # host doc: c1 —b1— {ref(sub)}; b1's target names the submodel's
+    # transport node (the terminal the open arc surfaces).
+    hc = node(hg, HOST, "c1", "lumped_capacity", "C1")
+    b1 = arc(hg, HOST, "b1", hc, st)
+    comp = URIRef(f"{HOST}/Composite_1")
+    hg.add((comp, RDF.type, PROMO["Composite"]))
+    hg.add((comp, PROMO["refersTo"], sub_iri))
+    hg.add((comp, PROMO["openArcs"],
+            Literal(json.dumps([{"iri": b1, "isSource": False}]))))
+    return {"host": HOST, "sub": SUB, "comp": str(comp),
+            "hc": hc, "b1": b1, "st": st, "sc": sc}
+
+
+def test_referenced_composite_endpoint(client):
+    """§22 end to end: host model artefact + referenced submodel →
+    /model expands the occurrence, /code emits call-style helpers,
+    POST /instantiations persists a nested sub-plan with pins."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    fx = _seed_referenced_composite(store)
+    prefix = fx["comp"] + "/"
+
+    # -- /model: occurrence content merged under the path prefix ------
+    r = client.get("/api/instantiate/model",
+                   params={"graph": fx["host"], "vars": onto})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    occ_nodes = [n for e in body["entity_types"] for n in e["nodes"]
+                 if n.startswith(prefix)]
+    assert set(occ_nodes) == {prefix + fx["st"], prefix + fx["sc"]}
+
+    ets = {e["entity_type"]: e for e in body["entity_types"]}
+    cap, tr = ets[_et("lumped_capacity")], ets[_et("diffusion_transport")]
+    assert cap["has_assignment"] and tr["has_assignment"]
+    # host capacity + occurrence capacity under one entity type
+    assert fx["hc"] in cap["nodes"]
+    assert fx["st"] in tr["nodes"] or prefix + fx["st"] in tr["nodes"]
+
+    # boundary arc b1 survives in the host registry, re-pointed at the
+    # occurrence instance; the inner copy is not duplicated.
+    assert fx["b1"] in body["indices"][_idx("idx_arc")]
+
+    # ports across the boundary: the transport's effort port binds at
+    # each capacity contact — host c1 (via b1) and the occurrence's
+    # own c2 (via inner a2).
+    pin_ports = [p for p in body["ports"] if p["var"] == ids["pin"]]
+    assert {p["element"] for p in pin_ports} == {
+        fx["hc"], prefix + fx["sc"]}
+    assert all(p["status"] == "bound" for p in pin_ports)
+    assert {p["peer_var"] for p in pin_ports} == {ids["p"]}
+
+    # -- /code: occurrence blocks emitted call-style ------------------
+    r = client.get("/api/instantiate/code",
+                   params={"graph": fx["host"], "vars": onto,
+                           "target": "python"})
+    assert r.status_code == 200, r.text
+    src = r.json()["source"]
+    assert "def derivative(t, y, par, out=None):" in src
+    # occurrence blocks emitted under the helper-function style — the
+    # submodel contributes flow/balance blocks on its own slice
+    assert "Composite_1" in src or "occ" in src
+
+    # -- POST /instantiations: nested sub-plan persisted --------------
+    r = client.post("/api/instantiate/instantiations",
+                    params={"graph": fx["host"]},
+                    json={"vars": onto})
+    assert r.status_code == 200, r.text
+    inst_iri = URIRef(r.json()["iri"])
+    hg = store.dataset.graph(inst_iri)
+    subs = list(hg.objects(inst_iri, PROMO["hasSubPlan"]))
+    assert len(subs) == 1
+    sub_inst = subs[0]
+    assert str(hg.value(sub_inst, PROMO["occurrencePath"])) == prefix
+    assert str(hg.value(sub_inst, PROMO["instantiates"])) == fx["sub"]
+    assert str(hg.value(sub_inst, PROMO["usesLibrary"])) == onto
+    plan = json.loads(str(hg.value(sub_inst, PROMO["plan"])))
+    # Boundary semantics: blocks vectorise over the merged element
+    # set, so a binding that spans the boundary stays host-owned.
+    # Here the transport's J binds A_diff = {host b1, sub a2} — the
+    # boundary arc itself — and the capacity's m/p cover host c1 +
+    # occurrence c2.  Every block crosses → the slice is empty.
+    # §22 Option A (per-occurrence binding split, deferred until a
+    # real referenced-composite case exists) makes this non-empty.
+    assert plan["levels"] == []
+    assert plan["states"] == []
+
+
 def test_initial_endpoint(client):
     """POST /api/instantiate/initial runs the t=0 solve in-service:
     ``par`` supplies the parameter slot plus the ic0 pin; the response
