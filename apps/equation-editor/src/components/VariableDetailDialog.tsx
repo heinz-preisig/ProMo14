@@ -421,7 +421,9 @@ export default function VariableDetailDialog({
                       step="1"
                       title={`tokenVector exponent for ${t.label}`}
                       placeholder="exp"
-                      value={tokenVector[t.iri] ?? ''}
+                      value={tokenVector[t.iri]
+                        ?? tokenVector[t.iri.split('#').pop()!]
+                        ?? ''}
                       onChange={(e) => setTokenExponent(t.iri, e.target.value)}
                       style={{ width: 52 }}
                     />

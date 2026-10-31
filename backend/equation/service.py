@@ -1016,8 +1016,12 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
     # declarations remains a locked structural change.
     old_tokens = sorted(getattr(old, "tokens", []))
     new_tokens = sorted(record.tokens)
-    old_tv = dict(getattr(old, "token_vector", None) or {})
-    new_tv = dict(record.token_vector or {})
+    # tokenVector keys interoperate by fragment (IRI- vs fragment-keyed
+    # vectors denote the same exponent map — TokenVec's convention).
+    frag = lambda k: k.split("#")[-1].split("/")[-1]
+    old_tv = {frag(k): v for k, v in
+              (getattr(old, "token_vector", None) or {}).items()}
+    new_tv = {frag(k): v for k, v in (record.token_vector or {}).items()}
     # additive: previously untracked -> declared; report as no change
     tokens_pair = (old_tokens, new_tokens) if old_tokens else (old_tokens, old_tokens)
     tv_pair = (old_tv, new_tv) if old_tv else (old_tv, old_tv)

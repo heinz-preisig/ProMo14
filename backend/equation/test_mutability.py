@@ -331,3 +331,49 @@ def test_altering_token_declarations_blocked_when_referenced(client):
     assert r.status_code == 409
     locked = r.json()["detail"]["locked_fields"]
     assert "tokens" in locked and "token_vector" in locked
+
+
+def test_token_vector_key_form_not_a_change(client):
+    """tokenVector keys interoperate by fragment: an IRI-keyed edit of a
+    fragment-keyed stored vector is not a structural change."""
+    _post(client, _var(
+        "V_1",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={"token_mass": 1, "token_time": -1},
+    ))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    r = _put(client, _var(
+        "V_1",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={
+            "https://w3id.org/promo/ontology#token_mass": 1,
+            "https://w3id.org/promo/ontology#token_time": -1,
+        },
+    ))
+    assert r.status_code == 200, r.text
+
+
+def test_axisvalue_loaded_across_graphs(client):
+    """axisValue on a variable in a non-ontology graph resolves to
+    classifications — the AxisTerm/hasAxis resources live in the
+    ontology graph, not the variable's own graph."""
+    from rdflib import Graph, URIRef
+    from rdflib.namespace import RDF
+    from backend.ontology.rdf_context import scoped_context
+
+    store = graph_store.get_store()
+    onto = store.dataset.graph(URIRef(BASE))
+    term = next(onto.subjects(PROMO["hasAxis"], None))
+    artefact = store.dataset.graph(URIRef("https://example.org/lib"))
+    artefact.add((URIRef("https://example.org/lib#v1"),
+                  RDF.type, PROMO["Variable"]))
+    artefact.add((URIRef("https://example.org/lib#v1"),
+                  PROMO["axisValue"], term))
+
+    var = scoped_context(store, None).variables()[
+        "https://example.org/lib#v1"]
+    axis = str(onto.value(term, PROMO["hasAxis"]))
+    assert getattr(var, "classifications") == {axis: str(term)}

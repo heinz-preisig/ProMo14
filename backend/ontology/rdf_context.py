@@ -233,11 +233,19 @@ class RdfContext(EquationContext):
 
     def _load_variables(self) -> Dict[str, Variable]:
         variables: Dict[str, Variable] = {}
+        # term IRI -> axis IRI over the whole scope: axisValue triples sit
+        # next to the variable, but the AxisTerm/hasAxis resources live in
+        # the ontology graph — a per-graph lookup drops them.
+        term_axis: Dict[str, str] = {}
+        for graph in self._all_graphs():
+            for term, axis in graph.subject_objects(PROMO["hasAxis"]):
+                term_axis[str(term)] = str(axis)
         for graph in self._all_graphs():
             for s in graph.subjects(RDF.type, PROMO["Variable"]):
                 iri = str(s)
                 network, domain_iri = _domain_membership(graph, s)
-                var = self._build_variable(graph, s, iri, network, domain_iri)
+                var = self._build_variable(
+                    graph, s, iri, network, domain_iri, term_axis)
                 existing = variables.get(iri)
                 if existing is None:
                     variables[iri] = var
@@ -249,18 +257,22 @@ class RdfContext(EquationContext):
                     )
         return variables
 
-    def _build_variable(self, graph, s, iri: str, network: str, domain_iri: str) -> Variable:
+    def _build_variable(self, graph, s, iri: str, network: str,
+                        domain_iri: str,
+                        term_axis: Optional[Dict[str, str]] = None) -> Variable:
         aliases = _aliases(graph, s)
         fragment = iri.split("#")[-1].split("/")[-1]
         if fragment and "global_ID" not in aliases:
             aliases["global_ID"] = fragment
 
-        # Multi-axis classifications (promo:axisValue -> axis term IRI).
+        # Multi-axis classifications (promo:axisValue -> axis term IRI);
+        # term->axis is resolved scope-wide (see _load_variables).
+        term_axis = term_axis or {}
         classifications: Dict[str, str] = {}
         for term_iri in graph.objects(s, PROMO["axisValue"]):
-            axis_iri = graph.value(term_iri, PROMO["hasAxis"])
+            axis_iri = term_axis.get(str(term_iri))
             if axis_iri:
-                classifications[str(axis_iri)] = str(term_iri)
+                classifications[axis_iri] = str(term_iri)
 
         var = Variable(
             iri=iri,
