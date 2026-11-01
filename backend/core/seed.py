@@ -379,6 +379,7 @@ class SeedMixin:
         self._seed_scale_regimes(g, base)
         self._seed_transport_mechanisms(g, base)
         self._seed_arc_sub_indices(g, base)
+        self._seed_incidence_factors(g, base)
         self._seed_equation_classes(g, base)
         self._seed_capabilities(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
@@ -530,6 +531,111 @@ class SeedMixin:
                 "sub_index_of": str(arc_iri),
                 "selector": str(self.mint_iri(base, sel_frag)),
             })
+
+    def _seed_incidence_factors(self, g: Graph, base: str) -> None:
+        """Materialise one incidence-factor variable per arc sub-index.
+
+        §25: ``F_<mech>`` is the equation layer's symbolic handle on a
+        mechanism's slice of the node–arc incidence — fixed
+        ``[A_k, N]`` shape, determination ``constant`` + function
+        ``parameter``, dimensionless, carrying the mechanism's token.
+        The record is a pure function of the sub-index, so it is
+        derived here rather than authored: every artefact that uses
+        this ontology sees literally the same ``F_*`` objects.
+
+        Idempotent — ``add_variable_dict``'s replace semantics fill
+        missing triples and correct stale single-valued ones (the
+        port-variable-era ``F_conv`` is normalised in place), while
+        the exact-set pass below drops extra ``indexStructure`` /
+        ``carriesToken`` members.  The token is derived, not
+        table-driven: the selector's ancestor directly under
+        ``transport_system`` names the token group
+        (``mass_transport`` → ``token_mass``), so a mechanism added to
+        the ontology materialises its factor at next load.
+        """
+        arc_iri = self.mint_iri(base, "idx_arc")
+        node_iri = self.mint_iri(base, "idx_node")
+        if (arc_iri, RDF.type, PROMO["Index"]) not in g or \
+                (node_iri, RDF.type, PROMO["Index"]) not in g:
+            return
+        transport_root = self.mint_iri(base, "etype_transport_system")
+        domain = self.mint_iri(base, "domain_physical")
+
+        for sub in sorted(g.subjects(PROMO["subIndexOf"], arc_iri)):
+            short = str(g.value(sub, PROMO["shortName"]) or "")
+            if short.startswith("A_"):
+                mech = short[2:]
+            else:
+                frag = str(sub).rsplit("#", 1)[-1]
+                mech = (frag.removeprefix("idx_arc_")
+                        if frag != str(arc_iri).rsplit("#", 1)[-1] else "")
+            if not mech:
+                continue
+            # Variable IRIs in this store are the literal
+            # ``promo:<label>`` form (the frontend mints
+            # ``promo:${lhs}``; references, incidence lists and
+            # artefact placements all use it).  The factor must use
+            # the same spelling or the union read sees two records.
+            iri = URIRef(f"promo:F_{mech}")
+
+            # Token: walk the selector's parent chain; the node just
+            # under transport_system is the token group —
+            # ``X_transport`` → ``token_X``.
+            tokens: List[str] = []
+            token_vector: Dict[str, int] = {}
+            cur, seen = g.value(sub, PROMO["selector"]), set()
+            while isinstance(cur, URIRef) and cur not in seen:
+                seen.add(cur)
+                parent = g.value(cur, PROMO["parent"])
+                if parent == transport_root:
+                    frag = str(cur).rsplit("#", 1)[-1]
+                    group = (frag.removeprefix("etype_")
+                             .removesuffix("_transport"))
+                    tok = self.mint_iri(base, f"token_{group}")
+                    if (tok, RDF.type, PROMO["Token"]) in g:
+                        tokens = [str(tok)]
+                        token_vector = {f"token_{group}": 1}
+                    break
+                cur = parent
+
+            # Classifications only if the seeded terms are present.
+            classifications = {}
+            for axis, term in (
+                ("axis_determination_physical",
+                 "term_determination_constant"),
+                ("axis_function_physical", "term_function_parameter"),
+            ):
+                term_iri = self.mint_iri(base, term)
+                if (term_iri, None, None) in g:
+                    classifications[str(self.mint_iri(base, axis))] = \
+                        str(term_iri)
+
+            existed = (iri, RDF.type, PROMO["Variable"]) in g
+            label = str(g.value(sub, RDFS.label) or f"{mech} arc")
+            self.add_variable_dict(g, {
+                "iri": str(iri),
+                "label": f"F_{mech}",
+                "network": "physical",
+                "domain_iri": str(domain),
+                # Keep an existing internalID; mint only on creation.
+                "internal_id": None if existed
+                else self.next_internal_id("V"),
+                "units": [0, 0, 0, 0, 0, 0, 0, 0],
+                "index_structures": [str(sub), str(node_iri)],
+                "port_variable": False,
+                "classifications": classifications,
+                "aliases": {"latex": "F", "global_ID": f"promo:F_{mech}"},
+                "doc": f"incidence matrix for the {label}",
+                "tokens": tokens,
+                "token_vector": token_vector,
+            })
+            # Exact-set enforcement on the multi-valued shape triples.
+            keep_idx = {sub, node_iri}
+            keep_tok = {URIRef(t) for t in tokens}
+            for o in set(g.objects(iri, PROMO["indexStructure"])) - keep_idx:
+                g.remove((iri, PROMO["indexStructure"], o))
+            for o in set(g.objects(iri, PROMO["carriesToken"])) - keep_tok:
+                g.remove((iri, PROMO["carriesToken"], o))
 
     def _seed_capabilities(self, g: Graph, base: str) -> None:
         """Seed entity-type capabilities (§20): which types may inject

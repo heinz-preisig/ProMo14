@@ -55,6 +55,14 @@
 
     promo:hasStateVariable a rdf:Property .
 
+    promo:hasSubPlan a rdf:Property .
+
+    promo:instantiates a rdf:Property .
+
+    promo:occurrencePath a rdf:Property .
+
+    promo:overrides a rdf:Property .
+
     promo:publishedOn a rdf:Property .
 
     promo:seedFloor a rdf:Property .
@@ -66,6 +74,8 @@
     promo:usesOntology a rdf:Property .
 
     promo:usesSpecies a rdf:Property .
+
+    promo:usesValues a rdf:Property .
 
     promo:valueCell a rdf:Property ;
         promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
@@ -85,7 +95,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_16> ;
-        promo:hasEquationSequence _:n226171ae3c3b41329b3d0aec5f19a94fb1 ;
+        promo:hasEquationSequence _:n042cf68b9bcc4aa2b1a79a355473a00fb1 ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:F_conv>,
             <promo:k_conv>,
@@ -105,7 +115,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library/#E_13> ;
-        promo:hasEquationSequence _:n226171ae3c3b41329b3d0aec5f19a94fb3 ;
+        promo:hasEquationSequence _:n042cf68b9bcc4aa2b1a79a355473a00fb3 ;
         promo:hasInstantiatedVariable <promo:Axy>,
             <promo:k_conv>,
             <promo:p_term>,
@@ -114,37 +124,37 @@
         promo:hasPortVariable <promo:c> ;
         promo:hasStateVariable <promo:n> .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb1 rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb4 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb1 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb4 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb10 rdf:first <https://w3id.org/promo/library/#E_16> ;
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb10 rdf:first <https://w3id.org/promo/library/#E_16> ;
         rdf:rest () .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb11 rdf:first <https://w3id.org/promo/library/#E_15> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb12 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb11 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb12 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb12 rdf:first <https://w3id.org/promo/library/#E_16> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb5 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb12 rdf:first <https://w3id.org/promo/library/#E_16> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb5 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb3 rdf:first <https://w3id.org/promo/library/#E_11> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb8 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb3 rdf:first <https://w3id.org/promo/library/#E_11> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb8 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb4 rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb9 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb4 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb9 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb5 rdf:first <https://w3id.org/promo/library/#E_17> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb6 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb5 rdf:first <https://w3id.org/promo/library/#E_17> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb6 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb6 rdf:first <https://w3id.org/promo/library/#E_18> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb7 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb6 rdf:first <https://w3id.org/promo/library/#E_18> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb7 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb7 rdf:first <https://w3id.org/promo/library/#E_13> ;
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb7 rdf:first <https://w3id.org/promo/library/#E_13> ;
         rdf:rest () .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb8 rdf:first <https://w3id.org/promo/library/#E_12> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb11 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb8 rdf:first <https://w3id.org/promo/library/#E_12> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb11 .
 
-    _:n226171ae3c3b41329b3d0aec5f19a94fb9 rdf:first <https://w3id.org/promo/library/#E_15> ;
-        rdf:rest _:n226171ae3c3b41329b3d0aec5f19a94fb10 .
+    _:n042cf68b9bcc4aa2b1a79a355473a00fb9 rdf:first <https://w3id.org/promo/library/#E_15> ;
+        rdf:rest _:n042cf68b9bcc4aa2b1a79a355473a00fb10 .
 }
 

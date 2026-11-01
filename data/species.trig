@@ -44,9 +44,17 @@
 
     promo:generatedFrom a rdf:Property .
 
+    promo:hasSubPlan a rdf:Property .
+
+    promo:instantiates a rdf:Property .
+
     promo:internalID a rdf:Property .
 
     promo:member a rdf:Property .
+
+    promo:occurrencePath a rdf:Property .
+
+    promo:overrides a rdf:Property .
 
     promo:product a rdf:Property .
 
@@ -63,6 +71,8 @@
     promo:usesOntology a rdf:Property .
 
     promo:usesSpecies a rdf:Property .
+
+    promo:usesValues a rdf:Property .
 
     promo:valueCell a rdf:Property ;
         promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .

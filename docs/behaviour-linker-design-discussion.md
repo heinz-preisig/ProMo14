@@ -2488,3 +2488,68 @@ Assumptions are inputs, not identities.
 
 Implementation (variableClass removal, seed renames, gate rewrites,
 minimal-state readout) follows after this section is reviewed.
+
+---
+
+## 25. Incidence factors are seeded scheme objects (2026-11-01)
+
+### The problem
+
+`promo:F_conv` existed twice: a port-variable-era description in the
+ontology artefact (`portVariable true`, single index `A_conv`,
+`internalID V_4`) and the current `[A_conv, N]` constant/parameter
+record in the library artefact (`V_25`). One IRI, two divergent
+descriptions — under the union read (`RdfContext` resolves variables
+over artefact + `usesOntology` pins) scalar predicates pick
+arbitrarily. The question "all network-dependent equations should use
+the same objects" exposed the missing rule for *where a shared
+variable lives*.
+
+### Decision
+
+- **Home: the ontology graph.** Resolution scope is artefact ∪ pinned
+  ontologies — a variable is visible only upstream in the pin chain.
+  `F_*` are needed by the ontology's own equations and by every
+  library using the ontology; the ontology graph is the only home
+  that reaches all of them.
+- **Derived, not authored.** Every field of an `F_*` record is a pure
+  function of its arc sub-index: name `F_<mech>` from the
+  `idx_arc_*` IRI, indices `[A_k, N]`, determination `constant` +
+  function `parameter`, dimensionless units, LaTeX `F`, doc — and the
+  token follows the mechanism tree: sub-index `selector` → entity
+  type → `promo:parent` walk to the `mass_transport` /
+  `energy_transport` group → `token_mass` / `token_energy`. Zero user
+  content → a floor migration `_seed_incidence_factors`, run from
+  `load()` like `_seed_arc_sub_indices` (§17 seed contract). A new
+  mechanism sub-index materialises its factor at next load; deletion
+  resurrects, so the reserved records cannot drift or be forked.
+- **Cleanup.** The authored copies are removed: the ontology V_4
+  description is superseded by the seed; the library V_25 and the
+  API-made `F_heat` become redundant (same IRI resolves to the one
+  ontology record). The legacy ontology equation
+  `sign(F_conv * p_mech)` uses the single-index form and is rewritten
+  to the `[A_k, N]` contraction.
+- **Guard.** A save-time check on the equation-editor write path
+  rejects a variable whose IRI is already defined in another in-scope
+  graph with a different shape — the structural fix for the
+  V_4/V_25-class split brain. (Deferred with the seed; listed as an
+  open thread in concepts §8.)
+- **Reserved shape is unchanged.** Instantiation's `incidence`
+  binding (§19) keys on constant-class + `[node, arc]` shape; nothing
+  downstream needs to know which records are seeds.
+- **Editor.** "New incidence factor…" is redundant once factors are
+  seeded — retired with the migration; its mechanism→record
+  derivation logic moves into the seed function.
+
+### Consequences
+
+- Network-dependent equations across all artefacts reference one
+  `promo:F_*` object — literally the same subject, not a copy.
+- The dialog's hand mapping (`TOKEN_GUESS`) is replaced by the
+  ontology-structural derivation — no guessing when new mechanisms
+  appear.
+- Concept documented for users in concepts-and-architecture §3.5
+  (structure handles) + terminology entry; authoring guide notes the
+  factors are referenced, not authored.
+- Same pattern earmarked for stoichiometric matrices when reaction
+  instantiation lands.

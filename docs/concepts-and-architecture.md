@@ -213,6 +213,44 @@ the same equations can be selected by several entity types, and swapping
 one constitutive relation for an alternative definition is an
 assignment edit, not an equation edit.
 
+### 3.5 Structure handles — variables that stand for derived structure
+
+Most variables name quantities: mass, pressure, a conductivity. A few
+name *structure*: the equation layer's handle on the network the
+model will later supply. The node–arc incidence factors are the
+canonical case — `F`, `F_diff`, `F_conv`, `F_heat`, … — one per arc
+sub-index (§16, §3.2).
+
+An incidence factor is two halves held deliberately in different
+artefacts:
+
+- **The record** lives in the var/expr graph — an ordinary variable
+  with a fixed index pair `[A_k, N]`, constant class, dimensionless
+  units, the mechanism's token, LaTeX `F`. It exists so equations can
+  reference the matrix *symbolically*: `d(m)/dt = F_diff·J_diff +
+  F_conv·m_conv` is physics, written before any model exists.
+- **The matrix** is instantiation output — `+1` where an arc's
+  reference direction enters a node, `−1` where it leaves (§4.1),
+  built from the drawn topology. It is never typed and never edited.
+
+The role is recognized by **reserved shape**, not a flag: a
+constant-class variable indexed `[node, arc]` *is* an incidence
+handle. There is no marker to set and no format to learn — the shape
+is the contract, and instantiation binds every variable of that shape
+to the matching matrix.
+
+Two consequences follow. First, the factors are **scheme content**:
+each exists because its arc sub-index exists, so they are provided
+with the mechanism seed rather than authored — every artefact that
+uses the ontology sees literally the same `F_*` objects, and a new
+mechanism's factor appears automatically. Second, the indirection is
+the payoff of separating science from engineering: flip a reference
+direction in the Modeller and only signs in the generated matrix
+change — equations, assignments, and code templates are untouched.
+
+The same "symbolic handle → derived matrix" pattern will serve the
+stoichiometric matrices when reaction-scheme instantiation lands.
+
 ---
 
 ## 4. The pipeline
@@ -406,6 +444,12 @@ overloads them. This list is normative for new documentation.
   in legacy data; new content uses `p`.)
 - **F and I.** `F` = node–arc incidence matrix `[N, A]`; `I` = identity
   matrix. Never write `I[N, A]` for incidence.
+- **Incidence factor / structure handle.** `F_*` = the symbolic variable
+  standing for one mechanism's slice `[A_k, N]` of the node–arc
+  incidence. The *record* is scheme content (seeded); the *matrix* is
+  derived at instantiation. Any constant-class variable indexed
+  `[node, arc]` is by convention an incidence handle — the shape is
+  reserved (§3.5).
 - **Variable class names.** The physical-branch axes are `determination`
   {constant, variable} and `function` {state, effort, flow, frame,
   reaction, parameter}; `port`/`derived` are structural facts
@@ -424,6 +468,15 @@ designed:
   dissolve for modification), recursive references with
   `reference-cycle` detection. Remaining: implementation (save /
   library-pick / insert / connect / override / dissolve gestures).
+- Incidence-factor seeding — designed + implemented 2026-11-01 (BL
+  doc §25): `F_*` records are floor seeds derived from the arc
+  sub-indices (`_seed_incidence_factors`), hand-authored copies are
+  stripped by `_migrate_incidence_factors`, and the legacy
+  `sign(F_conv * p_mech)` equation was rewritten to the `[A_k, N]`
+  contraction. Variable IRIs use the store's literal `promo:<label>`
+  convention — the seed writes that same spelling or the union read
+  sees two records. Remaining: a save-time guard against same-IRI
+  redefinition across artefact graphs (deferred in §25).
 - Meshing (distributed-systems-design.md).
 - Empirical model selection artefact (energy-function + EOS pattern).
 - Instantiation artefact — done 2026-10-17: `promo:Instantiation`

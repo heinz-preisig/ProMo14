@@ -3,7 +3,7 @@
 import json
 
 from rdflib import Dataset, Literal, URIRef
-from rdflib.namespace import RDF
+from rdflib.namespace import RDF, RDFS
 
 from .graph_store import PROMO, RdfStore
 
@@ -258,3 +258,83 @@ def test_save_removes_stale_line_files(tmp_path):
         "<https://example.org/ghost> a <urn:x> }")
     store.save()
     assert not stale.exists()
+
+ONTO = "https://w3id.org/promo/ontology"
+# Variable IRIs are the literal ``promo:<label>`` form — the same
+# spelling the frontend mints and references use.
+PVAR = "promo:"
+
+
+def test_seed_incidence_factors(tmp_path):
+    """§25: one canonical F_<mech> variable per arc sub-index — fixed
+    [A_k, N] shape, constant+parameter, dimensionless, mechanism token
+    derived from the entity-tree token group."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    node = URIRef(f"{ONTO}#idx_node")
+    arc = URIRef(f"{ONTO}#idx_arc")
+    subs = sorted(ont.subjects(PROMO["subIndexOf"], arc))
+    assert len(subs) >= 5
+    for sub in subs:
+        mech = str(ont.value(sub, PROMO["shortName"]))[2:]
+        f = URIRef(f"{PVAR}F_{mech}")
+        assert (f, RDF.type, PROMO["Variable"]) in ont, mech
+        assert str(ont.value(f, RDFS.label)) == f"F_{mech}"
+        assert set(ont.objects(f, PROMO["indexStructure"])) == {sub, node}
+        assert str(ont.value(f, PROMO["portVariable"])) == "false"
+        toks = {str(t).rsplit("#", 1)[-1]
+                for t in ont.objects(f, PROMO["carriesToken"])}
+        want = "token_mass" if mech in ("conv", "diff", "mass") \
+            else "token_energy"
+        assert toks == {want}, mech
+        assert json.loads(str(ont.value(f, PROMO["tokenVector"]))) == \
+            {want: 1}
+
+
+def test_seed_incidence_factors_normalises_stale_record(tmp_path):
+    """A pre-seed record with the wrong shape is corrected in place:
+    port flag cleared, missing node index added, spurious index
+    members dropped; internalID is kept."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    f = URIRef(f"{PVAR}F_conv")
+    ont.set((f, PROMO["portVariable"], Literal(True)))
+    ont.remove((f, PROMO["indexStructure"], URIRef(f"{ONTO}#idx_node")))
+    ont.add((f, PROMO["indexStructure"], URIRef(f"{ONTO}#idx_arc")))
+    store._seed_incidence_factors(ont, ONTO)
+    assert str(ont.value(f, PROMO["portVariable"])) == "false"
+    assert set(ont.objects(f, PROMO["indexStructure"])) == {
+        URIRef(f"{ONTO}#idx_arc_convection"), URIRef(f"{ONTO}#idx_node")}
+
+
+def test_migrate_incidence_factors_strips_duplicate_records(tmp_path):
+    """Hand-authored F_* copies in artefact graphs are removed so the
+    seeded ontology record is the single description."""
+    store = RdfStore(tmp_path)
+    store.load()
+    dup = URIRef(f"{PVAR}F_heat")
+    g = store.dataset.get_context(URIRef(ARTEFACT))
+    store.add_variable_dict(g, {
+        "iri": str(dup), "label": "F_heat", "network": "physical"})
+    assert (dup, None, None) in g
+    store._migrate_incidence_factors()
+    assert (dup, None, None) not in g
+    assert (dup, RDF.type, PROMO["Variable"]) in store.ontology_graph
+
+
+def test_migrate_incidence_factors_strips_absolute_orphans(tmp_path):
+    """The absolute ``promo#F_*`` spelling is never canonical —
+    duplicates under it are orphans even in the ontology graph."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    orphan = PROMO["F_rad"]
+    ont.add((orphan, RDF.type, PROMO["Variable"]))
+    ont.add((orphan, RDFS.label, Literal("F_rad")))
+    store._migrate_incidence_factors()
+    assert (orphan, None, None) not in ont
+    # …while the literal promo: record stays.
+    assert (URIRef("promo:F_rad"), RDF.type,
+            PROMO["Variable"]) in ont

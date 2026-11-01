@@ -778,12 +778,16 @@ applicable to a domain pair:
   values; regime is derived by `promo:parent` ancestry.  All seeded
   entity types are continuum.  See BL design doc §17.
 - **Seed contract** — `seed_default_ontology` writes the initial
-  state once (empty graph only); four idempotent migrations in
+  state once (empty graph only); idempotent migrations in
   `load()` (`_seed_constants`, `_seed_scale_regimes`,
-  `_seed_transport_mechanisms`, `_seed_arc_sub_indices`) guarantee a
+  `_seed_transport_mechanisms`, `_seed_arc_sub_indices`, and —
+  per BL design doc §25 — `_seed_incidence_factors`) guarantee a
   floor on the core graph — deletions of floor items resurrect on
-  restart, modifications persist.  Other artefact graphs are never
-  seeded or migrated.  See BL design doc §17.
+  restart, modifications persist.  Incidence factors are derived
+  seeds: one `promo:F_<mech>` variable per arc sub-index, fixed
+  `[A_k, N]` shape / constant+parameter / mechanism token resolved
+  from the entity-tree token group.  Other artefact graphs are never
+  seeded or migrated.  See BL design doc §17, §25.
 
 ## 6. Open questions
 

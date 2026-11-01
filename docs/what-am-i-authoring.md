@@ -44,6 +44,10 @@ tool.
   `constant`/`parameter` (determination axis) or get an `Instantiate`
   equation. An `[N, arc]`-indexed variable intended as the incidence
   matrix **must be constant-class** — that slot is reserved for F.
+  The `F_*` incidence factors themselves are *not authored here*: one
+  exists per mechanism arc sub-index as scheme content (concepts §3.5).
+  You reference them in equations like any variable; their numbers are
+  the model's topology, supplied at instantiation.
 - **Produces:** checked output is trusted downstream — errors here
   surface as
   [`missing-equation`](problem-catalogue.md#missing-equation) /

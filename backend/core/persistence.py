@@ -87,6 +87,10 @@ class PersistenceMixin:
         # namespace are rehomed into their graph's own namespace.
         self._migrate_equation_iris()
         self._migrate_domain_membership()
+        # §25: incidence factors are seeded scheme objects in the
+        # ontology graph — drop hand-authored copies elsewhere so the
+        # union read sees one description.
+        self._migrate_incidence_factors()
         self._migrate_canonical_rhs()
 
         # Idempotent vocabulary migration: every artefact graph is
@@ -230,6 +234,51 @@ class PersistenceMixin:
                     domain = domains_by_name.get(str(name or "universe"))
                     if domain is not None:
                         graph.set((subject, PROMO["inDomain"], domain))
+                        changed = True
+        if changed:
+            self.mark_dirty()
+
+    def _migrate_incidence_factors(self) -> None:
+        """§25: ``promo:F_<mech>`` incidence factors are seeded scheme
+        objects — the ontology graph's copy is the single description.
+        Older stores may carry hand-authored duplicates (the
+        port-variable-era ``F_conv``, API-made ``F_heat``) in var/expr
+        artefact graphs; under the union read those would merge with —
+        or shadow — the seeded record.  Remove their *subject* triples
+        from every graph except the ontology.  References *to* the IRI
+        (equations, incidence lists) are untouched — shared references
+        are the point.
+        """
+        ont = self.ontology_graph
+        base = str(self.ONTOLOGY_GRAPH_IRI)
+        arc_iri = URIRef(f"{base}#idx_arc")
+        mechs = set()
+        for sub in ont.subjects(PROMO["subIndexOf"], arc_iri):
+            short = str(ont.value(sub, PROMO["shortName"]) or "")
+            if short.startswith("A_"):
+                mech = short[2:]
+            else:
+                mech = str(sub).rsplit("#", 1)[-1].removeprefix("idx_arc_")
+            if mech:
+                mechs.add(mech)
+        if not mechs:
+            return
+        changed = False
+        for g in self.dataset.contexts():
+            if self.is_frozen(g):
+                continue
+            home = g.identifier == self.ONTOLOGY_GRAPH_IRI
+            for mech in mechs:
+                # Variable IRIs are the literal ``promo:<label>``
+                # form — that spelling is the canonical record, kept
+                # in the ontology graph only.  The absolute
+                # ``promo#F_*`` spelling is always an orphan (the
+                # seeded factor does not use it).
+                for iri, keep in (
+                        (URIRef(f"promo:F_{mech}"), home),
+                        (PROMO[f"F_{mech}"], False)):
+                    if not keep and (iri, None, None) in g:
+                        g.remove((iri, None, None))
                         changed = True
         if changed:
             self.mark_dirty()
