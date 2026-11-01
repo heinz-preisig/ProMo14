@@ -83,7 +83,7 @@ def ancestors(entity_type: Optional[str],
 
 
 def arc_carrier(arc_type_iri: Optional[str]) -> Optional[str]:
-    """Carrier category from an arc-type IRI (``promo:ArcType/<carrier>``).
+    """Carrier category from an arc-type IRI (``promo#ArcType/<carrier>``).
 
     The modeller synthesises arc types from connection-rule carriers;
     the fragment after ``ArcType/`` is the carrier.  Anything else is
