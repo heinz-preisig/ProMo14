@@ -2553,3 +2553,57 @@ variable lives*.
   factors are referenced, not authored.
 - Same pattern earmarked for stoichiometric matrices when reaction
   instantiation lands.
+
+## 26. Instance IRIs are absolute and live under their artefact's namespace (2026-11-01)
+
+Problem, found while finishing §25: three historical mints produce
+*relative* URIs — `<promo:F_conv>` (variables), `<promo:Model/Node_1>`
+(model records), `<promo:ArcType/token-flow>` (synthesised arc types).
+The strings look like prefixed names but are whole base-less,
+scheme-less URIs: in the TriG files `promo:F_conv` (prefixed name,
+expands to `https://w3id.org/promo#F_conv`) and `<promo:F_conv>`
+(relative URI) are *two different subjects*.  That is exactly what
+split the seeded incidence factor from the authored record — the seed
+spelled the IRI one way, every reference the other.
+
+Rule: **an instance IRI is absolute and lives under the namespace of
+the artefact that owns it.**  The artefact owns what exists; the IRI
+says so.
+
+- **Variables**: `promo:X` → `{home-graph}#<label>` — the equation-IRI
+  precedent (§`_migrate_equation_iris`) applied one level up.
+  Home = the graph holding the variable's equation subjects, else the
+  graph with the richer record.  Duplicate records (`Axy`, `p_mech`,
+  `p_term` — same internalID, written into both `ontology` and
+  `library` by earlier write paths) are merged into the home graph;
+  the `promo:V` ontology stub (empty `V_8`) merges into the real
+  library record (`V_23`).  Expressions are untouched: they resolve
+  `network!label`, never IRIs.
+- **`global_ID`** = the canonical IRI.  It *is* the global
+  identifier — a `promo:X` spelling was the same defect one layer
+  down.  `rdf_context` falls back to the full IRI, not the fragment.
+- **Model records**: `promo:Model/Node_n` → `{model}Node_n`,
+  `promo:Arc/Arc_n` → `{model}Arc_n` — the flat `model/Composite_0` /
+  `model/Model` convention the persistence layer already uses.
+- **Arc types**: `promo:ArcType/<carrier>` → `promo#ArcType/<carrier>`.
+  A synthesised, shared, vocabulary-side resource — the honest
+  expansion of the prefixed name the mint intended.
+- **Rewritten everywhere**: subject triples, object references
+  (`lhs`, `hasEquation`, `hasInstantiated/Port/StateVariable`,
+  `instanceOf`, `source`/`target`/`referenceFrom`/`referenceTo`,
+  canonical `rdf:first` argument lists), and `promo:` tokens inside
+  JSON literals (`incidenceList`, `aliases.global_ID`, `children`,
+  `knots`).  Tokens with no subject anywhere (e.g. the long-dangling
+  `promo:c`) expand to `promo#` — a dangling absolute IRI beats a
+  dangling relative one.
+- **Frozen version graphs are not rewritten** — a published snapshot
+  keeps the spellings it was published with.
+- **Mints move to the canonical form**: frontend
+  `promo:${lhs}` → `{graph}#${lhs}`, `ModelGraph` prefixes,
+  `ARC_TYPE_PREFIX`, and the §25 seeds write `{graph}#` directly.
+- **Guard**: the variable/equation write path rejects relative IRIs —
+  the deferred §25 same-IRI-redefinition guard lands here: nothing
+  without a URI scheme gets stored again.
+
+Migration `_migrate_variable_iris` runs at `load()` like its equation
+counterpart — idempotent, both machines converge on next load.

@@ -19,6 +19,11 @@ from rdflib.namespace import RDF
 
 from .vocab import PROMO, _EQUATION_ID_RE
 
+# §26: relative ``promo:X`` URIs — pseudo-prefixed names stored
+# verbatim.  Matches whole tokens inside literals too (path-shaped
+# ones like ``promo:Model/Node_1`` as well as bare ``promo:d``).
+_PROMO_REL_RE = re.compile(r"promo:[A-Za-z_][\w.-]*(?:/[A-Za-z_][\w.-]*)*")
+
 
 class PersistenceMixin:
     """TriG load/save, legacy migrations and the dirty flag."""
@@ -87,6 +92,10 @@ class PersistenceMixin:
         # namespace are rehomed into their graph's own namespace.
         self._migrate_equation_iris()
         self._migrate_domain_membership()
+        # §26: instance IRIs belong to their artefact — rehome the
+        # relative ``promo:X`` spellings before anything else reasons
+        # about them.
+        self._migrate_variable_iris()
         # §25: incidence factors are seeded scheme objects in the
         # ontology graph — drop hand-authored copies elsewhere so the
         # union read sees one description.
@@ -238,9 +247,109 @@ class PersistenceMixin:
         if changed:
             self.mark_dirty()
 
+    def _migrate_variable_iris(self) -> None:
+        """§26: instance IRIs live under the owning artefact's
+        namespace.
+
+        Relative ``promo:X`` URIs — pseudo-prefixed names stored
+        verbatim — are consolidated and rehomed: variables to
+        ``{home}#<name>``, model records to ``{graph}<name>`` (the
+        ``model/Composite_0`` convention).  When a variable's record
+        is split across graphs the copies merge into one home: the
+        graph holding an equation whose ``lhs`` is the variable, else
+        the richest record, ontology winning ties.  References —
+        URIRef objects and ``promo:`` tokens inside literals —
+        rewrite to the canonical IRI; tokens with no subject anywhere
+        expand to ``promo#`` (arc types, dangling refs).  Frozen
+        version graphs keep their published spellings.
+        """
+        graphs = [g for g in self.dataset.contexts()
+                  if len(g) and not self.is_frozen(g)]
+        rel: Dict[str, List[Graph]] = {}
+        for g in graphs:
+            for s in g.subjects():
+                if isinstance(s, URIRef) and str(s).startswith("promo:"):
+                    rel.setdefault(str(s), []).append(g)
+        if not rel:
+            return
+        ont_id = self.ONTOLOGY_GRAPH_IRI
+
+        def home_for(iri: URIRef, holders: List[Graph]) -> Graph:
+            # A record already in the ontology artefact is
+            # scheme-owned — scopes that pin the ontology but not the
+            # var/expr graph must still see it.
+            ont = next((g for g in holders
+                        if g.identifier == ont_id), None)
+            if ont is not None:
+                return ont
+            for g in holders:
+                if (None, PROMO["lhs"], iri) in g:
+                    return g
+            return max(
+                holders,
+                key=lambda g: len(list(g.predicate_objects(iri))))
+
+        moves: Dict[str, str] = {}
+        for iri_str in sorted(rel):
+            s = URIRef(iri_str)
+            tail = iri_str[len("promo:"):]
+            local = tail.rsplit("/", 1)[-1]
+            holders = sorted(rel[iri_str], key=lambda g: str(g.identifier))
+            home = home_for(s, holders)
+            is_var = any((s, RDF.type, PROMO["Variable"]) in g
+                         for g in holders)
+            new = URIRef(f"{home.identifier}#{local}" if is_var
+                         else f"{home.identifier}{local}")
+            moves[iri_str] = str(new)
+            # Richest record first, the home record winning ties — its
+            # literals become canonical; poorer copies contribute only
+            # non-conflicting extras (their stubs lose).
+            ordered = sorted(
+                holders,
+                key=lambda g: (-len(list(g.predicate_objects(s))),
+                               g.identifier != home.identifier))
+            for g in ordered:
+                for _s, p, o in list(g.triples((s, None, None))):
+                    if self._absorbable(home, new, p, o):
+                        home.add((new, p, o))
+                    g.remove((s, p, o))
+
+        def remap(token: str) -> str:
+            return moves.get(token) or f"{PROMO}{token[len('promo:'):]}"
+
+        # Reference rewrite: URIRef objects and literal tokens.
+        for g in graphs:
+            for s, p, o in list(g.triples((None, None, None))):
+                if p == PROMO["doc"]:
+                    continue   # VOCAB_DOCS prose — re-stamped each load
+                if isinstance(o, URIRef) and str(o).startswith("promo:"):
+                    g.remove((s, p, o))
+                    g.add((s, p, URIRef(remap(str(o)))))
+                elif isinstance(o, Literal) and "promo:" in str(o):
+                    text = _PROMO_REL_RE.sub(
+                        lambda m: remap(m.group(0)), str(o))
+                    if text != str(o):
+                        g.remove((s, p, o))
+                        g.add((s, p, Literal(text)))
+        self.mark_dirty()
+
+    @staticmethod
+    def _absorbable(g: Graph, new: URIRef, p, o) -> bool:
+        """Whether ``(new, p, o)`` may be added during a rehome merge:
+        exact duplicates are skipped and for literal-valued
+        predicates the existing (canonical) value wins."""
+        if (new, p, o) in g:
+            return False
+        if isinstance(o, Literal):
+            for ex in g.objects(new, p):
+                if isinstance(ex, Literal) and ex != o:
+                    return False
+        return True
+
     def _migrate_incidence_factors(self) -> None:
-        """§25: ``promo:F_<mech>`` incidence factors are seeded scheme
-        objects — the ontology graph's copy is the single description.
+        """§25/§26: ``{ontology}#F_<mech>`` incidence factors are seeded
+        scheme objects — the ontology graph's copy is the single
+        description.
         Older stores may carry hand-authored duplicates (the
         port-variable-era ``F_conv``, API-made ``F_heat``) in var/expr
         artefact graphs; under the union read those would merge with —
@@ -263,23 +372,24 @@ class PersistenceMixin:
                 mechs.add(mech)
         if not mechs:
             return
+        # §26 canonical form: ``{ontology}#F_<mech>`` — and only in
+        # the ontology graph.  Any other subject whose local name is
+        # ``F_<mech>`` (relative, vocabulary-ns or artefact-ns
+        # spelling) is a duplicate and goes.
+        canonical = {URIRef(f"{base}#F_{m}") for m in mechs}
         changed = False
         for g in self.dataset.contexts():
             if self.is_frozen(g):
                 continue
             home = g.identifier == self.ONTOLOGY_GRAPH_IRI
-            for mech in mechs:
-                # Variable IRIs are the literal ``promo:<label>``
-                # form — that spelling is the canonical record, kept
-                # in the ontology graph only.  The absolute
-                # ``promo#F_*`` spelling is always an orphan (the
-                # seeded factor does not use it).
-                for iri, keep in (
-                        (URIRef(f"promo:F_{mech}"), home),
-                        (PROMO[f"F_{mech}"], False)):
-                    if not keep and (iri, None, None) in g:
-                        g.remove((iri, None, None))
-                        changed = True
+            for s in list(g.subjects()):
+                local = re.split(r"[#/:]", str(s))[-1]
+                if not local.startswith("F_") or local[2:] not in mechs:
+                    continue
+                if home and s in canonical:
+                    continue
+                g.remove((s, None, None))
+                changed = True
         if changed:
             self.mark_dirty()
 

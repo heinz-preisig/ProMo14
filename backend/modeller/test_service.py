@@ -34,26 +34,26 @@ def client(tmp_path: Path, monkeypatch):
 def _doc():
     return {
         "nodes": [
-            {"iri": "promo:Model/Node_1", "entityType": "promo:EntityType/capacity", "label": "Reactor"},
-            {"iri": "promo:Model/Node_2", "entityType": "promo:EntityType/capacity", "label": "Tank"},
+            {"iri": f"{MODEL}Node_1", "entityType": f"{ONTO}#etype_capacity", "label": "Reactor"},
+            {"iri": f"{MODEL}Node_2", "entityType": f"{ONTO}#etype_capacity", "label": "Tank"},
         ],
         "arcs": [
-            {"iri": "promo:Arc/Arc_1", "sourceIri": "promo:Model/Node_1",
-             "targetIri": "promo:Model/Node_2", "arcType": "promo:ArcType/token-flow",
-             "referenceFrom": "promo:Model/Node_2",
-             "referenceTo": "promo:Model/Node_1"},
+            {"iri": f"{MODEL}Arc_1", "sourceIri": f"{MODEL}Node_1",
+             "targetIri": f"{MODEL}Node_2", "arcType": "https://w3id.org/promo#ArcType/token-flow",
+             "referenceFrom": f"{MODEL}Node_2",
+             "referenceTo": f"{MODEL}Node_1"},
         ],
         "composites": [
             {"treeId": 0, "label": "Root", "parentTreeId": None,
-             "children": [{"id": 1, "iri": "promo:Model/Node_1"}, {"id": 2}],
+             "children": [{"id": 1, "iri": f"{MODEL}Node_1"}, {"id": 2}],
              "layout": {"1": {"x": 0.0, "y": 0.0}, "2": {"x": 100.0, "y": 50.0}},
-             "knots": {"promo:Arc/Arc_1": [{"x": 10.0, "y": 20.0}]},
+             "knots": {f"{MODEL}Arc_1": [{"x": 10.0, "y": 20.0}]},
              "openArcs": []},
             {"treeId": 2, "label": "Group", "parentTreeId": 0,
-             "children": [{"id": 3, "iri": "promo:Model/Node_2"}],
+             "children": [{"id": 3, "iri": f"{MODEL}Node_2"}],
              "layout": {"3": {"x": 5.0, "y": 5.0}}, "knots": {},
-             "openArcs": [{"iri": "promo:Arc/Arc_9", "externalIri": "promo:Model/Node_1",
-                           "arcType": "promo:ArcType/token-flow", "isSource": True,
+             "openArcs": [{"iri": f"{MODEL}Arc_9", "externalIri": f"{MODEL}Node_1",
+                           "arcType": "https://w3id.org/promo#ArcType/token-flow", "isSource": True,
                            "refToExternal": True}]},
         ],
         "rootTreeId": 0, "nextTreeId": 4, "arcCounter": 2,
@@ -72,7 +72,7 @@ def test_put_get_roundtrip(client):
     assert client.put("/api/modeller/model", json=doc).status_code == 200
 
     got = client.get(f"/api/modeller/model?graph={MODEL}").json()
-    assert {n["iri"] for n in got["nodes"]} == {"promo:Model/Node_1", "promo:Model/Node_2"}
+    assert {n["iri"] for n in got["nodes"]} == {f"{MODEL}Node_1", f"{MODEL}Node_2"}
     assert got["rootTreeId"] == 0
     assert got["nextTreeId"] == 4
     assert got["arcCounter"] == 2
@@ -80,16 +80,16 @@ def test_put_get_roundtrip(client):
     by_id = {c["treeId"]: c for c in got["composites"]}
     assert by_id[2]["parentTreeId"] == 0
     assert by_id[0]["children"] == [
-        {"id": 1, "iri": "promo:Model/Node_1"}, {"id": 2, "iri": None}]
+        {"id": 1, "iri": f"{MODEL}Node_1"}, {"id": 2, "iri": None}]
     assert by_id[0]["layout"]["2"] == {"x": 100.0, "y": 50.0}
-    assert by_id[0]["knots"]["promo:Arc/Arc_1"] == [{"x": 10.0, "y": 20.0}]
-    assert by_id[2]["openArcs"][0]["externalIri"] == "promo:Model/Node_1"
+    assert by_id[0]["knots"][f"{MODEL}Arc_1"] == [{"x": 10.0, "y": 20.0}]
+    assert by_id[2]["openArcs"][0]["externalIri"] == f"{MODEL}Node_1"
 
     # §15: reference direction persists on the arc, refToExternal on the
     # open arc (JSON literal inside the Composite).
     arc = got["arcs"][0]
-    assert arc["referenceFrom"] == "promo:Model/Node_2"
-    assert arc["referenceTo"] == "promo:Model/Node_1"
+    assert arc["referenceFrom"] == f"{MODEL}Node_2"
+    assert arc["referenceTo"] == f"{MODEL}Node_1"
     assert by_id[2]["openArcs"][0]["refToExternal"] is True
 
 
@@ -215,14 +215,14 @@ def test_extract_submodel(client):
     # host: Node_2 gone, referenced composite in place, boundary arc
     # stays as an open arc on the new composite
     host = client.get(f"/api/modeller/model?graph={MODEL}").json()
-    assert {n["iri"] for n in host["nodes"]} == {"promo:Model/Node_1"}
+    assert {n["iri"] for n in host["nodes"]} == {f"{MODEL}Node_1"}
     assert len(host["arcs"]) == 1  # boundary arc kept (dangling end)
     by_id = {c["treeId"]: c for c in host["composites"]}
     assert by_id[comp_id]["refersTo"] == "https://example.org/sub"
     assert by_id[comp_id]["parentTreeId"] == 0
     open_arc = by_id[comp_id]["openArcs"][0]
-    assert open_arc["iri"] == "promo:Arc/Arc_1"
-    assert open_arc["externalIri"] == "promo:Model/Node_1"
+    assert open_arc["iri"] == f"{MODEL}Arc_1"
+    assert open_arc["externalIri"] == f"{MODEL}Node_1"
     assert open_arc["isSource"] is False   # removed end was the target
     # Arc_1 referenceTo = Node_1 (outside) → ref points to external
     assert open_arc["refToExternal"] is True
@@ -232,12 +232,12 @@ def test_extract_submodel(client):
     # boundary arc; pins inherited from the host artefact
     sub = client.get(
         "/api/modeller/model?graph=https://example.org/sub").json()
-    assert {n["iri"] for n in sub["nodes"]} == {"promo:Model/Node_2"}
+    assert {n["iri"] for n in sub["nodes"]} == {f"{MODEL}Node_2"}
     sub_root = {c["treeId"]: c for c in sub["composites"]}[sub["rootTreeId"]]
     assert len(sub_root["openArcs"]) == 1
     s_open = sub_root["openArcs"][0]
-    assert s_open["iri"] == "promo:Arc/Arc_1"
-    assert s_open["externalIri"] == "promo:Model/Node_2"
+    assert s_open["iri"] == f"{MODEL}Arc_1"
+    assert s_open["externalIri"] == f"{MODEL}Node_2"
     assert s_open["isSource"] is True      # missing end was the source
     assert s_open["refToExternal"] is False  # ref points away from inside
     assert sub["usesSpecies"] == []
@@ -324,7 +324,7 @@ def test_dissolve_roundtrip(client):
 
     got = client.get(f"/api/modeller/model?graph={MODEL}").json()
     assert {n["iri"] for n in got["nodes"]} == {
-        "promo:Model/Node_1", "promo:Model/Node_2"}
+        f"{MODEL}Node_1", f"{MODEL}Node_2"}
     assert len(got["arcs"]) == 1  # boundary arc, deduplicated by IRI
     by_id = {c["treeId"]: c for c in got["composites"]}
     comp = by_id[comp_id]
@@ -337,7 +337,7 @@ def test_dissolve_roundtrip(client):
     inner = by_id[inner_id]
     assert inner["parentTreeId"] == comp_id
     assert {ch.get("iri") for ch in inner["children"]} == {
-        "promo:Model/Node_2"}
+        f"{MODEL}Node_2"}
     assert got["usesModel"] == []
 
     # dissolving an inline composite is a 422
@@ -377,14 +377,14 @@ def test_instantiation_expands_reference(client):
     r = client.get(f"/api/instantiate/incidence?graph={MODEL}")
     assert r.status_code == 200, r.text
     base = r.json()["base"]
-    occ_node = f"{comp_iri}/promo:Model/Node_2"
+    occ_node = f"{comp_iri}/{MODEL}Node_2"
     assert occ_node in base["nodes"]
     # the boundary arc connects host Node_1 to the occurrence instance
     row_nodes = base["nodes"]
-    assert "promo:Model/Node_1" in row_nodes
+    assert f"{MODEL}Node_1" in row_nodes
     assert len(base["entries"]) == 2
     touched = {row_nodes[r_] for r_, _, _ in base["entries"]}
-    assert touched == {"promo:Model/Node_1", occ_node}
+    assert touched == {f"{MODEL}Node_1", occ_node}
 
     # cycles report a reference-cycle problem instead of recursing
     store = graph_store.get_store()
@@ -476,22 +476,22 @@ def _species_doc(env_alloc=None, env_rxns=None, lump_alloc=None,
     """Minimal model: an Environment and a Lumped tank (optionally a
     Convection pipe on the arc endpoint) with §20 gestures."""
     nodes = [
-        {"iri": "promo:Model/Env", "entityType": ET_ENV,
+        {"iri": f"{MODEL}Env", "entityType": ET_ENV,
          "label": "Environment",
          "speciesAllocation": env_alloc, "reactions": env_rxns or []},
-        {"iri": "promo:Model/Tank", "entityType": ET_LUMPED,
+        {"iri": f"{MODEL}Tank", "entityType": ET_LUMPED,
          "label": "Tank",
          "speciesAllocation": lump_alloc, "reactions": lump_rxns or []},
     ]
-    target = "promo:Model/Tank"
+    target = f"{MODEL}Tank"
     if conv_endpoint:
-        nodes.append({"iri": "promo:Model/Pipe", "entityType": ET_CONV,
+        nodes.append({"iri": f"{MODEL}Pipe", "entityType": ET_CONV,
                       "label": "Pipe"})
-        target = "promo:Model/Pipe"
+        target = f"{MODEL}Pipe"
     doc = _doc()
     doc["nodes"] = nodes
-    doc["arcs"] = [{"iri": "promo:Arc/Arc_1", "sourceIri": "promo:Model/Env",
-                    "targetIri": target, "arcType": "promo:ArcType/token-flow",
+    doc["arcs"] = [{"iri": f"{MODEL}Arc_1", "sourceIri": f"{MODEL}Env",
+                    "targetIri": target, "arcType": "https://w3id.org/promo#ArcType/token-flow",
                     "permeable": arc_perm}]
     return doc
 
@@ -531,7 +531,7 @@ def test_instantiation_reports_inadmissible_gestures(client):
     net for artefacts that bypassed the save gate."""
     store = graph_store.get_store()
     g = store.dataset.graph(URIRef(MODEL))
-    node = URIRef("promo:Model/Env")
+    node = URIRef(f"{MODEL}Env")
     g.add((node, RDF.type, graph_store.PROMO["ModelNode"]))
     g.add((node, graph_store.PROMO["entityType"], URIRef(ET_ENV)))
     g.add((node, graph_store.PROMO["hostsReaction"], URIRef(RXN)))
@@ -615,7 +615,7 @@ def test_port_satisfaction_endpoint(client):
     # Carrier filter: a reference arc carries signal, not mass.
     r = client.get("/api/modeller/port-satisfaction", params={
         "graph": MODEL, "source": ET_LUMPED, "target": ET_ENV,
-        "arc_type": "promo:ArcType/reference"})
+        "arc_type": "https://w3id.org/promo#ArcType/reference"})
     p = next(p for p in r.json()["source"]["ports"]
              if p["var"] == f"{ONTO}#var_p")
     assert p["status"] == "unlicensed"

@@ -473,10 +473,13 @@ designed:
   sub-indices (`_seed_incidence_factors`), hand-authored copies are
   stripped by `_migrate_incidence_factors`, and the legacy
   `sign(F_conv * p_mech)` equation was rewritten to the `[A_k, N]`
-  contraction. Variable IRIs use the store's literal `promo:<label>`
-  convention — the seed writes that same spelling or the union read
-  sees two records. Remaining: a save-time guard against same-IRI
-  redefinition across artefact graphs (deferred in §25).
+  contraction. Same day §26 closed the IRI question it exposed:
+  instance IRIs are absolute and live under the owning artefact's
+  namespace (`{graph}#name` for var/expr content) — the relative
+  `promo:X` spellings are rehomed by `_migrate_variable_iris`
+  (duplicates consolidated, references and JSON-literal tokens
+  rewritten), mints updated, and the variable write path now rejects
+  relative IRIs — the deferred same-IRI guard landed there.
 - Meshing (distributed-systems-design.md).
 - Empirical model selection artefact (energy-function + EOS pattern).
 - Instantiation artefact — done 2026-10-17: `promo:Instantiation`

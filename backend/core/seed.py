@@ -571,12 +571,17 @@ class SeedMixin:
                         if frag != str(arc_iri).rsplit("#", 1)[-1] else "")
             if not mech:
                 continue
-            # Variable IRIs in this store are the literal
-            # ``promo:<label>`` form (the frontend mints
-            # ``promo:${lhs}``; references, incidence lists and
-            # artefact placements all use it).  The factor must use
-            # the same spelling or the union read sees two records.
-            iri = URIRef(f"promo:F_{mech}")
+            # §26: instance IRIs live under the owning artefact's
+            # namespace — the factor is seeded under ``{graph}#``.
+            iri = URIRef(f"{base}#F_{mech}")
+            # Rehome the port-variable-era ``promo:F_<mech>`` spelling
+            # in place — its record (and internalID) is the one being
+            # normalised, not replaced.
+            legacy = URIRef(f"promo:F_{mech}")
+            if (legacy, None, None) in g:
+                for _s, p, o in list(g.triples((legacy, None, None))):
+                    g.add((iri, p, o))
+                    g.remove((_s, p, o))
 
             # Token: walk the selector's parent chain; the node just
             # under transport_system is the token group —
@@ -624,7 +629,7 @@ class SeedMixin:
                 "index_structures": [str(sub), str(node_iri)],
                 "port_variable": False,
                 "classifications": classifications,
-                "aliases": {"latex": "F", "global_ID": f"promo:F_{mech}"},
+                "aliases": {"latex": "F", "global_ID": str(iri)},
                 "doc": f"incidence matrix for the {label}",
                 "tokens": tokens,
                 "token_vector": token_vector,

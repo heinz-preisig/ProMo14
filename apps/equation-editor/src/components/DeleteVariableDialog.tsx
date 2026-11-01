@@ -10,8 +10,9 @@ export interface DeleteImpact {
 }
 
 function stripPrefix(s: string): string {
-  // incidence may contain qualified names like "network!iri"; keep the iri part
-  return s.includes('!') ? s.split('!').pop()! : s
+  // Incidence entries are IRIs or qualified names ("net!x") — keep the
+  // local part after the last separator.
+  return s.split(/[:#!]/).pop() ?? s
 }
 
 export function computeDeleteImpact(

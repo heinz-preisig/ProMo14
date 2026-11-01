@@ -260,9 +260,9 @@ def test_save_removes_stale_line_files(tmp_path):
     assert not stale.exists()
 
 ONTO = "https://w3id.org/promo/ontology"
-# Variable IRIs are the literal ``promo:<label>`` form — the same
-# spelling the frontend mints and references use.
-PVAR = "promo:"
+# §26: variable IRIs live under the owning artefact's namespace —
+# seeded factors are ``{ontology}#F_<mech>``.
+PVAR = f"{ONTO}#"
 
 
 def test_seed_incidence_factors(tmp_path):
@@ -292,18 +292,20 @@ def test_seed_incidence_factors(tmp_path):
             {want: 1}
 
 
-def test_seed_incidence_factors_normalises_stale_record(tmp_path):
-    """A pre-seed record with the wrong shape is corrected in place:
-    port flag cleared, missing node index added, spurious index
-    members dropped; internalID is kept."""
+def test_seed_incidence_factors_rehomes_legacy_spelling(tmp_path):
+    """The port-variable-era ``promo:F_conv`` record is rehomed under
+    the artefact namespace and normalised — internalID kept."""
     store = RdfStore(tmp_path)
     store.load()
     ont = store.ontology_graph
-    f = URIRef(f"{PVAR}F_conv")
-    ont.set((f, PROMO["portVariable"], Literal(True)))
-    ont.remove((f, PROMO["indexStructure"], URIRef(f"{ONTO}#idx_node")))
-    ont.add((f, PROMO["indexStructure"], URIRef(f"{ONTO}#idx_arc")))
+    legacy = URIRef("promo:F_conv")
+    ont.add((legacy, RDF.type, PROMO["Variable"]))
+    ont.add((legacy, PROMO["internalID"], Literal("V_4")))
+    ont.add((legacy, PROMO["portVariable"], Literal(True)))
     store._seed_incidence_factors(ont, ONTO)
+    f = URIRef(f"{PVAR}F_conv")
+    assert (legacy, None, None) not in ont
+    assert str(ont.value(f, PROMO["internalID"])) == "V_4"
     assert str(ont.value(f, PROMO["portVariable"])) == "false"
     assert set(ont.objects(f, PROMO["indexStructure"])) == {
         URIRef(f"{ONTO}#idx_arc_convection"), URIRef(f"{ONTO}#idx_node")}
@@ -314,18 +316,21 @@ def test_migrate_incidence_factors_strips_duplicate_records(tmp_path):
     seeded ontology record is the single description."""
     store = RdfStore(tmp_path)
     store.load()
-    dup = URIRef(f"{PVAR}F_heat")
+    dup = URIRef("promo:F_heat")   # the historical duplicate spelling
     g = store.dataset.get_context(URIRef(ARTEFACT))
     store.add_variable_dict(g, {
         "iri": str(dup), "label": "F_heat", "network": "physical"})
-    assert (dup, None, None) in g
+    store._migrate_variable_iris()   # rehomes to {artefact}#F_heat
     store._migrate_incidence_factors()
+    assert (URIRef(f"{ARTEFACT}#F_heat"), None, None) not in g
     assert (dup, None, None) not in g
-    assert (dup, RDF.type, PROMO["Variable"]) in store.ontology_graph
+    canonical = URIRef(f"{PVAR}F_heat")
+    assert (canonical, RDF.type,
+            PROMO["Variable"]) in store.ontology_graph
 
 
 def test_migrate_incidence_factors_strips_absolute_orphans(tmp_path):
-    """The absolute ``promo#F_*`` spelling is never canonical —
+    """The vocabulary-ns ``promo#F_*`` spelling is never canonical —
     duplicates under it are orphans even in the ontology graph."""
     store = RdfStore(tmp_path)
     store.load()
@@ -335,6 +340,60 @@ def test_migrate_incidence_factors_strips_absolute_orphans(tmp_path):
     ont.add((orphan, RDFS.label, Literal("F_rad")))
     store._migrate_incidence_factors()
     assert (orphan, None, None) not in ont
-    # …while the literal promo: record stays.
-    assert (URIRef("promo:F_rad"), RDF.type,
+    # …while the canonical artefact-ns record stays.
+    assert (URIRef(f"{PVAR}F_rad"), RDF.type,
             PROMO["Variable"]) in ont
+
+
+def test_migrate_variable_iris_rehomes_and_rewrites(tmp_path):
+    """§26: relative ``promo:X`` subjects move under their artefact's
+    namespace; object references and literal tokens follow."""
+    store = RdfStore(tmp_path)
+    store.load()
+    g = store.dataset.get_context(URIRef(ARTEFACT))
+    var = URIRef("promo:x")
+    store.add_variable_dict(g, {
+        "iri": str(var), "label": "x", "network": "physical"})
+    eq = URIRef(f"{ARTEFACT}#E_1")
+    g.add((eq, RDF.type, PROMO["Equation"]))
+    g.add((eq, PROMO["lhs"], var))
+    g.add((eq, PROMO["incidenceList"],
+           Literal('["promo:x", "promo:ghost"]')))
+    g.add((URIRef(f"{ARTEFACT}#node"), PROMO["arcType"],
+           URIRef("promo:ArcType/token-flow")))
+    store._migrate_variable_iris()
+    new = URIRef(f"{ARTEFACT}#x")
+    assert (var, None, None) not in g
+    assert (new, RDF.type, PROMO["Variable"]) in g
+    assert (eq, PROMO["lhs"], new) in g
+    assert str(g.value(eq, PROMO["incidenceList"])) == \
+        f'["{new}", "{PROMO}ghost"]'
+    assert (URIRef(f"{ARTEFACT}#node"), PROMO["arcType"],
+            PROMO["ArcType/token-flow"]) in g
+
+
+def test_migrate_variable_iris_consolidates_split_record(tmp_path):
+    """A variable written into two graphs merges into the graph that
+    holds an equation naming it — the home record wins literal
+    conflicts, the foreign copy uniques are absorbed."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    lib = store.dataset.get_context(URIRef(ARTEFACT))
+    var = URIRef("promo:heat")
+    eq = URIRef(f"{ONTO}#E_9")
+    ont.add((eq, RDF.type, PROMO["Equation"]))
+    ont.add((eq, PROMO["lhs"], var))
+    for g in (ont, lib):
+        store.add_variable_dict(g, {
+            "iri": str(var), "label": "heat", "network": "physical"})
+    lib.add((var, PROMO["doc"], Literal("library doc")))
+    ont.add((var, PROMO["doc"], Literal("ontology doc")))
+    store._migrate_variable_iris()
+    new = URIRef(f"{ONTO}#heat")
+    assert (var, None, None) not in ont
+    assert (var, None, None) not in lib
+    assert (new, RDF.type, PROMO["Variable"]) in ont
+    assert (new, None, None) not in lib
+    assert str(ont.value(new, PROMO["doc"])) == "ontology doc"
+    assert (eq, PROMO["lhs"], new) in ont

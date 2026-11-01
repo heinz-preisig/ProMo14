@@ -1,6 +1,7 @@
 import type { ModelNode, ModelArc, NodeType, ArcType } from '../types'
+import { GRAPH_IRI } from '../api'
 
-/** Carrier category from an arc-type IRI (``promo:ArcType/<carrier>``).
+/** Carrier category from an arc-type IRI (``promo#ArcType/<carrier>``).
  *  Mirrors backend.instantiate.resolver.arc_carrier. */
 export function arcCarrier(arcTypeIri: string | undefined): string | undefined {
   if (!arcTypeIri) return undefined
@@ -130,7 +131,7 @@ export class ModelGraphOps {
   }
 
   /** Generate a new arc IRI using the internal counter. */
-  nextArcIri(prefix = 'promo:Arc/Arc_'): string {
+  nextArcIri(prefix = `${GRAPH_IRI}Arc_`): string {
     const iri = `${prefix}${this.arcCounter}`
     return iri
   }

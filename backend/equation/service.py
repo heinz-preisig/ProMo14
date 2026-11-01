@@ -698,6 +698,7 @@ def create_variable(
 
     if not record.iri:
         record.iri = str(store.mint_iri(graph.identifier, record.internal_id or store.next_internal_id("V")))
+    _assert_absolute_iri(record.iri)
     if not record.internal_id:
         record.internal_id = store.next_internal_id("V")
 
@@ -735,6 +736,7 @@ def update_variable(
     equation — changing them then returns 409 with the referencers.
     """
     _validate_variable_latex(record)
+    _assert_absolute_iri(iri)
     store = get_store()
     _resolve_record_domains(store, graph_iri, record)
     graph = resolve_graph(store, graph_iri)
@@ -1229,4 +1231,20 @@ def _validate_variable_latex(record: VariableRecord) -> None:
         raise HTTPException(
             status_code=422,
             detail={"field": "aliases.latex", "message": error},
+        )
+
+
+def _assert_absolute_iri(iri: str) -> None:
+    """§26: instance IRIs are absolute — the pseudo-prefixed relative
+    spellings (``promo:X``) that predated the artefact-namespace
+    convention are rejected at the write boundary."""
+    if not iri.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "variable IRI must be absolute, under the owning "
+                f"artefact's namespace (e.g. "
+                "https://w3id.org/promo/library/#name) — got "
+                f"{iri!r}"
+            ),
         )

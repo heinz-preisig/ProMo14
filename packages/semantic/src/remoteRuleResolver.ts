@@ -107,7 +107,7 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
               status: 'allowed',
               connections: body.rules.map((r) => ({
                 ruleIri: r.iri,
-                arcTypeIri: `promo:ArcType/${r.carrier ?? r.rule_type ?? 'generic'}`,
+                arcTypeIri: `https://w3id.org/promo#ArcType/${r.carrier ?? r.rule_type ?? 'generic'}`,
                 matchedTokens: r.matched_tokens,
               })),
             }

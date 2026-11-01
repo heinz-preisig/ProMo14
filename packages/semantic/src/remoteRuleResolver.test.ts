@@ -41,8 +41,8 @@ describe('RemoteRuleResolver', () => {
     expect(result.status).toBe('allowed')
     if (result.status === 'allowed') {
       expect(result.connections).toEqual([
-        { ruleIri: 'promo:rule_physical-same', arcTypeIri: 'promo:ArcType/token-flow' },
-        { ruleIri: 'promo:rule_access', arcTypeIri: 'promo:ArcType/reference' },
+        { ruleIri: 'promo:rule_physical-same', arcTypeIri: 'https://w3id.org/promo#ArcType/token-flow' },
+        { ruleIri: 'promo:rule_access', arcTypeIri: 'https://w3id.org/promo#ArcType/reference' },
       ])
     }
   })
@@ -54,7 +54,7 @@ describe('RemoteRuleResolver', () => {
     const r = new RemoteRuleResolver()
     const result = await r.resolveAsync(QUERY)
     expect(result.status === 'allowed' && result.connections[0].arcTypeIri)
-      .toBe('promo:ArcType/signal')
+      .toBe('https://w3id.org/promo#ArcType/signal')
   })
 
   it('returns forbidden when the backend lists no applicable rules', async () => {

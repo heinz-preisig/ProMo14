@@ -71,7 +71,7 @@ describe('RemoteCatalogue', () => {
   it('synthesises arc types from rule carriers', async () => {
     const cat = await load()
     const iris = cat.getArcTypes().map((a) => a.iri).sort()
-    expect(iris).toEqual(['promo:ArcType/reference', 'promo:ArcType/token-flow'])
+    expect(iris).toEqual(['https://w3id.org/promo#ArcType/reference', 'https://w3id.org/promo#ArcType/token-flow'])
   })
 
   it('exposes domains and tokens', async () => {

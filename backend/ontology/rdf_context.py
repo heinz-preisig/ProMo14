@@ -272,8 +272,10 @@ class RdfContext(EquationContext):
                         ) -> Variable:
         aliases = _aliases(graph, s)
         fragment = iri.split("#")[-1].split("/")[-1]
-        if fragment and "global_ID" not in aliases:
-            aliases["global_ID"] = fragment
+        # §26: global_ID is the global identifier — the canonical IRI,
+        # not a pseudo-prefixed spelling.
+        if "global_ID" not in aliases:
+            aliases["global_ID"] = iri
 
         # Multi-axis classifications (promo:axisValue -> axis term IRI);
         # term->axis is resolved scope-wide (see _load_variables).
@@ -400,8 +402,8 @@ class RdfContext(EquationContext):
     def _build_index(graph, s, iri: str, network: str, domain_iri: str) -> Index:
         aliases = _aliases(graph, s)
         fragment = iri.split("#")[-1].split("/")[-1]
-        if fragment and "global_ID" not in aliases:
-            aliases["global_ID"] = fragment
+        if "global_ID" not in aliases:
+            aliases["global_ID"] = iri
         label = _one_literal(graph, s, RDFS.label) or fragment or iri
         # The short name is the surface token used in expressions; fall
         # back to the label when no explicit shortName is stored.

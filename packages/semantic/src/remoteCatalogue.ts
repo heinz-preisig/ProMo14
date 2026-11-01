@@ -75,7 +75,7 @@ export interface CatalogueFetchers {
   connectionRules(): Promise<ConnectionRuleRecord[]>
 }
 
-const ARC_TYPE_PREFIX = 'promo:ArcType/'
+const ARC_TYPE_PREFIX = 'https://w3id.org/promo#ArcType/'
 
 export class RemoteCatalogue implements SemanticCatalogue {
   private entities = new Map<Iri, BaseEntityDefinition>()

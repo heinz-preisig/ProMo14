@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { checkExpression, generateExpression, parseExpression } from '../api'
+import { checkExpression, generateExpression, GRAPH_IRI, parseExpression } from '../api'
 import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
@@ -213,7 +213,7 @@ export default function DependentVariableEditor({
       ...(editing ?? {}),
       // Case-sensitive IRI: the language treats `rho` and `Rho` as
       // distinct identifiers, so the IRI must preserve case too.
-      iri: editing?.iri ?? `promo:${lhs}`,
+      iri: editing?.iri ?? `${GRAPH_IRI}#${lhs}`,
       label: lhs,
       network: domain,
       domain_iri: selectedDomainIri,

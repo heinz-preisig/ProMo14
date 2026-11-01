@@ -6,6 +6,7 @@ import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
 import { resolveConnectionAsync, pickArcType } from '@promo/semantic'
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
+import { GRAPH_IRI } from '../api'
 
 /** Root of the transport-system subtree — seeded entity type
  *  (deterministic IRI, minted under the ontology namespace). */
@@ -63,7 +64,7 @@ export function useCanvasEvents(
 
   const insertNodeAt = (x: number, y: number) => {
     const id = state.tree.nextId + 1
-    const iri = `promo:Model/Node_${id}`
+    const iri = `${GRAPH_IRI}Node_${id}`
     dispatch({
       type: 'insertNode',
       id,
@@ -193,7 +194,7 @@ export function useCanvasEvents(
       )
       const arcType = pickArcType(result, activeArcType)
       if (arcType) {
-        const arcIri = `promo:Arc/Arc_${state.arcCounter}`
+        const arcIri = `${GRAPH_IRI}Arc_${state.arcCounter}`
         const orientation = defaultOrientation(
           arcType,
           pendingConnection.sourceModelIri,
@@ -236,7 +237,7 @@ export function useCanvasEvents(
         )
         const arcType = pickArcType(result, activeArcType)
         if (arcType) {
-          const arcIri = `promo:Arc/Arc_${state.arcCounter}`
+          const arcIri = `${GRAPH_IRI}Arc_${state.arcCounter}`
           const orientation = defaultOrientation(
             arcType,
             sourceNode.modelNodeIri,
