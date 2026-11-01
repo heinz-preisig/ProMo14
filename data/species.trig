@@ -2,7 +2,7 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-<https://w3id.org/promo/species/> {
+<https://w3id.org/promo/species> {
     promo:Allocation a rdfs:Class .
 
     promo:Assignment a rdfs:Class .
@@ -84,7 +84,7 @@
 
     promo:versionOf a rdf:Property .
 
-    <https://w3id.org/promo/species/> a promo:Species ;
+    <https://w3id.org/promo/species> a promo:Species ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
 
     <https://w3id.org/promo/species/Allocation_mufi5tl5> a promo:Allocation ;

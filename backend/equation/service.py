@@ -1117,8 +1117,8 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
         ("internal_id", getattr(old, "internal_id", None),
          record.internal_id),
         ("alias:global_ID",
-         getattr(old, "aliases", {}).get("global_ID") or fragment,
-         record.aliases.get("global_ID") or fragment),
+         getattr(old, "aliases", {}).get("global_ID") or record.iri,
+         record.aliases.get("global_ID") or record.iri),
         ("alias:internal_code",
          getattr(old, "aliases", {}).get("internal_code"),
          record.aliases.get("internal_code")),
@@ -1154,9 +1154,20 @@ def delete_variable(
     A frozen target always 409s.
     """
     store = get_store()
-    graph = resolve_graph(store, graph_iri)
+    # Resolve the graph that actually owns the subject — the editor
+    # shows variables from the whole resolution scope (library +
+    # ontology pins), so a delete request may name a variable that
+    # lives outside the graph selected in the UI.
     subject = URIRef(iri)
-    if (subject, None, None) not in graph:
+    owners = [g for g in store.dataset.graphs()
+              if (subject, None, None) in g]
+    graph = next((g for g in owners if not store.is_frozen(g)), None)
+    if graph is None:
+        if owners:
+            raise HTTPException(status_code=409, detail={
+                "message": "Variable is frozen (proven) — unfreeze it first",
+                "frozen": True,
+            })
         raise HTTPException(status_code=404, detail="Variable not found")
     if _is_frozen(graph, subject):
         raise HTTPException(status_code=409, detail={

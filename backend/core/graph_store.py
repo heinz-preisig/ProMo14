@@ -414,18 +414,25 @@ class RdfStore(PersistenceMixin, SeedMixin):
         if prefix not in self._id_counters:
             self._id_counters[prefix] = 0
 
-        # Look for existing IDs in the ontology graph.
-        for s, o in self.ontology_graph.subject_objects(PROMO["internalID"]):
-            if isinstance(o, Literal):
-                value = str(o)
-                if value.startswith(prefix):
-                    try:
-                        num = int(value[len(prefix) :].lstrip("_"))
-                        self._id_counters[prefix] = max(
-                            self._id_counters[prefix], num
-                        )
-                    except ValueError:
-                        pass
+        # Look for existing IDs across the WHOLE dataset, not just the
+        # ontology graph: internal IDs double as IRI fragments
+        # ({graph}#V_n) and expression surface symbols, so an ID that
+        # exists in the library/model graph must never be re-minted —
+        # the fresh subject would silently overwrite a live variable
+        # record under replace-semantics (§18 only catches it when the
+        # victim is already referenced by equations).
+        for graph in self.dataset.graphs():
+            for s, o in graph.subject_objects(PROMO["internalID"]):
+                if isinstance(o, Literal):
+                    value = str(o)
+                    if value.startswith(prefix):
+                        try:
+                            num = int(value[len(prefix) :].lstrip("_"))
+                            self._id_counters[prefix] = max(
+                                self._id_counters[prefix], num
+                            )
+                        except ValueError:
+                            pass
 
         self._id_counters[prefix] += 1
         # Old IDs were like "V_1", "I_3".  Keep that shape.

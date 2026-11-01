@@ -151,7 +151,12 @@ export default function DependentVariableEditor({
   const effectiveEqClass = isInstantiate ? instantiateClassIri : eqClass
   // Structural fields lock while the edited variable is used — the
   // Instantiate kind-forcing must not bypass the lock either.
-  const structuralLocked = !!editing && used
+  // `used` resolves async, so also treat "has stored equations" as
+  // locked — a variable's own defining equations count as references
+  // (§18 lhs refs) and make the lock deterministic from open.
+  const hasStoredEquations = !!editing &&
+    Object.keys(editing.equations ?? {}).length > 0
+  const structuralLocked = !!editing && (used || hasStoredEquations)
 
   // Names must be valid expression-language identifiers (lexer rule).
   const nameValid = isValidVariableName(name)
@@ -217,15 +222,25 @@ export default function DependentVariableEditor({
       label: lhs,
       network: domain,
       domain_iri: selectedDomainIri,
-      units: checkResult?.units ?? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
-      index_structures: checkResult?.indices ?? editing?.index_structures ?? [],
+      // A locked variable keeps its stored signature — the checker's
+      // units/indices belong to the new equation, not the variable,
+      // and applying them trips the §18 mutability guard.  An UNUSED
+      // (or new) variable still adopts the checker signature — the
+      // first equation defines it.
+      units: structuralLocked
+        ? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0]
+        : checkResult?.units ?? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
+      index_structures: structuralLocked
+        ? editing?.index_structures ?? []
+        : checkResult?.indices ?? editing?.index_structures ?? [],
       internal_id: editing?.internal_id ?? nextInternalId(variables),
       port_variable: editing?.port_variable ?? false,
       classifications,
       aliases,
       doc,
     }
-  }, [name, domain, variables, checkResult, latexSym, doc, editing, classifications])
+  }, [name, domain, variables, checkResult, latexSym, doc, editing,
+      classifications, structuralLocked])
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when

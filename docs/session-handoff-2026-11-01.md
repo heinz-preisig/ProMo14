@@ -160,3 +160,47 @@ uv run --with pytest --with httpx pytest backend/ -x -q
 (cd packages/semantic && npm test)   # vitest
 (cd apps/modeller && npx tsc --noEmit)
 ```
+
+# Late evening — save/delete path bugs found during energy authoring
+
+## What was done
+
+- **Root cause of the phantom §18 409s (mu/V_35):**
+  `next_internal_id` scanned only `self.ontology_graph` for `internalID`
+  literals — blind to `V_1..V_54` living in the *library* graph.
+  Ontology's max is `V_34`, so a "New dependent variable" POST
+  (`iri: ''`) minted `V_35` (= `mu`), then `V_36` — existing subjects.
+  The create became an overwrite of the victim's record → guard 409'd
+  with `units`/`index_structures`/`alias:global_ID` — and silently
+  *saved* `mu` from being replaced. Fix: scan **all** named graphs in
+  `graph_store.py:424` → now mints `V_55+`. Verified live.
+- **`delete_variable` 404 "Variable not found":** required the subject
+  in the UI-selected graph; ontology-living variables (e.g. `F_mass`)
+  shown via resolution scope could never delete. Now resolves the
+  owning graph by scanning `dataset.graphs()` for subject membership,
+  preferring non-frozen (`service.py:1162`).
+- **`_structural_changes` `global_ID` false positive:** absent alias
+  fell back to the IRI *fragment* while the reader injects the full
+  IRI → phantom `alias:global_ID` flag on any round-trip that omitted
+  it. Fallback now `record.iri` on both sides (`service.py:1119`).
+- **`DependentVariableEditor.draftVariable` signature override:**
+  `checkResult.units`/`indices` overwrote the stored signature when
+  attaching an equation to a used variable → phantom structural flags.
+  Now gated on `structuralLocked = editing && (used || hasStored
+  equations)` — `hasStoredEquations` is synchronous, closing the
+  async `useVariableLock` race; unused variables still adopt the
+  checker signature (first equation defines it).
+
+## Known latent issue (not fixed)
+
+- **POST update path shares the graph blind spot:** saving a
+  foreign-graph variable writes a *second* record into the selected
+  graph (subject `{ont}#F_x` inside `library`) instead of updating the
+  owner — split identity. Same shape as the delete fix if it bites.
+
+## State
+
+- **502 backend tests** pass; equation-editor `tsc`+vite clean
+  (bundle `index-DmJq04ph.js` — hard-refresh needed after rebuild).
+- `fQx` save succeeded post-fix (`V_55` minted). Energy equations
+  E_26–E_28 authored. `data/` diffs = user content + re-serialization.
