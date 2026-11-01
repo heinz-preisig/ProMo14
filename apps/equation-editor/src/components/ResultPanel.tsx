@@ -14,7 +14,7 @@ function formatIndex(iri: string, indices: Index[] = []) {
   return `${indexShortLabel(idx)} (${idx.label})`
 }
 
-// Incidence entries are IRIs ("promo:Mm", "net!x", "...#x") — display the
+// Incidence entries are IRIs (".../ontology#Mm", "net!x", "...#x") — display the
 // bare name after the last separator.
 function formatIncidence(iri: string): string {
   return iri.split(/[:#!]/).pop() ?? iri

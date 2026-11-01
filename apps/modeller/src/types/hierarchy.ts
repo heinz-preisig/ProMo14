@@ -14,7 +14,7 @@ import type { Knot } from './index'
 
 /** A model node is a leaf in the tree and has a unique IRI. */
 export interface ModelNode {
-  iri: string           // Unique IRI — e.g. "promo:Model/Reactor_A1"
+  iri: string           // Unique IRI — e.g. ".../model/Reactor_A1"
   entityType: string   // From ontology (e.g. "promo:Reactor")
   label: string
   // §20 species placement (capability-gated):
