@@ -64,8 +64,8 @@ describe('RemoteCatalogue', () => {
     const attrs = Object.fromEntries(
       (cap?.attributes ?? []).map((a) => [a.predicateIri, a.value]),
     )
-    expect(attrs['promo:temporalType']).toBe('dynamic')
-    expect(attrs['promo:spatialType']).toBe('distributed')
+    expect(attrs['https://w3id.org/promo#temporalType']).toBe('dynamic')
+    expect(attrs['https://w3id.org/promo#spatialType']).toBe('distributed')
   })
 
   it('synthesises arc types from rule carriers', async () => {

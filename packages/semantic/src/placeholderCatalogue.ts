@@ -16,7 +16,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 const nodeGraphicalA: NodeGraphicalDefinition = {
-  iri: 'promo:Graphical/TypeA',
+  iri: 'https://w3id.org/promo#Graphical/TypeA',
   kind: 'node',
   shape: 'circle',
   fill: '#e8f4fd',
@@ -27,7 +27,7 @@ const nodeGraphicalA: NodeGraphicalDefinition = {
 }
 
 const nodeGraphicalB: NodeGraphicalDefinition = {
-  iri: 'promo:Graphical/TypeB',
+  iri: 'https://w3id.org/promo#Graphical/TypeB',
   kind: 'node',
   shape: 'circle',
   fill: '#d4edda',
@@ -38,7 +38,7 @@ const nodeGraphicalB: NodeGraphicalDefinition = {
 }
 
 const nodeGraphicalC: NodeGraphicalDefinition = {
-  iri: 'promo:Graphical/TypeC',
+  iri: 'https://w3id.org/promo#Graphical/TypeC',
   kind: 'node',
   shape: 'circle',
   fill: '#fff3cd',
@@ -49,7 +49,7 @@ const nodeGraphicalC: NodeGraphicalDefinition = {
 }
 
 const arcGraphical1: ArcGraphicalDefinition = {
-  iri: 'promo:Graphical/ArcType1',
+  iri: 'https://w3id.org/promo#Graphical/ArcType1',
   kind: 'arc',
   lineStyle: 'solid',
   stroke: '#333',
@@ -59,7 +59,7 @@ const arcGraphical1: ArcGraphicalDefinition = {
 }
 
 const arcGraphical2: ArcGraphicalDefinition = {
-  iri: 'promo:Graphical/ArcType2',
+  iri: 'https://w3id.org/promo#Graphical/ArcType2',
   kind: 'arc',
   lineStyle: 'dashed',
   stroke: '#888',
@@ -74,28 +74,28 @@ const arcGraphical2: ArcGraphicalDefinition = {
 // ---------------------------------------------------------------------------
 
 const entityA: BaseEntityDefinition = {
-  iri: 'promo:TypeA',
+  iri: 'https://w3id.org/promo#TypeA',
   label: 'Type A',
   typeIris: [],
-  graphicalDefinitionIri: 'promo:Graphical/TypeA',
+  graphicalDefinitionIri: 'https://w3id.org/promo#Graphical/TypeA',
   classifications: [],
   attributes: [],
 }
 
 const entityB: BaseEntityDefinition = {
-  iri: 'promo:TypeB',
+  iri: 'https://w3id.org/promo#TypeB',
   label: 'Type B',
   typeIris: [],
-  graphicalDefinitionIri: 'promo:Graphical/TypeB',
+  graphicalDefinitionIri: 'https://w3id.org/promo#Graphical/TypeB',
   classifications: [],
   attributes: [],
 }
 
 const entityC: BaseEntityDefinition = {
-  iri: 'promo:TypeC',
+  iri: 'https://w3id.org/promo#TypeC',
   label: 'Type C',
   typeIris: [],
-  graphicalDefinitionIri: 'promo:Graphical/TypeC',
+  graphicalDefinitionIri: 'https://w3id.org/promo#Graphical/TypeC',
   classifications: [],
   attributes: [],
 }
@@ -105,18 +105,18 @@ const entityC: BaseEntityDefinition = {
 // ---------------------------------------------------------------------------
 
 const arcType1: ArcTypeDefinition = {
-  iri: 'promo:ArcType1',
+  iri: 'https://w3id.org/promo#ArcType1',
   label: 'Arc Type 1',
   typeIris: [],
-  graphicalDefinitionIri: 'promo:Graphical/ArcType1',
+  graphicalDefinitionIri: 'https://w3id.org/promo#Graphical/ArcType1',
   attributes: [],
 }
 
 const arcType2: ArcTypeDefinition = {
-  iri: 'promo:ArcType2',
+  iri: 'https://w3id.org/promo#ArcType2',
   label: 'Arc Type 2',
   typeIris: [],
-  graphicalDefinitionIri: 'promo:Graphical/ArcType2',
+  graphicalDefinitionIri: 'https://w3id.org/promo#Graphical/ArcType2',
   attributes: [],
 }
 
@@ -182,8 +182,8 @@ class PlaceholderRuleResolver implements ConnectionRuleResolver {
     return {
       status: 'allowed',
       connections: [
-        { ruleIri: 'promo:Rule/AllowAll', arcTypeIri: 'promo:ArcType1' },
-        { ruleIri: 'promo:Rule/AllowAll', arcTypeIri: 'promo:ArcType2' },
+        { ruleIri: 'https://w3id.org/promo#Rule/AllowAll', arcTypeIri: 'https://w3id.org/promo#ArcType1' },
+        { ruleIri: 'https://w3id.org/promo#Rule/AllowAll', arcTypeIri: 'https://w3id.org/promo#ArcType2' },
       ],
     }
   }

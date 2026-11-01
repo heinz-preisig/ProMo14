@@ -136,13 +136,13 @@ export class RemoteCatalogue implements SemanticCatalogue {
     entityTypes.forEach((e, i) => {
       const attributes: SemanticAttribute[] = []
       if (e.temporal_type) {
-        attributes.push({ predicateIri: 'promo:temporalType', value: e.temporal_type })
+        attributes.push({ predicateIri: 'https://w3id.org/promo#temporalType', value: e.temporal_type })
       }
       if (e.spatial_type) {
-        attributes.push({ predicateIri: 'promo:spatialType', value: e.spatial_type })
+        attributes.push({ predicateIri: 'https://w3id.org/promo#spatialType', value: e.spatial_type })
       }
       if (e.spatial_size) {
-        attributes.push({ predicateIri: 'promo:spatialSize', value: e.spatial_size })
+        attributes.push({ predicateIri: 'https://w3id.org/promo#spatialSize', value: e.spatial_size })
       }
       const domainIri = e.branch ? branchDomain.get(e.branch) : undefined
       cat.entities.set(e.iri, {

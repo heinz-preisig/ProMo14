@@ -192,8 +192,8 @@ export default function App() {
   }), [catalogue])
 
   // --- Palette state (UI only, not part of model) ---
-  const [activeNodeType, setActiveNodeType] = useState<NodeType>('promo:TypeA')
-  const [activeArcType, setActiveArcType] = useState<ArcType>('promo:ArcType1')
+  const [activeNodeType, setActiveNodeType] = useState<NodeType>('https://w3id.org/promo#TypeA')
+  const [activeArcType, setActiveArcType] = useState<ArcType>('https://w3id.org/promo#ArcType1')
 
   // Keep the active palette selection valid when the catalogue swaps.
   useEffect(() => {

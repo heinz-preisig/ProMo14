@@ -42,8 +42,8 @@ describe('resolveConnection', () => {
     expect(result.status).toBe('allowed')
     if (result.status === 'allowed') {
       expect(result.connections).toHaveLength(2)
-      expect(result.connections[0].arcTypeIri).toBe('promo:ArcType1')
-      expect(result.connections[1].arcTypeIri).toBe('promo:ArcType2')
+      expect(result.connections[0].arcTypeIri).toBe('https://w3id.org/promo#ArcType1')
+      expect(result.connections[1].arcTypeIri).toBe('https://w3id.org/promo#ArcType2')
     }
   })
 })
