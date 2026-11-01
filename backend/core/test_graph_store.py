@@ -2,7 +2,7 @@
 
 import json
 
-from rdflib import Dataset, Literal, URIRef
+from rdflib import BNode, Dataset, Literal, URIRef
 from rdflib.namespace import RDF, RDFS
 
 from .graph_store import PROMO, RdfStore
@@ -397,3 +397,33 @@ def test_migrate_variable_iris_consolidates_split_record(tmp_path):
     assert (new, None, None) not in lib
     assert str(ont.value(new, PROMO["doc"])) == "ontology doc"
     assert (eq, PROMO["lhs"], new) in ont
+
+
+def test_heal_vocab_ns_refs_repoints_and_strips(tmp_path):
+    """Assignment/canonical references spelt ``promo#X`` heal on load:
+    a unique same-local-name subject wins the ref, dead variable role
+    claims are stripped, list members and vocabulary terms stay."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    home = URIRef(f"{PVAR}F_conv")
+    assert (home, RDF.type, PROMO["Variable"]) in ont
+    g = store.dataset.get_context(URIRef(ARTEFACT))
+    rec = URIRef(f"{ARTEFACT}#asg_1")
+    g.add((rec, RDF.type, PROMO["BehaviourAssignment"]))
+    g.add((rec, PROMO["hasInstantiatedVariable"], PROMO["F_conv"]))
+    g.add((rec, PROMO["hasInstantiatedVariable"], PROMO["gone"]))
+    g.add((rec, PROMO["arcType"], PROMO["ArcType/token-flow"]))
+    node = BNode()   # canonical hasArguments list member
+    g.add((node, RDF["first"], PROMO["F_conv"]))
+    g.add((node, RDF["first"], PROMO["dead"]))
+    eq = URIRef(f"{ARTEFACT}#E_1")
+    g.add((eq, PROMO["incidenceList"], Literal(f'["{PROMO}F_conv"]')))
+    store._heal_vocab_ns_refs()
+    assert (rec, PROMO["hasInstantiatedVariable"], home) in g
+    assert (rec, PROMO["hasInstantiatedVariable"], PROMO["F_conv"]) not in g
+    assert (rec, PROMO["hasInstantiatedVariable"], PROMO["gone"]) not in g
+    assert (rec, PROMO["arcType"], PROMO["ArcType/token-flow"]) in g
+    assert (node, RDF["first"], home) in g
+    assert (node, RDF["first"], PROMO["dead"]) in g   # list stays intact
+    assert str(g.value(eq, PROMO["incidenceList"])) == f'["{home}"]'

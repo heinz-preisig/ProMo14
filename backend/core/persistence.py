@@ -100,6 +100,7 @@ class PersistenceMixin:
         # ontology graph — drop hand-authored copies elsewhere so the
         # union read sees one description.
         self._migrate_incidence_factors()
+        self._heal_vocab_ns_refs()
         self._migrate_canonical_rhs()
 
         # Idempotent vocabulary migration: every artefact graph is
@@ -390,6 +391,76 @@ class PersistenceMixin:
                     continue
                 g.remove((s, None, None))
                 changed = True
+        if changed:
+            self.mark_dirty()
+
+    def _heal_vocab_ns_refs(self) -> None:
+        """§26: references spelt ``promo#X`` that have no subject.
+
+        A ``promo#X`` object in a variable slot is either mis-pointed
+        — the variable lives at ``{artefact}#X`` — or dead: the
+        variable is gone and the claim is stale.  Repoint to the
+        unique same-local-name subject; drop the triple when no such
+        subject exists.  Only variable-reference predicates are
+        touched, so vocabulary terms (``promo#ArcType/*``, classes,
+        properties) are never in scope.  ``rdf:first`` members
+        repoint but are never dropped — list structure must not
+        break.  ``promo#`` tokens inside literals repoint on the same
+        unique-subject rule but are never removed: a stale literal
+        token is a harmless cache refreshed on the next save.  Frozen
+        version graphs keep their published spellings.
+        """
+        role_preds = {
+            PROMO["lhs"],
+            PROMO["instanceOf"],
+            PROMO["hasStateVariable"],
+            PROMO["hasPortVariable"],
+            PROMO["hasInstantiatedVariable"],
+            PROMO["hasOutputVariable"],
+            RDF["first"],
+        }
+        graphs = [g for g in self.dataset.contexts()
+                  if len(g) and not self.is_frozen(g)]
+        # local name → artefact subjects carrying it
+        locals_: Dict[str, List[URIRef]] = {}
+        for g in graphs:
+            for s in g.subjects():
+                if isinstance(s, URIRef):
+                    local = str(s).rsplit("#", 1)[-1]
+                    locals_.setdefault(local, []).append(s)
+
+        def home_of(iri: str) -> Optional[str]:
+            homes = {str(s) for s in locals_.get(iri.rsplit("#", 1)[-1], [])
+                     if str(s) != iri}
+            return next(iter(homes)) if len(homes) == 1 else None
+
+        abs_re = re.compile(re.escape(str(PROMO)) + r"[A-Za-z_][\w.-]*")
+        changed = False
+        for g in graphs:
+            for s, p, o in list(g.triples((None, None, None))):
+                if p == PROMO["doc"]:
+                    continue   # VOCAB_DOCS prose — re-stamped each load
+                if isinstance(o, URIRef):
+                    iri = str(o)
+                    if not iri.startswith(str(PROMO)) or p not in role_preds:
+                        continue
+                    home = home_of(iri)
+                    if home is not None:
+                        g.remove((s, p, o))
+                        g.add((s, p, URIRef(home)))
+                        changed = True
+                    elif p != RDF["first"]:
+                        # Dead role claim — the variable is gone.
+                        g.remove((s, p, o))
+                        changed = True
+                elif isinstance(o, Literal) and str(PROMO) in str(o):
+                    text = abs_re.sub(
+                        lambda m: home_of(m.group(0)) or m.group(0),
+                        str(o))
+                    if text != str(o):
+                        g.remove((s, p, o))
+                        g.add((s, p, Literal(text)))
+                        changed = True
         if changed:
             self.mark_dirty()
 
