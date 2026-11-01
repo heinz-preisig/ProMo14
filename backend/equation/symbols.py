@@ -24,7 +24,7 @@ Adding a new operator or function:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 
 @dataclass(frozen=True)

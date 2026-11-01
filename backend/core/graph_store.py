@@ -37,7 +37,6 @@ from .vocab import (
     QUDT,
     SEED_CONSTANTS,
     SEED_FLOOR,
-    UNIT_FIELDS,
     VOCAB_DOCS,
     XSD,
     _EQUATION_ID_RE,
