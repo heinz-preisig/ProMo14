@@ -82,9 +82,12 @@ export async function saveVariable(
     internal_id: v.internal_id ?? null,
     aliases: v.aliases ?? {},
     network: v.network,
+    domain_iri: v.domain_iri ?? null,
     classifications: v.classifications ?? {},
     port_variable: v.port_variable ?? false,
     imported: v.imported ?? false,
+    // Carry the flag back — omitting it would silently unfreeze.
+    frozen: v.frozen ?? false,
     doc: v.doc ?? '',
     units: v.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
     tokens: v.tokens ?? [],
@@ -141,10 +144,15 @@ export function documentUrl(format: 'pdf' | 'tex' = 'pdf'): string {
   return withParams(`/api/equation/document?format=${format}`)
 }
 
-export async function deleteVariable(iri: string): Promise<void> {
-  const res = await apiFetch(`/api/equation/variables/${encodeURIComponent(iri)}`, {
-    method: 'DELETE',
-  })
+export async function deleteVariable(
+  iri: string,
+  cascade = false,
+): Promise<void> {
+  const suffix = cascade ? '?cascade=true' : ''
+  const res = await apiFetch(
+    `/api/equation/variables/${encodeURIComponent(iri)}${suffix}`,
+    { method: 'DELETE' },
+  )
   if (!res.ok) throw await apiError(res, `Failed to delete variable: ${res.status}`)
 }
 

@@ -1,5 +1,6 @@
+import 'katex/dist/katex.min.css'
 import { Fragment, useMemo, useState } from 'react'
-import { indexShortLabel } from '../latex'
+import { astToLatex, indexShortLabel, renderLatex } from '../latex'
 import type { ClassificationAxis, EquationClass, Index, Variable } from '../types'
 import { kindSummary } from '../axisClassifications'
 import { equationClassLabel } from '../variableUtils'
@@ -26,6 +27,8 @@ export interface VariableTableProps {
   /** EquationClass nodes — maps stored class IRIs to labels. */
   equationClasses?: EquationClass[]
   onSelect?: (v: Variable) => void
+  /** Open the equation editor on a stored equation (expanded row). */
+  onEditEquation?: (v: Variable, eqId: string) => void
   /** Persist an edited variable — enables inline editing of the free
    *  fields (name, doc).  Structural fields stay in the detail dialog
    *  (§18 mutability policy). */
@@ -37,7 +40,7 @@ type EditCell = { iri: string; field: 'label' | 'doc' }
 /** Repository browser: sortable/filterable table of all variables with
  *  per-variable expandable equation rows.  Name and doc cells are
  *  click-to-edit when ``onSave`` is given. */
-export default function VariableTable({ variables, indices, axes = [], equationClasses = [], onSelect, onSave }: VariableTableProps) {
+export default function VariableTable({ variables, indices, axes = [], equationClasses = [], onSelect, onEditEquation, onSave }: VariableTableProps) {
   const [filter, setFilter] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('label')
   const [sortAsc, setSortAsc] = useState(true)
@@ -107,6 +110,14 @@ export default function VariableTable({ variables, indices, axes = [], equationC
   )
 
   const eqCount = (v: Variable) => Object.keys(v.equations ?? {}).length
+
+  // Rendered symbol — alias + index subscripts (same path as the
+  // LaTeX preview and the delete dialog).
+  const symbolLatex = (v: Variable) =>
+    astToLatex({ type: 'Var', name: v.label }, { variables: [v], indices })
+  const symbolHtml = (v: Variable) => renderLatex(symbolLatex(v), false)
+  const equationHtml = (v: Variable, rhsLatex: string) =>
+    renderLatex(`${symbolLatex(v)} = ${rhsLatex}`, false)
 
   const rows = useMemo(() => {
     const kind = (v: Variable) => kindSummary(axes, v.classifications ?? {})
@@ -277,10 +288,52 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                           ? editInput(`label-${v.iri}`)
                           : (
                             <>
-                              {v.label}
+                              <span dangerouslySetInnerHTML={{ __html: symbolHtml(v) }} />{' '}
+                              <span style={{ color: '#888', fontWeight: 400 }}>{v.label}</span>
                               {v.value != null && v.value !== '' && (
                                 <span style={{ color: '#888', fontWeight: 400 }}> = {v.value}</span>
                               )}
+                              {onSave ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void onSave({ ...v, frozen: !v.frozen })
+                                  }}
+                                  title={v.frozen
+                                    ? 'Frozen (proven) — click to unfreeze'
+                                    : 'Mark as proven (freeze against edits & cascade delete)'}
+                                  style={{
+                                    marginLeft: 6,
+                                    fontSize: 9,
+                                    padding: '0 4px',
+                                    cursor: 'pointer',
+                                    borderRadius: 3,
+                                    border: v.frozen
+                                      ? '1px solid #1565c0'
+                                      : '1px solid #ccc',
+                                    background: v.frozen ? '#e3f2fd' : 'none',
+                                    color: v.frozen ? '#1565c0' : '#bbb',
+                                  }}
+                                >
+                                  {v.frozen ? 'frozen' : 'freeze'}
+                                </button>
+                              ) : v.frozen ? (
+                                <span
+                                  title="Frozen (proven) — read-only"
+                                  style={{
+                                    marginLeft: 6,
+                                    fontSize: 9,
+                                    padding: '0 4px',
+                                    borderRadius: 3,
+                                    border: '1px solid #1565c0',
+                                    background: '#e3f2fd',
+                                    color: '#1565c0',
+                                  }}
+                                >
+                                  frozen
+                                </span>
+                              ) : null}
                             </>
                           )}
                       </td>
@@ -329,13 +382,33 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                             colSpan={7}
                             style={{ padding: '3px 8px', borderBottom: '1px solid #f0f0f0' }}
                           >
-                            <code style={{ fontSize: 11 }}>
-                              {v.label} := {eq.rhs}
-                            </code>
+                            {eq.rhs_latex ? (
+                              <span
+                                style={{ overflowX: 'auto', display: 'inline-block', maxWidth: '100%', verticalAlign: 'middle' }}
+                                dangerouslySetInnerHTML={{ __html: equationHtml(v, eq.rhs_latex) }}
+                              />
+                            ) : (
+                              <code style={{ fontSize: 11 }}>
+                                {v.label} := {eq.rhs}
+                              </code>
+                            )}
                             {eq.equation_class && (
                               <span style={{ fontSize: 10, color: '#888', marginLeft: 8 }}>
                                 [{equationClassLabel(eq.equation_class, equationClasses)}]
                               </span>
+                            )}
+                            {onEditEquation && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onEditEquation(v, eqId)
+                                }}
+                                style={{ marginLeft: 8, fontSize: 10 }}
+                                title={`Edit equation ${eqId}`}
+                              >
+                                Edit…
+                              </button>
                             )}
                           </td>
                         </tr>

@@ -37,6 +37,34 @@ def _var(tag: str, **over):
     return v
 
 
+def test_context_refreshes_rhs_latex_on_alias_edit(client):
+    """Stored rhs_latex is a save-time cache — an alias edit on a
+    *referenced* variable must re-render the referencing equation in
+    /context, not serve the stale symbol."""
+    v_a = {"iri": f"{BASE}#V_a", "label": "a", "internal_id": "V_a",
+           "aliases": {"global_ID": "V_a"}, "network": "root",
+           "units": [0] * 8, "index_structures": [], "equations": {}}
+    eq = {"iri": f"{BASE}#E_b", "lhs": f"{BASE}#V_b", "rhs": "sqrt(a)",
+          "network": "root"}
+    v_b = {"iri": f"{BASE}#V_b", "label": "b", "internal_id": "V_b",
+           "aliases": {"global_ID": "V_b"}, "network": "root",
+           "units": [0] * 8, "index_structures": [],
+           "equations": {"root": eq}}
+    for v in (v_a, v_b):
+        r = client.post("/api/equation/variables", json=v)
+        assert r.status_code == 200, r.text
+
+    # Edit a's latex alias — b's equation references it.
+    r = client.post("/api/equation/variables", json={
+        **v_a, "aliases": {"global_ID": "V_a", "latex": "\\alpha"}})
+    assert r.status_code == 200, r.text
+
+    ctx = client.get("/api/equation/context").json()
+    stored_b = next(v for v in ctx["variables"] if v["label"] == "b")
+    latex = next(iter(stored_b["equations"].values()))["rhs_latex"]
+    assert "\\alpha" in latex
+
+
 def test_check_plain_expression(client):
     r = client.post("/api/equation/check", json={
         "text": "a + b",

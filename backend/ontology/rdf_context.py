@@ -310,6 +310,11 @@ class RdfContext(EquationContext):
             "imported",
             _one_bool(graph, s, PROMO["imported"], False),
         )
+        setattr(
+            var,
+            "frozen",
+            _one_bool(graph, s, PROMO["frozen"], False),
+        )
         setattr(var, "equations", self._variable_equations(graph, s, iri))
         return var
 

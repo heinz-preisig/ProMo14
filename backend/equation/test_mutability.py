@@ -280,6 +280,99 @@ def test_delete_removes_own_equations(client):
 
 
 # ---------------------------------------------------------------------------
+# Cascade delete (brutal mode)
+# ---------------------------------------------------------------------------
+
+def _context_iris(client):
+    context = client.get("/api/equation/context").json()
+    return {v["iri"] for v in context["variables"]}
+
+
+def test_cascade_delete_removes_dependents(client):
+    """?cascade=true removes the variable, its equations, and every
+    dependent variable+equation in the cone — the brutal delete."""
+    _post(client, _var("V_1"))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+    _post(client, _var("V_3", equations={
+        "root": _eq("E_2", f"{BASE}#V_3", "V_2 + 1"),
+    }))
+
+    r = client.delete(
+        f"/api/equation/variables/{_iri_path(f'{BASE}#V_1')}"
+        "?cascade=true")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["deleted"] == f"{BASE}#V_1"
+    assert f"{BASE}#V_2" in body["cascade"]
+    assert f"{BASE}#V_3" in body["cascade"]
+
+    remaining = _context_iris(client)
+    assert not {f"{BASE}#V_1", f"{BASE}#V_2", f"{BASE}#V_3"} & remaining
+
+
+def test_cascade_delete_unrelated_variables_survive(client):
+    _post(client, _var("V_1"))
+    _post(client, _var("V_9"))
+
+    r = client.delete(
+        f"/api/equation/variables/{_iri_path(f'{BASE}#V_1')}"
+        "?cascade=true")
+    assert r.status_code == 200, r.text
+    assert f"{BASE}#V_9" in _context_iris(client)
+
+
+# ---------------------------------------------------------------------------
+# Freeze (proven variables)
+# ---------------------------------------------------------------------------
+
+def test_frozen_blocks_edit_and_delete(client):
+    """promo:frozen 409s structural edits and deletes until unfrozen."""
+    _post(client, _var("V_1", frozen=True))
+
+    r = _put(client, _var("V_1", doc="new doc", frozen=True))
+    assert r.status_code == 409
+    assert r.json()["detail"]["frozen"] is True
+
+    r = client.delete(f"/api/equation/variables/{_iri_path(f'{BASE}#V_1')}")
+    assert r.status_code == 409
+    assert r.json()["detail"]["frozen"] is True
+
+    r = client.delete(
+        f"/api/equation/variables/{_iri_path(f'{BASE}#V_1')}"
+        "?cascade=true")
+    assert r.status_code == 409
+
+    # Unfreeze → edits and delete work again.
+    r = _put(client, _var("V_1", doc="new doc", frozen=False))
+    assert r.status_code == 200, r.text
+    r = client.delete(f"/api/equation/variables/{_iri_path(f'{BASE}#V_1')}")
+    assert r.status_code == 200, r.text
+
+
+def test_frozen_dependent_blocks_cascade(client):
+    """A frozen variable inside the cone halts the whole cascade —
+    nothing is deleted."""
+    _post(client, _var("V_1"))
+    _post(client, _var("V_2", frozen=True, equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    r = client.delete(
+        f"/api/equation/variables/{_iri_path(f'{BASE}#V_1')}"
+        "?cascade=true")
+    assert r.status_code == 409
+    detail = r.json()["detail"]
+    assert detail["frozen"] is True
+    assert detail["blockers"]
+
+    remaining = _context_iris(client)
+    assert f"{BASE}#V_1" in remaining
+    assert f"{BASE}#V_2" in remaining
+
+
+# ---------------------------------------------------------------------------
 # References endpoint
 # ---------------------------------------------------------------------------
 
@@ -353,6 +446,30 @@ def test_token_vector_key_form_not_a_change(client):
         },
     ))
     assert r.status_code == 200, r.text
+
+
+def test_domain_backfill_not_a_move(client):
+    """Records saved before IRI-backed domains store domain_iri=None; the
+    write path derives it from the network name.  A plain save must not
+    mistake the backfill for a domain move — which would 409 on
+    references that live outside the editable graph."""
+    from rdflib.namespace import RDF
+
+    _post(client, _var("V_1"))
+    # Emulate the legacy record: drop the derived inDomain triple.
+    store = graph_store.get_store()
+    onto = store.dataset.graph(URIRef(BASE))
+    onto.remove((URIRef(f"{BASE}#V_1"), PROMO["inDomain"], None))
+    # Referencing equation in a *foreign* graph — outside the editable
+    # write graph, so a phantom move would be unfulfillable.
+    artefact = store.dataset.graph(URIRef("https://example.org/lib"))
+    eq = URIRef("https://example.org/lib#E_1")
+    artefact.add((eq, RDF.type, PROMO["Equation"]))
+    artefact.add((eq, PROMO["rhs"], Literal("V_1 * 2")))
+
+    r = _put(client, _var("V_1", doc="edited"))
+    assert r.status_code == 200, r.text
+    assert "universe" in (r.json().get("domain_iri") or "")
 
 
 def test_axisvalue_loaded_across_graphs(client):

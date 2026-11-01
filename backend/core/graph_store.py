@@ -527,6 +527,9 @@ class RdfStore(PersistenceMixin, SeedMixin):
         self._set_literal(
             graph, iri, PROMO["imported"], var.get("imported", False)
         )
+        self._set_literal(
+            graph, iri, PROMO["frozen"], var.get("frozen", False)
+        )
 
         # Pre-bound value slot (universal constants; ADR-008).
         self._set_literal(graph, iri, PROMO["value"], var.get("value"))

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, Index, NetworkTree, SavedEquation, Variable } from '../types'
+import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
   kindTag,
@@ -45,8 +45,14 @@ export interface DependentVariableEditorProps {
    *  variable instead of minting a new one — fields are prefilled and
    *  structural ones lock while the variable is used (§18). */
   editing?: Variable | null
+  /** When set, the editor rewrites this stored equation on ``editing``
+   *  instead of appending a new one (edit-equation mode). */
+  editingEquation?: { id: string; record: EquationRecord } | null
   onDefaultsChange?: (domain: string, classifications: Record<string, string>) => void
   onAccept: (v: Variable, eq: SavedEquation) => void
+  /** Persist the variable record alone (no new equation) — enables
+   *  saving field edits like the LaTeX symbol while attaching. */
+  onSaveVariable?: (v: Variable) => void
 }
 
 export default function DependentVariableEditor({
@@ -61,8 +67,10 @@ export default function DependentVariableEditor({
   initialDomain,
   initialClassifications,
   editing,
+  editingEquation,
   onDefaultsChange,
   onAccept,
+  onSaveVariable,
 }: DependentVariableEditorProps) {
   const [domain, setDomain] = useState(initialDomain)
   const [classifications, setClassifications] = useState<Record<string, string>>({})
@@ -91,18 +99,26 @@ export default function DependentVariableEditor({
       setClassifications(cls)
       setName(editing?.label ?? '')
       setLatexSym(editing?.aliases?.latex ?? '')
-      setText('')
+      const eqRec = editingEquation?.record
+      setText(eqRec?.rhs ?? '')
       setAst(null)
       setParseError(null)
       setCheckResult(null)
       setError(null)
       setDoc(editing?.doc ?? '')
-      setEqClass(equationClasses.find((c) => c.label === 'generic')?.iri ?? '')
+      // Stored class may be a label or an IRI — match both.
+      setEqClass(
+        equationClasses.find(
+          (c) => c.iri === eqRec?.equation_class || c.label === eqRec?.equation_class,
+        )?.iri
+          ?? equationClasses.find((c) => c.label === 'generic')?.iri
+          ?? '',
+      )
       setLoading(false)
       setGenCode(null)
       setGenLoading(false)
     }
-  }, [open, editing])
+  }, [open, editing, editingEquation])
 
   useEffect(() => {
     setAst(null)
@@ -276,6 +292,28 @@ export default function DependentVariableEditor({
 
     const draft = draftVariable()
 
+    // Edit-equation mode: rewrite the stored entry — the backend
+    // re-canonicalises rhs/incidence/latex on the variable POST.
+    if (editingEquation && editing) {
+      const stored = editing.equations?.[editingEquation.id]
+      if (stored) {
+        draft.equations = {
+          ...draft.equations,
+          [editingEquation.id]: {
+            ...stored,
+            rhs: text.trim(),
+            equation_class: effectiveEqClass || stored.equation_class || 'generic',
+            incidence_list: checkResult.incidence ?? stored.incidence_list ?? [],
+            modified: new Date().toISOString(),
+            rhs_latex: null,
+          },
+        }
+      }
+      onSaveVariable?.(draft)
+      onClose()
+      return
+    }
+
     // Sequential E_n — same smallest-free mint as saveVariable's store
     // key, so the pending id matches the persisted record's identity.
     const eq: SavedEquation = {
@@ -296,6 +334,30 @@ export default function DependentVariableEditor({
   }, [])
 
   const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
+
+  // Variable-only edits (LaTeX symbol, doc, domain, classifications) vs
+  // the attached record — enables "Save variable" without an equation.
+  const variableDirty = !!editing && (
+    name.trim() !== editing.label ||
+    domain !== (editing.network ?? '') ||
+    doc !== (editing.doc ?? '') ||
+    latexSym !== (editing.aliases?.latex ?? '') ||
+    JSON.stringify(classifications) !== JSON.stringify(editing.classifications ?? {})
+  )
+
+  // A new variable with an empty RHS is equation-less by intent —
+  // parameters and constants are authored exactly this way.
+  const handleSaveVariable = () => {
+    if (latexError || !nameValid || !domain) return
+    if (editing) {
+      if (!variableDirty) return
+      onSaveVariable?.(draftVariable())
+      return
+    }
+    if (text.trim()) return
+    onSaveVariable?.(draftVariable())
+    onClose()
+  }
 
   if (!open) return null
 
@@ -338,7 +400,11 @@ export default function DependentVariableEditor({
           {/* Row 1: title + actions */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
             <h3 style={{ margin: 0 }}>
-              {editing ? `Add equation — ${editing.label}` : 'New dependent variable'}
+              {editingEquation
+                ? `Edit equation ${editingEquation.id} — ${editing?.label ?? ''}`
+                : editing
+                  ? `Add equation — ${editing.label}`
+                  : 'New dependent variable'}
             </h3>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
               {acceptBlockReason && (
@@ -347,13 +413,31 @@ export default function DependentVariableEditor({
               <button type="button" onClick={onClose}>
                 Cancel
               </button>
+              {onSaveVariable && (editing || !text.trim()) && (
+                <button
+                  type="button"
+                  onClick={handleSaveVariable}
+                  disabled={
+                    editing
+                      ? !variableDirty || !!latexError || !name.trim()
+                      : !nameValid || !domain || !!latexError
+                  }
+                  title={
+                    editing
+                      ? 'Save variable changes (name, LaTeX symbol, domain, classifications) without adding an equation'
+                      : 'Create the variable without an equation (parameters, constants)'
+                  }
+                >
+                  Save variable
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleAccept}
                 disabled={!!acceptBlockReason}
                 title={acceptBlockReason ?? undefined}
               >
-                {editing ? 'Add equation' : 'Accept'}
+                {editingEquation ? 'Save equation' : editing ? 'Add equation' : 'Accept'}
               </button>
             </div>
           </div>
@@ -468,6 +552,7 @@ export default function DependentVariableEditor({
               variables={variables}
               expressionNetwork={domain}
               networkTree={networkTree}
+              indices={indices}
               onInsert={insertText}
             />
           </div>

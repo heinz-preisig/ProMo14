@@ -102,6 +102,9 @@ class VariableRecord(BaseModel):
     classifications: Dict[str, str] = Field(default_factory=dict)
     port_variable: bool = False
     imported: bool = False  # ontology-editor metadata
+    #: Frozen variables are proven/checked — edits and deletes 409 until
+    #: unfrozen.  Distinct from graph-level version freezing.
+    frozen: bool = False
 
     # Semantics
     doc: str = ""

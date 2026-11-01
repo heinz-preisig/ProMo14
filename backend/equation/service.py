@@ -19,10 +19,10 @@ import re
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, field_validator
-from rdflib import URIRef, Literal
+from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, get_store
@@ -130,6 +130,8 @@ class VariableIn(BaseModel):
     aliases: Dict[str, str] = Field(default_factory=dict)
     doc: str = ""
     port_variable: bool = False
+    #: Frozen = proven/checked — edits and deletes 409 until unfrozen.
+    frozen: bool = False
     tokens: List[str] = Field(default_factory=list)
     token_vector: Optional[Dict[str, int]] = None  # §24 algebraic signature
     value: Optional[str] = None  # pre-bound promo:value (constants)
@@ -244,6 +246,10 @@ def context_endpoint(
 
     variables = []
     for v in ctx.variables().values():
+        # Stored rhs_latex is a save-time cache — a later alias edit on a
+        # *referenced* variable leaves it stale.  Re-render with the
+        # current space so the UI always shows the live symbols.
+        _refresh_equation_latex(ctx, v)
         variables.append(
             VariableIn(
                 iri=v.iri,
@@ -257,6 +263,7 @@ def context_endpoint(
                 aliases=v.aliases,
                 doc=v.doc,
                 port_variable=v.port_variable,
+                frozen=getattr(v, "frozen", False),
                 tokens=v.tokens,
                 token_vector=getattr(v, "token_vector", None),
                 value=getattr(v, "value", None),
@@ -294,6 +301,29 @@ def context_endpoint(
         equation_classes=ctx.equation_classes(),
         capabilities={"pdf": pdf_available()},
     )
+
+
+def _refresh_equation_latex(ctx, v) -> None:
+    """Re-render a variable's stored equations with the current compile
+    space (aliases, indices).  On any failure the stored cache stands
+    — the read path must never break on an uncheckable equation."""
+    variables = ctx.variables()
+    for equation in (getattr(v, "equations", {}) or {}).values():
+        equation_network = equation.get("network") or v.network
+        space = CompileSpace(
+            variables,
+            ctx.indices(),
+            variable_definition_network=v.network,
+            expression_definition_network=equation_network,
+            accessible_networks=ctx.accessible_networks(equation_network),
+            network_tree=ctx.tree(),
+        )
+        try:
+            checked = check(parse(equation.get("rhs") or ""), space,
+                            Var(v.label))
+            equation["rhs_latex"] = render(checked, space, "latex")
+        except Exception:
+            pass
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -816,14 +846,29 @@ def _rewrite_reference(rhs: str, old, destination: str) -> str:
     return rewritten
 
 
+def _domain_iri_for_name(store, graph_iri: Optional[str],
+                         name: Optional[str]) -> Optional[str]:
+    """Domain IRI the write path derives for a network name (None for
+    unknown names).  Records saved before IRI-backed domains store
+    ``domain_iri=None`` — the guards compare the resolved value, not the
+    absent literal, so a backfill is not mistaken for a move."""
+    for domain in scoped_context(store, graph_iri).domains():
+        if domain["name"] == ("universe" if name == "root" else name):
+            return domain["iri"]
+    return None
+
+
 def _plan_domain_move(store, graph, iri: str, record: VariableRecord,
                       graph_iri: Optional[str]) -> List["tuple[URIRef, str, List[str], str, Argument]"]:
     """Return validated equation rewrites needed to preserve a moved variable."""
     if (URIRef(iri), None, None) not in graph:
         return []
     old = scoped_context(store, graph_iri).variables().get(iri)
-    if old is None or (old.domain_iri == record.domain_iri
-                       and old.network == record.network):
+    if old is None:
+        return []
+    old_domain = old.domain_iri or _domain_iri_for_name(
+        store, graph_iri, old.network)
+    if old_domain == record.domain_iri and old.network == record.network:
         return []
 
     context = scoped_context(store, graph_iri)
@@ -945,15 +990,27 @@ def _apply_domain_move(
         )
 
 
+def _is_frozen(graph, subject: URIRef) -> bool:
+    """Stored ``promo:frozen`` flag on a variable or equation."""
+    value = graph.value(subject, PROMO["frozen"])
+    return value is not None and str(value).lower() in (
+        "true", "1", "yes")
+
+
+def _remove_equation(graph, eq) -> None:
+    """Remove one equation node and its rhs expression tree."""
+    rhs_expression = graph.value(eq, RHS_EXPRESSION)
+    if rhs_expression is not None:
+        clear_expression(graph, rhs_expression)
+    graph.remove((eq, None, None))
+
+
 def _remove_variable(graph, subject: URIRef) -> None:
     """Remove a variable *and* its equation nodes — equations are nested
     records; dropping only the variable's triples would orphan rhs
     references that still mention other variables."""
     for eq in list(graph.objects(subject, PROMO["hasEquation"])):
-        rhs_expression = graph.value(eq, RHS_EXPRESSION)
-        if rhs_expression is not None:
-            clear_expression(graph, rhs_expression)
-        graph.remove((eq, None, None))
+        _remove_equation(graph, eq)
     graph.remove((subject, None, None))
 
 
@@ -972,7 +1029,20 @@ def _guard_structural_edit(store, graph, iri: str,
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         return
+    # Frozen variables are proven — the only legal write is unfreezing
+    # (record.frozen=False), which then falls through to the normal
+    # structural checks on whatever else changed in the same save.
+    if _is_frozen(graph, subject) and record.frozen:
+        raise HTTPException(status_code=409, detail={
+            "message": "Variable is frozen (proven) — unfreeze it first",
+            "frozen": True,
+        })
     old = scoped_context(store, graph_iri).variables().get(iri)
+    if old is not None and not old.domain_iri:
+        # Legacy record without domain_iri — normalise to what the write
+        # path derives, else the fill-in reports as a locked field.
+        old = copy.copy(old)
+        old.domain_iri = _domain_iri_for_name(store, graph_iri, old.network)
     changed = _structural_changes(old, record) if old is not None else []
     refs = _variable_references(store, iri)
     foreign_refs = [ref for ref in refs if ref["via"] != "lhs"]
@@ -1054,19 +1124,33 @@ def variable_references(iri: str) -> Dict[str, Any]:
 def delete_variable(
     iri: str,
     graph_iri: Optional[str] = Depends(editable_param),
-) -> Dict[str, str]:
+    cascade: bool = Query(False),
+) -> Dict[str, Any]:
     """Delete a variable from the selected artefact graph.
 
-    Blocked (409) while *other* variables' equations reference it; its
-    own equations are deleted with it.
+    Blocked (409) while *other* variables' equations reference it —
+    unless ``cascade=true``, which performs the brutal delete the
+    impact dialog already advertises: the variable, its own equations,
+    every equation anywhere referencing it, and recursively the
+    variables those equations define (their references expand the
+    cone).  The cascade halts at frozen walls — a frozen variable or
+    equation inside the cone 409s the whole operation; references in
+    frozen *version* graphs are listed as unremovable blockers too.
+    A frozen target always 409s.
     """
     store = get_store()
     graph = resolve_graph(store, graph_iri)
     subject = URIRef(iri)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Variable not found")
-    refs = [r for r in _variable_references(store, iri) if r["via"] != "lhs"]
-    if refs:
+    if _is_frozen(graph, subject):
+        raise HTTPException(status_code=409, detail={
+            "message": "Variable is frozen (proven) — unfreeze it first",
+            "frozen": True,
+        })
+    refs = [r for r in _variable_references(store, iri)
+            if r["via"] != "lhs"]
+    if refs and not cascade:
         raise HTTPException(status_code=409, detail={
             "message": (
                 "Variable is referenced by %d equation(s) — remove the "
@@ -1074,8 +1158,66 @@ def delete_variable(
             ),
             "references": refs,
         })
-    _remove_variable(graph, subject)
-    return {"deleted": iri}
+
+    if not cascade:
+        _remove_variable(graph, subject)
+        return {"deleted": iri}
+
+    # Expand the deletion cone: variables + foreign equations, over all
+    # artefact graphs (a library equation may reference an ontology
+    # variable — leaving it would dangle the reference).
+    cone_vars: Dict[str, Graph] = {iri: graph}
+    cone_eqs: List[tuple] = []          # (graph, eq_subject)
+    blockers: List[Dict[str, str]] = []
+    queue = [iri]
+    while queue:
+        var_iri = queue.pop(0)
+        for ref in _variable_references(store, var_iri):
+            g = store.dataset.graph(URIRef(ref["graph"]))
+            eq = URIRef(ref["equation"])
+            if ref["via"] == "lhs":
+                cone_eqs.append((g, eq))
+                continue
+            if store.is_frozen(g):
+                # Published snapshots are immutable copies — deleting the
+                # live variable leaves them self-consistent, so they are
+                # neither removed nor blockers.
+                continue
+            if _is_frozen(g, eq):
+                blockers.append({**ref, "reason": "frozen"})
+                continue
+            cone_eqs.append((g, eq))
+            owner = next(iter(g.subjects(PROMO["hasEquation"], eq)), None)
+            if owner is not None:
+                o = str(owner)
+                if o not in cone_vars:
+                    if _is_frozen(g, owner):
+                        blockers.append({
+                            "equation": ref["equation"],
+                            "graph": ref["graph"],
+                            "via": "frozen-owner",
+                            "reason": "frozen",
+                            "variable": o,
+                        })
+                        continue
+                    cone_vars[o] = g
+                    queue.append(o)
+    if blockers:
+        raise HTTPException(status_code=409, detail={
+            "message": (
+                "Cascade blocked by %d frozen item(s) — unfreeze them "
+                "first" % len(blockers)
+            ),
+            "frozen": True,
+            "blockers": blockers,
+        })
+    for g, eq in cone_eqs:
+        _remove_equation(g, eq)
+    for var_iri, g in cone_vars.items():
+        g.remove((URIRef(var_iri), None, None))
+    return {"deleted": iri,
+            "cascade": sorted(v for v in cone_vars if v != iri),
+            "equations": sorted(str(e) for _, e in cone_eqs)}
 
 
 def _validate_variable_latex(record: VariableRecord) -> None:

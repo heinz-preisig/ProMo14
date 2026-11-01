@@ -14,6 +14,12 @@ function formatIndex(iri: string, indices: Index[] = []) {
   return `${indexShortLabel(idx)} (${idx.label})`
 }
 
+// Incidence entries are IRIs ("promo:Mm", "net!x", "...#x") — display the
+// bare name after the last separator.
+function formatIncidence(iri: string): string {
+  return iri.split(/[:#!]/).pop() ?? iri
+}
+
 export default function ResultPanel({ result, loading, indices = [], label }: ResultPanelProps) {
   if (loading) return <div style={{ color: '#666', fontSize: 13 }}>Checking…</div>
   if (!result) return <div style={{ color: '#888', fontSize: 13 }}>No check result yet.</div>
@@ -73,7 +79,8 @@ export default function ResultPanel({ result, loading, indices = [], label }: Re
             : 'none — the expression has no free indices'}
         </div>
         <div>
-          <strong>Incidence:</strong> {result.incidence?.join(', ') ?? '[]'}
+          <strong>Incidence:</strong>{' '}
+          {result.incidence ? result.incidence.map(formatIncidence).join(', ') : '[]'}
         </div>
         {(label ?? result.label) && (
           <div>

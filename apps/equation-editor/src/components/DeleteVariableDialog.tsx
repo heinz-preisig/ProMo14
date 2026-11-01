@@ -1,5 +1,7 @@
+import 'katex/dist/katex.min.css'
 import { useMemo } from 'react'
-import type { SavedEquation, Variable } from '../types'
+import { astToLatex, renderLatex } from '../latex'
+import type { Index, SavedEquation, Variable } from '../types'
 
 export interface DeleteImpact {
   target: Variable
@@ -66,6 +68,7 @@ export interface DeleteVariableDialogProps {
   target: Variable | null
   variables: Variable[]
   equations: SavedEquation[]
+  indices?: Index[]
   onClose: () => void
   onConfirm: (impact: DeleteImpact) => void
 }
@@ -75,6 +78,7 @@ export default function DeleteVariableDialog({
   target,
   variables,
   equations,
+  indices = [],
   onClose,
   onConfirm,
 }: DeleteVariableDialogProps) {
@@ -89,6 +93,23 @@ export default function DeleteVariableDialog({
   const impactedVariables = impact.variableIris.map((iri) => iriToVar.get(iri)).filter((v): v is Variable => !!v)
   const impactedEquations = equations.filter((eq) => impact.equationIds.includes(eq.id))
   const onlyTarget = impactedVariables.length === 1 && impactedEquations.length === 0
+  // Frozen walls — the backend 409s; mirror it here so the reason is
+  // visible before confirming.
+  const frozenVars = impactedVariables.filter((v) => v.frozen)
+  const blocked = !!target.frozen || frozenVars.length > 0
+
+  // Rendered symbol for a variable — latex alias + index subscripts.
+  const varLatexHtml = (v: Variable) =>
+    renderLatex(astToLatex({ type: 'Var', name: v.label }, { variables, indices }), false)
+
+  // ``lhs = rhs`` rendered via the equation's AST; raw text fallback when
+  // no AST was captured (e.g. unchecked leftovers).
+  const eqLatexHtml = (eq: SavedEquation): string | null => {
+    if (!eq.ast) return null
+    const lhs = astToLatex({ type: 'Var', name: eq.lhs }, { variables, indices })
+    const rhs = astToLatex(eq.ast, { variables, indices })
+    return renderLatex(`${lhs} = ${rhs}`, false)
+  }
 
   return (
     <div
@@ -121,8 +142,30 @@ export default function DeleteVariableDialog({
       >
         <h3 style={{ margin: 0 }}>Delete variable?</h3>
         <div>
-          You are about to delete <strong>{target.label}</strong>.
+          You are about to delete{' '}
+          <strong
+            dangerouslySetInnerHTML={{ __html: varLatexHtml(target) }}
+          />{' '}
+          <span style={{ color: '#666', fontSize: 12 }}>({target.label})</span>.
         </div>
+
+        {blocked && (
+          <div
+            style={{
+              background: '#e3f2fd',
+              border: '1px solid #1565c0',
+              borderRadius: 4,
+              padding: 12,
+              color: '#1565c0',
+              fontSize: 13,
+            }}
+          >
+            <strong>Blocked:</strong> {target.frozen
+              ? <><strong>{target.label}</strong> is frozen (proven)</>
+              : <>{frozenVars.map((v) => v.label).join(', ')} {frozenVars.length === 1 ? 'is' : 'are'} frozen (proven)</>
+            } — unfreeze first.
+          </div>
+        )}
 
         {onlyTarget ? (
           <div style={{ color: '#555', fontSize: 13 }}>
@@ -152,7 +195,11 @@ export default function DeleteVariableDialog({
                 .filter((v) => v.iri !== target.iri)
                 .map((v) => (
                   <li key={v.iri}>
-                    <strong>{v.label}</strong> <span style={{ color: '#666' }}>({v.network})</span>
+                    <span dangerouslySetInnerHTML={{ __html: varLatexHtml(v) }} />{' '}
+                    <span style={{ color: '#666' }}>{v.label} ({v.network})</span>
+                    {v.frozen && (
+                      <span style={{ marginLeft: 4, fontSize: 10, color: '#1565c0' }}>frozen</span>
+                    )}
                   </li>
                 ))}
             </ul>
@@ -163,13 +210,20 @@ export default function DeleteVariableDialog({
           <div>
             <strong style={{ fontSize: 13 }}>Equations to delete</strong>
             <ul style={{ margin: '4px 0', paddingLeft: 18, fontSize: 13 }}>
-              {impactedEquations.map((eq) => (
-                <li key={eq.id}>
-                  <code>
-                    {eq.lhs} = {eq.text.length > 50 ? eq.text.slice(0, 50) + '…' : eq.text}
-                  </code>
-                </li>
-              ))}
+              {impactedEquations.map((eq) => {
+                const html = eqLatexHtml(eq)
+                return (
+                  <li key={eq.id} style={{ overflowX: 'auto' }}>
+                    {html ? (
+                      <span dangerouslySetInnerHTML={{ __html: html }} />
+                    ) : (
+                      <code>
+                        {eq.lhs} = {eq.text.length > 50 ? eq.text.slice(0, 50) + '…' : eq.text}
+                      </code>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )}
@@ -181,13 +235,15 @@ export default function DeleteVariableDialog({
           <button
             type="button"
             onClick={() => onConfirm(impact)}
+            disabled={blocked}
+            title={blocked ? 'Unfreeze the marked variables first' : undefined}
             style={{
-              background: '#c62828',
+              background: blocked ? '#bbb' : '#c62828',
               color: '#fff',
-              border: '1px solid #c62828',
+              border: `1px solid ${blocked ? '#bbb' : '#c62828'}`,
               borderRadius: 4,
               padding: '4px 12px',
-              cursor: 'pointer',
+              cursor: blocked ? 'not-allowed' : 'pointer',
             }}
           >
             Delete {impactedVariables.length > 1 || impactedEquations.length > 0

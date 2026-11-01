@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { demoIndices, demoNetworkTree } from './demoContext'
 import { deleteVariable, documentUrl, listTokens, loadContext, saveOntology, saveVariable } from './api'
 import { useStoreDirty } from '@promo/ui'
-import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from './types'
+import type { ClassificationAxis, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
@@ -29,6 +29,9 @@ export default function App() {
   // Set when the equation editor attaches to an existing variable
   // ("Add equation…" in the detail dialog) instead of minting a new one.
   const [dependentEditing, setDependentEditing] = useState<Variable | null>(null)
+  // Set when a stored equation is being rewritten — the editor updates
+  // the equations entry instead of appending one.
+  const [editingEquation, setEditingEquation] = useState<{ id: string; record: EquationRecord } | null>(null)
   // Last domain/classifications picked in either variable editor —
   // offered as defaults the next time one is opened.
   const [lastDomain, setLastDomain] = useState('')
@@ -39,6 +42,9 @@ export default function App() {
   const [debugOpen, setDebugOpen] = useState(false)
   const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
   const [saveMsg, setSaveMsg] = useState('')
+  // Async save/load failures — stays up until dismissed (unlike saveMsg
+  // which auto-clears); without this a failed POST is invisible.
+  const [saveErr, setSaveErr] = useState('')
   // Host capability from /context — false when the backend has no TeX
   // toolchain (e.g. default Docker image); gates the PDF doc link.
   const [pdfCapable, setPdfCapable] = useState(false)
@@ -84,7 +90,10 @@ export default function App() {
           setEquations(saved)
         }
       })
-      .catch((err) => console.error('Failed to load context:', err))
+      .catch((err) => {
+        console.error('Failed to load context:', err)
+        setSaveErr(`Failed to load context: ${err}`)
+      })
   }, [])
 
   // Persist an edited variable (detail dialog + inline table edits);
@@ -111,39 +120,86 @@ export default function App() {
         ? (ctx.variables.find((x) => x.iri === v.iri) ?? prev)
         : prev,
     )
+    setDependentEditing((prev) =>
+      prev?.iri === v.iri
+        ? (ctx.variables.find((x) => x.iri === v.iri) ?? prev)
+        : prev,
+    )
     refreshDirty()
   }, [refreshDirty, variables])
 
   // Equation editor accept — covers both "new dependent variable" and
   // "add equation to existing variable" (editing mode).
   const acceptDependent = useCallback((v: Variable, eq: SavedEquation) => {
-    saveEditedVariable(v, eq).catch((err) =>
-      console.error('Failed to save variable:', err),
-    )
+    saveEditedVariable(v, eq).catch((err) => {
+      console.error('Failed to save variable:', err)
+      setSaveErr(`Failed to save variable: ${err}`)
+    })
+  }, [saveEditedVariable])
+
+  // Variable-only save from the equation editor (e.g. a LaTeX-symbol
+  // edit while attaching an equation) — no new equation appended.
+  const saveOnlyVariable = useCallback((v: Variable) => {
+    saveEditedVariable(v).catch((err) => {
+      console.error('Failed to save variable:', err)
+      setSaveErr(`Failed to save variable: ${err}`)
+    })
   }, [saveEditedVariable])
 
   const addPortVariable = useCallback((v: Variable) => {
-    saveEditedVariable(v).catch((err) =>
-      console.error('Failed to save variable:', err),
-    )
+    saveEditedVariable(v).catch((err) => {
+      console.error('Failed to save variable:', err)
+      setSaveErr(`Failed to save variable: ${err}`)
+    })
   }, [saveEditedVariable])
 
   const removeEquation = useCallback((id: string) => {
     setEquations((prev) => prev.filter((eq) => eq.id !== id))
   }, [])
 
+  // Open the equation editor on an existing stored equation — the
+  // variable is the owner found via the equations dict key.
+  const openEquationEditor = useCallback((v: Variable, eqId: string) => {
+    const record = v.equations?.[eqId]
+    if (!record) return
+    setDependentEditing(v)
+    setEditingEquation({ id: eqId, record })
+    setDependentOpen(true)
+  }, [])
+
+  const selectEquation = useCallback((eq: SavedEquation) => {
+    const owner = variables.find((v) => v.equations && eq.id in v.equations)
+    if (owner) openEquationEditor(owner, eq.id)
+  }, [variables, openEquationEditor])
+
   const removeVariable = useCallback(async (impact: DeleteImpact) => {
-    for (const iri of impact.variableIris) {
-      try {
-        await deleteVariable(iri)
-      } catch (err) {
-        console.error('Failed to delete variable:', iri, err)
+    // Brutal delete: one backend call removes the whole dependency cone
+    // (the dialog's impact list is the same cone, computed client-side).
+    // 409s surface in the banner — nothing is deleted or unfrozen.
+    try {
+      await deleteVariable(impact.target.iri, true)
+    } catch (err) {
+      console.error('Failed to delete variable:', impact.target.iri, err)
+      setSaveErr(`Failed to delete variable: ${err}`)
+      setDeleteTarget(null)
+      return
+    }
+    // Rebuild from reloaded truth — the cascade can reach variables the
+    // client-side impact didn't predict (e.g. foreign-graph refs).
+    const ctx = await loadContext()
+    setVariables(ctx.variables)
+    const saved: SavedEquation[] = []
+    for (const v of ctx.variables) {
+      if (v.equations) {
+        for (const [eqId, eq] of Object.entries(v.equations)) {
+          saved.push({ id: eqId, lhs: v.label, text: eq.rhs, ast: null, check: null })
+        }
       }
     }
-    setVariables((prev) => prev.filter((v) => !impact.variableIris.includes(v.iri)))
-    setEquations((prev) => prev.filter((eq) => !impact.equationIds.includes(eq.id)))
+    setEquations(saved)
+    refreshDirty()
     setDeleteTarget(null)
-  }, [])
+  }, [refreshDirty])
 
   const updateContext = useCallback((ctx: {
     variables: Variable[]
@@ -204,6 +260,19 @@ export default function App() {
             </span>
           )}
           {saveMsg && <span style={{ fontSize: 12, color: '#2e8b57', whiteSpace: 'nowrap' }}>{saveMsg}</span>}
+          {saveErr && (
+            <span style={{ fontSize: 12, color: '#c62828', whiteSpace: 'nowrap' }}>
+              {saveErr}
+              <button
+                type="button"
+                onClick={() => setSaveErr('')}
+                style={{ marginLeft: 6, fontSize: 11 }}
+                title="Dismiss"
+              >
+                ×
+              </button>
+            </span>
+          )}
           {pdfCapable && (
             <a
               href={documentUrl('pdf')}
@@ -257,6 +326,7 @@ export default function App() {
               type="button"
               onClick={() => {
                 setDependentEditing(null)
+                setEditingEquation(null)
                 setDependentOpen(true)
               }}
             >
@@ -265,12 +335,13 @@ export default function App() {
           </div>
           <VariablePalette
             variables={variables}
+            indices={indices}
             onDelete={setDeleteTarget}
             onSelect={setSelectedVariable}
           />
           <EquationList
             equations={equations}
-            onSelect={() => {}}
+            onSelect={selectEquation}
             onRemove={removeEquation}
           />
         </div>
@@ -307,6 +378,7 @@ export default function App() {
             axes={axes}
             equationClasses={equationClasses}
             onSelect={setSelectedVariable}
+            onEditEquation={openEquationEditor}
             onSave={saveEditedVariable}
           />
         </div>
@@ -324,7 +396,12 @@ export default function App() {
           onSave={saveEditedVariable}
           onAddEquation={(v) => {
             setDependentEditing(v)
+            setEditingEquation(null)
             setDependentOpen(true)
+          }}
+          onEditEquation={(v, eqId) => {
+            setSelectedVariable(null)
+            openEquationEditor(v, eqId)
           }}
           onClose={() => setSelectedVariable(null)}
         />
@@ -352,6 +429,7 @@ export default function App() {
         target={deleteTarget}
         variables={variables}
         equations={equations}
+        indices={indices}
         onClose={() => setDeleteTarget(null)}
         onConfirm={removeVariable}
       />
@@ -361,6 +439,7 @@ export default function App() {
         onClose={() => {
           setDependentOpen(false)
           setDependentEditing(null)
+          setEditingEquation(null)
         }}
         variables={variables}
         indices={indices}
@@ -371,11 +450,13 @@ export default function App() {
         initialDomain={lastDomain}
         initialClassifications={lastClassifications}
         editing={dependentEditing}
+        editingEquation={editingEquation}
         onDefaultsChange={(d, c) => {
           setLastDomain(d)
           setLastClassifications(c)
         }}
         onAccept={acceptDependent}
+        onSaveVariable={saveOnlyVariable}
       />
 
       {debugOpen && (

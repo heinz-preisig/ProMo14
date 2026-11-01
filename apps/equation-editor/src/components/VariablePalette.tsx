@@ -1,5 +1,7 @@
+import 'katex/dist/katex.min.css'
 import { useMemo, useState } from 'react'
-import type { NetworkTree, Variable } from '../types'
+import { astToLatex, renderLatex } from '../latex'
+import type { Index, NetworkTree, Variable } from '../types'
 
 /** Map of network → steps above ``from`` in the domain tree
  *  (0 = ``from`` itself).  Networks not on the ancestor chain are
@@ -27,6 +29,8 @@ export interface VariablePaletteProps {
   variables: Variable[]
   expressionNetwork?: string
   networkTree?: NetworkTree
+  /** Index catalogue — resolves subscripts in rendered symbols. */
+  indices?: Index[]
   onInsert?: (label: string) => void
   onDelete?: (v: Variable) => void
   onSelect?: (v: Variable) => void
@@ -36,6 +40,7 @@ export default function VariablePalette({
   variables,
   expressionNetwork = '',
   networkTree = {},
+  indices = [],
   onInsert,
   onDelete,
   onSelect,
@@ -176,7 +181,21 @@ export default function VariablePalette({
                   // the value badge and never offer delete — they are
                   // permanent fixtures of the ontology.
                   const bound = v.value != null && v.value !== ''
-                  const display = bound ? `${label}=${v.value}` : label
+                  // Rendered symbol (alias + index subscripts); the chip
+                  // title keeps the label/IRI.
+                  const symbol = (
+                    <>
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: renderLatex(
+                            astToLatex({ type: 'Var', name: v.label }, { variables, indices }),
+                            false,
+                          ),
+                        }}
+                      />
+                      {bound && `=${v.value}`}
+                    </>
+                  )
                   const title = `${v.iri}${v.type ? ' — kind: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}${insert !== label ? ' — inserts as ' + insert : ''}`
                   const style = {
                     fontSize: 12,
@@ -198,7 +217,7 @@ export default function VariablePalette({
                       title={title}
                       style={style as React.CSSProperties}
                     >
-                      {display}
+                      {symbol}
                     </button>
                   ) : onDelete ? (
                     <div key={v.iri} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -207,7 +226,7 @@ export default function VariablePalette({
                         style={selectStyle as React.CSSProperties}
                         onClick={() => onSelect?.(v)}
                       >
-                        {display}
+                        {symbol}
                       </span>
                       {!bound && (
                         <button
@@ -237,7 +256,7 @@ export default function VariablePalette({
                       style={selectStyle as React.CSSProperties}
                       onClick={() => onSelect?.(v)}
                     >
-                      {display}
+                      {symbol}
                     </span>
                   )
                 })}

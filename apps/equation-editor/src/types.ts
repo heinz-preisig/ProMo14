@@ -25,6 +25,8 @@ export interface Variable {
   aliases?: Record<string, string>
   doc?: string
   port_variable?: boolean
+  /** promo:frozen — proven/checked; edits & deletes 409 until unfrozen. */
+  frozen?: boolean
   /** promo:carriesToken — network membership (port licensing). */
   tokens?: string[]
   /** promo:tokenVector — §24 algebraic signature {token IRI: exponent}.

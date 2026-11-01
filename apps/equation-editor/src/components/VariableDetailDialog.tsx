@@ -1,7 +1,8 @@
+import 'katex/dist/katex.min.css'
 import { useEffect, useState } from 'react'
 import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, TokenRecord, Variable } from '../types'
 import { equationClassLabel } from '../variableUtils'
-import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
+import { astToLatex, indexShortLabel, renderLatex, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
 import AxisClassifications, { applicableAxes, kindTag } from '../axisClassifications'
 import NetworkTreeSelect from './NetworkTreeSelect'
@@ -22,6 +23,8 @@ export interface VariableDetailDialogProps {
   onSave: (v: Variable) => Promise<void>
   /** Open the equation editor to attach another equation (§18). */
   onAddEquation?: (v: Variable) => void
+  /** Open the equation editor to rewrite a stored equation. */
+  onEditEquation?: (v: Variable, eqId: string) => void
   onClose: () => void
 }
 
@@ -41,6 +44,7 @@ export default function VariableDetailDialog({
   tokenCatalogue = [],
   onSave,
   onAddEquation,
+  onEditEquation,
   onClose,
 }: VariableDetailDialogProps) {
   const [label, setLabel] = useState(variable.label)
@@ -152,13 +156,37 @@ export default function VariableDetailDialog({
     try {
       await onSave(draftVariable())
       setMsg('Saved')
-      setTimeout(() => setMsg(''), 3000)
+      setTimeout(onClose, 600)
     } catch (err) {
       setMsg(`Save failed: ${err instanceof Error ? err.message : err}`)
     }
   }
 
   const storedEqs = Object.entries(variable.equations ?? {})
+
+  // Live-rendered symbol — the edited alias + currently selected index
+  // structures, matching how expressions render this variable.
+  const symbolPreviewHtml = (() => {
+    const pv: Variable = {
+      ...variable,
+      label: label.trim() || variable.label,
+      aliases: latexSym.trim()
+        ? { ...(variable.aliases ?? {}), latex: latexSym.trim() }
+        : variable.aliases,
+      index_structures: Array.from(selectedIndices),
+    }
+    return renderLatex(
+      astToLatex({ type: 'Var', name: pv.label }, { variables: [pv], indices }),
+      false,
+    )
+  })()
+
+  // ``lhs = rhs`` for stored equations — the persisted rhs_latex is the
+  // render truth; raw text fallback for older records.
+  const storedEqHtml = (v: Variable, rhsLatex: string) => {
+    const lhs = astToLatex({ type: 'Var', name: v.label }, { variables: [v], indices })
+    return renderLatex(`${lhs} = ${rhsLatex}`, false)
+  }
 
   // Units and index structures remain locked while referenced.  Domain
   // has its own narrower lock; role/classification remains editable.
@@ -239,6 +267,10 @@ export default function VariableDetailDialog({
                 Use {latexSuggestion}
               </button>
             )}
+            <span
+              style={{ padding: '4px 0' }}
+              dangerouslySetInnerHTML={{ __html: symbolPreviewHtml }}
+            />
             {latexError && <span style={{ color: '#c62828', fontSize: 11 }}>{latexError}</span>}
           </label>
 
@@ -434,15 +466,31 @@ export default function VariableDetailDialog({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <strong style={{ fontSize: 13 }}>Equations</strong>
             {storedEqs.map(([eqId, eq]) => (
-              <code
+              <div
                 key={eqId}
-                style={{ fontSize: 12, background: '#f5f5f5', padding: 8, borderRadius: 4 }}
+                style={{ fontSize: 12, background: '#f5f5f5', padding: 8, borderRadius: 4, overflowX: 'auto' }}
               >
-                {variable.label} := {eq.rhs}
+                {eq.rhs_latex ? (
+                  <span dangerouslySetInnerHTML={{ __html: storedEqHtml(variable, eq.rhs_latex) }} />
+                ) : (
+                  <code>
+                    {variable.label} := {eq.rhs}
+                  </code>
+                )}
                 {eq.equation_class && (
                   <span style={{ color: '#888' }}> [{equationClassLabel(eq.equation_class, equationClasses)}]</span>
                 )}
-              </code>
+                {onEditEquation && (
+                  <button
+                    type="button"
+                    onClick={() => onEditEquation(variable, eqId)}
+                    style={{ marginLeft: 8, fontSize: 11 }}
+                    title={`Edit equation ${eqId}`}
+                  >
+                    Edit…
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
