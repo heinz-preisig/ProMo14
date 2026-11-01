@@ -186,10 +186,6 @@ class Parser:
     def _current(self) -> Token:
         return self.tokens[self.pos]
 
-    def _peek(self, offset: int = 0) -> Token:
-        idx = self.pos + offset
-        return self.tokens[idx] if idx < len(self.tokens) else EOF
-
     def _advance(self) -> Token:
         tok = self._current
         self.pos += 1
@@ -215,16 +211,6 @@ class Parser:
         if tok.kind == kind and (value is None or tok.value == value):
             return self._advance()
         return None
-
-    def _at_factor_start(self, tok: Token) -> bool:
-        """Return True if ``tok`` can start a Factor."""
-        if tok.kind in ("lparen", "ufunc", "maxmin", "function", "var"):
-            return True
-        if tok.kind == "kw" and tok.value in {
-            "Integral", "Product", "Root", "TotalDiff", "ParDiff", "reduceSum",
-        }:
-            return True
-        return False
 
     def parse(self) -> Node:
         """Parse the entire token stream and return the AST."""

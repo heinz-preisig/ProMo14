@@ -352,10 +352,6 @@ class CompileSpace:
             )
         raise VarError(" no such variable %s defined" % symbol)
 
-    def get_variable(self, symbol: str) -> Variable:
-        """Convenience wrapper returning just the variable."""
-        return self.resolve(symbol).variable
-
     def get_index(self, symbol: str) -> Optional[str]:
         """Resolve an index surface name to its IRI, or ``None``."""
         return self.inverse_indices.get(symbol)

@@ -33,10 +33,6 @@ class AmbiguousVariableError(VarError):
         self.candidates = candidates
 
 
-class TrackingError(VarError):
-    """Error while tracking dependencies through the var/expr graph."""
-
-
 class UnitError(VarError):
     """Incompatible or unexpected units."""
 
@@ -46,11 +42,3 @@ class UnitError(VarError):
 
 class IndexStructureError(VarError):
     """Incompatible or unexpected index structures."""
-
-
-class MatrixCompilationError(VarError):
-    """Error while compiling an indexed expression to matrix form."""
-
-
-class EquationDeleteError(VarError):
-    """An equation cannot be deleted (e.g. it is the variable's only one)."""
