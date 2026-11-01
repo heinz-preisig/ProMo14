@@ -19,6 +19,7 @@ from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.core.graph_store import (
     PROMO, PROMOLG, QUDT, SEED_FLOOR, get_store,
 )
+from backend.core.iri import arc_type_iri, vocab_iri
 from backend.ontology.rdf_context import scoped_context
 
 from .models import (
@@ -100,7 +101,7 @@ def _mint_fresh(store, graph, fragment: str) -> str:
     Applies only to auto-minted IRIs — an explicitly supplied ``record.iri``
     keeps the upsert (create-or-update) semantics.
     """
-    iri = str(store.mint_iri(graph.identifier, fragment))
+    iri = str(vocab_iri(graph.identifier, fragment))
     if (URIRef(iri), None, None) in graph:
         raise HTTPException(status_code=409,
                             detail=f"IRI already exists: {iri}")
@@ -1279,6 +1280,11 @@ def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
                 carrier=str(carrier) if carrier else None,
                 scope=str(scope) if scope else None,
                 description=str(doc) if doc else "",
+                # §26: the server owns ArcType/<carrier> synthesis —
+                # clients consume, never construct, this IRI.
+                arc_type_iri=arc_type_iri(
+                    str(carrier) if carrier
+                    else str(rule_type) if rule_type else None),
             )
         )
     return records

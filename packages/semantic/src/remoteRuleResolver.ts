@@ -5,6 +5,7 @@ import type {
   ConnectionRuleResolver,
   ConnectionRuleResult,
 } from './contracts'
+import { arcTypeIri } from './iris'
 
 // ---------------------------------------------------------------------------
 // Remote connection-rule resolver
@@ -25,9 +26,10 @@ import type {
 // itself is used (entity types double as domain selectors until the
 // modeller models domains explicitly).
 //
-// Rule → arc type: the backend licenses *carriers* (token-flow | reference),
-// surfaced as arcTypeIri `promo:ArcType/<carrier>` (falling back to the
-// rule type when a rule has no carrier).
+// Rule → arc type: the backend licenses *carriers* (token-flow | reference)
+// and returns the synthesised ``arc_type_iri`` itself — §26: the server
+// owns the ``promo#ArcType/<carrier>`` shape; the local arcTypeIri() is
+// only a fallback for older backends.
 // ---------------------------------------------------------------------------
 
 export interface RemoteRuleResolverOptions {
@@ -43,7 +45,13 @@ export interface RemoteRuleResolverOptions {
 }
 
 interface ResolveConnectionResponse {
-  rules: { iri: Iri; rule_type?: string; carrier?: string; matched_tokens?: string[] }[]
+  rules: {
+    iri: Iri
+    rule_type?: string
+    carrier?: string
+    matched_tokens?: string[]
+    arc_type_iri?: string
+  }[]
 }
 
 export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
@@ -107,7 +115,8 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
               status: 'allowed',
               connections: body.rules.map((r) => ({
                 ruleIri: r.iri,
-                arcTypeIri: `https://w3id.org/promo#ArcType/${r.carrier ?? r.rule_type ?? 'generic'}`,
+                arcTypeIri: r.arc_type_iri
+                  ?? arcTypeIri(r.carrier ?? r.rule_type),
                 matchedTokens: r.matched_tokens,
               })),
             }

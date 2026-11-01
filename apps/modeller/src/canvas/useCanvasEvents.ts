@@ -3,7 +3,7 @@ import type { KonvaEventObject } from 'konva/lib/Node'
 import type { AppState, Command } from '../state/ModelState'
 import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
-import { resolveConnectionAsync, pickArcType } from '@promo/semantic'
+import { resolveConnectionAsync, pickArcType, modelNodeIri, modelArcIri } from '@promo/semantic'
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
 import { GRAPH_IRI } from '../api'
@@ -64,7 +64,8 @@ export function useCanvasEvents(
 
   const insertNodeAt = (x: number, y: number) => {
     const id = state.tree.nextId + 1
-    const iri = `${GRAPH_IRI}Node_${id}`
+    // GRAPH_IRI is guaranteed — main.tsx only renders App with ?graph=.
+    const iri = modelNodeIri(GRAPH_IRI!, id)
     dispatch({
       type: 'insertNode',
       id,
@@ -194,7 +195,7 @@ export function useCanvasEvents(
       )
       const arcType = pickArcType(result, activeArcType)
       if (arcType) {
-        const arcIri = `${GRAPH_IRI}Arc_${state.arcCounter}`
+        const arcIri = modelArcIri(GRAPH_IRI!, state.arcCounter)
         const orientation = defaultOrientation(
           arcType,
           pendingConnection.sourceModelIri,
@@ -237,7 +238,7 @@ export function useCanvasEvents(
         )
         const arcType = pickArcType(result, activeArcType)
         if (arcType) {
-          const arcIri = `${GRAPH_IRI}Arc_${state.arcCounter}`
+          const arcIri = modelArcIri(GRAPH_IRI!, state.arcCounter)
           const orientation = defaultOrientation(
             arcType,
             sourceNode.modelNodeIri,

@@ -1,4 +1,5 @@
 export * from './contracts'
+export * from './iris'
 export * from './placeholderCatalogue'
 export * from './connectionService'
 export * from './remoteRuleResolver'

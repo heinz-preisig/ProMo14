@@ -17,7 +17,17 @@ from typing import Any, Dict, List, Optional
 from rdflib import Dataset, Graph, Literal, URIRef
 from rdflib.namespace import RDF
 
-from .vocab import PROMO, _EQUATION_ID_RE
+from .iri import (
+    canonical_graph_iri,
+    child_iri,
+    equation_iri,
+    f_factor_iri,
+    local_name,
+    variable_iri,
+    vocab_iri,
+    vocab_ns_iri,
+)
+from .vocab import PROMO, SEED_CONSTANTS, _EQUATION_ID_RE
 
 # §26: relative ``promo:X`` URIs — pseudo-prefixed names stored
 # verbatim.  Matches whole tokens inside literals too (path-shaped
@@ -85,6 +95,10 @@ class PersistenceMixin:
             except Exception:
                 continue
 
+        # §26: artefact graph IRIs are slash-free names — rename
+        # trailing-slash identifiers first so every later migration
+        # (and every mint) sees the canonical spelling.
+        self._normalize_graph_iris()
         # Idempotent data migration: legacy ``E_<epoch-ms>`` equation
         # ids → sequential ``E_n`` (readable in the printed document).
         self._migrate_equation_ids()
@@ -96,6 +110,9 @@ class PersistenceMixin:
         # relative ``promo:X`` spellings before anything else reasons
         # about them.
         self._migrate_variable_iris()
+        # …and label-keyed variable IRIs converge onto their internal
+        # ID — identity must be rename-stable (§26).
+        self._migrate_variable_iris_keyed()
         # §25: incidence factors are seeded scheme objects in the
         # ontology graph — drop hand-authored copies elsewhere so the
         # union read sees one description.
@@ -120,6 +137,84 @@ class PersistenceMixin:
             # now — before any edit lands — so the tracked files match
             # the per-artefact layout (hub ticket #4).
             self.save()
+
+    def _normalize_graph_iris(self) -> None:
+        """§26: artefact graph IRIs are slash-free names.
+
+        A trailing-slash identifier (``…/library/``, ``…/model/``)
+        renames to the slash-free form: the named graph's triples move
+        to the new context, references to the identifier follow
+        (``usesOntology``/``usesLibrary``/``usesAssignment`` pins,
+        ``versionOf``, ``refersTo``), and ``{old}#x`` vocabulary
+        members rehome to ``{new}#x`` with their references.  Members
+        spelled ``{old}/x`` (model Node/Arc, composites, species
+        records) keep their IRI — ``child_iri`` yields that same form
+        under the new identifier.
+
+        Frozen version graphs never rename — a published snapshot
+        keeps its name — but references *to* a renamed graph are
+        rewritten inside frozen graphs too: a ``versionOf`` link must
+        keep pointing at its draft line.  Idempotent; marks the store
+        dirty when anything moved.
+        """
+        renames: Dict[str, str] = {}
+        for g in list(self.dataset.contexts()):
+            if not len(g) or self.is_frozen(g):
+                continue
+            old = str(g.identifier)
+            new = canonical_graph_iri(old)
+            if new and new != old:
+                renames[old] = new
+        if not renames:
+            return
+
+        def translate(text: str) -> Optional[str]:
+            """``old`` → ``new``; ``{old}#x`` → ``{new}#x``."""
+            if text in renames:
+                return renames[text]
+            for old, new in renames.items():
+                if text.startswith(old + "#"):
+                    return str(vocab_iri(new, text[len(old) + 1:]))
+            return None
+
+        token_re = re.compile(
+            "|".join(re.escape(o) + r"#[\w.-]+" for o in renames))
+
+        for g in list(self.dataset.contexts()):
+            if not len(g):
+                continue
+            old_id = str(g.identifier)
+            dest = (self.dataset.graph(URIRef(renames[old_id]))
+                    if old_id in renames else g)
+            frozen = self.is_frozen(g)
+            for s0, p0, o0 in list(g):
+                s, o = s0, o0
+                # Subjects keep their spelling in frozen graphs;
+                # everywhere else a renamed identifier or {old}#
+                # member moves with its whole record.
+                if not frozen and isinstance(s0, URIRef):
+                    ns = translate(str(s0))
+                    if ns is not None:
+                        s = URIRef(ns)
+                # Objects follow the rename everywhere — a versionOf
+                # or pin must keep pointing at the live artefact.
+                if isinstance(o0, URIRef):
+                    no = translate(str(o0))
+                    if no is not None:
+                        o = URIRef(no)
+                elif not frozen and isinstance(o0, Literal) \
+                        and "#" in str(o0):
+                    text = token_re.sub(
+                        lambda m: m.group(0).replace(
+                            m.group(0).split("#", 1)[0],
+                            renames[m.group(0).split("#", 1)[0]], 1),
+                        str(o0))
+                    if text != str(o0):
+                        o = Literal(text)
+                if dest is not g or s is not s0 or o is not o0:
+                    g.remove((s0, p0, o0))
+                    dest.add((s, p0, o))
+        self.mark_dirty()
 
     def _migrate_equation_ids(self) -> None:
         """Renumber non-conforming equation ``internalID`` literals.
@@ -170,10 +265,10 @@ class PersistenceMixin:
                 iid = g.value(s, PROMO["internalID"])
                 if iid is not None and _EQUATION_ID_RE.match(str(iid)):
                     frag = str(iid)
-                new = URIRef(f"{base}#{frag}")
+                new = equation_iri(base, frag)
                 n = 1
                 while (new, None, None) in g and new != s:
-                    new = URIRef(f"{base}#{frag}_{n}")
+                    new = equation_iri(base, f"{frag}_{n}")
                     n += 1
                 moves.setdefault(str(s), {})[g.identifier] = new
                 for _s, p, o in list(g.triples((s, None, None))):
@@ -299,8 +394,8 @@ class PersistenceMixin:
             home = home_for(s, holders)
             is_var = any((s, RDF.type, PROMO["Variable"]) in g
                          for g in holders)
-            new = URIRef(f"{home.identifier}#{local}" if is_var
-                         else f"{home.identifier}{local}")
+            new = (variable_iri(home.identifier, local) if is_var
+                   else child_iri(home.identifier, local))
             moves[iri_str] = str(new)
             # Richest record first, the home record winning ties — its
             # literals become canonical; poorer copies contribute only
@@ -316,7 +411,7 @@ class PersistenceMixin:
                     g.remove((s, p, o))
 
         def remap(token: str) -> str:
-            return moves.get(token) or f"{PROMO}{token[len('promo:'):]}"
+            return moves.get(token) or vocab_ns_iri(token[len('promo:'):])
 
         # Reference rewrite: URIRef objects and literal tokens.
         for g in graphs:
@@ -347,6 +442,80 @@ class PersistenceMixin:
                     return False
         return True
 
+    def _migrate_variable_iris_keyed(self) -> None:
+        """§26: a variable IRI keys on its internal ID — ``{graph}#{iid}``.
+
+        Label-keyed IRIs made a rename a search-and-rewrite of every
+        reference; internal-ID keys make labels plain data.  Records
+        with no ``internalID`` mint one from the ``V`` counter first.
+
+        Seed-floor records are the same rule with deterministic IDs:
+        seeded constants and ``F_<mech>`` incidence factors keep their
+        canonical IRIs because their ``internal_id`` *is* the frag —
+        the migration only rewrites a legacy ``V_n`` ``internalID``
+        literal onto it (the seeds do the same on the write path).
+        Restricted to the ontology graph: ``F_`` names are scheme
+        objects, user variables elsewhere keep their own IDs.
+
+        References follow everywhere outside frozen graphs: object
+        position (``promo:lhs``, ``instanceOf``, role predicates,
+        ``rdf:first``) and literal tokens (``incidenceList``, ``rhs``
+        streams, ``aliases.global_ID``).  Idempotent.
+        """
+        seed_frags = {frag for frag, *_ in SEED_CONSTANTS}
+        ont = str(self.ONTOLOGY_GRAPH_IRI)
+        moves: Dict[str, str] = {}
+        for g in list(self.dataset.contexts()):
+            if not len(g) or self.is_frozen(g):
+                continue
+            in_ont = str(g.identifier) == ont
+            for s in list(g.subjects(RDF.type, PROMO["Variable"])):
+                iid = g.value(s, PROMO["internalID"])
+                iid_str = str(iid).strip() if iid is not None else ""
+                local = local_name(s)
+                if in_ont and (local in seed_frags
+                               or local.startswith("F_")):
+                    # Seed-floor: the deterministic ID is the frag.
+                    if iid_str != local:
+                        g.set((s, PROMO["internalID"], Literal(local)))
+                    iid_str = local
+                elif not iid_str:
+                    iid_str = self.next_internal_id("V")
+                    g.set((s, PROMO["internalID"], Literal(iid_str)))
+                canonical = str(variable_iri(g.identifier, iid_str))
+                if str(s) != canonical:
+                    moves[str(s)] = canonical
+        if not moves:
+            return
+
+        token_re = re.compile(
+            "(" + "|".join(
+                re.escape(o) for o in sorted(moves, key=len,
+                                             reverse=True)) + ")"
+            + r"(?![\w./-])")
+
+        for g in list(self.dataset.contexts()):
+            if not len(g) or self.is_frozen(g):
+                continue
+            for s0, p0, o0 in list(g):
+                s, o = s0, o0
+                ns = moves.get(str(s0))
+                if ns is not None:
+                    s = URIRef(ns)
+                if isinstance(o0, URIRef):
+                    no = moves.get(str(o0))
+                    if no is not None:
+                        o = URIRef(no)
+                elif isinstance(o0, Literal):
+                    text = token_re.sub(lambda m: moves[m.group(1)],
+                                        str(o0))
+                    if text != str(o0):
+                        o = Literal(text)
+                if s is not s0 or o is not o0:
+                    g.remove((s0, p0, o0))
+                    g.add((s, p0, o))
+        self.mark_dirty()
+
     def _migrate_incidence_factors(self) -> None:
         """§25/§26: ``{ontology}#F_<mech>`` incidence factors are seeded
         scheme objects — the ontology graph's copy is the single
@@ -361,7 +530,7 @@ class PersistenceMixin:
         """
         ont = self.ontology_graph
         base = str(self.ONTOLOGY_GRAPH_IRI)
-        arc_iri = URIRef(f"{base}#idx_arc")
+        arc_iri = vocab_iri(base, "idx_arc")
         mechs = set()
         for sub in ont.subjects(PROMO["subIndexOf"], arc_iri):
             short = str(ont.value(sub, PROMO["shortName"]) or "")
@@ -377,7 +546,7 @@ class PersistenceMixin:
         # the ontology graph.  Any other subject whose local name is
         # ``F_<mech>`` (relative, vocabulary-ns or artefact-ns
         # spelling) is a duplicate and goes.
-        canonical = {URIRef(f"{base}#F_{m}") for m in mechs}
+        canonical = {f_factor_iri(base, m) for m in mechs}
         changed = False
         for g in self.dataset.contexts():
             if self.is_frozen(g):

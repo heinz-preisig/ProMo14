@@ -47,6 +47,7 @@ from rdflib import RDF, RDFS, Literal, URIRef
 from backend.behaviour.service import _read_assignment
 from backend.core.capabilities import violations as capability_violations
 from backend.core.graph_store import PROMO, get_store
+from backend.core.iri import composite_iri, local_name, model_iri
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.instantiate.satisfy import port_satisfaction
 from backend.instantiate.service import (
@@ -152,11 +153,11 @@ class ModelDocument(BaseModel):
 
 def _composite_iri(graph, tree_id: int) -> URIRef:
     """Deterministic composite IRI — stable across save/load (ADR-007)."""
-    return URIRef("%s/Composite_%d" % (str(graph.identifier).rstrip("/#"), tree_id))
+    return composite_iri(graph.identifier, tree_id)
 
 
 def _model_iri(graph) -> URIRef:
-    return URIRef("%s/Model" % str(graph.identifier).rstrip("/#"))
+    return model_iri(graph.identifier)
 
 
 def _one(graph, s, p):
@@ -465,7 +466,7 @@ def put_model(
         for f in n.fixes:
             graph.add((s, PROMO["fix"], URIRef(f)))
         graph.set((s, PROMO["internalID"],
-                   Literal(n.iri.rsplit("/", 1)[-1])))
+                   Literal(local_name(n.iri))))
 
     for a in doc.arcs:
         s = URIRef(a.iri)
@@ -483,7 +484,7 @@ def put_model(
         for p in a.permeable or []:
             graph.add((s, PROMO["permeable"], URIRef(p)))
         graph.set((s, PROMO["internalID"],
-                   Literal(a.iri.rsplit("/", 1)[-1])))
+                   Literal(local_name(a.iri))))
 
     for c in doc.composites:
         s = _composite_iri(graph, c.treeId)

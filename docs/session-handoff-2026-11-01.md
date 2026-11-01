@@ -98,6 +98,61 @@ control loop to surface seams.
   delete/unmark-output), plus `promo:hasOutputVariable` persistence
   and delete cascade-vs-reopen UX (design-gated).
 
+---
+
+# Evening session — §26 IRI system normalized, §27 composition
+
+## What was done
+
+### IRI construction centralized (single source per language)
+
+- **`backend/core/iri.py`** (new) + **`packages/semantic/src/iris.ts`**
+  (new): every IRI shape has a named constructor. Two joins:
+  `vocab_iri` = `{base}#{frag}` (vocabulary members), `child_iri` =
+  `{base}/{seg}` (subordinate resources).
+- Server owns minting: `POST /variables` with `iri:''` returns
+  `{graph}#V_n` minted from the **store's own counter** (client's
+  `nextInternalId` guess ignored — could collide). `arc_type_iri` is
+  server-synthesised on rule records.
+- Clients mint only whole-document topology IDs (`modelNodeIri`,
+  `modelArcIri`, `speciesMemberIri`) via the shared helpers.
+
+### Normalization — the grammar is now uniform
+
+- **Artefact graph IRIs are slash-free names** (`…/library`,
+  `…/model`, `…/ontology`). `_normalize_graph_iris` runs first in
+  `load()`: trailing-slash identifiers rename, pins/`versionOf`/
+  `refersTo` follow (incl. inside frozen graphs), `{old}#x` members
+  rehome. `deps.py` normalizes `?graph=` via `canonical_graph_iri`.
+- **`concat_iri` deleted** — Node/Arc mint via `child_iri`
+  (`{graph}/Node_n`); the `test-modelNode_3` seam is gone.
+- **Variables key on internal ID** — `{graph}#{internal_id}`, not
+  label: rename-stable identity, labels are data. `_migrate_variable_iris_keyed`
+  rehomes label-IRIs, rewriting refs + literal tokens.
+- **Seed records get deterministic internal IDs** (`const_zero`,
+  `F_{mech}`) — `{graph}#{iid}` reproduces their readable IRIs, so
+  the convention stays uniform with zero special-casing.
+- Verified on a copy of real data: `library/#x` → `library#V_n`,
+  `const_*`/`F_*` intact, **zero non-conforming variable IRIs**,
+  filenames stable.
+
+### §27 — ontology composition (documented)
+
+- **Artefacts compose via pins; nothing merges.** `resolution_scope`
+  walks the transitive `usesOntology`/`usesLibrary` closure (BFS,
+  cycle-safe) — already implemented, now specified + tested.
+- `usesAssignment`/`usesSpecies`/`usesModel` are resource pins,
+  consumed by their own services — excluded from vocabulary scope.
+- Alignment deferred: mapping artefact (`promo:equivalentTo`) + rule
+  resolver expansion, when a second ontology actually exists.
+
+## State
+
+- **502 backend + 26 semantic tests**; all workspaces `tsc`+vite clean.
+- `data/` on disk still holds old spellings — converges on next
+  save after server restart (in-memory migration is verified).
+- Equation authoring can proceed: new variables mint `#V_n`.
+
 ## Test invocations
 
 ```bash

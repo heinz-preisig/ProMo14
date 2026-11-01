@@ -222,6 +222,9 @@ class ConnectionRuleRecord(BaseModel):
     carrier: Optional[Literal["token-flow", "reference"]] = None
     scope: Optional[Literal["same", "cross", "any"]] = None
     description: str = ""
+    #: Synthesised ``promo#ArcType/<carrier>`` — server-side on reads;
+    #: clients never synthesise arc-type IRIs themselves (§26).
+    arc_type_iri: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

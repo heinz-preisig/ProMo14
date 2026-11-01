@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { checkExpression, generateExpression, GRAPH_IRI, parseExpression } from '../api'
+import { checkExpression, generateExpression, parseExpression } from '../api'
 import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, Variable } from '../types'
 import AxisClassifications, {
   applicableAxes,
@@ -211,9 +211,9 @@ export default function DependentVariableEditor({
     const selectedDomainIri = domains.find((item) => item.name === domain)?.iri ?? null
     return {
       ...(editing ?? {}),
-      // Case-sensitive IRI: the language treats `rho` and `Rho` as
-      // distinct identifiers, so the IRI must preserve case too.
-      iri: editing?.iri ?? `${GRAPH_IRI}#${lhs}`,
+      // §26: the store owns minting — a new variable sends an empty
+      // IRI and gets ``{graph}#{internal_id}`` back from the server.
+      iri: editing?.iri ?? '',
       label: lhs,
       network: domain,
       domain_iri: selectedDomainIri,

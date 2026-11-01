@@ -2607,3 +2607,127 @@ says so.
 
 Migration `_migrate_variable_iris` runs at `load()` like its equation
 counterpart — idempotent, both machines converge on next load.
+
+### Shape table (normative, 2026-11-01)
+
+Single definition sites: `backend/core/iri.py` (server) and
+`packages/semantic/src/iris.ts` (clients).  Two join conventions —
+`#` names a vocabulary member, `/` names a subordinate resource:
+
+| Shape | Constructor | Used for |
+|---|---|---|
+| `{base}#{frag}` | `vocab_iri` | Vocabulary members of an artefact: variables (`variable_iri`, frag = internal ID `V_n` — rename-stable), equations (`equation_iri`, frag = internal ID `E_n`), domains, entity types, indices, tokens, assignment resources (`{assignments}#assignment_<etype>`) |
+| `{base}/{seg}` | `child_iri` | Subordinate resources: `{graph}/Model`, `{graph}/Composite_<treeId>` (deterministic, ADR-007), `{graph}/Node_n` (`model_node_iri`/`modelNodeIri`), `{graph}/Arc_n` (`model_arc_iri`/`modelArcIri`), `{eq}/expression`, `{base}/assignments` artefact, species members `{graph}/{Kind}_{stamp}` |
+
+**Artefact graph IRIs are slash-free names** (`…/ontology`,
+`…/library`, `…/model`, `…/library/assignments`, `…/ontology/1.0`).
+`_normalize_graph_iris` rewrites trailing-slash identifiers at
+`load()` — graph triples move to the canonical context, pin /
+`versionOf` / `refersTo` references follow (also inside frozen graphs,
+which keep their own published names), and `{old}#x` vocabulary
+members rehome to `{new}#x`.  `child_iri` makes `/`-joined member
+IRIs identical under both spellings, so model/species record IRIs are
+untouched.  `canonical_graph_iri` normalises `?graph=` input so old
+session URLs keep resolving.
+
+Synthesised (read-only, never a stored subject):
+
+| Shape | Constructor | Used for |
+|---|---|---|
+| `promo#ArcType/<carrier>` | `arc_type_iri` | Arc-type vocabulary — server-synthesised on `ConnectionRuleRecord.arc_type_iri`; clients consume, never construct |
+| `{ontology}#F_<mech>` | `f_factor_iri` | Seeded incidence factors (§25) |
+| `promo#{local}` | `vocab_ns_iri` | Expansion of a bare `promo:` token with no owning subject (migration fallback) |
+
+Helpers: `local_name` (last fragment after `#` or `/`), `is_absolute`
+(the write-boundary guard), `occurrence_prefix` (§22 instance paths
+`{composite}/`).
+
+**Who mints**: the server owns every IRI it writes — variables are
+POSTed with `iri: ''` and come back `{graph}#{internal_id}`
+(store-minted `V_n`; labels are data, never keys — a rename touches
+no reference).  Seed-floor records follow the same rule with
+deterministic IDs: `const_zero` / `F_{mech}` are the internal IDs,
+so `{graph}#{iid}` reproduces their readable IRIs.  Clients mint
+only whole-document topology IDs (model Node/Arc, species members)
+that the server stores verbatim under `PUT` document semantics.
+
+**Resolved seams** (2026-11-01): the two earlier inconsistencies —
+mixed artefact-IRI spellings (`…/library/` vs `…/ontology`) and the
+bare-concat `{graph}Node_n` convention that produced
+`test-modelNode_3` on slash-free graphs — both collapse under the
+slash-free-graph + `/`-child convention above.  `_migrate_variable_iris`
+rehomes non-variable subjects via `child_iri` for the same reason.
+
+## 27. Ontology composition — artefacts compose via pins, nothing merges (2026-11-01)
+
+Prompted by §26's cleanup: with every member IRI namespaced to its
+owning artefact, combining vocabularies can never collide on
+identifiers — the open question is only *resolution semantics*.
+
+### Premise
+
+An ontology is just an artefact (`promo:Ontology` marker).  The store
+already knows how to keep several side by side — `…/ontology`,
+`…/library`, `…/model`, each its own line in `data/`.  "Combining
+ontologies" therefore splits into three distinct modes:
+
+- **Extension** — artefact B builds on artefact A's vocabulary.  This
+  is the `usesOntology`/`usesLibrary` pin, and it already works.
+- **Alignment** — two independently-authored vocabularies describing
+  overlapping domains (community ontology vs core).
+- **Physical merge** — one graph absorbs another's content.
+
+### Decision
+
+**Artefacts compose via pins; nothing merges.**  Concretely:
+
+- `resolution_scope(graph)` is the artefact's vocabulary context: the
+  graph itself plus the *transitive* `usesOntology`/`usesLibrary`
+  closure, breadth-first, cycle-safe.  A model pinning a library sees
+  the library's ontology set without re-declaring it — pin chains
+  stay shallow (a new artefact stamps only its *direct* pins; the
+  closure does the rest).
+- `usesAssignment`/`usesSpecies`/`usesModel` are **resource pins**,
+  consumed by their own services (behaviour vend, species panel,
+  §22 referenced composites) — they deliberately do *not* enter the
+  vocabulary scope: an assignment graph holds no entity types, a
+  species graph no equation vocabulary.
+- Pins may name **frozen version IRIs** (`…/ontology/1.0`) — that is
+  the reproducible-dependency form; a draft pin tracks the moving
+  line.
+- **Extension never copies**: a user ontology pins the core, it does
+  not inherit the seed floor.  The floor self-repairs only in
+  `ONTOLOGY_GRAPH_IRI` (§floor scope) — composition over inheritance.
+- **Alignment is a mapping artefact** (deferred): a graph of
+  `promo:equivalentTo` claims between `ontA#x` and `ontB#y`, consumed
+  by the rule resolver's `promo:parent` walk and the checker's type
+  equivalence as a synonym expansion.  Build when a second ontology
+  actually exists — the machinery is a day of work for zero users
+  today.
+- **Physical merge is not a strategy.**  The `promo:`→absolute
+  rehome machinery (`_migrate_variable_iris`) is the precedent for
+  what a merge *would* look like — subject consolidation with
+  provenance loss — kept as a healing tool, not a path.  When a
+  community ontology matures into the standard library the route is
+  mapping artefact + a rehome migration, not graph surgery.
+
+### Consequences
+
+- Identity is stable across artefacts by §26: `{graph}#{internal_id}`
+  variables and `{graph}/x` members mean a cross-artefact reference
+  (`lhs`, `instanceOf`, assignment roles) survives edits on either
+  side.  Rename affects nothing outside the record.
+- Label ambiguity is a *display* problem, not a data problem: two
+  ontologies may both define `conv`; resolution is exact-IRI, and the
+  picker must qualify by home (`conv (my-lib)` vs `conv (core)`).
+- `usesOntology` pins from a dependency flow *through*: model →
+  library → ontology gives the model both vocabularies.  Tested in
+  `test_graph_store.py` (`resolution_scope` suite).
+
+### Open threads
+
+- `promo:equivalentTo` predicate + resolver expansion (alignment,
+  above).
+- Label qualification in pickers once a second ontology exists.
+- Hub UI: pin editors already offer every artefact's draft + frozen
+  versions — nothing to add.

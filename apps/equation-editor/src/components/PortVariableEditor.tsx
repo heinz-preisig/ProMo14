@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { GRAPH_IRI } from '../api'
 import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
 import AxisClassifications, {
@@ -108,10 +107,9 @@ export default function PortVariableEditor({
     const trimmed = name.trim()
     const selectedDomainIri = domains.find((item) => item.name === domain)?.iri ?? null
     const v: Variable = {
-      // Case-sensitive IRI: the language treats `rho` and `Rho` as
-      // distinct identifiers, so the IRI must preserve case too.
-      // §26: instance IRIs live under the artefact's namespace.
-      iri: `${GRAPH_IRI}#${trimmed}`,
+      // §26: the store owns minting — an empty IRI is minted
+      // ``{graph}#{internal_id}`` server-side.
+      iri: '',
       label: trimmed,
       network: domain,
       domain_iri: selectedDomainIri,

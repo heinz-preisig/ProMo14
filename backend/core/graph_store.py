@@ -28,6 +28,7 @@ from rdflib import Dataset, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
 from .config import get_data_dir
+from .iri import equation_iri, vocab_iri
 from .persistence import PersistenceMixin
 from .seed import SeedMixin
 from .vocab import (
@@ -401,11 +402,9 @@ class RdfStore(PersistenceMixin, SeedMixin):
     # ------------------------------------------------------------------
 
     def mint_iri(self, base: Union[str, URIRef], fragment: str) -> URIRef:
-        """Create a new IRI under ``base`` with the given fragment."""
-        if isinstance(base, URIRef):
-            base = str(base)
-        base = base.rstrip("#")
-        return URIRef(f"{base}#{fragment}")
+        """``{base}#{fragment}`` — delegates to ``iri.vocab_iri``, the
+        single definition site for all §26 instance-IRI shapes."""
+        return vocab_iri(base, fragment)
 
     def next_internal_id(self, prefix: str) -> str:
         """Return the next internal ID for a prefix, e.g. ``V_1``.
@@ -569,7 +568,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
         equations = var.get("equations")
         if equations:
             for eq_id, eq in equations.items():
-                eq_iri = eq.get("iri") or str(self.mint_iri(graph.identifier, eq_id))
+                eq_iri = eq.get("iri") or str(equation_iri(graph.identifier, eq_id))
                 self.add_equation(graph, URIRef(eq_iri), iri, eq)
 
         return iri

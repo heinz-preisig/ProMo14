@@ -20,11 +20,14 @@ from fastapi import HTTPException
 from rdflib import URIRef
 
 from backend.core.graph_store import get_store
+from backend.core.iri import canonical_graph_iri
 
 
 def graph_param(graph: Optional[str] = None) -> Optional[str]:
-    """FastAPI dependency: the ``?graph=`` query param (a graph IRI)."""
-    return graph
+    """FastAPI dependency: the ``?graph=`` query param (a graph IRI).
+    Normalised to the slash-free canonical form — ``…/library/``-era
+    session URLs keep resolving after the §26 rename."""
+    return canonical_graph_iri(graph) if graph else graph
 
 
 def editable_param(graph: Optional[str] = None) -> Optional[str]:
@@ -46,6 +49,7 @@ def editable_param(graph: Optional[str] = None) -> Optional[str]:
             status_code=400,
             detail="?graph= is required on writes — open the artefact "
                    "from the hub so the session carries its graph IRI")
+    graph = canonical_graph_iri(graph)
     store = get_store()
     g = store.graph(graph)
     if not len(g):
@@ -62,6 +66,7 @@ def editable_param(graph: Optional[str] = None) -> Optional[str]:
 
 def resolve_graph(store, graph_iri: Optional[str]):
     """Resolve an optional graph IRI to a dataset graph (default: the
-    working ontology)."""
+    working ontology).  Slash-terminated spellings normalise to the
+    canonical slash-free identifier."""
     return store.ontology_graph if graph_iri is None \
-        else store.dataset.graph(URIRef(graph_iri))
+        else store.dataset.graph(URIRef(canonical_graph_iri(graph_iri)))

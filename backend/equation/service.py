@@ -26,6 +26,12 @@ from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, get_store
+from backend.core.iri import (
+    equation_iri,
+    expression_iri,
+    is_absolute,
+    variable_iri,
+)
 from backend.ontology.models import VariableRecord
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.ontology.rdf_context import RdfContext, scoped_context
@@ -646,7 +652,7 @@ def _canonicalise_equations(
     canonical: Dict[str, Argument] = {}
     for key, equation in record.equations.items():
         if not equation.iri:
-            equation.iri = str(store.mint_iri(graph.identifier, key))
+            equation.iri = str(equation_iri(graph.identifier, key))
         equation_network = equation.network or record.network
         space = CompileSpace(
             variables,
@@ -680,7 +686,7 @@ def _attach_canonical_equations(graph, canonical: Dict[str, Argument]) -> None:
             graph,
             equation,
             expression,
-            URIRef("%s/expression" % equation_iri),
+            expression_iri(equation_iri),
         )
 
 
@@ -696,11 +702,18 @@ def create_variable(
     _resolve_record_domains(store, graph_iri, record)
     graph = resolve_graph(store, graph_iri)
 
+    # §26: the store owns minting — a new variable gets
+    # ``{graph}#{internal_id}`` so identity survives renames (labels
+    # are data, not keys).  The internal ID comes from the store's own
+    # counter — a client-supplied one could collide with a live
+    # ``#V_n`` subject and overwrite it under replace-semantics.
     if not record.iri:
-        record.iri = str(store.mint_iri(graph.identifier, record.internal_id or store.next_internal_id("V")))
-    _assert_absolute_iri(record.iri)
-    if not record.internal_id:
         record.internal_id = store.next_internal_id("V")
+        record.iri = str(variable_iri(graph.identifier,
+                                      record.internal_id))
+    elif not record.internal_id:
+        record.internal_id = store.next_internal_id("V")
+    _assert_absolute_iri(record.iri)
 
     # POST doubles as the editor's update path (the frontend never PUTs):
     # enforce the mutability guard and replace — not merge — when the
@@ -1238,7 +1251,7 @@ def _assert_absolute_iri(iri: str) -> None:
     """§26: instance IRIs are absolute — the pseudo-prefixed relative
     spellings (``promo:X``) that predated the artefact-namespace
     convention are rejected at the write boundary."""
-    if not iri.startswith(("http://", "https://")):
+    if not is_absolute(iri):
         raise HTTPException(
             status_code=400,
             detail=(

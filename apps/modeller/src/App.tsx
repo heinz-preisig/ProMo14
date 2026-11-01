@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useReducer, useCallback, useRef } from 'r
 import { Stage, Layer, Line, Group } from 'react-konva'
 import type { NodeType, ArcType, OpenArc } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
-import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue } from '@promo/semantic'
+import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue, childIri } from '@promo/semantic'
 import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
 import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
@@ -380,7 +380,7 @@ export default function App() {
   const extractSelected = useCallback(async () => {
     if (selectedVisibleNode?.treeNodeId === undefined) return
     const treeId = selectedVisibleNode.treeNodeId
-    const iri = window.prompt('New submodel artefact IRI:', `${GRAPH_IRI}/submodel`)
+    const iri = window.prompt('New submodel artefact IRI:', childIri(GRAPH_IRI!, 'submodel'))
     if (!iri) return
     const label = window.prompt('Label:', selectedVisibleNode.label) ?? selectedVisibleNode.label
     try {

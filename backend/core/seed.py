@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
+from .iri import f_factor_iri
 from .vocab import (
     PROMO, SEED_CONSTANTS, SEED_EQUATION_CLASSES, SEED_FLOOR,
 )
@@ -395,15 +396,19 @@ class SeedMixin:
         for frag, label, value, latex in SEED_CONSTANTS:
             iri = self.mint_iri(base, frag)
             if (iri, RDF.type, PROMO["Variable"]) in g:
+                # §26: converge a legacy V_n internalID onto the
+                # deterministic frag — ``{graph}#{internal_id}`` then
+                # reads the canonical IRI either way.
+                if str(g.value(iri, PROMO["internalID"])) != frag:
+                    g.set((iri, PROMO["internalID"], Literal(frag)))
                 continue
-            internal_id = self.next_internal_id("V")
             self.add_variable_dict(g, {
                 "iri": str(iri),
                 "label": label,
                 "network": "root",
                 "type": "constant",
-                "internal_id": internal_id,
-                "aliases": {"global_ID": internal_id, "latex": latex},
+                "internal_id": frag,
+                "aliases": {"global_ID": frag, "latex": latex},
                 "value": value,
                 "doc": "Universal constant",
             })
@@ -573,7 +578,7 @@ class SeedMixin:
                 continue
             # §26: instance IRIs live under the owning artefact's
             # namespace — the factor is seeded under ``{graph}#``.
-            iri = URIRef(f"{base}#F_{mech}")
+            iri = f_factor_iri(base, mech)
             # Rehome the port-variable-era ``promo:F_<mech>`` spelling
             # in place — its record (and internalID) is the one being
             # normalised, not replaced.
@@ -622,9 +627,9 @@ class SeedMixin:
                 "label": f"F_{mech}",
                 "network": "physical",
                 "domain_iri": str(domain),
-                # Keep an existing internalID; mint only on creation.
-                "internal_id": None if existed
-                else self.next_internal_id("V"),
+                # §26: deterministic ID — ``{graph}#{internal_id}``
+                # reproduces the canonical ``#F_<mech>`` IRI.
+                "internal_id": f"F_{mech}",
                 "units": [0, 0, 0, 0, 0, 0, 0, 0],
                 "index_structures": [str(sub), str(node_iri)],
                 "port_variable": False,

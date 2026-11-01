@@ -37,6 +37,7 @@ from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS, XSD
 
 from backend.core.graph_store import PROMO, get_store
+from backend.core.iri import assignment_iri, assignments_graph_iri
 from backend.equation.compile_space import BOUND_KINDS, CompileSpace
 from backend.equation.document import _rhs_latex, _var_symbol
 from backend.core.deps import editable_param, graph_param
@@ -180,15 +181,14 @@ def _assignment_graph_iri(store, graph_iri: Optional[str]) -> str:
         iri = URIRef(graph_iri)
         if (iri, RDF.type, PROMO["Assignment"]) in store.dataset.graph(iri):
             return graph_iri
-        return graph_iri.rstrip("/") + "/assignments"
+        return assignments_graph_iri(graph_iri)
     return DEFAULT_ASSIGNMENT_GRAPH
 
 
 def _assignment_res(store, graph_iri: Optional[str],
                     entity_type: str) -> URIRef:
-    frag = entity_type.split("#")[-1].split("/")[-1]
-    return URIRef(_assignment_graph_iri(store, graph_iri)
-                  + "#assignment_" + frag)
+    return assignment_iri(
+        _assignment_graph_iri(store, graph_iri), entity_type)
 
 
 def _assignment_graph(store, graph_iri: Optional[str]):

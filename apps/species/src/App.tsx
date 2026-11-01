@@ -13,12 +13,14 @@ import type {
   SpeciesDocument,
 } from './types'
 
-const frag = (iri: string) =>
-  iri.split('#').pop()?.split('/').pop() ?? iri
+import { localName, speciesMemberIri } from '@promo/semantic'
 
-/** Mint a fresh member IRI under the artefact graph. */
+const frag = (iri: string) => localName(iri)
+
+/** Mint a fresh member IRI under the artefact graph (§26 shape lives
+ *  in packages/semantic/iris.ts). */
 const mint = (graph: string | undefined, kind: string) =>
-  `${(graph ?? 'species').replace(/[#/]$/, '')}/${kind}_${Date.now().toString(36)}`
+  speciesMemberIri(graph, kind)
 
 const S: Record<string, React.CSSProperties> = {
   app: { display: 'flex', flexDirection: 'column', height: '100%' },

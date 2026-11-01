@@ -180,7 +180,7 @@ def test_load_migrates_literal_rhs_to_canonical_expression(tmp_path):
     assert canonical is not None
     assert graph.value(equation, PROMO["rhs"]) == Literal("( rho + rho )")
     incidence = graph.value(equation, PROMO["incidenceList"])
-    assert json.loads(str(incidence)) == [f"{ARTEFACT}#V_rho"]
+    assert json.loads(str(incidence)) == [f"{ARTEFACT}#V_1"]
     assert store.dirty
 
 
@@ -305,7 +305,9 @@ def test_seed_incidence_factors_rehomes_legacy_spelling(tmp_path):
     store._seed_incidence_factors(ont, ONTO)
     f = URIRef(f"{PVAR}F_conv")
     assert (legacy, None, None) not in ont
-    assert str(ont.value(f, PROMO["internalID"])) == "V_4"
+    # §26: deterministic internal ID — the frag is the identity, so
+    # ``{graph}#{internal_id}`` reproduces the canonical IRI.
+    assert str(ont.value(f, PROMO["internalID"])) == "F_conv"
     assert str(ont.value(f, PROMO["portVariable"])) == "false"
     assert set(ont.objects(f, PROMO["indexStructure"])) == {
         URIRef(f"{ONTO}#idx_arc_convection"), URIRef(f"{ONTO}#idx_node")}
@@ -427,3 +429,63 @@ def test_heal_vocab_ns_refs_repoints_and_strips(tmp_path):
     assert (node, RDF["first"], home) in g
     assert (node, RDF["first"], PROMO["dead"]) in g   # list stays intact
     assert str(g.value(eq, PROMO["incidenceList"])) == f'["{home}"]'
+
+
+ONT2 = "https://example.org/ont2"
+LIB = "https://example.org/lib"
+MODEL = "https://example.org/model"
+
+
+def test_resolution_scope_is_transitive(tmp_path):
+    """§27: pins compose — a model pinning a library sees the
+    library's ontology pins, and the ontology's own pins too.
+    Self first, then pins breadth-first."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont2 = URIRef(ONT2)
+    base = store.dataset.get_context(ont2)
+    # ont2 extends the core ontology
+    base.add((ont2, PROMO["usesOntology"], store.ONTOLOGY_GRAPH_IRI))
+    store.create_artefact_graph(
+        LIB, "Library", uses=[ONT2])
+    store.create_artefact_graph(
+        MODEL, "Model", uses_library=[LIB])
+
+    scope = [str(i) for i in store.resolution_scope(MODEL)]
+    assert scope[0] == MODEL
+    assert set(scope) == {
+        MODEL, LIB, ONT2, str(store.ONTOLOGY_GRAPH_IRI)}
+
+    # And a library scoped to its own pins sees its ontology set.
+    lib_scope = {str(i) for i in store.resolution_scope(LIB)}
+    assert lib_scope == {
+        LIB, ONT2, str(store.ONTOLOGY_GRAPH_IRI)}
+
+
+def test_resolution_scope_excludes_resource_pins(tmp_path):
+    """usesAssignment / usesSpecies are resource pins consumed by
+    their services, not vocabulary — they stay out of the scope."""
+    store = RdfStore(tmp_path)
+    store.load()
+    spec = URIRef("https://example.org/species")
+    asg = URIRef("https://example.org/asg")
+    store.create_artefact_graph(
+        MODEL, "Model", uses=[str(store.ONTOLOGY_GRAPH_IRI)])
+    g = store.dataset.get_context(URIRef(MODEL))
+    g.add((URIRef(MODEL), PROMO["usesSpecies"], spec))
+    g.add((URIRef(MODEL), PROMO["usesAssignment"], asg))
+    scope = {str(i) for i in store.resolution_scope(MODEL)}
+    assert scope == {MODEL, str(store.ONTOLOGY_GRAPH_IRI)}
+
+
+def test_resolution_scope_cycle_safe(tmp_path):
+    """Mutual pins terminate (each visited once)."""
+    store = RdfStore(tmp_path)
+    store.load()
+    a, b = URIRef(LIB), URIRef(ONT2)
+    ga = store.dataset.get_context(a)
+    gb = store.dataset.get_context(b)
+    ga.add((a, PROMO["usesLibrary"], b))
+    gb.add((b, PROMO["usesOntology"], a))
+    scope = [str(i) for i in store.resolution_scope(LIB)]
+    assert sorted(scope) == sorted([LIB, ONT2])

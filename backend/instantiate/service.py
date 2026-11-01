@@ -46,6 +46,7 @@ from backend.core.capabilities import (
     entity_capabilities, graph_violations,
 )
 from backend.core.graph_store import PROMO, get_store
+from backend.core.iri import assignments_graph_iri, occurrence_prefix
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.ontology.rdf_context import scoped_context
 
@@ -388,7 +389,7 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
         if ref is None:
             continue
         ref_iri = str(ref)
-        prefix = str(s) + "/"
+        prefix = occurrence_prefix(s)
         open_iris = {o.get("iri") for o in
                      _json_value(model_graph, s, PROMO["openArcs"], [])}
         occ = {
@@ -797,7 +798,7 @@ def _model_dependencies(model_graph, vars_override: Optional[str]):
     library = vars_override or _first_pin(model_graph, PROMO["usesLibrary"])
     assignment = _first_pin(model_graph, PROMO["usesAssignment"])
     if assignment is None and vars_override:
-        assignment = vars_override.rstrip("/") + "/assignments"
+        assignment = assignments_graph_iri(vars_override)
     return library, assignment
 
 

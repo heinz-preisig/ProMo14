@@ -8,6 +8,7 @@ import type {
   SemanticCatalogue,
   TokenDefinition,
 } from './contracts'
+import { arcTypeIri } from './iris'
 
 // ---------------------------------------------------------------------------
 // Ontology-backed catalogue
@@ -22,8 +23,9 @@ import type {
 //   resolves to that domain's IRI → ``domainTypeIris`` — this is what the
 //   domain-based ``resolve-connection`` endpoint matches on.
 // - Arc types are synthesised from rule ``carrier`` values as
-//   ``promo:ArcType/<carrier>`` — the same mapping ``RemoteRuleResolver``
-//   applies to resolution results.
+//   ``promo#ArcType/<carrier>`` — the server supplies ``arc_type_iri``
+//   on each rule record; the ``arcTypeIri()`` helper (iris.ts) is the
+//   single shape definition for offline fallback.
 // - Graphical definitions are delegated to a fallback catalogue (the
 //   ontology does not store shapes yet); entities/arc types are assigned
 //   the fallback's graphicals round-robin.
@@ -66,6 +68,9 @@ export interface ConnectionRuleRecord {
   iri: string
   rule_type: string
   carrier?: string | null
+  /** Server-synthesised ``promo#ArcType/<carrier>`` (§26) — preferred
+   *  over local synthesis when present. */
+  arc_type_iri?: string | null
 }
 
 export interface CatalogueFetchers {
@@ -74,8 +79,6 @@ export interface CatalogueFetchers {
   tokens(): Promise<TokenRecord[]>
   connectionRules(): Promise<ConnectionRuleRecord[]>
 }
-
-const ARC_TYPE_PREFIX = 'https://w3id.org/promo#ArcType/'
 
 export class RemoteCatalogue implements SemanticCatalogue {
   private entities = new Map<Iri, BaseEntityDefinition>()
@@ -159,13 +162,16 @@ export class RemoteCatalogue implements SemanticCatalogue {
       })
     })
 
-    // Arc types from rule carriers: promo:ArcType/<carrier>
+    // Arc types from rule carriers: promo#ArcType/<carrier>
     const arcGraphicals = fallback.getArcTypes()
       .map((a) => a.graphicalDefinitionIri)
       .filter((g): g is Iri => !!g)
     const carriers = [...new Set(rules.map((r) => r.carrier).filter((c): c is string => !!c))]
+    const carrierIris = new Map(
+      rules.map((r) => [r.carrier, r.arc_type_iri]),
+    )
     carriers.forEach((carrier, i) => {
-      const iri = `${ARC_TYPE_PREFIX}${carrier}`
+      const iri = carrierIris.get(carrier) ?? arcTypeIri(carrier)
       cat.arcTypes.set(iri, {
         iri,
         label: carrier,

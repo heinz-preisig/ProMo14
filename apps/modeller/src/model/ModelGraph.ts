@@ -1,14 +1,12 @@
 import type { ModelNode, ModelArc, NodeType, ArcType } from '../types'
+import { arcTypeCarrier, modelArcIri } from '@promo/semantic'
 import { GRAPH_IRI } from '../api'
 
 /** Carrier category from an arc-type IRI (``promo#ArcType/<carrier>``).
- *  Mirrors backend.instantiate.resolver.arc_carrier. */
-export function arcCarrier(arcTypeIri: string | undefined): string | undefined {
-  if (!arcTypeIri) return undefined
-  const i = arcTypeIri.indexOf('ArcType/')
-  if (i >= 0) return arcTypeIri.slice(i + 'ArcType/'.length)
-  return arcTypeIri.split('#').pop()!.split('/').pop()
-}
+ *  Delegates to ``arcTypeCarrier`` (packages/semantic/iris.ts) — the
+ *  single TS definition site; mirrors
+ *  ``backend.instantiate.resolver.arc_carrier``. */
+export const arcCarrier = arcTypeCarrier
 
 /** §15 default reference direction for a new arc.
  *
@@ -130,10 +128,10 @@ export class ModelGraphOps {
     return this.arcs.delete(iri)
   }
 
-  /** Generate a new arc IRI using the internal counter. */
-  nextArcIri(prefix = `${GRAPH_IRI}Arc_`): string {
-    const iri = `${prefix}${this.arcCounter}`
-    return iri
+  /** Generate a new arc IRI using the internal counter.
+   *  ``GRAPH_IRI`` is guaranteed — main.tsx only renders with ?graph=. */
+  nextArcIri(): string {
+    return modelArcIri(GRAPH_IRI!, this.arcCounter)
   }
 
   /** Get all arcs connected to a given node IRI. */
