@@ -784,10 +784,11 @@ applicable to a domain pair:
   per BL design doc §25 — `_seed_incidence_factors`) guarantee a
   floor on the core graph — deletions of floor items resurrect on
   restart, modifications persist.  Incidence factors are derived
-  seeds: one `promo:F_<mech>` variable per arc sub-index, fixed
+  seeds: one `ontology#F_<mech>` variable per arc sub-index, fixed
   `[A_k, N]` shape / constant+parameter / mechanism token resolved
   from the entity-tree token group.  Other artefact graphs are never
-  seeded or migrated.  See BL design doc §17, §25.
+  seeded; the IRI/factor normalisations are the only cross-graph
+  migrations (§26).  See BL design doc §17, §25.
 
 ## 6. Open questions
 

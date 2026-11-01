@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @promo/modeller",
+    "dev:ontology": "npm run dev -w @promo/ontology-editor",
     "dev:equation": "npm run dev -w @promo/equation-editor",
     "dev:behaviour": "npm run dev -w @promo/behaviour-linker",
     "dev:instantiation": "npm run dev -w @promo/instantiation",
