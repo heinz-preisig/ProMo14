@@ -14,9 +14,3 @@ def get_data_dir() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     return PROJECT_ROOT / "data"
-
-
-def ensure_data_dir() -> Path:
-    data_dir = get_data_dir()
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir

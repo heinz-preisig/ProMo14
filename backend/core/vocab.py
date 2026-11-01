@@ -160,16 +160,6 @@ _EQUATION_ID_RE = re.compile(r"^E_(\d{1,6})$")
 #   promo:rhs              — the expression token stream (string)
 #   promo:rhsLatex         — generated LaTeX of the RHS (cached)
 #   promo:incidenceList     — list of variable IRIs in the RHS (JSON array)
-UNIT_FIELDS = [
-    "time",
-    "length",
-    "mass",
-    "current",
-    "temperature",
-    "amount",
-    "light",
-    "nil",
-]
 
 
 def _as_literal(value: Any) -> Literal:

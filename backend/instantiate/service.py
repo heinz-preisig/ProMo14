@@ -42,7 +42,7 @@ from backend.behaviour.service import (
     _assignment_graph_iri,
     _read_assignment,
 )
-from backend.core.gestures import (
+from backend.core.capabilities import (
     entity_capabilities, graph_violations,
 )
 from backend.core.graph_store import PROMO, get_store

@@ -45,7 +45,7 @@ from pydantic import BaseModel, Field
 from rdflib import RDF, RDFS, Literal, URIRef
 
 from backend.behaviour.service import _read_assignment
-from backend.core.gestures import violations as gesture_violations
+from backend.core.capabilities import violations as capability_violations
 from backend.core.graph_store import PROMO, get_store
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.instantiate.satisfy import port_satisfaction
@@ -427,7 +427,7 @@ def put_model(
 
     # §20 gesture admissibility (ontology capability gates): a rejected
     # document leaves the graph untouched — validate before the wipe.
-    problems = gesture_violations(
+    problems = capability_violations(
         store, graph.identifier,
         nodes=[(n.iri, n.entityType or None, n.speciesAllocation,
                 list(n.reactions)) for n in doc.nodes],
