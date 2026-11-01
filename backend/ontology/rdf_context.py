@@ -29,10 +29,6 @@ from backend.equation.errors import VarError
 from backend.equation.units import Units
 
 
-def _str(value) -> str:
-    return str(value) if value is not None else ""
-
-
 def _network(raw: str) -> str:
     """Return the legacy/display domain name, defaulting to ``universe``."""
     return "universe" if not raw or raw == "root" else raw
