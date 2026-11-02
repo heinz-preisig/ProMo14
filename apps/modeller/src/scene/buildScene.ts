@@ -12,11 +12,45 @@ import type {
   NodeGraphicalDefinition,
   ArcGraphicalDefinition,
 } from '@promo/semantic'
+import { arcTypeCarrier } from '@promo/semantic'
 
-const NODE_RADIUS = 24
-const COMPOSITE_WIDTH = 80
-const COMPOSITE_HEIGHT = 60
+export const NODE_RADIUS = 24
+export const COMPOSITE_WIDTH = 80
+export const COMPOSITE_HEIGHT = 60
 const ARROW_SIZE = 10
+
+/** §16: token → arc colour for token-flow arcs (mass blue, energy
+ *  orange).  Selection red still wins — applied only when the arc is
+ *  not selected.  Extend as new token groups appear. */
+const TOKEN_COLORS: Record<string, string> = {
+  mass: '#2980b9',
+  energy: '#e67e22',
+}
+
+/** Bounding-box half-extent of a node graphical definition — the
+ *  contract every spatial constraint (zone clamp, hit-test, rim
+ *  attach) reads.  Declared w×h wins; radius falls back to {r,r};
+ *  missing graphic → the leaf default.  When the graphic designer
+ *  lands, its declared bounding box feeds this same function. */
+export function graphicalHalfExtent(
+  g: NodeGraphicalDefinition | undefined,
+): { x: number; y: number } {
+  if (g?.width != null && g?.height != null) {
+    return { x: g.width / 2, y: g.height / 2 }
+  }
+  const r = g?.radius ?? NODE_RADIUS
+  return { x: r, y: r }
+}
+
+/** Half-extent for a node of this entity type before it exists —
+ *  same derivation path as buildNodeSceneObject, so placement and
+ *  drag clamps agree on every graphic. */
+export function entityHalfExtent(
+  entityType: string | undefined,
+  catalogue: SemanticCatalogue,
+): { x: number; y: number } {
+  return graphicalHalfExtent(resolveNodeGraphical(entityType, catalogue))
+}
 
 function rimPoint(x1: number, y1: number, x2: number, y2: number, radius: number) {
   const dx = x2 - x1
@@ -171,6 +205,9 @@ function buildNodeSceneObject(
     radius,
     width,
     height,
+    halfExtent: isComposite
+      ? { x: COMPOSITE_WIDTH / 2, y: COMPOSITE_HEIGHT / 2 }
+      : graphicalHalfExtent(g),
     entityType: node.entityType,
     treeNodeId: node.treeNodeId,
     modelNodeIri: node.modelNodeIri,
@@ -199,10 +236,13 @@ export interface BuildSceneOptions {
   hoveredNodeId?: string | null
   hoveredHighlight?: 'valid' | 'invalid' | null
   catalogue: SemanticCatalogue
+  /** §16: entityTypeIri → token name (mass|energy|…) — the token a
+   *  token-flow arc borrows from its incident transport node. */
+  tokenByEntityType?: Map<string, string>
 }
 
 export function buildScene(options: BuildSceneOptions): SceneObject[] {
-  const { graphView, selectedNodeId, selectedArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue } = options
+  const { graphView, selectedNodeId, selectedArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, tokenByEntityType } = options
   const objects: SceneObject[] = []
   const nodeMap = new Map<string, VisibleNode>()
 
@@ -235,6 +275,16 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
         doubleClickable: true,
         rightClickable: true,   // §15: right-click reverses reference direction
       },
+    }
+    if (arcTypeCarrier(arc.modelArcType) === 'token-flow' && tokenByEntityType) {
+      // §16: the arc declares no token — borrow it from the incident
+      // transport node's entity type (capacity/env ends yield none).
+      obj.token =
+        tokenByEntityType.get(nodeMap.get(arc.sourceId)?.entityType ?? '') ??
+        tokenByEntityType.get(nodeMap.get(arc.targetId)?.entityType ?? '')
+      if (obj.token && !isSelected) {
+        obj.stroke = TOKEN_COLORS[obj.token] ?? obj.stroke
+      }
     }
     objects.push(obj)
   }

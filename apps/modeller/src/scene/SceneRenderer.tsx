@@ -141,11 +141,22 @@ function renderNode(
   )
 }
 
+/** Midpoint of the arc's middle segment — anchor for the token label. */
+function arcMidpoint(points: number[]): { x: number; y: number } {
+  const n = points.length / 2
+  const mid = Math.floor((n - 1) / 2)
+  return {
+    x: (points[2 * mid] + points[2 * mid + 2]) / 2,
+    y: (points[2 * mid + 1] + points[2 * mid + 3]) / 2,
+  }
+}
+
 function renderArc(
   obj: SceneObject & { kind: 'arc' },
   handlers: SceneInteractionHandlers
 ) {
   const aPoints = arrowPoints(obj.arrowX, obj.arrowY, obj.arrowAngle)
+  const tokenPos = obj.token ? arcMidpoint(obj.points) : null
   return (
     <Group
       key={obj.id}
@@ -174,6 +185,18 @@ function renderArc(
         stroke={obj.stroke}
         strokeWidth={obj.strokeWidth}
       />
+      {tokenPos && (
+        <Text
+          x={tokenPos.x - 30}
+          y={tokenPos.y - 18}
+          width={60}
+          align="center"
+          text={obj.token}
+          fontSize={11}
+          fill={obj.stroke}
+          listening={false}
+        />
+      )}
     </Group>
   )
 }

@@ -1,7 +1,7 @@
 import 'katex/dist/katex.min.css'
 import { useMemo } from 'react'
 import { astToLatex, renderLatex } from '../latex'
-import type { Index, SavedEquation, Variable } from '../types'
+import type { Index, Variable } from '../types'
 
 export interface DeleteImpact {
   target: Variable
@@ -9,50 +9,57 @@ export interface DeleteImpact {
   equationIds: string[]
 }
 
-function stripPrefix(s: string): string {
-  // Incidence entries are IRIs or qualified names ("net!x") — keep the
-  // local part after the last separator.
-  return s.split(/[:#!]/).pop() ?? s
+/** Flattened view of every persisted equation, derived from variables.
+ *  Owner is tracked by IRI (rename-robust); incidence comes from the
+ *  canonical promo:incidenceList — always populated, unlike the
+ *  session-only check result. */
+interface FlatEquation {
+  id: string
+  ownerIri: string
+  ownerLabel: string
+  rhs: string
+  incidence: string[]
+}
+
+function flattenEquations(variables: Variable[]): FlatEquation[] {
+  const out: FlatEquation[] = []
+  for (const v of variables) {
+    for (const [id, rec] of Object.entries(v.equations ?? {})) {
+      out.push({
+        id,
+        ownerIri: v.iri,
+        ownerLabel: v.label,
+        rhs: rec.rhs,
+        incidence: rec.incidence_list ?? [],
+      })
+    }
+  }
+  return out
 }
 
 export function computeDeleteImpact(
   target: Variable,
-  variables: Variable[],
-  equations: SavedEquation[]
+  variables: Variable[]
 ): DeleteImpact {
-  const iriToVar = new Map<string, Variable>()
-  const labelToIri = new Map<string, string>()
-  for (const v of variables) {
-    iriToVar.set(v.iri, v)
-    labelToIri.set(v.label, v.iri)
-  }
-
+  const flat = flattenEquations(variables)
   const toDeleteIris = new Set<string>([target.iri])
   const toDeleteEqIds = new Set<string>()
 
   let changed = true
   while (changed) {
     changed = false
-    for (const eq of equations) {
+    for (const eq of flat) {
       if (toDeleteEqIds.has(eq.id)) continue
-
-      const lhsIri = labelToIri.get(eq.lhs)
-      const incidence = new Set((eq.check?.incidence ?? []).map(stripPrefix))
-
-      if (lhsIri && toDeleteIris.has(lhsIri)) {
-        toDeleteEqIds.add(eq.id)
-        changed = true
+      if (!toDeleteIris.has(eq.ownerIri)
+          && !eq.incidence.some((iri) => toDeleteIris.has(iri))) {
         continue
       }
-
-      if ([...incidence].some((iri) => toDeleteIris.has(iri))) {
-        toDeleteEqIds.add(eq.id)
-        if (lhsIri && !toDeleteIris.has(lhsIri)) {
-          toDeleteIris.add(lhsIri)
-          changed = true
-        } else {
-          changed = true
-        }
+      toDeleteEqIds.add(eq.id)
+      // The equation dies → so does the variable it defines; the cone
+      // grows and the loop re-scans.
+      if (!toDeleteIris.has(eq.ownerIri)) {
+        toDeleteIris.add(eq.ownerIri)
+        changed = true
       }
     }
   }
@@ -68,7 +75,6 @@ export interface DeleteVariableDialogProps {
   open: boolean
   target: Variable | null
   variables: Variable[]
-  equations: SavedEquation[]
   indices?: Index[]
   onClose: () => void
   onConfirm: (impact: DeleteImpact) => void
@@ -78,21 +84,21 @@ export default function DeleteVariableDialog({
   open,
   target,
   variables,
-  equations,
   indices = [],
   onClose,
   onConfirm,
 }: DeleteVariableDialogProps) {
+  const flatEqs = useMemo(() => flattenEquations(variables), [variables])
   const impact = useMemo(() => {
     if (!target) return null
-    return computeDeleteImpact(target, variables, equations)
-  }, [target, variables, equations])
+    return computeDeleteImpact(target, variables)
+  }, [target, variables])
 
   if (!open || !target || !impact) return null
 
   const iriToVar = new Map(variables.map((v) => [v.iri, v]))
   const impactedVariables = impact.variableIris.map((iri) => iriToVar.get(iri)).filter((v): v is Variable => !!v)
-  const impactedEquations = equations.filter((eq) => impact.equationIds.includes(eq.id))
+  const impactedEquations = flatEqs.filter((eq) => impact.equationIds.includes(eq.id))
   const onlyTarget = impactedVariables.length === 1 && impactedEquations.length === 0
   // Frozen walls — the backend 409s; mirror it here so the reason is
   // visible before confirming.
@@ -103,14 +109,6 @@ export default function DeleteVariableDialog({
   const varLatexHtml = (v: Variable) =>
     renderLatex(astToLatex({ type: 'Var', name: v.label }, { variables, indices }), false)
 
-  // ``lhs = rhs`` rendered via the equation's AST; raw text fallback when
-  // no AST was captured (e.g. unchecked leftovers).
-  const eqLatexHtml = (eq: SavedEquation): string | null => {
-    if (!eq.ast) return null
-    const lhs = astToLatex({ type: 'Var', name: eq.lhs }, { variables, indices })
-    const rhs = astToLatex(eq.ast, { variables, indices })
-    return renderLatex(`${lhs} = ${rhs}`, false)
-  }
 
   return (
     <div
@@ -211,20 +209,13 @@ export default function DeleteVariableDialog({
           <div>
             <strong style={{ fontSize: 13 }}>Equations to delete</strong>
             <ul style={{ margin: '4px 0', paddingLeft: 18, fontSize: 13 }}>
-              {impactedEquations.map((eq) => {
-                const html = eqLatexHtml(eq)
-                return (
-                  <li key={eq.id} style={{ overflowX: 'auto' }}>
-                    {html ? (
-                      <span dangerouslySetInnerHTML={{ __html: html }} />
-                    ) : (
-                      <code>
-                        {eq.lhs} = {eq.text.length > 50 ? eq.text.slice(0, 50) + '…' : eq.text}
-                      </code>
-                    )}
-                  </li>
-                )
-              })}
+              {impactedEquations.map((eq) => (
+                <li key={eq.id} style={{ overflowX: 'auto' }}>
+                  <code>
+                    {eq.ownerLabel} = {eq.rhs.length > 50 ? eq.rhs.slice(0, 50) + '…' : eq.rhs}
+                  </code>
+                </li>
+              ))}
             </ul>
           </div>
         )}

@@ -372,7 +372,11 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             units=y.units * x.units,
             indices=y.indices,
             label=space.new_temp(),
-            incidence=y.incidence | x.incidence | xl.incidence | xu.incidence,
+            # The integration variable is bound by ``::`` — the integrator
+            # sweeps it, it is not a value dependency (same precedent as
+            # ``Instantiate``'s prototype).  Bounds stay: their values are
+            # real dependencies.
+            incidence=y.incidence | xl.incidence | xu.incidence,
             children=[y, x, xl, xu],
             tokens=tmul(y.tokens, x.tokens),
         )

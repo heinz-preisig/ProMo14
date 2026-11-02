@@ -29,6 +29,8 @@ export interface VariableTableProps {
   onSelect?: (v: Variable) => void
   /** Open the equation editor on a stored equation (expanded row). */
   onEditEquation?: (v: Variable, eqId: string) => void
+  /** Delete a stored equation (expanded row). */
+  onDeleteEquation?: (v: Variable, eqId: string) => void
   /** Persist an edited variable — enables inline editing of the free
    *  fields (name, doc).  Structural fields stay in the detail dialog
    *  (§18 mutability policy). */
@@ -40,7 +42,7 @@ type EditCell = { iri: string; field: 'label' | 'doc' }
 /** Repository browser: sortable/filterable table of all variables with
  *  per-variable expandable equation rows.  Name and doc cells are
  *  click-to-edit when ``onSave`` is given. */
-export default function VariableTable({ variables, indices, axes = [], equationClasses = [], onSelect, onEditEquation, onSave }: VariableTableProps) {
+export default function VariableTable({ variables, indices, axes = [], equationClasses = [], onSelect, onEditEquation, onDeleteEquation, onSave }: VariableTableProps) {
   const [filter, setFilter] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('label')
   const [sortAsc, setSortAsc] = useState(true)
@@ -267,11 +269,11 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                             }}
                             title={open ? 'Hide equations' : 'Show equations'}
                             style={{
-                              fontSize: 10,
+                              fontSize: 14,
                               background: 'none',
                               border: 'none',
                               cursor: 'pointer',
-                              padding: 0,
+                              padding: '0 2px',
                               color: '#555',
                             }}
                           >
@@ -408,6 +410,19 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                                 title={`Edit equation ${eqId}`}
                               >
                                 Edit…
+                              </button>
+                            )}
+                            {onDeleteEquation && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDeleteEquation(v, eqId)
+                                }}
+                                style={{ marginLeft: 4, fontSize: 11, color: '#c62828', background: 'none', border: 'none', cursor: 'pointer' }}
+                                title={`Delete equation ${eqId}`}
+                              >
+                                ×
                               </button>
                             )}
                           </td>

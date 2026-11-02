@@ -2731,3 +2731,61 @@ ontologies" therefore splits into three distinct modes:
 - Label qualification in pickers once a second ontology exists.
 - Hub UI: pin editors already offer every artefact's draft + frozen
   versions — nothing to add.
+
+## 28. Event-dynamic entities, transport-law ownership, and rule granularity (2026-11-02)
+
+Reviewing the simple-system chain (environment → convection transport
+→ lumped) surfaced where `state` comes from and who may own a
+transport equation.
+
+### Decision
+
+- **Event-dynamic = stateless assignment shape.**  `state` was
+  hardcoded to `lhs(base_equation)` — a transport's base LHS is its
+  flow output, not an accumulation.  `base_equation = null` suppresses
+  the derivation entirely: `closed=True`, `state=None`, sequence +
+  outputs intact.  The environment's no-base shape generalises.
+- **Regime switching = artefact swap, not parametric zero.**  An
+  event-dynamic transport is physically a C→0 capacity, but setting
+  accumulation to zero turns the state algebraic — a value decision
+  with a structural (DAE) consequence.  Instead: same entity type,
+  two assignment *shapes* (stateless vs state-bearing); the switch
+  happens at model time by re-assignment.  No algebraic-state
+  machinery needed yet.
+- **Entity types already carry `temporal_type`** (`event-dynamic` on
+  every transport leaf) — the no-accumulation signal exists on the
+  ontology side; wiring it into closure (expect stateless on
+  event-dynamic types) is open.
+- **Transport equations live on transport entities.**  A lumped
+  capacity owns balances over ports, nothing else — a flow with no
+  second end is source/sink or conversion, a different mechanism and
+  a different entity.  When the BL offers another entity's equation
+  (entity-agnostic candidates), the fix is visibility — *"E_4 is
+  claimed by convection_transport"* — not prohibition: reuse stays
+  possible when intentional, but seen.
+
+### Gaps found
+
+- **Connection rules are domain-pair + shared-token only.**  All
+  physical entity types share `domain_physical`, so env→env is
+  indistinguishable from lumped→transport — `rule_physical-same`
+  licenses a token-flow between two environments.  "Token exchange
+  requires a transport endpoint" is inexpressible in the current
+  schema → needs entity-role-aware rules (ontology data), not a
+  gesture hardcode.  Related UX bug: the sync resolver's cache-miss
+  answer `allowed` + `connections:[]` paints the hover 'valid' before
+  the authoritative (forbidden) answer lands.
+- **The delete cone is single-artefact.**  Variable delete scans
+  var/expr incidence refs; assignment endpoint refs
+  (`hasInstantiatedVariable`, ports, state, outputs, sequence) are
+  cross-artefact and invisible → a deleted `k_conv` left a dead IRI
+  in the transport's instantiated list.  Proposed: a read-only
+  cross-artefact integrity audit (endpoints/sequences → vars/eqs,
+  model entityType refs, instantiation pins, stale caches incl.
+  `promo:closed` vs live and stored `incidence_list` vs re-check)
+  plus extending the delete cone to assignment references.
+- **Graphic-designer extent contract.**  Any spatial constraint must
+  read the object's own bounding box, never a shape constant — the
+  coming node graphic designer MUST declare one.  Implemented:
+  `SceneNode.halfExtent` + `graphicalHalfExtent`/`entityHalfExtent`
+  (zone clamp migrated; hit-test and rim-attach to follow).

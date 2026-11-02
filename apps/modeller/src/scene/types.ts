@@ -34,6 +34,11 @@ export interface SceneNode extends SceneObjectBase {
   radius: number
   width?: number
   height?: number
+  /** Bounding-box half-extent derived from the graphical definition
+   *  (radius → {r,r}; w×h → {w/2,h/2}).  Spatial constraints read this
+   *  — never a per-shape constant — so any designer graphic works.
+   *  The graphic designer MUST declare an equivalent bounding box. */
+  halfExtent?: { x: number; y: number }
   entityType?: string
   highlight?: 'valid' | 'invalid'
 }
@@ -51,6 +56,9 @@ export interface SceneArc extends SceneObjectBase {
   strokeWidth: number
   dash?: number[]
   hitStrokeWidth: number
+  /** §16: token derived from the incident transport node's entity
+   *  type — shown as a mid-arc label on token-flow arcs. */
+  token?: string
 }
 
 export interface SceneOpenArc extends SceneObjectBase {

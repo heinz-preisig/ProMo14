@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useReducer, useCallback, useRef } from 'react'
 import { Stage, Layer, Line, Group } from 'react-konva'
+import type Konva from 'konva'
 import type { NodeType, ArcType, OpenArc } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
 import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue, childIri } from '@promo/semantic'
-import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
+import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityTokens, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
 import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
@@ -46,6 +47,7 @@ export default function App() {
   const [speciesIri, setSpeciesIri] = useState<string | undefined>(undefined)
   const [dist, setDist] = useState<SpeciesDistribution | null>(null)
   const [capabilities, setCapabilities] = useState<Map<string, string[]>>(new Map())
+  const [entityTokens, setEntityTokens] = useState<Map<string, string>>(new Map())
   const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
   const [fixVars, setFixVars] = useState<EntityVariable[]>([])
   const [modelArtefacts, setModelArtefacts] = useState<CatalogueLine[]>([])
@@ -75,6 +77,9 @@ export default function App() {
     fetchEntityCapabilities()
       .then((m) => { if (!cancelled) setCapabilities(m) })
       .catch(() => { /* capabilities optional — gestures stay hidden */ })
+    fetchEntityTokens()
+      .then((m) => { if (!cancelled) setEntityTokens(m) })
+      .catch(() => { /* token labels optional */ })
     loadModel()
       .then((doc) => {
         if (cancelled) return null
@@ -116,6 +121,29 @@ export default function App() {
       await saveOntology()
     } catch (err) {
       console.error('Failed to save model:', err)
+    }
+  }, [state])
+
+  const stageRef = useRef<Konva.Stage>(null)
+  const onScreenshot = useCallback(() => {
+    try {
+      const stage = stageRef.current
+      if (!stage) {
+        console.warn('screenshot: no stage')
+        return
+      }
+      const viewLabel = (
+        state.tree.nodes.get(state.currentViewNodeId)?.label ?? 'root'
+      ).replace(/[^\w-]+/g, '_')
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const a = document.createElement('a')
+      a.href = stage.toDataURL({ pixelRatio: 2 })
+      a.download = `promo-${viewLabel}-${stamp}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch (err) {
+      console.error('screenshot failed:', err)
     }
   }, [state])
 
@@ -356,8 +384,9 @@ export default function App() {
       hoveredNodeId,
       hoveredHighlight,
       catalogue,
+      tokenByEntityType: entityTokens,
     }),
-    [graphView, state.selectedVisibleNodeId, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue]
+    [graphView, state.selectedVisibleNodeId, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, entityTokens]
   )
 
   // --- Canvas event handlers (isolated from rendering) ---
@@ -450,7 +479,7 @@ export default function App() {
             </button>
           )}
           <button style={{ fontSize: 12 }} onClick={onSave}>Save</button>
-          <button style={{ fontSize: 12 }}>Screenshot</button>
+          <button style={{ fontSize: 12 }} onClick={onScreenshot}>Screenshot</button>
         </div>
       </div>
 
@@ -638,6 +667,7 @@ export default function App() {
 
         {/* Canvas */}
         <Stage
+          ref={stageRef}
           width={stageSize.width}
           height={stageSize.height}
           onClick={handleStageClick}

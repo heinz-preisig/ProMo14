@@ -173,6 +173,32 @@ export async function fetchEntityCapabilities(): Promise<Map<string, string[]>> 
   return new Map(ets.map((e) => [e.iri, e.capabilities ?? []]))
 }
 
+/** §16: the token an entity type's transport branch carries — derived
+ *  by walking ``promo:parent`` to the direct child of
+ *  ``etype_transport_system`` (mass_transport → 'mass').  Arcs declare
+ *  no token; token-flow arcs borrow it from their incident transport
+ *  node.  Entity types outside transport_system get no entry. */
+export async function fetchEntityTokens(): Promise<Map<string, string>> {
+  const ets = await getJson<EntityTypeRecord[]>('/api/ontology/entity-types')
+  const parent = new Map(ets.map((e) => [e.iri, e.parent ?? '']))
+  const root = 'https://w3id.org/promo/ontology#etype_transport_system'
+  const out = new Map<string, string>()
+  for (const e of ets) {
+    let cur = e.iri
+    const seen = new Set<string>()
+    while (cur && !seen.has(cur)) {
+      seen.add(cur)
+      if (parent.get(cur) === root) break
+      cur = parent.get(cur) ?? ''
+    }
+    if (!cur || parent.get(cur) !== root) continue
+    const local = cur.split('#').pop() ?? ''
+    const token = local.replace(/^etype_/, '').replace(/_transport$/, '')
+    if (token) out.set(e.iri, token)
+  }
+  return out
+}
+
 /** ADR-008 layer 2: the variables an entity type's assignment mentions
  *  — the candidate set for promo:fix marks on a model node. */
 export interface EntityVariable {

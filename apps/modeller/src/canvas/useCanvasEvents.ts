@@ -6,6 +6,7 @@ import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
 import { resolveConnectionAsync, pickArcType, modelNodeIri, modelArcIri } from '@promo/semantic'
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
+import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
 import { GRAPH_IRI } from '../api'
 
 /** Root of the transport-system subtree — seeded entity type
@@ -62,10 +63,25 @@ export function useCanvasEvents(
   const isPanning = useRef(false)
   const lastPanPos = useRef<{ x: number; y: number } | null>(null)
 
+  /** Margins are render zones (ancestors | siblings) — user nodes live
+   *  in the centre panel only.  Applies to placement clicks AND drags.
+   *  halfW/halfH = the node's own half-extent so the whole body stays
+   *  inside, not just its centre point. */
+  const clampToPanel = (x: number, y: number, halfW = NODE_RADIUS, halfH = NODE_RADIUS) => {
+    const halfStageW = stageSize.width / 2
+    const halfStageH = stageSize.height / 2
+    return {
+      x: Math.max(-halfStageW + 80 + halfW, Math.min(halfStageW - 80 - halfW, x)),
+      y: Math.max(-halfStageH + 80 + halfH, Math.min(halfStageH - 40 - halfH, y)),
+    }
+  }
+
   const insertNodeAt = (x: number, y: number) => {
     const id = state.tree.nextId + 1
     // GRAPH_IRI is guaranteed — main.tsx only renders App with ?graph=.
     const iri = modelNodeIri(GRAPH_IRI!, id)
+    const e = entityHalfExtent(activeNodeType, catalogue)
+    const p = clampToPanel(x, y, e.x, e.y)
     dispatch({
       type: 'insertNode',
       id,
@@ -73,8 +89,8 @@ export function useCanvasEvents(
       label: `Node ${id}`,
       entityType: activeNodeType,
       parentViewNodeId: state.currentViewNodeId,
-      x,
-      y,
+      x: p.x,
+      y: p.y,
     })
   }
 
@@ -315,14 +331,12 @@ export function useCanvasEvents(
       const pos = e.target.position()
       let { x, y } = pos
       if (obj.nodeType === 'leaf' || obj.nodeType === 'composite') {
-        const halfW = stageSize.width / 2
-        const halfH = stageSize.height / 2
-        const minX = -halfW + 80
-        const maxX = halfW - 80
-        const minY = -halfH + 80
-        const maxY = halfH - 40
-        x = Math.max(minX, Math.min(maxX, x))
-        y = Math.max(minY, Math.min(maxY, y))
+        // Extent comes from the object — set from its graphical
+        // definition at scene-build — never a per-shape constant.
+        const he = obj.halfExtent ?? { x: NODE_RADIUS, y: NODE_RADIUS }
+        const p = clampToPanel(x, y, he.x, he.y)
+        x = p.x
+        y = p.y
       }
       e.target.position({ x, y })
       dispatch({

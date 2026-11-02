@@ -6,7 +6,6 @@ import type { ClassificationAxis, Domain, EquationClass, EquationRecord, Index, 
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
-import EquationList from './components/EquationList'
 import PortVariableEditor from './components/PortVariableEditor'
 import VariableDetailDialog from './components/VariableDetailDialog'
 import VariablePalette from './components/VariablePalette'
@@ -21,8 +20,6 @@ export default function App() {
   const [equationClasses, setEquationClasses] = useState<EquationClass[]>([])
   const [tokenCatalogue, setTokenCatalogue] = useState<TokenRecord[]>([])
   const [expressionNetwork, setExpressionNetwork] = useState('root')
-
-  const [equations, setEquations] = useState<SavedEquation[]>([])
 
   const [portOpen, setPortOpen] = useState(false)
   const [dependentOpen, setDependentOpen] = useState(false)
@@ -71,24 +68,6 @@ export default function App() {
         setEquationClasses(ctx.equation_classes ?? [])
         setPdfCapable(ctx.capabilities?.pdf ?? false)
         listTokens().then(setTokenCatalogue).catch(() => {})
-        // Rebuild SavedEquation list from persisted equations
-        const saved: SavedEquation[] = []
-        for (const v of ctx.variables) {
-          if (v.equations) {
-            for (const [eqId, eq] of Object.entries(v.equations)) {
-              saved.push({
-                id: eqId,
-                lhs: v.label,
-                text: eq.rhs,
-                ast: null,
-                check: null,
-              })
-            }
-          }
-        }
-        if (saved.length > 0) {
-          setEquations(saved)
-        }
       })
       .catch((err) => {
         console.error('Failed to load context:', err)
@@ -108,13 +87,6 @@ export default function App() {
     setAxes(ctx.axes ?? [])
     setDomains(ctx.domains ?? [])
     setEquationClasses(ctx.equation_classes ?? [])
-    // A rename changes the displayed lhs of the variable's equations —
-    // refresh them from the reloaded records (keeps session ast/check).
-    const eqIds = new Set(Object.keys(v.equations ?? {}))
-    setEquations((prev) => [
-      ...prev.map((e) => (eqIds.has(e.id) ? { ...e, lhs: v.label } : e)),
-      ...(eq ? [eq] : []),
-    ])
     setSelectedVariable((prev) =>
       prev?.iri === v.iri
         ? (ctx.variables.find((x) => x.iri === v.iri) ?? prev)
@@ -153,10 +125,6 @@ export default function App() {
     })
   }, [saveEditedVariable])
 
-  const removeEquation = useCallback((id: string) => {
-    setEquations((prev) => prev.filter((eq) => eq.id !== id))
-  }, [])
-
   // Open the equation editor on an existing stored equation — the
   // variable is the owner found via the equations dict key.
   const openEquationEditor = useCallback((v: Variable, eqId: string) => {
@@ -167,10 +135,17 @@ export default function App() {
     setDependentOpen(true)
   }, [])
 
-  const selectEquation = useCallback((eq: SavedEquation) => {
-    const owner = variables.find((v) => v.equations && eq.id in v.equations)
-    if (owner) openEquationEditor(owner, eq.id)
-  }, [variables, openEquationEditor])
+  // Delete a stored equation: the variable PUT replaces the equations
+  // dict wholesale — dropping the entry deletes it server-side.
+  const deleteEquation = useCallback((v: Variable, eqId: string) => {
+    if (!window.confirm(`Delete equation ${eqId} from ${v.label}?`)) return
+    const equations = { ...(v.equations ?? {}) }
+    delete equations[eqId]
+    saveEditedVariable({ ...v, equations }).catch((err) => {
+      console.error('Failed to delete equation:', err)
+      setSaveErr(`Failed to delete equation: ${err}`)
+    })
+  }, [saveEditedVariable])
 
   const removeVariable = useCallback(async (impact: DeleteImpact) => {
     // Brutal delete: one backend call removes the whole dependency cone
@@ -188,15 +163,6 @@ export default function App() {
     // client-side impact didn't predict (e.g. foreign-graph refs).
     const ctx = await loadContext()
     setVariables(ctx.variables)
-    const saved: SavedEquation[] = []
-    for (const v of ctx.variables) {
-      if (v.equations) {
-        for (const [eqId, eq] of Object.entries(v.equations)) {
-          saved.push({ id: eqId, lhs: v.label, text: eq.rhs, ast: null, check: null })
-        }
-      }
-    }
-    setEquations(saved)
     refreshDirty()
     setDeleteTarget(null)
   }, [refreshDirty])
@@ -339,11 +305,6 @@ export default function App() {
             onDelete={setDeleteTarget}
             onSelect={setSelectedVariable}
           />
-          <EquationList
-            equations={equations}
-            onSelect={selectEquation}
-            onRemove={removeEquation}
-          />
         </div>
 
         <div
@@ -379,6 +340,7 @@ export default function App() {
             equationClasses={equationClasses}
             onSelect={setSelectedVariable}
             onEditEquation={openEquationEditor}
+            onDeleteEquation={deleteEquation}
             onSave={saveEditedVariable}
           />
         </div>
@@ -428,7 +390,6 @@ export default function App() {
         open={!!deleteTarget}
         target={deleteTarget}
         variables={variables}
-        equations={equations}
         indices={indices}
         onClose={() => setDeleteTarget(null)}
         onConfirm={removeVariable}
