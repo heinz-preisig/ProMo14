@@ -1304,8 +1304,8 @@ def model_initial(
         mod: Dict[str, Any] = {"_DATA": json.loads(
             emit_data(cp, _code_space(store, emit_scope)))}
         exec(source, mod)
-        par = {k: np.asarray(v, dtype=float) for k, v in
-               body.par.items()}
+        par = {k: np.atleast_1d(np.asarray(v, dtype=float))
+               for k, v in body.par.items()}
         y0 = np.atleast_1d(
             mod["initial"](par, steady_state=body.steady_state))
     except Exception as e:  # numeric/par errors → diagnostic payload

@@ -161,6 +161,15 @@ class _Julia(Dialect):
         return "    %s = %s[%s]  # port gather" % (
             gn, pn, [i + 1 for i in g.map])
 
+    def gather_multi(self, pieces, space: CompileSpace) -> str:
+        gn = pieces[0].name or inst_name(pieces[0].instance)
+        sel = ", ".join(
+            "%s[[%s]]" % (
+                s.peer_name or inst_name(s.peer_instance),
+                ", ".join(str(i + 1) for i in s.map))
+            for s in pieces)
+        return "    %s = vcat(%s)  # port gather" % (gn, sel)
+
     def loop(self, out: List[str], loop_id: int, blocks, space,
              cp: CodePlan) -> None:
         """One algebraic loop, cone-blocked: torn vars only are
@@ -264,8 +273,15 @@ class _Julia(Dialect):
         out.append("            total_diff = (x, y) -> x .* 0  "
                    "# der = 0")
         out.append("        end")
+        seen_g = set()
         for g in cp.gathers:
-            out.append("    " + self.gather(g, space))
+            if g.instance in seen_g:
+                continue
+            seen_g.add(g.instance)
+            sibs = [s for s in cp.gathers if s.instance == g.instance]
+            out.append("    " + (self.gather(sibs[0], space)
+                                  if len(sibs) == 1
+                                  else self.gather_multi(sibs, space)))
         for b in spec.guesses:
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("        x0 = %s  # root! guess" % nm)

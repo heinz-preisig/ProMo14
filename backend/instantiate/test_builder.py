@@ -1327,10 +1327,10 @@ def test_emit_python_initial():
     assert "_r1 = (_d(V_5 * V_6)) - V_3_diffusion_transport" in src
     assert ("_r2 = (_d(V_4 @ V_3_lumped_capacity)) - dV_1" in src)
     assert "total_diff = lambda x, y: np.zeros_like(x)" in src
-    assert "_rs += [np.atleast_1d(dV_1)]  # der = 0" in src
+    assert "_rs += [np.ravel(dV_1)]  # der = 0" in src
     assert '_e0 = (par["ic0_V_1"]) - V_1  # IC pin' in src
     assert "_u = fsolve(_t0, np.zeros(8))" in src
-    assert "return np.concatenate([np.atleast_1d(V_1)])" in src
+    assert "return np.concatenate([np.ravel(V_1)])" in src
 
 
 def test_emit_python_initial_steady_square():
@@ -1356,7 +1356,7 @@ def test_emit_python_initial_cells():
     assert 'par["ic0_V_1"]' not in src
     assert "V_1 = u[0:2]" in src            # state — always unknown
     assert "V_1 = _u[0:2]" in src
-    assert "return np.concatenate([np.atleast_1d(V_1)])" in src
+    assert "return np.concatenate([np.ravel(V_1)])" in src
 
 
 def test_emit_python_initial_equation():
@@ -1381,7 +1381,7 @@ def test_emit_python_initial_guess():
     src = emit_python(
         _plan(_build(), canonicals={_eq("flow"): canon}),
         _emit_space())
-    assert ("x0 = np.atleast_1d(V_3_diffusion_transport)  "
+    assert ("x0 = np.ravel(V_3_diffusion_transport)  "
             "# root! guess" in src)
 
 

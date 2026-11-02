@@ -179,6 +179,16 @@ class _Matlab(Dialect):
         return "  %s = %s;  %% port gather" % (
             gn, self._mdv(g.indices, space, val))
 
+    def gather_multi(self, pieces, space: CompileSpace) -> str:
+        gn = pieces[0].name or inst_name(pieces[0].instance)
+        val = "vertcat(%s)" % ", ".join(
+            "%s.value([%s])" % (
+                s.peer_name or inst_name(s.peer_instance),
+                " ".join(str(i + 1) for i in s.map))
+            for s in pieces)
+        return "  %s = %s;  %% port gather" % (
+            gn, self._mdv(pieces[0].indices, space, val))
+
     def state_assign(self, st, b: PlanBlock, rhs: str,
                      space: CompileSpace) -> List[str]:
         """``dy`` unwrap: rhs goes to a ``d<lhs>`` temp, ``dy`` takes
@@ -342,8 +352,15 @@ class _Matlab(Dialect):
         out.append("    if steady_state")
         out.append("      totalDiff = @(x, y) x .* 0;  %% der = 0")
         out.append("    end")
+        seen_g = set()
         for g in cp.gathers:
-            out.append("  " + self.gather(g, space))
+            if g.instance in seen_g:
+                continue
+            seen_g.add(g.instance)
+            sibs = [s for s in cp.gathers if s.instance == g.instance]
+            out.append("  " + (self.gather(sibs[0], space)
+                                if len(sibs) == 1
+                                else self.gather_multi(sibs, space)))
         for b in spec.guesses:
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("    x0 = %s.value;  %% root! guess" % nm)

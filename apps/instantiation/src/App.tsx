@@ -110,7 +110,7 @@ const S = {
     borderBottom: '1px solid #ddd', minHeight: 48,
   },
   title: { fontSize: 16, fontWeight: 600 },
-  meta: { fontSize: 12, color: '#666', fontFamily: 'monospace' },
+  meta: { fontSize: 14, color: '#666', fontFamily: 'monospace' },
   main: {
     flex: 1, overflow: 'auto', padding: 16,
     display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16,
@@ -120,31 +120,31 @@ const S = {
     background: '#fff', border: '1px solid #ddd', borderRadius: 6,
     padding: 12, marginBottom: 12,
   },
-  h3: { margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#333' },
-  table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 12 },
+  h3: { margin: '0 0 8px', fontSize: 15, fontWeight: 600, color: '#333' },
+  table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 14 },
   th: {
     textAlign: 'left' as const, padding: '4px 8px', color: '#666',
-    borderBottom: '1px solid #eee', fontWeight: 600, fontSize: 11,
+    borderBottom: '1px solid #eee', fontWeight: 600, fontSize: 13,
   },
   td: { padding: '4px 8px', borderBottom: '1px solid #f3f3f3' },
   badge: (bg: string) => ({
     display: 'inline-block', padding: '1px 7px', borderRadius: 10,
-    fontSize: 11, fontWeight: 600, background: bg, color: '#fff',
+    fontSize: 13, fontWeight: 600, background: bg, color: '#fff',
   }),
   pre: {
     margin: 0, padding: 12, background: '#0f172a', color: '#e2e8f0',
-    borderRadius: 6, fontSize: 12, lineHeight: 1.5, overflow: 'auto',
+    borderRadius: 6, fontSize: 14, lineHeight: 1.5, overflow: 'auto',
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     maxHeight: '60vh',
   },
   btn: (primary: boolean) => ({
-    padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    padding: '6px 14px', fontSize: 15, fontWeight: 600, cursor: 'pointer',
     border: '1px solid ' + (primary ? '#2563eb' : '#ccc'),
     borderRadius: 6, background: primary ? '#2563eb' : '#fff',
     color: primary ? '#fff' : '#333',
   }),
   select: {
-    padding: '6px 8px', fontSize: 13, borderRadius: 6,
+    padding: '6px 8px', fontSize: 15, borderRadius: 6,
     border: '1px solid #ccc', background: '#fff',
   },
 }
@@ -157,7 +157,7 @@ function Problems({ report }: { report: InstantiationReport }) {
         {report.problems.length} problem{report.problems.length > 1 ? 's' : ''}
       </h3>
       {report.problems.map((p, i) => (
-        <div key={i} style={{ fontSize: 12, padding: '2px 0' }}>
+        <div key={i} style={{ fontSize: 14, padding: '2px 0' }}>
           {p.doc
             ? <a href={p.doc} target="_blank" rel="noreferrer"
                  style={{ textDecoration: 'none' }}>
@@ -178,7 +178,7 @@ function EntityCard({
     <div style={S.card}>
       <h3 style={S.h3}>
         {lab(e.entity_type)}{' '}
-        <span style={{ fontWeight: 400, color: '#888', fontSize: 11 }}>
+        <span style={{ fontWeight: 400, color: '#888', fontSize: 13 }}>
           {e.nodes.length} node{e.nodes.length !== 1 ? 's' : ''}
           {e.closed ? ' · closed' : ' · open'}
         </span>
@@ -213,7 +213,7 @@ function EntityCard({
                 )}
               </td>
               <td style={{ ...S.td, fontFamily: 'monospace' }}>{v.instance}</td>
-              <td style={{ ...S.td, color: '#888', fontSize: 11 }}>
+              <td style={{ ...S.td, color: '#888', fontSize: 13 }}>
                 {Object.entries(v.indices)
                   .map(([i, els]) => els == null
                     ? `${lab(i)}[·]` : `${lab(i)}[${els.length}]`)
@@ -224,7 +224,7 @@ function EntityCard({
         </tbody>
       </table>
       {e.equations.length > 0 && (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+        <div style={{ marginTop: 8, fontSize: 14, color: '#555' }}>
           {e.equations.map((q) => (
             <div key={q.equation} style={{ fontFamily: 'monospace' }}>
               {lab(q.lhs)} := {q.equation.split(/[/#]/).pop()}
@@ -233,7 +233,7 @@ function EntityCard({
         </div>
       )}
       {e.initial_equations.length > 0 && (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+        <div style={{ marginTop: 8, fontSize: 14, color: '#555' }}>
           {e.initial_equations.map((q) => (
             <div key={q.equation} style={{ fontFamily: 'monospace' }}>
               {lab(q.lhs)} := {q.equation.split(/[/#]/).pop()}{' '}
@@ -336,17 +336,17 @@ function ValuesCard({
   return (
     <div style={S.card}>
       <h3 style={S.h3}>Values</h3>
-      <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
         value cells — ν parameter tables and IC pins, keyed by
         index-element coordinates
       </div>
       {err && (
-        <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>
+        <div style={{ color: '#dc2626', fontSize: 14, marginBottom: 8 }}>
           {err}
         </div>
       )}
       {rows.length === 0 && (
-        <div style={{ fontSize: 12, color: '#888' }}>
+        <div style={{ fontSize: 14, color: '#888' }}>
           no parameter or state bindings to value
         </div>
       )}
@@ -372,7 +372,7 @@ function ValuesCard({
         const editInput = (k: string) => (
           <input
             style={{
-              width: 110, padding: '2px 6px', fontSize: 12,
+              width: 110, padding: '2px 6px', fontSize: 14,
               border: '1px solid #ccc', borderRadius: 4,
               textAlign: 'right', fontFamily: 'monospace',
             }}
@@ -386,9 +386,9 @@ function ValuesCard({
         )
         return (
           <div key={v.instance} style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, marginBottom: 4 }}>
+            <div style={{ fontSize: 14, marginBottom: 4 }}>
               <b>{lab(v.var)}</b>{' '}
-              <span style={{ color: '#888', fontSize: 11 }}>
+              <span style={{ color: '#888', fontSize: 13 }}>
                 {lab(entityType)}{v.role === 'state' ? ' · IC pin' : ''}
                 {stored ? ` · ${stored} entr${stored > 1 ? 'ies' : 'y'}` : ''}
                 {' '}
@@ -406,7 +406,7 @@ function ValuesCard({
                 ))}
               </span>
               <button
-                style={{ ...S.btn(false), float: 'right', padding: '2px 10px', fontSize: 11 }}
+                style={{ ...S.btn(false), float: 'right', padding: '2px 10px', fontSize: 13 }}
                 disabled={saving === v.var}
                 onClick={() => save(v)}
               >
@@ -417,7 +417,7 @@ function ValuesCard({
               <tbody>
                 {fillKeys.map((k) => (
                   <tr key={k}>
-                    <td style={{ ...S.td, fontSize: 11, color: '#7c3aed' }}>
+                    <td style={{ ...S.td, fontSize: 13, color: '#7c3aed' }}>
                       {k.split('|').map((s) => s === '*' ? '*' : lab(s))
                         .join(' · ')}
                       <span style={{ ...S.badge('#7c3aed'),
@@ -429,7 +429,7 @@ function ValuesCard({
                         title='remove fill'
                         style={{ border: 'none', background: 'none',
                                  color: '#dc2626', cursor: 'pointer',
-                                 fontSize: 12 }}
+                                 fontSize: 14 }}
                         onClick={() => setEdits((prev) => ({
                           ...prev,
                           [v.var]: { ...prev[v.var], [k]: '' },
@@ -443,10 +443,10 @@ function ValuesCard({
                     ? resolveFill(tbl, k, subs) : null
                   return (
                     <tr key={k}>
-                      <td style={{ ...S.td, fontSize: 11, color: '#666' }}>
+                      <td style={{ ...S.td, fontSize: 13, color: '#666' }}>
                         {k ? k.split('|').map(lab).join(' · ') : 'scalar'}
                         {filled && (
-                          <span style={{ fontSize: 10, color: '#7c3aed',
+                          <span style={{ fontSize: 12, color: '#7c3aed',
                                          marginLeft: 6 }}>
                             ← {filled.val} via{' '}
                             {filled.pat.split('|')
@@ -489,24 +489,27 @@ function FillAdder({ onAdd }: { onAdd: (key: string, val: string) => void }) {
     <div style={{ marginTop: 4, display: 'flex', gap: 6,
                   alignItems: 'center' }}>
       <input
-        style={{ width: 150, padding: '2px 6px', fontSize: 11,
+        style={{ width: 150, padding: '2px 6px', fontSize: 13,
                  border: '1px dashed #aaa', borderRadius: 4,
                  fontFamily: 'monospace' }}
         value={key}
         placeholder='fill key: *|B or sub-idx'
+        title='optional pattern — which cells this fill covers (* = all)'
         onChange={(e) => setKey(e.target.value)}
       />
       <input
-        style={{ width: 80, padding: '2px 6px', fontSize: 11,
+        style={{ width: 80, padding: '2px 6px', fontSize: 13,
                  border: '1px dashed #aaa', borderRadius: 4,
                  textAlign: 'right', fontFamily: 'monospace' }}
         value={val}
-        placeholder='value'
+        placeholder='value for key'
+        title='disabled until a fill key is set — single values go in the cell input above'
+        disabled={!key.trim()}
         onChange={(e) => setVal(e.target.value)}
       />
       <button
         style={{ border: 'none', background: 'none', color: '#2563eb',
-                 cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                 cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
         onClick={add}
       >+ fill</button>
     </div>
@@ -577,9 +580,15 @@ function SolveCard({
     setErr(null)
     try {
       const par: Record<string, number | number[]> = {}
+      const missing: string[] = []
       for (const k of keys) {
         const p = parsePar(parText[k] ?? '')
-        if (p !== undefined) par[k] = p
+        if (p === undefined) { missing.push(k); continue }
+        par[k] = p
+      }
+      if (missing.length) {
+        setErr(`no value for par: ${missing.join(', ')}`)
+        return
       }
       setOut(await solveInitial(par, steady))
     } catch (e) {
@@ -594,7 +603,7 @@ function SolveCard({
     <div style={S.card}>
       <h3 style={S.h3}>
         t = 0 solve{' '}
-        <label style={{ fontSize: 11, fontWeight: 400, color: '#666' }}>
+        <label style={{ fontSize: 13, fontWeight: 400, color: '#666' }}>
           <input
             type='checkbox'
             checked={steady}
@@ -603,7 +612,7 @@ function SolveCard({
           steady state
         </label>
         <button
-          style={{ ...S.btn(true), float: 'right', padding: '4px 12px', fontSize: 12 }}
+          style={{ ...S.btn(true), float: 'right', padding: '4px 12px', fontSize: 14 }}
           disabled={busy}
           onClick={solve}
         >
@@ -631,7 +640,7 @@ function SolveCard({
                     {n.status}
                   </span>
                   {n.supplied_by && (
-                    <span style={{ fontSize: 11, color: '#888' }}>
+                    <span style={{ fontSize: 13, color: '#888' }}>
                       {' '}{n.supplied_by}
                     </span>
                   )}
@@ -647,13 +656,13 @@ function SolveCard({
           <tbody>
             {keys.map((k) => (
               <tr key={k}>
-                <td style={{ ...S.td, fontFamily: 'monospace', fontSize: 11 }}>
+                <td style={{ ...S.td, fontFamily: 'monospace', fontSize: 13 }}>
                   {k}
                 </td>
                 <td style={{ ...S.td, textAlign: 'right' }}>
                   <input
                     style={{
-                      width: 140, padding: '2px 6px', fontSize: 12,
+                      width: 140, padding: '2px 6px', fontSize: 14,
                       border: '1px solid #ccc', borderRadius: 4,
                       textAlign: 'right', fontFamily: 'monospace',
                     }}
@@ -681,7 +690,7 @@ function SolveCard({
         </pre>
       )}
       {out?.ok && (
-        <div style={{ fontSize: 12 }}>
+        <div style={{ fontSize: 14 }}>
           {out.states.map((s) => (
             <div key={s.name} style={{ padding: '2px 0' }}>
               <b>{lab(s.var)}</b>{' '}
@@ -690,7 +699,7 @@ function SolveCard({
               </span>
             </div>
           ))}
-          <div style={{ color: '#888', fontSize: 11, marginTop: 4 }}>
+          <div style={{ color: '#888', fontSize: 13, marginTop: 4 }}>
             y0 = [{out.y0.map((x) => +x.toPrecision(6)).join(', ')}]
             {out.steady_state ? ' · steady state' : ''}
           </div>
@@ -771,7 +780,7 @@ export default function App() {
           {err && (
             <div style={{ ...S.card, borderColor: '#dc2626' }}>
               <h3 style={{ ...S.h3, color: '#dc2626' }}>Report failed</h3>
-              <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>{err}</pre>
+              <pre style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{err}</pre>
             </div>
           )}
           {report && <Problems report={report} />}
@@ -826,7 +835,7 @@ export default function App() {
             <div style={S.card}>
               <h3 style={S.h3}>Schedule</h3>
               {report.schedule.levels.map((lvl, i) => (
-                <div key={i} style={{ fontSize: 12, padding: '3px 0' }}>
+                <div key={i} style={{ fontSize: 14, padding: '3px 0' }}>
                   <span style={{ color: '#888' }}>level {i}:</span>{' '}
                   {lvl.map((b) => (
                     <span key={b.equation} style={{ fontFamily: 'monospace' }}>

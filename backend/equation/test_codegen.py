@@ -142,7 +142,8 @@ def test_python_constant_value_inlined():
 def test_python_integral():
     out = gen("Integral(M :: M in [one, one])", "python")
     assert out == ("scipy.integrate.quad_vec(lambda V_3: V_3, "
-                   "V_8, V_8)[0]")
+                   "np.asarray(V_8).item(), "
+                   "np.asarray(V_8).item())[0]")
 
 
 def test_python_root():

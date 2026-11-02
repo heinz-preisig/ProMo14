@@ -2789,3 +2789,56 @@ transport equation.
   coming node graphic designer MUST declare one.  Implemented:
   `SceneNode.halfExtent` + `graphicalHalfExtent`/`entityHalfExtent`
   (zone clamp migrated; hit-test and rim-attach to follow).
+
+## 29. Port gathers across peers, index-broadcast semantics, value-cell UX (2026-11-02)
+
+### Found and fixed (settled — machinery corrections)
+
+- **Port gathers must split per peer.**  `plan.py` grouped a port
+  var's contacts by `(etype, var)` and served all contacts from
+  `pbs[0]`'s peer field.  A 2-contact transport whose contacts resolve
+  to different peers (upstream env pressure, downstream lumped
+  pressure) got `[env[0], env[-1]]` — the `-1` was `pos.get`'s
+  not-found sentinel but Python reads it as a valid index →
+  `[p_up, p_up]` → `F@p = 0` → zero flow, silently.  Contacts now
+  batch into runs sharing a peer; runs split at peer changes and emits
+  concatenate sibling pieces in contact order (`gather_multi` in all
+  three dialects).  The shared var-keyed cell table (`V_34` values at
+  `Node_1`/`Node_3`) is what makes the element-keyed gather work.
+- **Numeric-shape normalisation** (recorded for the pattern):
+  `np.ravel` at every vector-concat site (cell tables keep bound index
+  shape, e.g. `[[v]]`); `np.atleast_1d` on runtime pars (port-gather
+  fancy indexing can't read 0-d); `np.asarray(x).item()` wherever a
+  scalar is required — NumPy 2.x rejects `float()` on ndim≥1 arrays.
+
+### Open questions
+
+- **Index-broadcast semantics (DECISION NEEDED).**  `fmc` is declared
+  `A_conv[2]×N[1]` but its defining law `k·A·(F@p)` produces a
+  per-node value — `F@p` contracts the contact index away.  Should a
+  RHS whose index space is a subset of the LHS's broadcast implicitly
+  over the missing index (here: same flow on both arcs — the right
+  serial-transport physics)?  If yes, emits wrap assignments in
+  `broadcast_to` against the declared dims; if no, the expression
+  language needs an explicit index-expansion operator and `E_4` needs
+  rewriting.  This is the same "implicit index union" question that
+  the einsum dialects paper over with Hadamard-expand rules — worth
+  settling once, for all targets.  Blocks `derivative()`/`outputs()`
+  (and therefore simulation) — t=0 already works because `fmc` is a
+  solved unknown there.
+- **Value cells are keyed by VARIABLE + element, not occurrence.**
+  Correct by design (the element coordinate IS the per-occurrence
+  addressing), but the Values card lists one row per occurrence all
+  editing the same table — looks like three independent tables, and
+  `save cells` (replace semantics) from one row rewrites the shared
+  table for all.  Display should say "shared table" or merge the rows;
+  port-bound vars shouldn't be listed at all (they resolve across
+  arcs, never from cells — the `values > 0` sticky clause keeps them
+  visible once any cells exist).  Fill keys also accept arbitrary
+  strings → entries that match no coordinate are stored as dead keys
+  (the `Node_1`/`Node_3` fill entries landed exactly where they were
+  needed only by accident of the shared table).
+- **Gather `-1` sentinel.**  `pos.get(element, -1)` emits a valid
+  negative index when a contact's element isn't in its peer's field —
+  the silent-alias source of the zero-flow bug.  Missing contact
+  elements should surface as plan problems, not indices.

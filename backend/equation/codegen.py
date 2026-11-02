@@ -396,7 +396,8 @@ class Renderer:
                 if self._is_sparse(ch[0]):
                     body = "(%s).toarray()" % body
                 return ("scipy.integrate.quad_vec(lambda %s: %s, "
-                        "%s, %s)[0]"
+                        "np.asarray(%s).item(), "
+                        "np.asarray(%s).item())[0]"
                         % (var, body, lo, hi))
             if self.target == "matlab":
                 # 'ArrayValued': the fun receives a scalar per call

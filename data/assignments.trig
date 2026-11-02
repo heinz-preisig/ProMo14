@@ -111,17 +111,18 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_30> ;
-        promo:hasEquationSequence _:N26dfd9d0c6f4450a9e7f60bbcfc4aff1 ;
+        promo:hasEquationSequence _:Ne2856ca0bac34c9098c2b4908df9d83a ;
+        promo:hasInstantiatedVariable <https://w3id.org/promo/ontology#V_34> ;
         promo:hasPortVariable <https://w3id.org/promo/library#V_56> ;
         promo:hasStateVariable <https://w3id.org/promo/library#V_58> .
 
     _:N119fe7ac43454ebbbcd35fc8968f78ba rdf:first <https://w3id.org/promo/library#E_4> ;
         rdf:rest () .
 
-    _:N26dfd9d0c6f4450a9e7f60bbcfc4aff1 rdf:first <https://w3id.org/promo/library#E_29> ;
-        rdf:rest _:Nf5303fff92394364bac06d02c05fa38c .
+    _:Ne2856ca0bac34c9098c2b4908df9d83a rdf:first <https://w3id.org/promo/library#E_29> ;
+        rdf:rest _:Nf0a24f59a00146a09c0c120deb8bd5a4 .
 
-    _:Nf5303fff92394364bac06d02c05fa38c rdf:first <https://w3id.org/promo/library#E_30> ;
+    _:Nf0a24f59a00146a09c0c120deb8bd5a4 rdf:first <https://w3id.org/promo/library#E_30> ;
         rdf:rest () .
 }
 

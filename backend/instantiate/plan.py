@@ -341,32 +341,52 @@ def plan(report: Instantiation, sched: Schedule,
                 by_type.setdefault((et, p.var), []).append(p)
     for (et, var), pbs in sorted(by_type.items()):
         vb = bindings.get((et, var))
-        peer_type = node_type.get(pbs[0].peer_node or "")
-        peer_vb = bindings.get(
-            (peer_type or "", pbs[0].peer_var or ""))
-        if vb is None or peer_vb is None:
+        if vb is None:
             continue
-        peer_elements = _all_elements(peer_vb)
-        pos = {el: i for i, el in enumerate(peer_elements)}
+        # One gather piece per run of contacts sharing a peer — a
+        # port's contacts may resolve to DIFFERENT peers (upstream
+        # vs downstream efforts).  Sibling pieces sharing an instance
+        # concatenate at emit, in contact order.
         arc_elements = _bound_elements(vb, indices, _arc_like)
         if arc_elements:
-            # Arc-indexed port: one entry per bound arc that resolved.
+            # Arc-indexed port: contacts ordered by bound arc.
             by_arc = {b.arc: b for b in pbs if b.arc}
-            elements = [a for a in arc_elements if a in by_arc]
-            gmap = [pos.get(by_arc[a].element or "", -1)
-                    for a in elements]
+            contacts = [by_arc[a] for a in arc_elements if a in by_arc]
         else:
-            # Scalar port: the peer element itself is the element.
-            elements = [b.element or "" for b in pbs]
-            gmap = [pos.get(b.element or "", -1) for b in pbs]
-        out.gathers.append(Gather(
-            var=var, instance=vb.instance,
-            peer_instance=peer_vb.instance,
-            name=names[et][var],
-            peer_name=names.get(peer_type or "", {}).get(
-                pbs[0].peer_var or "", peer_vb.instance),
-            elements=elements, map=gmap,
-            scalar=not vb.indices, indices=vb.indices))
+            contacts = list(pbs)
+        run: list = []
+        run_peer: Optional[Tuple] = None
+
+        def _flush() -> None:
+            if not run:
+                return
+            peer_type, peer_vb = run_peer
+            pos = {el: i for i, el in
+                   enumerate(_all_elements(peer_vb))}
+            out.gathers.append(Gather(
+                var=var, instance=vb.instance,
+                peer_instance=peer_vb.instance,
+                name=names[et][var],
+                peer_name=names.get(peer_type or "", {}).get(
+                    run[0].peer_var or "", peer_vb.instance),
+                elements=[b.arc if arc_elements else (b.element or "")
+                          for b in run],
+                map=[pos.get(b.element or "", -1) for b in run],
+                scalar=not vb.indices, indices=vb.indices))
+            run.clear()
+
+        for b in contacts:
+            peer_type = node_type.get(b.peer_node or "")
+            peer_vb = bindings.get(
+                (peer_type or "", b.peer_var or ""))
+            if peer_vb is None:
+                continue
+            if (run_peer is not None
+                    and run_peer[1].instance != peer_vb.instance):
+                _flush()
+            run_peer = (peer_type, peer_vb)
+            run.append(b)
+        _flush()
 
     # -- outputs (§21 observation sinks) -------------------------------------
     for e in report.entity_types:

@@ -141,6 +141,16 @@ class _Python(Dialect):
             return "    %s = %s[%d]  # port gather" % (gn, pn, g.map[0])
         return "    %s = %s[%s]  # port gather" % (gn, pn, g.map)
 
+    def gather_multi(self, pieces, space: CompileSpace) -> str:
+        gn = pieces[0].name or inst_name(pieces[0].instance)
+        sel = ", ".join(
+            "np.ravel(%s[%s])" % (
+                s.peer_name or inst_name(s.peer_instance),
+                [i for i in s.map])
+            for s in pieces)
+        return "    %s = np.concatenate([%s])  # port gather" % (
+            gn, sel)
+
     def _den(self, expr: str) -> str:
         """``_d(expr)`` when sparse values can reach this file —
         identity otherwise (no helper emitted then)."""
@@ -180,7 +190,7 @@ class _Python(Dialect):
             out.append("        _r_%s = (%s) - %s"
                        % (nm, self._den(rhs), nm))
         out.append("        return np.concatenate([%s])"
-                   % ", ".join("np.atleast_1d(_r_%s)" % nm
+                   % ", ".join("np.ravel(_r_%s)" % nm
                                for nm in names))
         out.append("    _x%d = fsolve(_loop%d, np.zeros(%d))"
                    % (loop_id, loop_id, total))
@@ -255,7 +265,7 @@ class _Python(Dialect):
                 continue
             out.append(self.param(p, space))
         y0 = "np.concatenate([%s])" % ", ".join(
-            "np.atleast_1d(%s)" % (s.name or inst_name(s.instance))
+            "np.ravel(%s)" % (s.name or inst_name(s.instance))
             for s in cp.states)
         out.append("    def _t0(u):  # t=0 residual system")
         off = 0
@@ -265,11 +275,18 @@ class _Python(Dialect):
         out.append("        if steady_state:")
         out.append("            total_diff = lambda x, y: "
                    "np.zeros_like(x)  # der = 0")
+        seen_g: set = set()
         for g in cp.gathers:
-            out.append("    " + self.gather(g, space))
+            if g.instance in seen_g:
+                continue
+            seen_g.add(g.instance)
+            sibs = [s for s in cp.gathers if s.instance == g.instance]
+            out.append("    " + (self.gather(sibs[0], space)
+                                  if len(sibs) == 1
+                                  else self.gather_multi(sibs, space)))
         for b in spec.guesses:
             nm = b.lhs_name or inst_name(b.lhs_instance)
-            out.append("        x0 = np.atleast_1d(%s)  # root! guess"
+            out.append("        x0 = np.ravel(%s)  # root! guess"
                        % nm)
         for i, (b, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(b, space,
@@ -277,11 +294,11 @@ class _Python(Dialect):
             out.append("        _r%d = (%s) - %s"
                        % (i, self._den(rhs), term))
         out.append("        _rs = [%s]" % ", ".join(
-            "np.atleast_1d(_r%d)" % i
+            "np.ravel(_r%d)" % i
             for i in range(len(spec.residuals))))
         out.append("        if steady_state:")
         out.append("            _rs += [%s]  # der = 0" % ", ".join(
-            "np.atleast_1d(%s)" % n for n in spec.dx))
+            "np.ravel(%s)" % n for n in spec.dx))
         out.append("        else:")
         ne = 0
         for b, term in spec.initials:
@@ -296,7 +313,7 @@ class _Python(Dialect):
                        % (ne, self.pin_term(st, space), nm))
             ne += 1
         out.append("            _rs += [%s]" % ", ".join(
-            "np.atleast_1d(_e%d)" % i for i in range(ne)))
+            "np.ravel(_e%d)" % i for i in range(ne)))
         out.append("        return np.concatenate(_rs) "
                    "if _rs else np.zeros_like(u)")
         out.append("    _u = fsolve(_t0, np.zeros(%d))"

@@ -367,6 +367,11 @@ class Dialect:
         """One port gather (the peer indexed by the gather map)."""
         raise NotImplementedError
 
+    def gather_multi(self, pieces, space: CompileSpace) -> str:
+        """Sibling gather pieces (one per contact, possibly different
+        peers) concatenated in contact order."""
+        raise NotImplementedError
+
     def assign(self, b: PlanBlock, rhs: str) -> List[str]:
         """A non-state block: ``name = rhs``."""
         return ["%s%s = %s%s" % (self.indent,
@@ -523,7 +528,11 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
         for g in cp.gathers:
             if g.var in consumed and g.instance not in emitted_gathers:
                 emitted_gathers.add(g.instance)
-                body.append(d.gather(g, space))
+                sibs = [s for s in cp.gathers
+                        if s.instance == g.instance]
+                body.append(d.gather(sibs[0], space)
+                            if len(sibs) == 1
+                            else d.gather_multi(sibs, space))
         loops_here: Dict[int, List[PlanBlock]] = {}
         groups: Dict[str, List[PlanBlock]] = {}
         inlines: List[PlanBlock] = []
