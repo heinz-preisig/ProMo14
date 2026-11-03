@@ -315,6 +315,28 @@ class Dialect:
             if set(checked.indices) == set(want):
                 src = self.permute(
                     src, [checked.indices.index(i) for i in want])
+            elif (block.bound
+                    and set(checked.indices) < set(want)
+                    and all((block.bound.get(i) or None)
+                            == (block.lhs_indices or {}).get(i)
+                            for i in checked.indices)):
+                # §31 broadcast: the rhs index set is a strict subset
+                # of the lhs's and their shared extents match — the
+                # per-(subset) value spreads over the lhs's extra
+                # (contact) axes.  E.g. a transport's per-node drop
+                # repeats onto each of its boundary arcs.
+                shared_in_want = [i for i in want
+                                  if i in checked.indices]
+                if list(checked.indices) != shared_in_want:
+                    src = self.permute(
+                        src, [checked.indices.index(i)
+                              for i in shared_in_want])
+                mapped = [len(block.lhs_indices[i])
+                          if i in checked.indices else 1
+                          for i in want]
+                dims = [len(els or []) or 1
+                        for els in (block.lhs_indices or {}).values()]
+                src = self.broadcast(src, mapped, dims)
             else:
                 # Different index sets bind positionally (loop
                 # residuals rely on it) — only a flat-size gap is
@@ -348,6 +370,15 @@ class Dialect:
         variable's declared index order — ``perm`` gives each
         wanted axis's position inside the expression (0-based)."""
         raise VarError("index-order transpose is not supported for "
+                       + self.target)
+
+    def broadcast(self, src: str, mapped: List[int],
+                  dims: List[int]) -> str:
+        """§31 broadcast: ``mapped`` gives the shape to reshape the
+        rhs into — its own extents at their positions in the lhs's
+        axis order, ``1`` at the lhs-only (contact) positions;
+        ``dims`` is the lhs's full bound shape to broadcast onto."""
+        raise VarError("rhs-to-lhs broadcast is not supported for "
                        + self.target)
 
     # -- whole-function shape -----------------------------------------

@@ -97,11 +97,11 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:N5cc3a4a9ac6141ca9242440e2bb2baa1 ;
+        promo:hasEquationSequence _:n3efe0f39d3954e5284c0bda1b4724994b1 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_57>,
             <https://w3id.org/promo/ontology#F_conv> ;
         promo:hasOutputVariable <https://w3id.org/promo/library#V_56> ;
-        promo:hasPortVariable <https://w3id.org/promo/ontology#V_34> .
+        promo:hasPortVariable <https://w3id.org/promo/ontology#V_59> .
 
     <https://w3id.org/promo/library/assignments#assignment_etype_environment> a promo:BehaviourAssignment ;
         promo:closed true ;
@@ -113,18 +113,18 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:n27435fa92fe94b72a18e97f9cb5fb544b3 ;
+        promo:hasEquationSequence _:n3efe0f39d3954e5284c0bda1b4724994b3 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/ontology#V_34> ;
         promo:hasPortVariable <https://w3id.org/promo/library#V_56> ;
         promo:hasStateVariable <https://w3id.org/promo/library#V_57> .
 
-    _:N36bdaf5ac20a45b6aee3efee67b0a099 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:n3efe0f39d3954e5284c0bda1b4724994b1 rdf:first <https://w3id.org/promo/library#E_4> ;
+        rdf:rest _:n3efe0f39d3954e5284c0bda1b4724994b4 .
+
+    _:n3efe0f39d3954e5284c0bda1b4724994b3 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 
-    _:N5cc3a4a9ac6141ca9242440e2bb2baa1 rdf:first <https://w3id.org/promo/library#E_4> ;
-        rdf:rest _:N36bdaf5ac20a45b6aee3efee67b0a099 .
-
-    _:n27435fa92fe94b72a18e97f9cb5fb544b3 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:n3efe0f39d3954e5284c0bda1b4724994b4 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 }
 

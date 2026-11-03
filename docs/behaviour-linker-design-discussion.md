@@ -2842,3 +2842,182 @@ transport equation.
   negative index when a contact's element isn't in its peer's field —
   the silent-alias source of the zero-flow bug.  Missing contact
   elements should surface as plan problems, not indices.
+
+---
+
+## 30. Per-mechanism incidence matrices — `F_k`, not `F_token` (2026-11-03)
+
+Resolves the "open design decision" in
+`session-handoff-2026-11-03.md` (`F_mass` vs `F_conv` in test_01).
+
+### Decision
+
+**Equations reference the mechanism index `F_k`**
+(`F_conv`, `F_diff`, `F_heat`, …), never the token-group union
+`F_mass`/`F_energy`.  The union exists — the machinery derives it —
+but it has no equation-facing role: conservation is always written as
+a **sum of per-mechanism terms**
+(`dmdt = F_conv·fmc + F_diff·fmd`, §16's "token partition falls out").
+
+### Why this is right
+
+- **The F matrices *are* the mechanism distinction.**  `F_diff`
+  selects the diffusion arcs, `F_conv` the convective ones — the
+  user's words: "we need to distinguish between diffusional mass
+  transfer and convective mass transfer; that should be the meaning
+  of defining different F matrices."
+- **Mechanism lives on the entity type, nowhere else.**  An arc
+  lands in `A_conv` iff it touches a node whose type is-a
+  `convection_transport` (selector + `promo:parent` closure,
+  resolver).  The arc itself declares nothing beyond `token-flow`;
+  the system has **no driving-force knowledge** — nothing knows that
+  pressure-driven means convection or chemical-potential-driven
+  means diffusion.  The user declares it twice: by placing the
+  transport node's entity type, and by writing the constitutive law
+  on that type.  Fick's law on `convection_transport` passes every
+  check — mechanism semantics is a user-held convention, like §15
+  orientation (any assignment valid; existence is all that matters).
+- **`F_mass ≡ F_conv` is model-contingent.**  Verified on test_01:
+  both arcs touch the convection node → member of `A_conv` **and**
+  `A_mass` → identical matrices.  The day a diffusion transport is
+  added, `F_mass` picks up its arcs automatically while `F_conv`
+  stays unchanged — exactly why the balance must name `F_conv`, so
+  the equation survives model growth without edits.
+- **Edge case noted:** an arc directly between two transports of
+  different mechanisms touches both types → member of `A_conv`,
+  `A_diff` *and* `A_mass` (one column in each).  Consistent with the
+  rule — whether such arcs should exist at all is a
+  connection-rule matter (§28 rule-schema gap).
+
+### Consequences for test_01 (Option A)
+
+- `V_56`/`V_57` keep `[idx_arc_convection, idx_node]`.
+- `E_4` uses `F_conv` → its `[N, A_conv]` result becomes a clean
+  permute onto the lhs (the fragile positional bind via `F_mass`
+  disappears).
+- `E_29` → `F_conv . fmc` (elementwise — `*` sees two shared index
+  IRIs and is ambiguous), **and** `F_conv` enters `E_29`'s incidence
+  list so the lumped binds it.
+- Edits go through the equation editor, not the `.trig` files.
+
+---
+
+## 31. Boundaries, not arcs — the unified port semantics (2026-11-03)
+
+Resolves the `V_34` `port-coverage` problem on test_01 — and
+**retracts both** the "re-index `V_34`" and the earlier
+"`own ∪ contacted` extent" framings from this session.  This is the
+baseline concept, not a patch: it was the original plan.
+
+### The concept (user)
+
+- **Everything is a system (node).**  Capacities and transports are
+  the same kind of thing, differing only in temporal regime: a
+  capacity integrates (dynamic); a transport is *event-dynamic* — a
+  capacity whose relaxation is infinitely fast, or ignored →
+  stateless, no interior, no state variable, no balance equation.
+  `temporal_type` already carries the signal (§28); this is where
+  it becomes load-bearing.
+- **An "arc" is not a thing — it is the drawing of a boundary
+  coupling between two systems.**  The arc index enumerates
+  *boundaries/connections*, not arc objects.
+- **Coupling = shared variable, not a copied value plus an
+  equation.**  The boundary slot *is* the peer's variable — that is
+  what eliminates the cut equations.
+
+  - *Physical*: bidirectional contact — effort and flow **equal at
+    the contact** (the continuity conditions).
+  - *Information*: directed signal — the output **is** the
+    connected input; identity, not even equality.
+
+  Same principle in both domains, different continuity rule.
+
+### The bound-extent rule
+
+> A port-connected variable on an **event-dynamic** entity binds
+> its **contacted (boundary) elements** — the peers' elements at
+> each contact.  On a **capacity** it binds own elements as today.
+
+The transport's domain degenerates to its boundary — a transport is
+always distributed, and "distributed" means the quantity varies
+over the entity's domain; for a stateless transport the domain *is*
+the boundary.  Each boundary slot is filled by the port gather —
+the peer's nodal value at that contact.
+
+### What this resolves in test_01
+
+- `V_34` (`p_mech`, `[N]`, nodal) — declaration unchanged; on the
+  convection transport it binds `{N1, N3}` (the contacted env and
+  lumped elements) = 2 slots = 2 contacts → `port-coverage` gone.
+- **No `p_N2`** — the transport has no internal pressure unknown.
+  That "cut equation" never appears; the drop across the transport
+  *is* the difference between its two boundary values.
+- **The drop** is the signed sum over the transport's contacts:
+  `F[N2, :] = [+1, −1]` *is* the sign vector over its boundaries —
+  `e * F` contracting `A` yields `p_env − p_lumped`, broadcast to
+  `fmc[A_conv]`.  Existing operators; `E_4` gets a rewrite in the
+  contact space (not `F_conv * p` over a shared node field — that
+  form assumed `p` spanning the neighbourhood including `N2`).
+- The §29 "same flow on both arcs" broadcast question dissolves —
+  it was this same seam seen from the other side.
+
+### Simplification for codegen (user's point, confirmed)
+
+- No mixed-provenance splicing — every boundary slot is
+  peer-delivered; the emit stays a pure gather-concat.
+- No implied equations, no extra unknowns — the transport's law
+  *is* its conservation.
+- Bound extent is per-entity-type already (`instance@etype`); the
+  change is *which elements* the port binding enumerates, not a new
+  data model.
+
+### The one open seam
+
+A boundary slot is addressed by its **contact** — an arc element —
+while `V_34` declares `[N]`.  Either the machinery lets a
+node-declared port var bind contacted arc-addressed elements
+(bound extent keyed by contact), or the boundary view is an
+`[A]`-declared port var bound to the same peer `p_mech` via
+token-comparability (already supported).  Decide when implementing.
+
+### Machinery change
+
+- `builder.py` — bound extent of a port-connected var on an
+  event-dynamic entity = contacted peer elements (not own nodes);
+  needs entity-type ancestry (`parents` is already collected in
+  `_collect`, not passed to `build()`).
+- `plan.py` — `port-coverage` counts supplied vs bound as today;
+  with the corrected extent the counts match.
+- Emit — unchanged (pure gather-concat).
+
+### Implemented (2026-11-03) — verified on test_01
+
+- **Bound extent**: `_collect` now threads `temporalType` into
+  `build()`; port-connected vars on `event-dynamic` entities bind
+  contacted peer elements (`contacted_elements`, contact order =
+  incident-arc order).  `port-coverage` gone; emit is pure
+  gather-concat — `V_59 = concat(env_p, lumped_p)`.
+- **Seam resolved — option B**: the boundary view is a separate
+  arc-indexed variable, not a node-declared var rebound.  `*`
+  contracts by declared index IRI only (checker never sees bound
+  elements), so the driving-force operand must carry the arc
+  index: `V_59 p_conv [A_conv]` (effort axis, token_momentum —
+  token-comparable to `p_mech`).  On the transport it resolves
+  per-contact to `{N1, N3}` values; on capacities `p_mech` stays
+  `[N]`.
+- **`E_4`**: `(kConvX . Ayz) . (p_conv * F_conv)` — contracts
+  `A_conv` → `+p_N1 − p_N3` (the drop) per transport node.
+- **Broadcast emit** (`emit_common.render_rhs` + per-dialect
+  `broadcast`): when the rhs index set is a strict subset of the
+  lhs's and shared extents match, the rhs spreads over the lhs's
+  extra axes — `[N] → [A_conv,N]` gives the same flow on both
+  contacts.  Python: `broadcast_to(reshape)`.
+- **`E_29`**: `reduceSum(F_conv . fmc, A_conv)` — the balance is
+  the *net* rate per node, not per-contact.  The `V_57=0` cells on
+  the transport then read correctly as "net accumulation = 0"
+  (stateless) instead of forcing each contact flow to zero — which
+  was the actual `gtol` contradiction (`fmc=0` vs `fmc=kA·4`).
+- Result: `problems: []`, `POST /initial` `ok:true` at t=0.
+- Remaining: matlab/julia `broadcast` stubs raise — implement when
+  those dialects are exercised; `E_11` still references `p_mech`
+  (unused by test_01).

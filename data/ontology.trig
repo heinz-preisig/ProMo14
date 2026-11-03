@@ -395,6 +395,22 @@
         promo:tokenVector "{\"token_energy\": 1, \"token_momentum\": -1}" ;
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" .
 
+    <https://w3id.org/promo/ontology#V_59> a promo:Variable ;
+        rdfs:label "p_conv" ;
+        promo:aliases "{\"latex\": \"p_{\\mathrm{conv}}\", \"global_ID\": \"https://w3id.org/promo/ontology#V_59\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_effort> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_momentum> ;
+        promo:doc "Mechanical effort at a convection boundary — the contacted peer's pressure at each contact (§31 boundary view of p_mech on an event-dynamic entity).  Arc-indexed so it contracts with F_conv over the contact index." ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_convection> ;
+        promo:internalID "V_59" ;
+        promo:latex "p_{\\mathrm{conv}}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_momentum\": -1}" ;
+        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" .
+
     <https://w3id.org/promo/ontology#V_6> a promo:Variable ;
         rdfs:label "n" ;
         promo:aliases "{\"latex\": \"n\", \"global_ID\": \"https://w3id.org/promo/ontology#V_6\"}" ;
@@ -754,7 +770,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:n34d876e61c1448f78aadbbe8201100a4b1 ;
+        promo:hasArguments _:n87999a9ac03043f3b246db9b120c6b0fb1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
@@ -772,7 +788,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial V}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:n34d876e61c1448f78aadbbe8201100a4b2 ;
+        promo:hasArguments _:n87999a9ac03043f3b246db9b120c6b0fb2 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -790,7 +806,7 @@
         promo:rhsLatex "r_{x,N} \\circ r_{y,N}" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:n34d876e61c1448f78aadbbe8201100a4b3 ;
+        promo:hasArguments _:n87999a9ac03043f3b246db9b120c6b0fb3 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -808,7 +824,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:n34d876e61c1448f78aadbbe8201100a4b4 ;
+        promo:hasArguments _:n87999a9ac03043f3b246db9b120c6b0fb4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -826,7 +842,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:n34d876e61c1448f78aadbbe8201100a4b5 ;
+        promo:hasArguments _:n87999a9ac03043f3b246db9b120c6b0fb5 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#V_10> a promo:Variable ;
@@ -1451,28 +1467,28 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n34d876e61c1448f78aadbbe8201100a4b6 .
+    _:n87999a9ac03043f3b246db9b120c6b0fb1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n87999a9ac03043f3b246db9b120c6b0fb6 .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n34d876e61c1448f78aadbbe8201100a4b7 .
+    _:n87999a9ac03043f3b246db9b120c6b0fb2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n87999a9ac03043f3b246db9b120c6b0fb7 .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
-        rdf:rest _:n34d876e61c1448f78aadbbe8201100a4b8 .
+    _:n87999a9ac03043f3b246db9b120c6b0fb3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
+        rdf:rest _:n87999a9ac03043f3b246db9b120c6b0fb8 .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n87999a9ac03043f3b246db9b120c6b0fb4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n87999a9ac03043f3b246db9b120c6b0fb5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+    _:n87999a9ac03043f3b246db9b120c6b0fb6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b7 rdf:first <https://w3id.org/promo/ontology#V_23> ;
+    _:n87999a9ac03043f3b246db9b120c6b0fb7 rdf:first <https://w3id.org/promo/ontology#V_23> ;
         rdf:rest () .
 
-    _:n34d876e61c1448f78aadbbe8201100a4b8 rdf:first <https://w3id.org/promo/ontology#V_15> ;
+    _:n87999a9ac03043f3b246db9b120c6b0fb8 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest () .
 }
 

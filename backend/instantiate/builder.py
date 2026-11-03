@@ -290,6 +290,7 @@ def build(nodes: Dict[str, NodeInfo],
           species: Optional[SpeciesDistribution] = None,
           species_index: Optional[str] = None,
           reaction_index: Optional[str] = None,
+          temporal_types: Optional[Dict[str, str]] = None,
           ) -> Instantiation:
     """Assemble the instantiated equation set for a model.
 
@@ -297,6 +298,10 @@ def build(nodes: Dict[str, NodeInfo],
     ``assignments`` maps entity-type IRI → §13 assignment artefact;
     ``variables``/``equations`` come from the var/expr scope;
     ``token_parents``/``token_kinds`` describe the token taxonomy.
+    ``temporal_types`` maps entity-type IRI → ``temporalType``
+    literal — an ``event-dynamic`` entity is distributed over its
+    boundary, so its port-connected vars bind contacted elements
+    (§31).
     ``species``/``species_index`` are the §20 distribution output and
     the species index IRI — when present, a species index binds to the
     union of species over the variable's topological extent.
@@ -376,6 +381,22 @@ def build(nodes: Dict[str, NodeInfo],
             return list(t_nodes)
         return arc_elements(idx_iri, type_node_set)
 
+    def contacted_elements(t_nodes: List[str]) -> List[str]:
+        """§31 boundary extent: the peers' elements at the type's
+        contacts — one slot per contact, deduplicated in
+        incident-arc order.  An event-dynamic entity's domain
+        degenerates to its boundary, so its port-connected vars
+        bind these instead of its own nodes."""
+        out: List[str] = []
+        for n in t_nodes:
+            for a_iri in incident.get(n, []):
+                arc = arcs[a_iri]
+                for end in (arc.source, arc.target):
+                    if (end is not None and end != n
+                            and end not in out):
+                        out.append(end)
+        return out
+
     def species_elements(arc_idx: Optional[str], node_idx: Optional[str],
                          type_node_set: Set[str], t_nodes: List[str]
                          ) -> Optional[List[str]]:
@@ -429,6 +450,14 @@ def build(nodes: Dict[str, NodeInfo],
                 kind="assignment-open",
                 message=f"assignment for {_frag(et)} is not closed",
                 entity_type=et))
+
+        # §31: an event-dynamic entity's domain is its boundary —
+        # its port-connected vars bind the contacted peer elements
+        # (one slot per contact) rather than its own nodes.
+        boundary_extent: Optional[List[str]] = (
+            contacted_elements(t_nodes)
+            if (temporal_types or {}).get(et) == "event-dynamic"
+            else None)
 
         # ADR-008 layer 2 — promo:fix marks on this type's nodes.
         # Bindings are per-entity-type, so a mark only binds cleanly
@@ -570,6 +599,10 @@ def build(nodes: Dict[str, NodeInfo],
                         arc_idx, node_idx, t_set, t_nodes)
                 elif reaction_index is not None and i == reaction_index:
                     bound_indices[i] = reaction_elements(t_nodes)
+                elif (boundary_extent is not None
+                      and v_iri in asg.ports
+                      and _node_like(indices.get(i), indices)):
+                    bound_indices[i] = list(boundary_extent)
                 else:
                     bound_indices[i] = index_elements(i, t_set, t_nodes)
 

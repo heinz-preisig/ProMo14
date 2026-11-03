@@ -323,7 +323,9 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
     path; nested references nest the path naturally).  Boundary arcs
     (the composite's openArcs) keep the host's copy with the dangling
     endpoint re-pointed at the occurrence instance.  Returns
-    ``(nodes, arcs, sub_indices, parents, labels, occurrences)`` —
+    ``(nodes, arcs, sub_indices, parents, temporal_types, labels,
+    occurrences)`` — ``temporal_types`` maps entity-type IRI → its
+    ``temporalType`` literal (the §31 event-dynamic discriminator);
     occurrences carry ``refersTo``/``overrides``/``cycle`` for the
     per-occurrence context merge."""
     nodes: Dict[str, NodeInfo] = {}
@@ -357,6 +359,7 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
     # Ontology side: entity-type parent chain + arc sub-index selectors,
     # read across the artefact's resolution scope.
     parents: Dict[str, str] = {}
+    temporal_types: Dict[str, str] = {}
     sub_indices: Dict[str, SubIndexInfo] = {}
     scope = store.resolution_scope(model_graph.identifier)
     for graph_iri in scope:
@@ -365,6 +368,9 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
             parent = g.value(et, PROMO["parent"])
             if parent is not None:
                 parents.setdefault(str(et), str(parent))
+            tt = g.value(et, PROMO["temporalType"])
+            if tt is not None:
+                temporal_types.setdefault(str(et), str(tt))
         for idx in g.subjects(RDF.type, PROMO["Index"]):
             base = g.value(idx, PROMO["subIndexOf"])
             sel = g.value(idx, PROMO["selector"])
@@ -404,11 +410,13 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
         if ref_iri in seen:
             continue
         sub_graph = store.dataset.graph(URIRef(ref_iri))
-        (sub_nodes, sub_arcs, sub_idx, sub_par,
+        (sub_nodes, sub_arcs, sub_idx, sub_par, sub_temp,
          sub_lbl, sub_occ) = _collect(store, sub_graph, tuple(seen))
         sub_indices.update(sub_idx)
         for k, v in sub_par.items():
             parents.setdefault(k, v)
+        for k, v in sub_temp.items():
+            temporal_types.setdefault(k, v)
 
         # boundary arcs: the host's copy keeps its IRI; the end that
         # names a submodel node re-points at the occurrence instance
@@ -454,7 +462,8 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
             inner_occ["path"] = prefix + inner_occ["path"]
             occurrences.append(inner_occ)
 
-    return nodes, arcs, sub_indices, parents, labels, occurrences
+    return (nodes, arcs, sub_indices, parents, temporal_types,
+            labels, occurrences)
 
 
 def _entity_capabilities(store, model_graph) -> Dict[str, Set[str]]:
@@ -598,7 +607,7 @@ def arc_indices(
     """Sub-index membership for every arc in the model artefact."""
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
-    nodes, arcs, sub_indices, parents, labels, _occ = _collect(
+    nodes, arcs, sub_indices, parents, _tt, labels, _occ = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     return ArcIndexReport(
@@ -626,7 +635,7 @@ def incidence(
     """
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
-    nodes, arcs, sub_indices, parents, labels, _occ = _collect(
+    nodes, arcs, sub_indices, parents, _tt, labels, _occ = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     report = build(nodes, arcs, memberships, sub_indices)
@@ -1000,7 +1009,7 @@ def model_instantiation(
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
     library, assignment_graph = _model_dependencies(model_graph, vars)
-    nodes, arcs, sub_indices, parents, labels, occurrences = _collect(
+    nodes, arcs, sub_indices, parents, temporal_types, labels, occurrences = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
@@ -1057,7 +1066,8 @@ def model_instantiation(
         assignments, variables, equations,
         token_parents, token_kinds,
         species=dist, species_index=species_index,
-        reaction_index=reaction_index)
+        reaction_index=reaction_index,
+        temporal_types=temporal_types)
     # §20 gesture admissibility — persisted model may predate the save
     # gate or have been written by another client; report violations
     # instead of silently instantiating them.
@@ -1150,7 +1160,7 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     store = get_store()
     model_graph = resolve_graph(store, graph_iri)
     library, assignment_graph = _model_dependencies(model_graph, vars)
-    nodes, arcs, sub_indices, parents, labels, occurrences = _collect(
+    nodes, arcs, sub_indices, parents, temporal_types, labels, occurrences = _collect(
         store, model_graph)
     memberships = resolve(nodes, arcs, sub_indices, parents)
     inc = build(nodes, arcs, memberships, sub_indices)
@@ -1183,7 +1193,8 @@ def _plan_for(graph_iri: str, vars: Optional[str],
         assignments, variables, equations,
         token_parents, token_kinds,
         species=dist, species_index=species_index,
-        reaction_index=reaction_index)
+        reaction_index=reaction_index,
+        temporal_types=temporal_types)
     for msg in graph_violations(store, model_graph):
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))

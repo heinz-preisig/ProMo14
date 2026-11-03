@@ -326,7 +326,31 @@ re-tokens the arc without touching topology. Consequences:
 
 Entities meet through ports. A port on entity X resolves against a peer
 entity that *defines* a comparable variable — the boundary is where
-another artefact supplies the value. Rules (R3 + 2026-10-16 extension):
+another artefact supplies the value.
+
+**Everything is a system; an arc is a boundary coupling, not a thing.**
+Capacities and transports are the same kind of entity distinguished
+only by temporal regime: a capacity integrates (dynamic); a transport
+is *event-dynamic* — a capacity whose relaxation is infinitely fast, or
+ignored, hence stateless: no interior, no state variable, no balance
+equation. The arc index enumerates boundaries/connections, not arc
+objects, and a boundary slot *is* the peer's variable — coupling is
+sharing, not copying plus a glue equation (the "cut equations" never
+exist):
+
+- *Physical* boundary: effort and flow equal at the contact.
+- *Information* boundary: the output *is* the connected input —
+  identity, not even equality.
+
+**Bound extent follows the boundary.** A port-connected variable on an
+event-dynamic entity binds its *contacted* elements — the peers'
+elements at each contact (one slot per boundary); on a capacity it
+binds own elements. The transport's domain degenerates to its
+boundary, so its port variables hold the boundary values only — the
+driving drop across a transport is the signed sum over its contacts,
+its own `F` row being the sign vector.
+
+Resolution rules (R3 + 2026-10-16 extension):
 
 - Candidates = peer's defined/comparable variables, preferring explicitly
   flagged state.

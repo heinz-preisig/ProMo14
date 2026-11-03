@@ -138,6 +138,15 @@ class _Python(Dialect):
         return "(%s).transpose((%s))" % (
             src, ", ".join(str(p) for p in perm))
 
+    def broadcast(self, src: str, mapped: List[int],
+                  dims: List[int]) -> str:
+        if not dims:
+            return src
+        return "np.broadcast_to(np.asarray(%s).reshape((%s)), (%s))" % (
+            src,
+            ", ".join(str(d) for d in mapped),
+            ", ".join(str(d) for d in dims))
+
     @staticmethod
     def _shape(indices) -> str:
         """``.reshape((d1, d2))`` for a flat materialization — dims in
