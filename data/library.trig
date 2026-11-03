@@ -180,14 +180,14 @@
         promo:doc "" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:incidenceList "[\"https://w3id.org/promo/ontology#F_conv\", \"https://w3id.org/promo/ontology#V_34\"]" ;
+        promo:incidenceList "[\"https://w3id.org/promo/ontology#F_conv\", \"https://w3id.org/promo/ontology#V_59\"]" ;
         promo:internalID "E_11" ;
         promo:lhs <https://w3id.org/promo/library#V_26> ;
-        promo:modified "2026-09-25T13:03:39.862Z" ;
+        promo:modified "2026-11-03T21:45:00.000Z" ;
         promo:network "macroscopic" ;
-        promo:rhs "sign( ( physical!F_conv . physical!p_mech ) )" ;
+        promo:rhs "sign( ( physical!F_conv . physical!p_conv ) )" ;
         promo:rhsExpression <https://w3id.org/promo/library#E_11/expression> ;
-        promo:rhsLatex "\\mathrm{sign}\\left( \\left( {F}_{A\\_conv,N} \\circ p_{\\mathrm{m},N} \\right) \\right)" .
+        promo:rhsLatex "\\mathrm{sign}\\left( \\left( {F}_{A\\_conv,N} \\circ p_{\\mathrm{conv},A\\_conv} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_11/expression> a promo:Expression ;
         promo:hasArguments _:nd27473a63b6f4c15b2bad6d2d91e051eb2 ;
@@ -1556,7 +1556,7 @@
     _:nd27473a63b6f4c15b2bad6d2d91e051eb65 rdf:first <https://w3id.org/promo/ontology#V_9> ;
         rdf:rest () .
 
-    _:nd27473a63b6f4c15b2bad6d2d91e051eb66 rdf:first <https://w3id.org/promo/ontology#V_34> ;
+    _:nd27473a63b6f4c15b2bad6d2d91e051eb66 rdf:first <https://w3id.org/promo/ontology#V_59> ;
         rdf:rest () .
 
     _:nd27473a63b6f4c15b2bad6d2d91e051eb67 a promo:Expression ;
