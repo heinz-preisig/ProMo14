@@ -136,6 +136,10 @@ class PlanBlock:
     inputs: List[str] = field(default_factory=list)     # var IRIs
     rhs: str = ""
     loop: int = -1
+    #: The entity type's bound element extent per index IRI — lets
+    #: the emitter size-check a rhs whose index set differs from the
+    #: lhs's (positional binding is legal; a size gap is not).
+    bound: Dict[str, List[str]] = field(default_factory=dict)
     #: The lhs needs an initial guess (a ``SolveRoot`` body in the
     #: canonical RHS) — emitters seed the nested solve with it.
     guess: bool = False
@@ -160,6 +164,7 @@ class CodePlan:
     #: t=0 layer: the ``initialise``-class equation blocks (one
     #: residual each inside the emitted ``initial`` solve).
     initials: List[PlanBlock] = field(default_factory=list)
+    constraints: List[PlanBlock] = field(default_factory=list)
     #: entity_type → var IRI → emitted identifier (the renderer's
     #: name override — per-type instance names, not bare ids).
     names: Dict[str, Dict[str, str]] = field(default_factory=dict)
@@ -270,6 +275,8 @@ def plan(report: Instantiation, sched: Schedule,
             size *= max(1, len(els or []))
         ic_values = _value_table(vb, values or {}, report.problems,
                                  subsets)
+        ic_values = _filled_table(vb, ic_values, report.problems,
+                                  "IC")
         init_lhs = {q.lhs for q in e.initial_equations}
         ic_source = ("cells" if ic_values is not None
                      else "initialise" if vb.var in init_lhs
@@ -319,15 +326,17 @@ def plan(report: Instantiation, sched: Schedule,
                     kind="constant" if v.binding == "fixed" else v.binding,
                     value=v.value,
                     indices=v.indices,
-                    values=_value_table(v, values or {}, report.problems,
-                                        subsets),
+                    values=_filled_table(
+                        v, _value_table(v, values or {}, report.problems,
+                                        subsets), report.problems),
                     name=names[e.entity_type][v.var]))
             elif v.binding in ("input", "fixed"):
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
                     indices=v.indices,
-                    values=_value_table(v, values or {}, report.problems,
-                                        subsets),
+                    values=_filled_table(
+                        v, _value_table(v, values or {}, report.problems,
+                                        subsets), report.problems),
                     name=names[e.entity_type][v.var]))
 
     # -- gathers (bound ports → peer element positions) ----------------------
@@ -388,6 +397,34 @@ def plan(report: Instantiation, sched: Schedule,
             run.append(b)
         _flush()
 
+    # Coverage: a bound port var should gather exactly one value per
+    # bound element — contacts fill slots positionally, so several
+    # contacts on the same slot is an ambiguous (over-bound) binding.
+    supplied: Dict[str, int] = {}
+    sizes: Dict[str, int] = {}
+    gname: Dict[str, str] = {}
+    gvar: Dict[str, str] = {}
+    for g in out.gathers:
+        supplied[g.instance] = (supplied.get(g.instance, 0)
+                                + len(g.elements))
+        gname[g.instance] = g.name or g.instance
+        gvar[g.instance] = g.var
+        n = 1
+        for els in (g.indices or {}).values():
+            n *= max(1, len(els or []))
+        sizes[g.instance] = n
+    for inst, count in supplied.items():
+        if count != sizes[inst]:
+            over = count > sizes[inst]
+            report.problems.append(Problem(
+                kind="port-coverage",
+                var=gvar[inst],
+                message=("%s gathers %d peer element(s) into %d "
+                         "bound slot(s) — %s"
+                         % (gname[inst], count, sizes[inst],
+                            "contacts over-cover the slots"
+                            if over else "slots left unbound"))))
+
     # -- outputs (§21 observation sinks) -------------------------------------
     for e in report.entity_types:
         for v_iri in e.outputs:
@@ -400,6 +437,17 @@ def plan(report: Instantiation, sched: Schedule,
                 name=names[e.entity_type][v_iri]))
 
     # -- blocks in schedule order ---------------------------------------------
+    # Every entity type's bound element extent per index IRI —
+    # ``render_rhs`` uses it to tell a sanctioned positional
+    # residual (same flat size, different index set) from a rhs the
+    #: lhs genuinely can't hold.
+    et_bound: Dict[str, Dict[str, List[str]]] = {}
+    for (et, _v), vb in bindings.items():
+        m = et_bound.setdefault(et, {})
+        for iri, els in (vb.indices or {}).items():
+            m.setdefault(iri, els or [])
+    prescribed = {(e.entity_type, q.equation) for e in report.entity_types
+                  for q in e.equations if q.constraint}
     for lvl in sched.levels:
         out_lvl: List[PlanBlock] = []
         for b in lvl:
@@ -419,12 +467,16 @@ def plan(report: Instantiation, sched: Schedule,
                 inputs=list(eq.inputs) if eq else [],
                 rhs=eq.rhs if eq else "",
                 loop=b.loop,
+                bound=et_bound.get(b.entity_type, {}),
                 guess=needs_guess,
                 occurrence=_occ_of_elements(
                     [el for els in vb.indices.values() for el in els]
                     if vb else [],
                     out.occurrences)))
-        out.levels.append(out_lvl)
+        out.constraints.extend(b for b in out_lvl
+                               if (b.entity_type, b.equation) in prescribed)
+        out.levels.append([b for b in out_lvl
+                           if (b.entity_type, b.equation) not in prescribed])
     out.loops = sched.loops
 
     # -- t0 layer: initialise-class equation blocks -------------------------
@@ -442,11 +494,32 @@ def plan(report: Instantiation, sched: Schedule,
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else list(q.inputs),
                 rhs=eq.rhs if eq else "",
+                bound=et_bound.get(e.entity_type, {}),
                 occurrence=_occ_of_elements(
                     [el for els in vb.indices.values() for el in els]
                     if vb else [],
                     out.occurrences)))
     return out
+
+
+def _filled_table(v: VarBinding, table: Optional[List[Any]],
+                  problems: Optional[List[Problem]],
+                  what: str = "value") -> Optional[List[Any]]:
+    """Reject a partially filled table: ``None`` cells can't be a
+    numeric literal — an ``unfilled-cells`` problem is recorded and
+    the caller falls back to the ``par`` lookup instead of emitting
+    a ``None`` that crashes the emitted solver."""
+    if table is None:
+        return None
+    if any(cell is None for cell in table):
+        if problems is not None:
+            problems.append(Problem(
+                kind="unfilled-cells", var=v.var,
+                message=("%s cells for %s are not all filled — "
+                         "falling back to a par lookup"
+                         % (what, v.instance))))
+        return None
+    return table
 
 
 def _value_table(v: VarBinding,
@@ -595,6 +668,7 @@ def sub_plan_slice(cp: CodePlan, path: str) -> CodePlan:
                    for lvl in cp.levels) if lvl]
     sub.initials = [b for b in cp.initials if b.occurrence == path]
     sub.loops = [scc for scc in cp.loops if set(scc) <= members]
+    sub.constraints = [b for b in cp.constraints if b.occurrence == path]
     sub.names = {et: dict(m) for et, m in cp.names.items()}
     return sub
 
@@ -626,6 +700,7 @@ def code_plan_from_dict(d: Dict[str, Any]) -> CodePlan:
     cp.loops = [[tuple(pair) for pair in scc]
                 for scc in d.get("loops", [])]
     cp.initials = [_mk(PlanBlock, b) for b in d.get("initials", [])]
+    cp.constraints = [_mk(PlanBlock, b) for b in d.get("constraints", [])]
     cp.names = {et: dict(m) for et, m in d.get("names", {}).items()}
     cp.occurrences = list(d.get("occurrences", []))
     return cp

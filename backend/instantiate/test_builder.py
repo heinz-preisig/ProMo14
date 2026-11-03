@@ -7,12 +7,15 @@ the assembled report.
 """
 
 import json
+import shutil
+import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from rdflib import RDF, RDFS, Literal, URIRef
+from scipy.integrate import solve_ivp
 
 from backend.core import graph_store
 from backend.core.graph_store import PROMO
@@ -44,6 +47,7 @@ from backend.equation.canonical import (
 )
 from backend.equation.canonical_rdf import attach_rhs_expression
 from backend.equation.compile_space import CompileSpace, Index, Variable
+from backend.equation.errors import VarError
 from backend.equation.units import Units
 from backend.instantiate.service import _ic_needs
 from backend.instantiate.emit_common import emit_data
@@ -55,6 +59,7 @@ from backend.instantiate.plan import (
     CodePlan,
     ParamSlot,
     PlanBlock,
+    StateSlot,
     code_plan_from_dict,
     plan,
     sub_plan_slice,
@@ -735,13 +740,20 @@ def test_plan_blocks_carry_rhs_and_indices():
 
 def test_plan_param_values():
     """§20 ν → plan: a parameter's stored cells expand over its bound
-    element sets in index order (missing cells → None); no table →
-    the slot keeps the par-lookup fallback."""
+    element sets in index order.  A table with unfilled cells can't
+    be a numeric literal — the slot falls back to the par lookup and
+    an ``unfilled-cells`` problem is reported; no table → par too."""
     rep = _build_indexed_k()
     cp = _plan(rep, values={_var("k"): {"a1": 1.5}})
     k = next(p for p in cp.params if p.var == _var("k"))
     assert k.indices[_idx("idx_arc_diffusion")] == ["a1", "a2"]
-    assert k.values == [1.5, None]              # a2 missing
+    assert k.values is None                     # a2 missing → par
+    assert any(p.kind == "unfilled-cells" and p.var == _var("k")
+               for p in rep.problems)
+
+    cp = _plan(rep, values={_var("k"): {"a1": 1.5, "a2": 2.5}})
+    k = next(p for p in cp.params if p.var == _var("k"))
+    assert k.values == [1.5, 2.5]
 
     cp = _plan(rep)
     assert next(p for p in cp.params
@@ -792,7 +804,7 @@ def test_emit_python():
     # level 2: J gather (identity over A_diff); dm = F·J
     assert ("V_3_lumped_capacity = V_3_diffusion_transport[[0, 1]]"
             in src)
-    assert ("dy[0:2] = _d(V_4 @ V_3_lumped_capacity)" in src)
+    assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
     assert "return dy" in src
 
 
@@ -822,9 +834,9 @@ def test_emit_matlab():
     unwraps via a d<lhs> temp."""
     src = emit_matlab(_plan(_build()), _emit_space())
     assert ("V_4 = MultiDimVar({'N', 'A_diff'}, [2 2], "
-            "{'N', 'A_diff'}, _mx(\"V_4\"));"
+            "{'N', 'A_diff'}, promo_mx(\"V_4\"));"
             in src)
-    assert "function dy = derivative(t, y, par)" in src
+    assert "function [dy, outs] = promo_derivative(t, y, par)" in src
     assert "V_1 = MultiDimVar({'N'}, 2, {'N'}, y(1:2));" in src
     assert "V_5 = MultiDimVar({}, 1, {}, par.V_5);" in src
     assert "V_2 = V_1;" in src
@@ -840,11 +852,12 @@ def test_emit_matlab():
 
 
 def test_emit_values_indexed():
-    """ν → emitters: an arc-indexed parameter with a partial table
-    lands in ``model_data.json`` (missing cell → NaN) and emits as a
-    ``_tab`` reference instead of the par lookup — python, julia,
-    matlab."""
-    cp = _plan(_build_indexed_k(), values={_var("k"): {"a1": 1.5}})
+    """ν → emitters: a fully filled arc-indexed parameter table
+    lands in ``model_data.json`` and emits as a ``_tab`` reference
+    instead of the par lookup — python, julia, matlab.  A partial
+    table falls back to ``par``."""
+    cp = _plan(_build_indexed_k(),
+               values={_var("k"): {"a1": 1.5, "a2": 2.5}})
 
     src = emit_python(cp, _emit_space())
     assert 'V_5 = _tab("V_5")  # value cells' in src
@@ -856,8 +869,12 @@ def test_emit_values_indexed():
 
     src = emit_matlab(cp, _emit_space())
     assert ("V_5 = MultiDimVar({'A_diff'}, 2, {'A_diff'}, "
-            '_tab("V_5"));  % value cells' in src)
+            'promo_tab("V_5"));  % value cells' in src)
     assert "par.V_5" not in src
+
+    cp = _plan(_build_indexed_k(), values={_var("k"): {"a1": 1.5}})
+    assert 'par["V_5"]' in emit_python(cp, _emit_space())
+    assert '_tab("V_5")' not in emit_python(cp, _emit_space())
 
 
 def test_value_fills_resolve():
@@ -874,7 +891,7 @@ def test_value_fills_resolve():
 
     slot = _plan(_build_indexed_k(),
                  values={k: {"a1": 2.0}}).params[0]
-    assert slot.values == [2.0, None]          # no fill → unfilled
+    assert slot.values is None                 # unfilled → par lookup
 
 
 def test_value_fills_conflict():
@@ -933,7 +950,7 @@ def test_emit_values_2d():
 
     assert 'V_9 = _tab("V_9")' in emit_python(cp, _emit_space())
     assert 'V_9 = _tab("V_9")' in emit_julia(cp, _emit_space())
-    assert '_tab("V_9")' in emit_matlab(cp, _emit_space())
+    assert 'promo_tab("V_9")' in emit_matlab(cp, _emit_space())
 
 
 def test_value_cell_layout_convention(tmp_path, monkeypatch):
@@ -996,16 +1013,64 @@ def test_emit_python_algebraic_loop():
     )
     src = emit_python(cp, _emit_space())
     assert "from scipy.optimize import fsolve" in src
-    assert "def _loop0(x):  # algebraic loop 0" in src
     # cone-blocked: V_2 is the torn unknown; V_3 sweeps inside the
     # residual — the solve is 2-dim, not 4
     assert "V_2 = x[0:2]" in src
     assert "        V_3 = V_2\n        _r_V_2 = (V_3) - V_2" in src
-    assert "_r_V_3" not in src
     assert "_x0 = fsolve(_loop0, np.zeros(2))" in src
     assert "V_2 = _x0[0:2]" in src
     # eliminated var re-binds at the solved tear values
     assert "    V_3 = V_2\n    return dy" in src
+
+
+def test_emit_python_lhs_index_conformity():
+    """A rhs is rendered in the lhs variable's *declared* index
+    order: a permutation of the same index set transposes at the
+    assign point; a different index set binds positionally — legal
+    while the flat sizes match, a ``VarError`` once they don't."""
+    n2 = {_idx("idx_node"): ["c1", "c2"]}
+    na = {_idx("idx_node"): ["c1", "c2"],
+          _idx("idx_arc_diffusion"): ["a1", "a2"]}
+    perm = CodePlan(
+        names={"et": {}},
+        levels=[[PlanBlock(
+            entity_type="et", equation="e_x", lhs=_var("F"),
+            lhs_instance="V_4@et", lhs_name="V_4", lhs_indices=na,
+            bound=dict(na), rhs="V_3 . V_2")]],
+    )
+    src = emit_python(perm, _emit_space())
+    assert "V_4 = (V_3[:, None] * V_2).transpose((1, 0))" in src
+
+    # same size, different index set → positional pass-through
+    pos = CodePlan(
+        names={"et": {}},
+        levels=[[PlanBlock(
+            entity_type="et", equation="e_z", lhs=_var("p"),
+            lhs_instance="V_2@et", lhs_name="V_2", lhs_indices=n2,
+            bound=dict(na), rhs="V_3")]],
+    )
+    assert "V_2 = V_3" in emit_python(pos, _emit_space())
+
+    # size gap → unemittable, regardless of which index set the rhs
+    # computed; without a bound map the extents are unknown and the
+    # legacy positional behaviour is kept.
+    bad = CodePlan(
+        names={"et": {}},
+        levels=[[PlanBlock(
+            entity_type="et", equation="e_y", lhs=_var("p"),
+            lhs_instance="V_2@et", lhs_name="V_2", lhs_indices=n2,
+            bound=dict(na), rhs="V_4")]],
+    )
+    with pytest.raises(VarError, match="index mismatch in e_y"):
+        emit_python(bad, _emit_space())
+    legacy = CodePlan(
+        names={"et": {}},
+        levels=[[PlanBlock(
+            entity_type="et", equation="e_y", lhs=_var("p"),
+            lhs_instance="V_2@et", lhs_name="V_2", lhs_indices=n2,
+            rhs="V_4")]],
+    )
+    assert "V_2 = V_4" in emit_python(legacy, _emit_space())
 
 
 def _loop_plan() -> CodePlan:
@@ -1185,10 +1250,10 @@ def test_emit_matlab_occurrence_fn():
     """Same extraction in Matlab — returns named in the signature;
     local functions live after the main function's ``end``."""
     src = emit_matlab(_occ_plan(), _emit_space())
-    assert "function [V_2, V_3] = _occ_2_L0(V_1)" in src
+    assert "function [V_2, V_3] = promo_occ_2_L0(V_1)" in src
     main_end = src.index("  dy = zeros")
-    assert src.index("function [V_2, V_3] = _occ_2_L0") > main_end
-    assert "  [V_2, V_3] = _occ_2_L0(V_1);" in src
+    assert src.index("function [V_2, V_3] = promo_occ_2_L0") > main_end
+    assert "  [V_2, V_3] = promo_occ_2_L0(V_1);" in src
 
 
 def test_tear_loop_boundary_first():
@@ -1234,15 +1299,15 @@ def test_emit_matlab_algebraic_loop():
     """The Matlab loop: nested function, MultiDimVar-wrapped torn
     guess, interior sweep, .value residual, fsolve."""
     src = emit_matlab(_loop_plan(), _emit_space())
-    assert "function r = _loop0(x)  % algebraic loop 0" in src
+    assert "function r = promo_loop0(x)  % algebraic loop 0" in src
     assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, x(1:2));" in src)
     assert "x(3:4)" not in src
     assert "    V_3 = V_2;" in src
-    assert "_r0 = (V_3) - V_2;" in src
+    assert "promo_r0 = (V_3) - V_2;" in src
     assert "_r1" not in src
-    assert "r = [_r0.value];" in src
-    assert "_x0 = fsolve(@_loop0, zeros(2, 1));" in src
-    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, _x0(1:2));" in src)
+    assert "r = [promo_r0.value];" in src
+    assert "promo_x0 = fsolve(@promo_loop0, zeros(2, 1));" in src
+    assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, promo_x0(1:2));" in src)
 
 
 # ---------------------------------------------------------------------------
@@ -1319,12 +1384,9 @@ def test_emit_python_initial():
     assert 'V_5 = par["V_5"]' in src
     assert "def _t0(u):  # t=0 residual system" in src
     assert "V_1 = u[0:2]" in src                  # state — always unknown
-    assert "V_2 = u[2:4]" in src                  # algebraic unknown
-    assert "V_3_diffusion_transport = u[4:6]" in src
-    assert "dV_1 = u[6:8]" in src                 # der(m) slot
-    assert "V_6 = V_2[[0, 1]]  # port gather" in src
+    assert "V_2 = u[2:4]" in src
+    assert "dV_1 = u[6:8]" in src
     assert "_r0 = (_d(V_1)) - V_2" in src         # prop at t0
-    assert "_r1 = (_d(V_5 * V_6)) - V_3_diffusion_transport" in src
     assert ("_r2 = (_d(V_4 @ V_3_lumped_capacity)) - dV_1" in src)
     assert "total_diff = lambda x, y: np.zeros_like(x)" in src
     assert "_rs += [np.ravel(dV_1)]  # der = 0" in src
@@ -1437,13 +1499,13 @@ def test_emit_matlab_initial():
     assert ("V_1 = MultiDimVar({'N'}, 2, {'N'}, u(1:2));" in src)
     assert ("V_2 = MultiDimVar({'N'}, 2, {'N'}, u(3:4));" in src)
     assert ("dV_1 = MultiDimVar({'N'}, 2, {'N'}, u(7:8));" in src)
-    assert "_r0 = (V_1) - V_2;" in src
-    assert "r = [_r0.value; _r1.value; _r2.value];" in src
+    assert "promo_r0 = (V_1) - V_2;" in src
+    assert "r = [promo_r0.value; promo_r1.value; promo_r2.value];" in src
     assert "totalDiff = @(x, y) x .* 0;" in src
     assert "r = [r; dV_1.value];  % der = 0" in src
-    assert ("_e0 = (MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1)) - V_1;"
+    assert ("promo_e0 = (MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1)) - V_1;"
             "  % IC pin" in src)
-    assert "_u = fsolve(@_t0, zeros(8, 1));" in src
+    assert "promo_u = fsolve(@promo_t0, zeros(8, 1));" in src
     assert "y0 = [V_1.value(:)];" in src
 
 
@@ -1470,7 +1532,7 @@ def test_emit_python_instantiated_pressure():
     assert "V_2 = V_1" not in src         # no prop block
     assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
-    assert ("dy[0:2] = _d(V_4 @ V_3_lumped_capacity)" in src)
+    assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
 
 
 # ---------------------------------------------------------------------------
@@ -1757,7 +1819,7 @@ def test_code_endpoint(client):
     assert 'V_5 = par["V_5"]' in src
     assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
-    assert ("dy[0:2] = _d(V_4 @ V_3_lumped_capacity)" in src)
+    assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
     # §21 outputs — p (lumped, V_2) and j (transport export,
     # V_3_diffusion_transport) ride the out channel; the wrapper
     # returns the recorded dict.
@@ -2375,3 +2437,75 @@ def test_code_plan_round_trip():
     raw = json.loads(json.dumps(asdict(cp)))
     rt = code_plan_from_dict(raw)
     assert rt == cp
+
+
+def test_prescribed_balance_python_execution():
+    cp = CodePlan(
+        params=[ParamSlot(var=_var("m"), instance="V_1@et", name="V_1", kind="parameter"),
+                ParamSlot(var=_var("J"), instance="V_3@et", name="V_3", kind="parameter")],
+        levels=[[PlanBlock(entity_type="et", equation="law", lhs=_var("p"),
+                           lhs_instance="V_2@et", lhs_name="V_2", rhs="V_1")]],
+        constraints=[PlanBlock(entity_type="et", equation="balance", lhs=_var("J"),
+                               lhs_instance="V_3@et", lhs_name="V_3", rhs="V_2")])
+    module = {}
+    exec(emit_python(cp, _emit_space()), module)
+    assert module["derivative"](0, [], {"V_1": [4.0], "V_3": [4.0]}).size == 0
+    with pytest.raises(ValueError, match="balance solve failed"):
+        module["derivative"](0, [], {"V_1": [4.0], "V_3": [0.0]})
+    restored = code_plan_from_dict(asdict(cp))
+    assert restored.constraints == cp.constraints
+
+
+def test_prescribed_balance_octave_execution(tmp_path):
+    if not shutil.which("octave"):
+        pytest.skip("Octave is not installed")
+    cp = CodePlan(
+        params=[ParamSlot(var=_var("m"), instance="V_1@et", name="V_1", kind="parameter"),
+                ParamSlot(var=_var("J"), instance="V_3@et", name="V_3", kind="parameter")],
+        levels=[[PlanBlock(entity_type="et", equation="law", lhs=_var("p"),
+                           lhs_instance="V_2@et", lhs_name="V_2", rhs="V_1")]],
+        constraints=[PlanBlock(entity_type="et", equation="balance", lhs=_var("J"),
+                               lhs_instance="V_3@et", lhs_name="V_3", rhs="V_2")])
+    (tmp_path / "derivative.m").write_text(emit_matlab(cp, _emit_space()))
+    runtime = Path(__file__).resolve().parents[2] / "runtime" / "matlab"
+    expression = (f"addpath('{runtime}'); model=derivative(); "
+                  "par=struct('V_1',4,'V_3',4); result=model.derivative(0,[],par); "
+                  "assert(isempty(result)); par.V_3=0; failed=false; "
+                  "try model.derivative(0,[],par); catch failed=true; end; assert(failed);")
+    result = subprocess.run(["octave", "--no-gui", "--quiet", "--eval", expression],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_prescribed_balance_initial_and_simulation(tmp_path):
+    cp = CodePlan(
+        states=[StateSlot(var=_var("m"), instance="V_1@et", entity_type="et",
+                          name="V_1", size=1)],
+        params=[ParamSlot(var=_var("k"), instance="V_5@et", name="V_5", kind="parameter"),
+                ParamSlot(var=_var("J"), instance="V_3@et", name="V_3", kind="parameter")],
+        levels=[[PlanBlock(entity_type="et", equation="law", lhs=_var("p"),
+                           lhs_instance="V_2@et", lhs_name="V_2", rhs="V_5")],
+                [PlanBlock(entity_type="et", equation="mass", lhs=_var("m"),
+                           lhs_instance="V_1@et", lhs_name="V_1", rhs="V_2")]],
+        constraints=[PlanBlock(entity_type="et", equation="balance", lhs=_var("J"),
+                               lhs_instance="V_3@et", lhs_name="V_3", rhs="V_2 - V_2")])
+    module = {}
+    exec(emit_python(cp, _emit_space()), module)
+    par = {"V_5": [4.0], "V_3": [0.0], "ic0_V_1": [2.0]}
+    y0 = module["initial"](par)
+    assert y0 == pytest.approx([2.0])
+    solution = solve_ivp(lambda t, y: module["derivative"](t, y, par), (0, 3), y0)
+    assert solution.success
+    assert solution.y[0, -1] == pytest.approx(14.0)
+    if not shutil.which("octave"):
+        return
+    (tmp_path / "derivative.m").write_text(emit_matlab(cp, _emit_space()))
+    runtime = Path(__file__).resolve().parents[2] / "runtime" / "matlab"
+    expression = (f"addpath('{runtime}'); model=derivative(); "
+                  "par=struct('V_5',4,'V_3',0,'ic0_V_1',2); y0=model.initial(par,false); "
+                  "assert(abs(y0-2)<1e-8); "
+                  "[t,y]=ode45(@(t,y) model.derivative(t,y,par),[0,3],y0); "
+                  "assert(abs(y(end)-14)<1e-6);")
+    result = subprocess.run(["octave", "--no-gui", "--quiet", "--eval", expression],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr

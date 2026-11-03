@@ -202,7 +202,8 @@ def _order(equations: Dict[str, EquationInfo],
         if eq is not None:
             defined_by[eq.lhs] = eq_iri
     state_var = (equations[selection.base_equation].lhs
-                 if selection.base_equation in equations else None)
+                 if selection.base_equation in equations
+                 and not _prescribed_base(equations, selection) else None)
 
     keep = [e for e in selection.sequence if e in equations]
     deps: Dict[str, Set[str]] = {e: set() for e in keep}
@@ -257,7 +258,8 @@ def _auto_pull(equations: Dict[str, EquationInfo],
         endpoints = (set(defined_by) | selection.instantiated
                      | selection.ports | auto)
         state_var = (equations[selection.base_equation].lhs
-                     if selection.base_equation in equations else None)
+                     if selection.base_equation in equations
+                 and not _prescribed_base(equations, selection) else None)
         if state_var:
             endpoints.add(state_var)
         open_vars: Set[str] = (
@@ -326,7 +328,7 @@ def _reclose(equations: Dict[str, EquationInfo],
     # A selected definer beats an instantiated/port mark on the same
     # variable (mark moves drop the definer before reclosing, so this
     # only reconciles loaded/legacy state).
-    selection.instantiated -= set(defined_by)
+    selection.instantiated -= set(defined_by) - {_prescribed_base(equations, selection)}
     selection.ports -= set(defined_by)
 
     # Prune everything outside the root cone — unreachable is a
@@ -460,7 +462,8 @@ def apply_move(equations: Dict[str, EquationInfo],
             # can prune.
             definer = next((e for e in sel.sequence
                             if equations[e].lhs == variable), None)
-            if definer is not None:
+            if definer is not None and not (
+                    role == "instantiated" and definer == sel.base_equation):
                 sel.sequence.remove(definer)
                 if definer == sel.base_equation:
                     sel.base_equation = None
@@ -485,6 +488,10 @@ def apply_move(equations: Dict[str, EquationInfo],
 # ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------
+
+def _prescribed_base(equations: Dict[str, EquationInfo], selection: Selection) -> Optional[str]:
+    base = equations.get(selection.base_equation)
+    return base.lhs if base and base.lhs in selection.instantiated else None
 
 def evaluate(equations: Dict[str, EquationInfo],
              selection: Selection,
@@ -533,17 +540,18 @@ def evaluate(equations: Dict[str, EquationInfo],
                 "unknown_equation", equation=selection.base_equation,
                 detail="base equation is not in scope"))
         else:
-            state_var = base.lhs
+            state_var = None if _prescribed_base(equations, selection) else base.lhs
             if (not selection.sequence
                     or selection.sequence[-1] != selection.base_equation):
                 order_violations.append(OrderViolation(
                     equation=selection.base_equation,
-                    variable=state_var,
+                    variable=base.lhs,
                     defined_by=selection.base_equation,
                     detail="base equation must close the sequence"))
 
     # -- role conflicts ----------------------------------------------------
-    for var in sorted(selection.instantiated & set(defined_by)):
+    for var in sorted((selection.instantiated & set(defined_by))
+                      - {_prescribed_base(equations, selection)}):
         conflicts.append(Conflict(
             "defined_and_instantiated", variable=var,
             equation=defined_by[var],
@@ -661,7 +669,8 @@ def evaluate(equations: Dict[str, EquationInfo],
     unconsumed = sorted(
         v for v, e in defined_by.items()
         if v != state_var and v not in consumed
-        and v not in selection.outputs)
+        and v not in selection.outputs
+        and v != _prescribed_base(equations, selection))
 
     # -- lower-triangular order check (§13) --------------------------------
     for eq_iri in selection.sequence:

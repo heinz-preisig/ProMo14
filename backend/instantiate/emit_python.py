@@ -43,9 +43,18 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    t0_layout,
     tear_loop,
 )
 from .plan import CodePlan
+
+
+def _flat_size(indices) -> int:
+    """Number of elements a binding's index dict spans."""
+    n = 1
+    for els in (indices or {}).values():
+        n *= max(1, len(els or []))
+    return n
 
 
 class _Python(Dialect):
@@ -80,7 +89,7 @@ class _Python(Dialect):
         out = ["import numpy as np"]
         if cp.matrices:
             out.append("import scipy.sparse")
-        if cp.loops or cp.states:
+        if cp.loops or cp.states or cp.constraints:
             # fsolve: algebraic loops + the t=0 solve; the module import
             # backs ``scipy.optimize.fsolve`` inside root!() bodies.
             out.append("import scipy.optimize")
@@ -123,33 +132,77 @@ class _Python(Dialect):
                else "def derivative(t, y, par):")
         return [sig, "    dy = np.zeros(%d)" % total]
 
+    def permute(self, src: str, perm: List[int]) -> str:
+        if len(perm) <= 1:
+            return src
+        return "(%s).transpose((%s))" % (
+            src, ", ".join(str(p) for p in perm))
+
+    @staticmethod
+    def _shape(indices) -> str:
+        """``.reshape((d1, d2))`` for a flat materialization — dims in
+        declaration order so canonical axis positions hold (a
+        ``tensordot`` over axis k must find that axis).  Empty for
+        ≤1 index: the slice is already the right shape."""
+        dims = [len(els or []) for els in (indices or {}).values()]
+        if len(dims) <= 1:
+            return ""
+        return ".reshape((%s))" % ", ".join(str(d) for d in dims)
+
     def state_unpack(self, st, space: CompileSpace) -> str:
-        return "    %s = y[%d:%d]" % (
+        return "    %s = y[%d:%d]%s" % (
             st.name or inst_name(st.instance), st.offset,
-            st.offset + st.size)
+            st.offset + st.size, self._shape(st.indices))
 
     def param(self, p, space: CompileSpace) -> str:
         nm = p.name or inst_name(p.instance)
         if p.values is not None:
             return '    %s = _tab("%s")  # value cells' % (nm, nm)
-        return '    %s = par["%s"]' % (nm, nm)
+        return '    %s = par["%s"]%s' % (nm, nm,
+                                        self._shape(p.indices))
+
+    def _fill(self, pairs, size: int, shape: str) -> str:
+        """Positional flat gather for a coverage-mismatched binding —
+        first-wins with right-pad up to the bound size, then reshape
+        to the declared dims.  ``plan()`` records the coverage
+        problem; this keeps the module runnable and deterministic."""
+        if not pairs:
+            return "np.zeros(%d)%s" % (size, shape)
+        src = "np.concatenate([%s])" % ", ".join(
+            "np.ravel(%s.flat[%d])" % (pn, m) for pn, m in pairs)
+        if len(pairs) != size:
+            src = "np.pad(%s, (0, %d))[:%d]" % (
+                src, max(0, size - len(pairs)), size)
+        return src + shape
 
     def gather(self, g, space: CompileSpace) -> str:
         gn = g.name or inst_name(g.instance)
         pn = g.peer_name or inst_name(g.peer_instance)
         if g.scalar:
             return "    %s = %s[%d]  # port gather" % (gn, pn, g.map[0])
+        size = _flat_size(g.indices)
+        if len(g.map) != size:
+            return "    %s = %s  # port gather" % (
+                gn, self._fill([(pn, m) for m in g.map], size,
+                               self._shape(g.indices)))
         return "    %s = %s[%s]  # port gather" % (gn, pn, g.map)
 
     def gather_multi(self, pieces, space: CompileSpace) -> str:
         gn = pieces[0].name or inst_name(pieces[0].instance)
+        size = _flat_size(pieces[0].indices)
+        pairs = [(s.peer_name or inst_name(s.peer_instance), m)
+                 for s in pieces for m in s.map]
+        if len(pairs) != size:
+            return "    %s = %s  # port gather" % (
+                gn, self._fill(pairs, size,
+                               self._shape(pieces[0].indices)))
         sel = ", ".join(
             "np.ravel(%s[%s])" % (
                 s.peer_name or inst_name(s.peer_instance),
                 [i for i in s.map])
             for s in pieces)
-        return "    %s = np.concatenate([%s])  # port gather" % (
-            gn, sel)
+        return "    %s = np.concatenate([%s])%s  # port gather" % (
+            gn, sel, self._shape(pieces[0].indices))
 
     def _den(self, expr: str) -> str:
         """``_d(expr)`` when sparse values can reach this file —
@@ -159,7 +212,7 @@ class _Python(Dialect):
     def state_assign(self, st, b, rhs, space: CompileSpace) -> List[str]:
         """``dy[...] = rhs`` — a sparse rhs must be densified for the
         packed derivative slice."""
-        return ["%sdy[%d:%d] = %s" % (
+        return ["%sdy[%d:%d] = np.ravel(%s)" % (
             self.indent, st.offset, st.offset + st.size,
             self._den(rhs))]
 
@@ -175,9 +228,12 @@ class _Python(Dialect):
         total = sum(sizes)
         out.append("    def _loop%d(x):  # algebraic loop %d"
                    % (loop_id, loop_id))
+        tear_idx = {b.lhs_name or inst_name(b.lhs_instance):
+                    b.lhs_indices for b in tears}
         off = 0
         for nm, sz in zip(names, sizes):
-            out.append("        %s = x[%d:%d]" % (nm, off, off + sz))
+            out.append("        %s = x[%d:%d]%s" % (
+                nm, off, off + sz, self._shape(tear_idx.get(nm))))
             off += sz
         for b in sweep:
             rhs = self.render_rhs(b, space,
@@ -196,8 +252,9 @@ class _Python(Dialect):
                    % (loop_id, loop_id, total))
         off = 0
         for nm, sz in zip(names, sizes):
-            out.append("    %s = _x%d[%d:%d]"
-                       % (nm, loop_id, off, off + sz))
+            out.append("    %s = _x%d[%d:%d]%s"
+                       % (nm, loop_id, off, off + sz,
+                          self._shape(tear_idx.get(nm))))
             off += sz
         # bind eliminated vars at the solved tear values
         for b in sweep:
@@ -205,6 +262,40 @@ class _Python(Dialect):
                                   cp.names.get(b.entity_type, {}))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("    %s = %s" % (nm, rhs))
+
+    def constrained(self, out: List[str], cp: CodePlan,
+                    space: CompileSpace) -> None:
+        spec = t0_layout(cp)
+        state_names = {s.name or inst_name(s.instance) for s in cp.states}
+        unknowns = [u for u in spec.unknowns if u[0] not in state_names]
+        out.append("    def _balance(u):")
+        offset = 0
+        for name, size, idx in unknowns:
+            out.append("        %s = u[%d:%d]%s" % (
+                name, offset, offset + size, self._shape(idx)))
+            offset += size
+        seen = set()
+        for g in cp.gathers:
+            if g.instance in seen:
+                continue
+            seen.add(g.instance)
+            pieces = [p for p in cp.gathers if p.instance == g.instance]
+            out.append("    " + (self.gather(g, space) if len(pieces) == 1
+                                  else self.gather_multi(pieces, space)))
+        for i, (block, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(block, space, cp.names.get(block.entity_type, {}))
+            out.append("        _r%d = np.ravel((%s) - %s)" % (i, self._den(rhs), term))
+        out.append("        return np.concatenate([%s])" % ", ".join(
+            "_r%d" % i for i in range(len(spec.residuals))))
+        out.append("    _u = _solve_balance(_balance, %d)" % offset)
+        offset = 0
+        for name, size, idx in unknowns:
+            out.append("    %s = _u[%d:%d]%s" % (
+                name, offset, offset + size, self._shape(idx)))
+            offset += size
+        for state, derivative in zip(cp.states, spec.dx):
+            out.append("    dy[%d:%d] = np.ravel(%s)" % (
+                state.offset, state.offset + state.size, derivative))
 
     def fn_close(self) -> List[str]:
         return ["    return dy", ""]
@@ -234,12 +325,29 @@ class _Python(Dialect):
                space: CompileSpace) -> None:
         """``_d`` — the densify shim used at residual/dy/output
         assign points (sparse results unwrap, denses pass through)."""
-        if not cp.matrices:
+        if not cp.matrices and not cp.constraints:
             return
         out += ["",
                 "def _d(x):",
-                "    return x.toarray() if scipy.sparse.issparse(x) "
+                "    return x.toarray() if hasattr(x, 'toarray') "
                 "else x"]
+        if cp.constraints:
+            out += self.balance_helpers()
+
+    @staticmethod
+    def balance_helpers() -> List[str]:
+        return ["", "def _solve_balance(fun, size):",
+                "    guess = np.zeros(size)",
+                "    if size == 0:",
+                "        if not np.allclose(fun(guess), 0, atol=1e-8):",
+                "            raise ValueError('prescribed balance is inconsistent')",
+                "        return guess",
+                "    result = scipy.optimize.least_squares(fun, guess, ftol=1e-12, xtol=1e-12, gtol=1e-12)",
+                "    if not result.success or not np.all(np.isfinite(result.fun)) or np.max(np.abs(result.fun), initial=0) > 1e-8:",
+                "        raise ValueError('prescribed balance solve failed: ' + result.message)",
+                "    if np.linalg.matrix_rank(result.jac) < size:",
+                "        raise ValueError('prescribed balance system is underdetermined')",
+                "    return result.x"]
 
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,
@@ -247,7 +355,7 @@ class _Python(Dialect):
         nm = st.name or inst_name(st.instance)
         if st.ic_source == "cells":
             return '_ictab("%s")' % nm
-        return 'par["ic0_%s"]' % nm
+        return 'par["ic0_%s"]%s' % (nm, self._shape(st.indices))
 
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
                 space: CompileSpace) -> None:
@@ -269,8 +377,9 @@ class _Python(Dialect):
             for s in cp.states)
         out.append("    def _t0(u):  # t=0 residual system")
         off = 0
-        for nm, sz, _idx in spec.unknowns:
-            out.append("        %s = u[%d:%d]" % (nm, off, off + sz))
+        for nm, sz, idx in spec.unknowns:
+            out.append("        %s = u[%d:%d]%s" % (
+                nm, off, off + sz, self._shape(idx)))
             off += sz
         out.append("        if steady_state:")
         out.append("            total_diff = lambda x, y: "
@@ -316,13 +425,18 @@ class _Python(Dialect):
             "np.ravel(_e%d)" % i for i in range(ne)))
         out.append("        return np.concatenate(_rs) "
                    "if _rs else np.zeros_like(u)")
-        out.append("    _u = fsolve(_t0, np.zeros(%d))"
-                   % sum(sz for _, sz, _ in spec.unknowns))
+        if cp.constraints:
+            out.append("    _u = _solve_balance(_t0, %d)"
+                       % sum(sz for _, sz, _ in spec.unknowns))
+        else:
+            out.append("    _u = fsolve(_t0, np.zeros(%d))"
+                       % sum(sz for _, sz, _ in spec.unknowns))
         y_names = {s.name or inst_name(s.instance) for s in cp.states}
         off = 0
-        for nm, sz, _idx in spec.unknowns:
+        for nm, sz, idx in spec.unknowns:
             if nm in y_names:
-                out.append("    %s = _u[%d:%d]" % (nm, off, off + sz))
+                out.append("    %s = _u[%d:%d]%s" % (
+                    nm, off, off + sz, self._shape(idx)))
             off += sz
         out.append("    return %s" % y0)
         out.append("")

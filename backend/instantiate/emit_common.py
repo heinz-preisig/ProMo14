@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple
 from backend.equation.checker import check
 from backend.equation.codegen import Renderer
 from backend.equation.compile_space import CompileSpace
+from backend.equation.errors import VarError
 from backend.equation.parser import parse
 from backend.equation.syntax import Var
 
@@ -258,6 +259,8 @@ def t0_layout(cp: CodePlan) -> T0Layout:
             else:
                 term = nm
             spec.residuals.append((b, term))
+    spec.residuals.extend((b, b.lhs_name or inst_name(b.lhs_instance))
+                          for b in cp.constraints)
     return spec
 
 
@@ -307,7 +310,45 @@ class Dialect:
             # downstream blocks may need the sparse-safe op forms.
             self.sparse_names = self.sparse_names | {
                 block.lhs_name or inst_name(block.lhs_instance)}
+        want = list((block.lhs_indices or {}).keys())
+        if checked.indices != want:
+            if set(checked.indices) == set(want):
+                src = self.permute(
+                    src, [checked.indices.index(i) for i in want])
+            else:
+                # Different index sets bind positionally (loop
+                # residuals rely on it) — only a flat-size gap is
+                # genuinely unemittable.  Unknown extents (plans
+                # built without a bound map) can't be checked and
+                # keep the legacy positional behaviour.
+                size = 1
+                known = bool(block.bound)
+                for iri in checked.indices:
+                    els = (block.bound or {}).get(iri)
+                    if els is None:
+                        known = False
+                    size *= max(1, len(els or []))
+                want_size = 1
+                for els in (block.lhs_indices or {}).values():
+                    want_size *= max(1, len(els or []))
+                if known and size != want_size:
+                    raise VarError(
+                        "index mismatch in %s: the rhs produces %s "
+                        "(%d elements) but %s is bound over %s "
+                        "(%d elements)"
+                        % (block.equation.split("#")[-1].split("/")[-1],
+                           space.pretty_index_list(checked.indices),
+                           size,
+                           block.lhs_name or inst_name(block.lhs_instance),
+                           space.pretty_index_list(want), want_size))
         return src
+
+    def permute(self, src: str, perm: List[int]) -> str:
+        """Re-order a rendered expression's axes into the lhs
+        variable's declared index order — ``perm`` gives each
+        wanted axis's position inside the expression (0-based)."""
+        raise VarError("index-order transpose is not supported for "
+                       + self.target)
 
     # -- whole-function shape -----------------------------------------
 
@@ -423,6 +464,10 @@ class Dialect:
         ``der = 0`` residuals."""
         raise NotImplementedError
 
+    def constrained(self, out: List[str], cp: CodePlan,
+                    space: CompileSpace) -> None:
+        raise VarError("prescribed-balance execution is not supported for " + self.target)
+
 
 def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
     """Walk a ``CodePlan`` once, asking ``d`` for each emitted line."""
@@ -521,8 +566,10 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
         site hook and as a task body when a level is parallel."""
         return "%s(%s)" % (fn, ", ".join(ext))
 
+    if cp.constraints:
+        d.constrained(body, cp, space)
     extractable = d.occ_fns and bool(occ_paths)
-    for level, lvl in enumerate(cp.levels):
+    for level, lvl in enumerate([] if cp.constraints else cp.levels):
         body.append(d.level_comment(level))
         consumed = {v for b in lvl for v in b.inputs}
         for g in cp.gathers:
@@ -646,9 +693,18 @@ def emit_data(cp: CodePlan, space: CompileSpace) -> str:
     out: Dict[str, Any] = {"matrices": {}, "values": {}, "ics": {}}
     for mx in cp.matrices:
         nm = mx.name or inst_name(mx.instance)
-        out["matrices"][nm] = {"m": len(mx.rows), "n": len(mx.cols),
-                               "i": [r for r, _, _ in mx.entries],
-                               "j": [c for _, c, _ in mx.entries],
+        i = [r for r, _, _ in mx.entries]
+        j = [c for _, c, _ in mx.entries]
+        m, n = len(mx.rows), len(mx.cols)
+        if mx.indices:
+            # The literal must follow the variable's *declared* index
+            # order — the checker computes tensor axes from it.  The
+            # plan builds rows=nodes/cols=arcs; when the declared
+            # order puts the arc index first the COO transposes.
+            first = next(iter(mx.indices.values()))
+            if first != mx.rows and first == mx.cols:
+                i, j, m, n = j, i, n, m
+        out["matrices"][nm] = {"m": m, "n": n, "i": i, "j": j,
                                "v": [s for _, _, s in mx.entries]}
     for p in cp.params + cp.inputs:
         if p.values is None:

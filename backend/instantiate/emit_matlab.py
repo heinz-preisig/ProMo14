@@ -62,6 +62,7 @@ from .emit_common import (
     inst_name,
     loop_layout,
     tear_loop,
+    t0_layout,
 )
 from .plan import CodePlan, PlanBlock
 
@@ -261,59 +262,6 @@ class _Matlab(Dialect):
             out.append("  outs.%s = %s.value;  %% §21 output"
                        % (nm, nm))
 
-    def footer(self, out: List[str], cp: CodePlan,
-               space: CompileSpace) -> None:
-        """File-end locals: ``_mdv_value`` (integral body unwrap) and
-        the ``model_data.json`` loaders — ``_model_data`` keeps the
-        decoded dict in a ``persistent`` so it parses once."""
-        if any("integral(" in ln for ln in out):
-            out += ["",
-                    "function v = _mdv_value(x)",
-                    "  if isa(x, 'MultiDimVar'), x = x.value; end",
-                    "  v = x;",
-                    "end"]
-        kinds = data_kinds(cp)
-        if kinds:
-            out += ["",
-                    "% the shared data file — the language-neutral half",
-                    "% of the data/code split (parsed once, persistent)",
-                    "function d = _model_data()",
-                    "  persistent d_",
-                    "  if isempty(d_)",
-                    "    d_ = jsondecode(fileread(fullfile("
-                    "fileparts(mfilename('fullpath')), "
-                    "'model_data.json')));",
-                    "  end",
-                    "  d = d_;",
-                    "end"]
-        if "matrices" in kinds:
-            out += ["",
-                    "function a = _mx(n)",
-                    "  d = _model_data();",
-                    "  e = d.matrices.(n);",
-                    "  a = sparse(e.i + 1, e.j + 1, e.v, e.m, e.n);",
-                    "end"]
-        if {"values", "ics"} & kinds:
-            out += ["",
-                    "function a = _shape(e)",
-                    "  d = e.dims;",
-                    "  if numel(d) <= 1, a = e.flat(:); return; end",
-                    "  a = permute(reshape(e.flat, fliplr(d)), "
-                    "fliplr(1:numel(d)));",
-                    "end"]
-        if "values" in kinds:
-            out += ["",
-                    "function a = _tab(n)",
-                    "  d = _model_data();",
-                    "  a = _shape(d.values.(n));",
-                    "end"]
-        if "ics" in kinds:
-            out += ["",
-                    "function a = _ictab(n)",
-                    "  d = _model_data();",
-                    "  a = _shape(d.ics.(n));",
-                    "end"]
-
     def pin_term(self, st, space: CompileSpace) -> str:
         """The IC pin expression — a cells literal or a ``par`` lookup,
         MultiDimVar-wrapped; the residual's rhs term in a non-steady
@@ -394,8 +342,12 @@ class _Matlab(Dialect):
             "_e%d.value" % i for i in range(ne)))
         out.append("    end")
         out.append("  end")
-        out.append("  _u = fsolve(@_t0, zeros(%d, 1));"
-                   % sum(sz for _, sz, _ in spec.unknowns))
+        if cp.constraints:
+            out.append("  _u = promo_solve_balance(@_t0, %d);"
+                       % sum(sz for _, sz, _ in spec.unknowns))
+        else:
+            out.append("  _u = fsolve(@_t0, zeros(%d, 1));"
+                       % sum(sz for _, sz, _ in spec.unknowns))
         off = 0
         for nm, sz, idx in spec.unknowns:
             if nm in y_names:
@@ -407,7 +359,121 @@ class _Matlab(Dialect):
         out.append("end")
         out.append("")
 
+    def constrained(self, out: List[str], cp: CodePlan,
+                    space: CompileSpace) -> None:
+        spec = t0_layout(cp)
+        states = {s.name or inst_name(s.instance) for s in cp.states}
+        unknowns = [u for u in spec.unknowns if u[0] not in states]
+        out.append("  function r = promo_balance(u)")
+        offset = 0
+        for name, size, idx in unknowns:
+            out.append("    %s = %s;" % (name, self._mdv(
+                idx, space, "u(%d:%d)" % (offset + 1, offset + size))))
+            offset += size
+        seen = set()
+        for g in cp.gathers:
+            if g.instance in seen:
+                continue
+            seen.add(g.instance)
+            pieces = [p for p in cp.gathers if p.instance == g.instance]
+            out.append("  " + (self.gather(g, space) if len(pieces) == 1
+                                  else self.gather_multi(pieces, space)))
+        for i, (block, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(block, space, cp.names.get(block.entity_type, {}))
+            out.append("    promo_r%d = (%s) - %s;" % (i, rhs, term))
+        out.append("    r = [%s];" % "; ".join(
+            "promo_r%d.value(:)" % i for i in range(len(spec.residuals))))
+        out.append("  end")
+        out.append("  promo_u = promo_solve_balance(@promo_balance, %d);" % offset)
+        offset = 0
+        for name, size, idx in unknowns:
+            out.append("  %s = %s;" % (name, self._mdv(
+                idx, space, "promo_u(%d:%d)" % (offset + 1, offset + size))))
+            offset += size
+        for state, derivative in zip(cp.states, spec.dx):
+            out.append("  dy(%d:%d) = %s.value(:);" % (
+                state.offset + 1, state.offset + state.size, derivative))
+
+    def footer(self, out: List[str], cp: CodePlan,
+               space: CompileSpace) -> None:
+        """File-end locals: ``_mdv_value`` (integral body unwrap) and
+        the ``model_data.json`` loaders — ``_model_data`` keeps the
+        decoded dict in a ``persistent`` so it parses once."""
+        if any("integral(" in ln for ln in out):
+            out += ["",
+                    "function v = _mdv_value(x)",
+                    "  if isa(x, 'MultiDimVar'), x = x.value; end",
+                    "  v = x;",
+                    "end"]
+        kinds = data_kinds(cp)
+        if kinds:
+            out += ["",
+                    "% the shared data file — the language-neutral half",
+                    "% of the data/code split (parsed once, persistent)",
+                    "function d = _model_data()",
+                    "  persistent d_",
+                    "  if isempty(d_)",
+                    "    d_ = jsondecode(fileread(fullfile("
+                    "fileparts(mfilename('fullpath')), "
+                    "'model_data.json')));",
+                    "  end",
+                    "  d = d_;",
+                    "end"]
+        if "matrices" in kinds:
+            out += ["",
+                    "function a = _mx(n)",
+                    "  d = _model_data();",
+                    "  e = d.matrices.(n);",
+                    "  a = sparse(e.i + 1, e.j + 1, e.v, e.m, e.n);",
+                    "end"]
+        if {"values", "ics"} & kinds:
+            out += ["",
+                    "function a = _shape(e)",
+                    "  d = e.dims;",
+                    "  if numel(d) <= 1, a = e.flat(:); return; end",
+                    "  a = permute(reshape(e.flat, fliplr(d)), "
+                    "fliplr(1:numel(d)));",
+                    "end"]
+        if "values" in kinds:
+            out += ["",
+                    "function a = _tab(n)",
+                    "  d = _model_data();",
+                    "  a = _shape(d.values.(n));",
+                    "end"]
+        if "ics" in kinds:
+            out += ["",
+                    "function a = _ictab(n)",
+                    "  d = _model_data();",
+                    "  a = _shape(d.ics.(n));",
+                    "end"]
+        if cp.constraints:
+            out += ["", "function u = promo_solve_balance(fun, count)",
+                    "  if count == 0",
+                    "    u = zeros(0, 1); r = fun(u);",
+                    "    if any(~isfinite(r)) || any(abs(r) > 1e-8), error('inconsistent prescribed balance'); end",
+                    "    return;",
+                    "  end",
+                    "  options = optimset('TolFun', 1e-12, 'TolX', 1e-12, 'Display', 'off');",
+                    "  [u, r, flag, output, jac] = fsolve(fun, zeros(count, 1), options);",
+                    "  if flag <= 0 || any(~isfinite(r)) || any(abs(r) > 1e-8), error('prescribed balance solve failed'); end",
+                    "  if rank(jac) < count, error('prescribed balance system is underdetermined'); end",
+                    "end"]
+
 
 def emit_matlab(cp: CodePlan, space: CompileSpace) -> str:
     """Emit the derivative function for a code plan."""
-    return emit_plan(cp, space, _Matlab())
+    source = emit_plan(cp, space, _Matlab())
+    source = source.replace("= derivative(t, y, par)", "= promo_derivative(t, y, par)")
+    source = re.sub(r"\b_([A-Za-z][A-Za-z0-9_]*)", r"promo_\1", source)
+    prefix = ["function [result, outs] = derivative(varargin)", "  outs = struct();"]
+    if not cp.outputs:
+        source = source.replace("function dy = promo_derivative(t, y, par)",
+                                "function [dy, outs] = promo_derivative(t, y, par)\n  outs = struct();")
+    start = source.index("function ")
+    matrices, functions = source[:start], source[start:]
+    prefix.append(matrices)
+    prefix += ["  if nargin == 0", "    result.derivative = @promo_derivative;"]
+    if cp.states:
+        prefix.append("    result.initial = @initial;")
+    prefix += ["    return;", "  end", "  [result, outs] = promo_derivative(varargin{:});", functions, "end"]
+    return "\n".join(prefix)

@@ -149,6 +149,7 @@ class EqBinding:
     equation: str
     lhs: str                            # variable IRI
     inputs: List[str] = field(default_factory=list)
+    constraint: bool = False
 
 
 @dataclass
@@ -481,7 +482,9 @@ def build(nodes: Dict[str, NodeInfo],
             eq_seq.append(eq)
             defined.add(eq.lhs)
             inst.equations.append(EqBinding(
-                equation=eq.iri, lhs=eq.lhs, inputs=list(eq.inputs)))
+                equation=eq.iri, lhs=eq.lhs, inputs=list(eq.inputs),
+                constraint=(eq.iri == asg.base_equation
+                            and eq.lhs in asg.instantiated)))
 
         # Variable discovery order: sequence lhs/inputs, then role lists.
         seen: Set[str] = set()

@@ -1,4 +1,11 @@
-import { type ChangeEvent, type KeyboardEvent, useRef, useState } from 'react'
+import {
+  type ChangeEvent,
+  forwardRef,
+  type KeyboardEvent,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { OPERATOR_HELP } from '../operatorHelp'
 import OperatorHelp from './OperatorHelp'
 import SyntaxDiagram from './SyntaxDiagram'
@@ -8,6 +15,12 @@ export interface ExpressionInputProps {
   onChange: (value: string) => void
   onCheck: () => void
   disabled?: boolean
+}
+
+/** Imperative surface for palette-driven inserts — the same
+ *  cursor-aware ``insert`` the operator buttons use. */
+export interface ExpressionInputHandle {
+  insert: (token: string) => void
 }
 
 const OP_BUTTONS: { label: string; value: string; tip?: string }[] = [
@@ -51,21 +64,31 @@ const FUNC_BUTTONS = [
   'sign',
 ]
 
-export default function ExpressionInput({
-  value,
-  onChange,
-  onCheck,
-  disabled,
-}: ExpressionInputProps) {
+const ExpressionInput = forwardRef<ExpressionInputHandle, ExpressionInputProps>(
+  function ExpressionInput({
+    value,
+    onChange,
+    onCheck,
+    disabled,
+  }, fwdRef) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  // Last known caret — the textarea keeps selectionStart after blur,
+  // but a never-focused element reports 0; treat "no recorded
+  // selection" as append-at-end so a first insert doesn't jump to
+  // the front.
+  const selRef = useRef<{ start: number; end: number } | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [syntaxOpen, setSyntaxOpen] = useState(false)
 
   const insert = (token: string) => {
     const el = ref.current
     if (!el) return
-    const start = el.selectionStart ?? 0
-    const end = el.selectionEnd ?? 0
+    const { start, end } = selRef.current
+      ? {
+          start: Math.min(selRef.current.start, value.length),
+          end: Math.min(selRef.current.end, value.length),
+        }
+      : { start: value.length, end: value.length }
     const before = value.slice(0, start)
     const after = value.slice(end)
     const next = before + token + after
@@ -76,6 +99,8 @@ export default function ExpressionInput({
       el.setSelectionRange(pos, pos)
     }, 0)
   }
+
+  useImperativeHandle(fwdRef, () => ({ insert }))
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'enter') {
@@ -153,6 +178,10 @@ export default function ExpressionInput({
         ref={ref}
         value={value}
         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
+        onSelect={(e) => {
+          const t = e.currentTarget
+          selRef.current = { start: t.selectionStart, end: t.selectionEnd }
+        }}
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder="Type an expression, e.g. U - p . V"
@@ -176,4 +205,7 @@ export default function ExpressionInput({
       </div>
     </div>
   )
-}
+  },
+)
+
+export default ExpressionInput

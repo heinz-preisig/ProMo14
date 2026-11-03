@@ -541,17 +541,30 @@ function deriveParKeys(report: InstantiationReport) {
     const base = v.instance.split('@')[0]
     counts.set(base, (counts.get(base) ?? 0) + 1)
   }
+  const subs = subsetsOf(report)
+  /** Server semantics (plan._filled_table): a table covers the var
+   *  only when *every* bound coordinate resolves to a non-empty
+   *  value — exact key or fill.  Partial tables fall back to par. */
+  const cellCovered = (v: VarBinding): boolean => {
+    const raw = v.values ?? {}
+    if (!Object.keys(raw).length) return false
+    const tbl = Object.fromEntries(
+      Object.entries(raw).map(([k, x]) => [k, x == null ? '' : String(x)]))
+    return coordKeys(v.indices).every(
+      (k) => (tbl[k] ?? '').trim() !== ''
+        || resolveFill(tbl, k, subs) !== null)
+  }
   const keys: string[] = []
   for (const e of report.entity_types) {
     const initLhs = new Set(e.initial_equations.map((q) => q.lhs))
     for (const v of e.variables) {
       const name = emitName(v, counts)
-      const cellCovered = Object.keys(v.values ?? {}).length > 0
+      const covered = cellCovered(v)
       if ((v.binding === 'parameter' || v.binding === 'input'
           || (v.binding === 'constant' && v.value == null))
-          && !cellCovered)
+          && !covered)
         keys.push(name)
-      if (v.role === 'state' && !initLhs.has(v.var) && !cellCovered)
+      if (v.role === 'state' && !initLhs.has(v.var) && !covered)
         keys.push(`ic0_${name}`)
     }
   }

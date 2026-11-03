@@ -142,6 +142,7 @@ class EqBindingOut(BaseModel):
     equation: str
     lhs: str
     inputs: List[str] = Field(default_factory=list)
+    constraint: bool = False
 
 
 class EntityInstantiationOut(BaseModel):
@@ -1098,10 +1099,10 @@ def model_instantiation(
                     cell_source.get(v.var, model_graph), v.var))
                 for v in e.variables],
             equations=[EqBindingOut(
-                equation=q.equation, lhs=q.lhs, inputs=q.inputs)
+                equation=q.equation, lhs=q.lhs, inputs=q.inputs, constraint=q.constraint)
                 for q in e.equations],
             initial_equations=[EqBindingOut(
-                equation=q.equation, lhs=q.lhs, inputs=q.inputs)
+                equation=q.equation, lhs=q.lhs, inputs=q.inputs, constraint=q.constraint)
                 for q in e.initial_equations])
             for e in report.entity_types],
         ports=[PortBindingOut(
@@ -1289,15 +1290,25 @@ def model_initial(
         for p in cp.params + cp.inputs
         if not (p.kind == "constant" and p.value is not None)
         and p.values is None]
-    par_needed += [
-        "ic0_%s" % (s.name or inst_name(s.instance))
-        for s in cp.states if s.ic_source == "par"]
+    if not body.steady_state:
+        # steady-state releases the pins — the emitted module never
+        # touches ic0_ keys in that branch.
+        par_needed += [
+            "ic0_%s" % (s.name or inst_name(s.instance))
+            for s in cp.states if s.ic_source == "par"]
     try:
         source = emit_python(cp, _code_space(store, emit_scope))
     except (ParseError, VarError) as e:
         return InitialOut(ok=False, steady_state=body.steady_state,
                           par_needed=par_needed,
                           error=str(e), problems=problems)
+    missing = [k for k in par_needed if k not in body.par]
+    if missing:
+        return InitialOut(ok=False, steady_state=body.steady_state,
+                          par_needed=par_needed,
+                          error="missing par values: %s"
+                                % ", ".join(missing),
+                          problems=problems)
     try:
         # the data/code split: emitted python references _DATA — inject
         # it so no model_data.json file is needed server-side.

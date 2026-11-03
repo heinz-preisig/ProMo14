@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
 import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, Variable } from '../types'
 import AxisClassifications, {
@@ -9,7 +9,7 @@ import AxisClassifications, {
 } from '../axisClassifications'
 import { nextEquationId, nextInternalId } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
-import ExpressionInput from './ExpressionInput'
+import ExpressionInput, { type ExpressionInputHandle } from './ExpressionInput'
 import LaTeXPreview from './LaTeXPreview'
 import NetworkTreeSelect from './NetworkTreeSelect'
 import ResultPanel from './ResultPanel'
@@ -344,8 +344,13 @@ export default function DependentVariableEditor({
     onClose()
   }
 
+  const exprRef = useRef<ExpressionInputHandle>(null)
+  // Palette chips insert at the textarea caret (tracked inside
+  // ExpressionInput), not the end — falls back to append only
+  // while the input isn't mounted.
   const insertText = useCallback((token: string) => {
-    setText((prev) => prev + token)
+    if (exprRef.current) exprRef.current.insert(token)
+    else setText((prev) => prev + token)
   }, [])
 
   const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
@@ -582,6 +587,7 @@ export default function DependentVariableEditor({
             }}
           >
             <ExpressionInput
+              ref={exprRef}
               value={text}
               onChange={setText}
               onCheck={handleCheck}

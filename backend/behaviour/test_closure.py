@@ -494,6 +494,27 @@ def test_move_mark_output_exclusive():
     assert "x" in sel.outputs and "x" not in sel.instantiated
 
 
+def test_prescribed_base_retains_balance():
+    equations = _graph(_eq("balance", "rate", ["flow"]),
+                       _eq("law", "flow", ["pressure"]))
+    selection = Selection(sequence=["law", "balance"],
+                          base_equation="balance", ports={"pressure"})
+    result = apply_move(equations, selection, "mark", variable="rate",
+                        role="instantiated")
+    selected = result["selection"]
+    assert selected.sequence == ["law", "balance"]
+    assert selected.base_equation == "balance"
+    assert selected.instantiated == {"rate"}
+    report = evaluate(equations, selected)
+    assert report.closed
+    assert report.state_variable is None
+    saved = apply_move(equations, selected, "reorder")["selection"]
+    assert saved.instantiated == {"rate"}
+    assert evaluate(equations, saved).closed
+    restored = apply_move(equations, saved, "unmark", variable="rate")["selection"]
+    assert evaluate(equations, restored).state_variable == "rate"
+
+
 # ---------------------------------------------------------------------------
 # Endpoint tests (real store in a throwaway data dir)
 # ---------------------------------------------------------------------------

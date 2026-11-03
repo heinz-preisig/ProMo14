@@ -93,6 +93,9 @@
 
     promo:usesValues a rdf:Property .
 
+    promo:value a rdf:Property ;
+        promo:doc "Literal scalar payload — a constant's pre-bound value (ADR-008) or a promo:ValueCell's value.  Never an expression: computed values are promo:Expression trees behind promo:rhsExpression or 'initialise'-class equations." .
+
     promo:valueCell a rdf:Property ;
         promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
 
@@ -103,11 +106,85 @@
 
     promo:versionOf a rdf:Property .
 
+    <https://w3id.org/promo/library#V_39> promo:valueCell <https://w3id.org/promo/model#cell_5ab8d9c81ba8> .
+
+    <https://w3id.org/promo/library#V_54> promo:valueCell <https://w3id.org/promo/model#cell_5ca2f9aa8552> .
+
+    <https://w3id.org/promo/library#V_57> promo:valueCell <https://w3id.org/promo/model#cell_130f61d593c2>,
+            <https://w3id.org/promo/model#cell_54a444ab40f2>,
+            <https://w3id.org/promo/model#cell_bdb3b16d5bba> .
+
+    <https://w3id.org/promo/library#V_58> promo:valueCell <https://w3id.org/promo/model#cell_5a41d0456ee2> .
+
     <https://w3id.org/promo/model> a promo:Model ;
         rdfs:label "test_01" ;
         promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
         promo:usesLibrary <https://w3id.org/promo/library> ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
+
+    <https://w3id.org/promo/model/Model> a promo:Model ;
+        promo:arcCounter 3 ;
+        promo:nextTreeId 3 ;
+        promo:rootComposite <https://w3id.org/promo/model/Composite_0> .
+
+    <https://w3id.org/promo/ontology#V_21> promo:valueCell <https://w3id.org/promo/model#cell_02f215ea8d8b> .
+
+    <https://w3id.org/promo/ontology#V_22> promo:valueCell <https://w3id.org/promo/model#cell_a3caf79fea42> .
+
+    <https://w3id.org/promo/ontology#V_34> promo:valueCell <https://w3id.org/promo/model#cell_02ea507ec31c>,
+            <https://w3id.org/promo/model#cell_cc4938a4db2a> .
+
+    <https://w3id.org/promo/model#cell_02ea507ec31c> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Node_3> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Node_3\"]" ;
+        promo:value 1 .
+
+    <https://w3id.org/promo/model#cell_02f215ea8d8b> a promo:ValueCell ;
+        promo:coordinate "[]" ;
+        promo:value 0 .
+
+    <https://w3id.org/promo/model#cell_130f61d593c2> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Arc_2>,
+            <https://w3id.org/promo/model/Node_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Arc_2\", \"https://w3id.org/promo/model/Node_2\"]" ;
+        promo:value 0 .
+
+    <https://w3id.org/promo/model#cell_54a444ab40f2> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Arc_2>,
+            <https://w3id.org/promo/model/Node_3> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Arc_2\", \"https://w3id.org/promo/model/Node_3\"]" ;
+        promo:value 0 .
+
+    <https://w3id.org/promo/model#cell_5a41d0456ee2> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Arc_2>,
+            <https://w3id.org/promo/model/Node_3> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Arc_2\", \"https://w3id.org/promo/model/Node_3\"]" ;
+        promo:value 0 .
+
+    <https://w3id.org/promo/model#cell_5ab8d9c81ba8> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Node_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Node_2\"]" ;
+        promo:value 1 .
+
+    <https://w3id.org/promo/model#cell_5ca2f9aa8552> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Node_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Node_2\"]" ;
+        promo:value 10 .
+
+    <https://w3id.org/promo/model#cell_a3caf79fea42> a promo:ValueCell ;
+        promo:coordinate "[]" ;
+        promo:value 100 .
+
+    <https://w3id.org/promo/model#cell_bdb3b16d5bba> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Arc_1>,
+            <https://w3id.org/promo/model/Node_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Arc_1\", \"https://w3id.org/promo/model/Node_2\"]" ;
+        promo:value 0 .
+
+    <https://w3id.org/promo/model#cell_cc4938a4db2a> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model/Node_1> ;
+        promo:coordinate "[\"https://w3id.org/promo/model/Node_1\"]" ;
+        promo:value 5 .
 
     <https://w3id.org/promo/model/Arc_1> a promo:ModelArc ;
         promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
@@ -117,6 +194,12 @@
         promo:source <https://w3id.org/promo/model/Node_1> ;
         promo:target <https://w3id.org/promo/model/Node_2> .
 
+    <https://w3id.org/promo/model/Composite_0> a promo:Composite ;
+        rdfs:label "Root" ;
+        promo:children "[{\"id\": 1, \"iri\": \"https://w3id.org/promo/model/Node_1\"}, {\"id\": 2, \"iri\": \"https://w3id.org/promo/model/Node_2\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model/Node_3\"}]" ;
+        promo:internalID 0 ;
+        promo:layout "{\"1\": {\"x\": -139.5, \"y\": -197.5}, \"2\": {\"x\": 8.666671752929688, \"y\": -195.5}, \"3\": {\"x\": 139.5, \"y\": -200.5}}" .
+
     <https://w3id.org/promo/model/Arc_2> a promo:ModelArc ;
         promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
         promo:internalID "Arc_2" ;
@@ -124,17 +207,6 @@
         promo:referenceTo <https://w3id.org/promo/model/Node_3> ;
         promo:source <https://w3id.org/promo/model/Node_2> ;
         promo:target <https://w3id.org/promo/model/Node_3> .
-
-    <https://w3id.org/promo/model/Model> a promo:Model ;
-        promo:arcCounter 3 ;
-        promo:nextTreeId 3 ;
-        promo:rootComposite <https://w3id.org/promo/model/Composite_0> .
-
-    <https://w3id.org/promo/model/Composite_0> a promo:Composite ;
-        rdfs:label "Root" ;
-        promo:children "[{\"id\": 1, \"iri\": \"https://w3id.org/promo/model/Node_1\"}, {\"id\": 2, \"iri\": \"https://w3id.org/promo/model/Node_2\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model/Node_3\"}]" ;
-        promo:internalID 0 ;
-        promo:layout "{\"1\": {\"x\": -139.5, \"y\": -197.5}, \"2\": {\"x\": 8.666671752929688, \"y\": -195.5}, \"3\": {\"x\": 139.5, \"y\": -200.5}}" .
 
     <https://w3id.org/promo/model/Node_1> a promo:ModelNode ;
         rdfs:label "Node 1" ;

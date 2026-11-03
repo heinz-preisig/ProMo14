@@ -141,6 +141,12 @@ class _Julia(Dialect):
                     "outs=nothing)"]
         return ["function derivative!(dy, y, par, t)"]
 
+    def permute(self, src: str, perm: List[int]) -> str:
+        if len(perm) <= 1:
+            return src
+        return "permutedims(%s, (%s))" % (
+            src, ", ".join(str(p + 1) for p in perm))
+
     def state_unpack(self, st, space: CompileSpace) -> str:
         return "    %s = @view y[%d:%d]" % (
             st.name or inst_name(st.instance),
