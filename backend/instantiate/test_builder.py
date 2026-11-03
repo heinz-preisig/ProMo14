@@ -1292,7 +1292,7 @@ def test_emit_julia_algebraic_loop():
     assert "V_3 = x" not in src
     assert "        V_3 = V_2\n        r[1:2] = (V_3) .- V_2" in src
     assert "_x0 = nlsolve(_loop0!, zeros(2))" in src
-    assert "V_2 = _x0[1:2]" in src
+    assert "V_2 = _x0.zero[1:2]" in src
 
 
 def test_emit_matlab_algebraic_loop():
@@ -1482,13 +1482,65 @@ def test_emit_julia_initial():
     assert "V_1 = u[1:2]" in src            # state — always unknown
     assert "V_2 = u[3:4]" in src
     assert "dV_1 = u[7:8]" in src
-    assert "_r0 = (V_1) .- V_2" in src
-    assert ("_r2 = (V_4 * V_3_lumped_capacity) .- dV_1" in src)
+    assert "_r0 = vec((V_1) .- V_2)" in src
+    assert ("_r2 = vec((V_4 * V_3_lumped_capacity) .- dV_1)" in src)
     assert "total_diff = (x, y) -> x .* 0" in src
-    assert "append!(_rs, Any[dV_1])  # der = 0" in src
-    assert "_e0 = (par.ic0_V_1) .- V_1  # IC pin" in src
+    assert "append!(_rs, Any[vec(dV_1)])  # der = 0" in src
+    assert "_e0 = vec((par.ic0_V_1) .- V_1)  # IC pin" in src
     assert "_u = nlsolve(_t0, zeros(8)).zero" in src
     assert "return [V_1]" in src
+
+
+def test_emit_julia_constrained():
+    """The Julia prescribed-balance block: a nested out-of-place
+    ``_balance`` residual over the non-state unknowns solved via the
+    module-level ``_solve_balance`` (footer), ``vec``'d residuals,
+    ``d<state>`` slots dropping into ``dy``; ``initial`` routes
+    through the same checked solve."""
+    cp = CodePlan(
+        params=[ParamSlot(var=_var("m"), instance="V_1@et",
+                          name="V_1", kind="parameter"),
+                ParamSlot(var=_var("J"), instance="V_3@et",
+                          name="V_3", kind="parameter")],
+        levels=[[PlanBlock(entity_type="et", equation="law",
+                           lhs=_var("p"), lhs_instance="V_2@et",
+                           lhs_name="V_2", rhs="V_1")]],
+        constraints=[PlanBlock(entity_type="et", equation="balance",
+                               lhs=_var("J"), lhs_instance="V_3@et",
+                               lhs_name="V_3", rhs="V_2")])
+    src = emit_julia(cp, _emit_space())
+    assert "using NLsolve" in src
+    assert "    function _balance(u)" in src        # nested
+    assert "V_2 = u[1:1]" in src
+    assert "_r0 = vec((V_1) .- V_2)" in src
+    assert "_r1 = vec((V_2) .- V_3)" in src
+    assert "return vcat(_r0, _r1)" in src
+    assert "_u = _solve_balance(_balance, 1)" in src
+    assert "V_2 = _u[1:1]" in src
+    assert "\nfunction _solve_balance(fun, count)" in src  # module-level
+    assert "res = nlsolve(fun, zeros(count))" in src
+    assert "return res.zero" in src
+
+    cp = CodePlan(
+        states=[StateSlot(var=_var("m"), instance="V_1@et",
+                          entity_type="et", name="V_1", size=1)],
+        params=[ParamSlot(var=_var("k"), instance="V_5@et",
+                          name="V_5", kind="parameter"),
+                ParamSlot(var=_var("J"), instance="V_3@et",
+                          name="V_3", kind="parameter")],
+        levels=[[PlanBlock(entity_type="et", equation="law",
+                           lhs=_var("p"), lhs_instance="V_2@et",
+                           lhs_name="V_2", rhs="V_5")],
+                [PlanBlock(entity_type="et", equation="mass",
+                           lhs=_var("m"), lhs_instance="V_1@et",
+                           lhs_name="V_1", rhs="V_2")]],
+        constraints=[PlanBlock(entity_type="et", equation="balance",
+                               lhs=_var("J"), lhs_instance="V_3@et",
+                               lhs_name="V_3", rhs="V_2 - V_2")])
+    src = emit_julia(cp, _emit_space())
+    assert "dV_1 = _u[2:2]" in src
+    assert "dy[1:1] = vec(dV_1)" in src
+    assert "_u = _solve_balance(_t0, 3)" in src     # t0 solve checked
 
 
 def test_emit_matlab_initial():

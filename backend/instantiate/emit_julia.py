@@ -50,6 +50,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    t0_layout,
     tear_loop,
 )
 from .plan import CodePlan
@@ -101,6 +102,10 @@ class _Julia(Dialect):
     def header(self, cp: CodePlan) -> List[str]:
         kinds = data_kinds(cp)
         out = ["using SparseArrays"]
+        if cp.loops or cp.states or cp.constraints:
+            # NLsolve backs the algebraic-loop residuals, the t=0
+            # solve and the prescribed-balance check.
+            out.append("using NLsolve")
         if kinds:
             # the shared data file — matrices + value/IC tables live
             # in model_data.json next to this file (the language-
@@ -217,7 +222,7 @@ class _Julia(Dialect):
                    % (loop_id, loop_id, total))
         off = 0
         for nm, sz in zip(names, sizes):
-            out.append("    %s = _x%d[%d:%d]"
+            out.append("    %s = _x%d.zero[%d:%d]"
                        % (nm, loop_id, off + 1, off + sz))
             off += sz
         # bind eliminated vars at the solved tear values
@@ -261,6 +266,72 @@ class _Julia(Dialect):
             return '_ictab("%s")' % nm
         return "par.ic0_%s" % nm
 
+    def constrained(self, out: List[str], cp: CodePlan,
+                    space: CompileSpace) -> None:
+        """The prescribed-balance block inside ``derivative!`` — a
+        nested out-of-place ``_balance`` residual over the non-state
+        unknowns (every runtime block contributes ``rhs .- lhs``),
+        solved once via ``_solve_balance`` and unpacked; the state's
+        derivative slots then drop into ``dy``."""
+        spec = t0_layout(cp)
+        state_names = {s.name or inst_name(s.instance) for s in cp.states}
+        unknowns = [u for u in spec.unknowns if u[0] not in state_names]
+        out.append("    function _balance(u)")
+        offset = 0
+        for name, size, _idx in unknowns:
+            out.append("        %s = u[%d:%d]" % (name, offset + 1,
+                                                  offset + size))
+            offset += size
+        seen = set()
+        for g in cp.gathers:
+            if g.instance in seen:
+                continue
+            seen.add(g.instance)
+            pieces = [p for p in cp.gathers if p.instance == g.instance]
+            out.append("    " + (self.gather(pieces[0], space)
+                                  if len(pieces) == 1
+                                  else self.gather_multi(pieces, space)))
+        for i, (block, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(block, space,
+                                  cp.names.get(block.entity_type, {}))
+            out.append("        _r%d = vec((%s) .- %s)" % (i, rhs, term))
+        out.append("        return vcat(%s)" % ", ".join(
+            "_r%d" % i for i in range(len(spec.residuals))))
+        out.append("    end")
+        out.append("    _u = _solve_balance(_balance, %d)" % offset)
+        offset = 0
+        for name, size, _idx in unknowns:
+            out.append("    %s = _u[%d:%d]" % (name, offset + 1,
+                                               offset + size))
+            offset += size
+        for state, derivative in zip(cp.states, spec.dx):
+            out.append("    dy[%d:%d] = vec(%s)" % (
+                state.offset + 1, state.offset + state.size, derivative))
+
+    def footer(self, out: List[str], cp: CodePlan,
+               space: CompileSpace) -> None:
+        """``_solve_balance`` — the checked-solve shim shared by the
+        constrained ``_balance`` and the t=0 solve: a consistency
+        check at size 0, convergence + residual bound otherwise.
+        The underdetermined-rank guard the other dialects emit is
+        skipped — NLsolve does not return a Jacobian."""
+        if not cp.constraints:
+            return
+        out += ["function _solve_balance(fun, count)",
+                "    if count == 0",
+                "        u = zeros(0); r = fun(u)",
+                "        (all(isfinite, r) && all(abs.(r) .<= 1e-8)) "
+                "|| error(\"inconsistent prescribed balance\")",
+                "        return u",
+                "    end",
+                "    res = nlsolve(fun, zeros(count))",
+                "    r = fun(res.zero)",
+                "    (NLsolve.converged(res) && all(isfinite, r) && "
+                "all(abs.(r) .<= 1e-8)) "
+                "|| error(\"prescribed balance solve failed\")",
+                "    return res.zero",
+                "end"]
+
     def initial(self, out: List[str], cp: CodePlan, spec: T0Layout,
                 space: CompileSpace) -> None:
         """``initial(par; steady_state=false)`` → ``y0``: one
@@ -302,23 +373,23 @@ class _Julia(Dialect):
         for i, (b, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
-            out.append("        _r%d = (%s) .- %s" % (i, rhs, term))
+            out.append("        _r%d = vec((%s) .- %s)" % (i, rhs, term))
         out.append("        _rs = Any[%s]" % ", ".join(
             "_r%d" % i for i in range(len(spec.residuals))))
         out.append("        if steady_state")
         out.append("            append!(_rs, Any[%s])  # der = 0"
-                   % ", ".join(spec.dx))
+                   % ", ".join("vec(%s)" % n for n in spec.dx))
         out.append("        else")
         ne = 0
         for b, term in spec.initials:
             rhs = self.render_rhs(b, space,
                                   cp.names.get(b.entity_type, {}))
-            out.append("            _e%d = (%s) .- %s  # initialise"
+            out.append("            _e%d = vec((%s) .- %s)  # initialise"
                        % (ne, rhs, term))
             ne += 1
         for st in spec.pins:
             nm = st.name or inst_name(st.instance)
-            out.append("            _e%d = (%s) .- %s  # IC pin"
+            out.append("            _e%d = vec((%s) .- %s)  # IC pin"
                        % (ne, self.pin_term(st, space), nm))
             ne += 1
         out.append("            append!(_rs, Any[%s])" % ", ".join(
@@ -327,8 +398,12 @@ class _Julia(Dialect):
         out.append("        return isempty(_rs) ? zeros(length(u)) : "
                    "vcat(_rs...)")
         out.append("    end")
-        out.append("    _u = nlsolve(_t0, zeros(%d)).zero"
-                   % sum(sz for _, sz, _ in spec.unknowns))
+        if cp.constraints:
+            out.append("    _u = _solve_balance(_t0, %d)"
+                       % sum(sz for _, sz, _ in spec.unknowns))
+        else:
+            out.append("    _u = nlsolve(_t0, zeros(%d)).zero"
+                       % sum(sz for _, sz, _ in spec.unknowns))
         y_names = {s.name or inst_name(s.instance) for s in cp.states}
         off = 0
         for nm, sz, _idx in spec.unknowns:
