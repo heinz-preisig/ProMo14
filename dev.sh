@@ -2,7 +2,8 @@
 # ProMo suite development control script
 #
 # Usage:
-#   ./dev.sh start [service]      — start one or all services
+#   ./dev.sh start [service]      — start a service (default: backend = the hub;
+#                                   'all' adds the Vite dev servers for frontend work)
 #   ./dev.sh stop [service]       — stop one or all services
 #   ./dev.sh restart [service]    — stop then start
 #   ./dev.sh status               — show what is running
@@ -256,8 +257,11 @@ for l in d.get("lines", []):
 }
 
 cmd_start() {
-    local service="${1:-all}"
-    _need_npm   # frontend starts run npm via nohup — needs nvm on PATH
+    # Default is backend-only: the hub + backend-served dist bundles
+    # are the normal way to use the suite.  'all' is for frontend
+    # development (per-app Vite dev servers with hot reload).
+    local service="${1:-backend}"
+    [ "$service" = "backend" ] || _need_npm  # npm via nvm only for frontend starts
     echo "Starting: $service"
     case "$service" in
         backend)  _start_backend ;;
@@ -423,7 +427,8 @@ cmd_help() {
     echo ""
     echo "Commands:"
     echo "  status              — show running services and data files"
-    echo "  start   [service]   — start service(s)"
+    echo "  start   [service]   — start service(s) (default: backend = hub;
+                        'all' adds Vite dev servers for frontend work)"
     echo "  stop    [service]   — stop service(s)"
     echo "  restart [service]   — restart service(s)"
     echo "  wipe                — delete all data files (backend reseeds on start)"
@@ -434,7 +439,8 @@ cmd_help() {
     echo "  build   [service]   — rebuild backend-served dist bundle(s)"
     echo "  logs    [service]   — tail log for a service"
     echo ""
-    echo "Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all (default)"
+    echo "Services: backend | ontology | equation | behaviour | modeller | species | instantiation | all"
+    echo "          (start default: backend;  stop/restart default: all)"
     echo ""
     echo "URLs:"
     echo "  Hub (entry point)  http://localhost:$BACKEND_PORT/"
@@ -457,7 +463,7 @@ SERVICE="${2:-all}"
 
 case "$COMMAND" in
     status)        cmd_status ;;
-    start)         cmd_start "$SERVICE" ;;
+    start)         cmd_start "${2:-}" ;;
     stop)          cmd_stop "$SERVICE" ;;
     restart)       cmd_restart "$SERVICE" ;;
     wipe)          cmd_wipe ;;
