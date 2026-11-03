@@ -138,6 +138,19 @@ class _Matlab(Dialect):
 
     # -- dialect hooks ---------------------------------------------------
 
+    def broadcast(self, src: str, mapped: List[int],
+                  dims: List[int], lhs_indices=None,
+                  space=None) -> str:
+        if not dims:
+            return src
+        rep = [str(d if m == 1 and d > 1 else 1)
+               for m, d in zip(mapped, dims)]
+        val = "repmat(reshape((%s).value, [%s]), [%s])" % (
+            src,
+            " ".join(str(d) for d in mapped),
+            " ".join(rep))
+        return self._mdv(dict(lhs_indices or {}), space, val)
+
     def matrix(self, mx, space: CompileSpace) -> str:
         nm = mx.name or inst_name(mx.instance)
         lit = '_mx("%s")' % nm

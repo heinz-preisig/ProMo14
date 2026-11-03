@@ -336,7 +336,8 @@ class Dialect:
                           for i in want]
                 dims = [len(els or []) or 1
                         for els in (block.lhs_indices or {}).values()]
-                src = self.broadcast(src, mapped, dims)
+                src = self.broadcast(src, mapped, dims,
+                                     block.lhs_indices, space)
             else:
                 # Different index sets bind positionally (loop
                 # residuals rely on it) — only a flat-size gap is
@@ -373,7 +374,8 @@ class Dialect:
                        + self.target)
 
     def broadcast(self, src: str, mapped: List[int],
-                  dims: List[int]) -> str:
+                  dims: List[int], lhs_indices=None,
+                  space=None) -> str:
         """§31 broadcast: ``mapped`` gives the shape to reshape the
         rhs into — its own extents at their positions in the lhs's
         axis order, ``1`` at the lhs-only (contact) positions;

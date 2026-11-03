@@ -139,7 +139,8 @@ class _Python(Dialect):
             src, ", ".join(str(p) for p in perm))
 
     def broadcast(self, src: str, mapped: List[int],
-                  dims: List[int]) -> str:
+                  dims: List[int], lhs_indices=None,
+                  space=None) -> str:
         if not dims:
             return src
         return "np.broadcast_to(np.asarray(%s).reshape((%s)), (%s))" % (

@@ -147,6 +147,14 @@ class _Julia(Dialect):
         return "permutedims(%s, (%s))" % (
             src, ", ".join(str(p + 1) for p in perm))
 
+    def broadcast(self, src: str, mapped: List[int],
+                  dims: List[int], lhs_indices=None,
+                  space=None) -> str:
+        if not dims:
+            return src
+        return "reshape(%s, (%s))" % (
+            src, ", ".join(str(d) for d in mapped))
+
     def state_unpack(self, st, space: CompileSpace) -> str:
         return "    %s = @view y[%d:%d]" % (
             st.name or inst_name(st.instance),
