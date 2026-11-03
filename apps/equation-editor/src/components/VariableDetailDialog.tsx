@@ -211,7 +211,7 @@ export default function VariableDetailDialog({
     >
       <div
         style={{
-          width: 480,
+          width: 880,
           maxHeight: '85vh',
           background: '#fff',
           borderRadius: 6,
@@ -243,7 +243,15 @@ export default function VariableDetailDialog({
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '0 20px',
+          }}
+        >
+          {/* left column — identity */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             Name <span style={{ color: '#c62828' }}>*</span>
             <input
@@ -300,6 +308,20 @@ export default function VariableDetailDialog({
             </label>
           </div>
 
+          <div style={{ fontSize: 12, color: '#555' }}>
+            <strong>Port variable:</strong> {variable.port_variable ? 'yes' : 'no'} ·{' '}
+            <strong>Index structures:</strong>{' '}
+            {variable.index_structures
+              ?.map((iri) => {
+                const idx = indices.find((i) => i.iri === iri)
+                return idx ? `${indexShortLabel(idx)} (${idx.label})` : iri
+              })
+              .join(', ') || '—'}
+          </div>
+          </div>
+
+          {/* right column — structure */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             {applicableAxes(axes, network, domains).length ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -449,16 +471,6 @@ export default function VariableDetailDialog({
               </div>
             </div>
           )}
-
-          <div style={{ fontSize: 12, color: '#555' }}>
-            <strong>Port variable:</strong> {variable.port_variable ? 'yes' : 'no'} ·{' '}
-            <strong>Index structures:</strong>{' '}
-            {variable.index_structures
-              ?.map((iri) => {
-                const idx = indices.find((i) => i.iri === iri)
-                return idx ? `${indexShortLabel(idx)} (${idx.label})` : iri
-              })
-              .join(', ') || '—'}
           </div>
         </div>
 
