@@ -3021,3 +3021,217 @@ token-comparability (already supported).  Decide when implementing.
 - Remaining: matlab/julia `broadcast` stubs raise — implement when
   those dialects are exercised; `E_11` still references `p_mech`
   (unused by test_01).
+
+## 32. Is the arc-typed boundary var an artifact? — OPEN (2026-11-04)
+
+User objection to the §31 option-B landing: `p_conv [A_conv]` is a
+machine-forced duplicate of `p_mech` — same physical field, re-indexed
+to satisfy the contraction rule.  "For the user completely illogical."
+
+Why it currently must exist (all three load-bearing):
+
+- `*` contracts by declared index IRI only — `p_mech[N]` cannot
+  contract `F_conv`'s `A_conv` axis.
+- The port needs a declared landing var — the gather must bind into
+  something arc-typed.
+- `F` is per-entity (`F_conv_ct` covers only the transport's own
+  node), so the global-style `Fᵀ·p` (per-arc endpoint difference, no
+  boundary var at all) cannot form — the peer pressures live in other
+  entities' instances; the gather brings them in, and gathers land on
+  bound (arc) elements.
+
+### Options weighed
+
+- **A — keep the artifact, fix the label.**  A boundary var is a real
+  modeling slot (where film/contact/membrane physics would attach);
+  it only reads redundant in the pure shared-trace case.  Cost: a
+  second var per effort-at-boundary; systematic naming
+  (`p_mech@A_conv`) would make it legible.  Zero machinery change.
+- **B — port = `p_mech`, arc view resolved by binding.**  The port
+  endpoint is the shared var itself; on event-dynamic entities its
+  bound domain *is* the contact set, so `ct!p_mech` is arc-typed by
+  context.  Cost: index structure becomes context-dependent —
+  `p_mech` means `[N]` on capacities, `[A_conv]` on transports; the
+  checker must see bound elements (the wall §31 kept).
+- **C — explicit trace op `contact(x, A_conv)`.**  Declares its
+  result index like `reduceSum`'s index args; the wall survives;
+  equations self-contained.  Cost: an operator whose semantics spans
+  declared/bound — and (user's objection) it *restates* a contact
+  fact the drawn arc already declares.
+
+### User's current feeling (not a ruling)
+
+The fact of contact is given by the arc drawn in the modeller —
+topology already carries it.  Requiring a separate operator (or,
+implicitly, a second var) double-declares what the arrow says.  This
+weights against C and toward B.
+
+### Sharpening of B under that objection
+
+B need not be "context magic": the bound domain is *declared* — in
+the model artefact, by the drawn arcs.  The wall isn't crossed into
+mystery; the index check would run in binding context rather than
+standalone at authoring.  Refined form:
+
+- Port endpoint = `(var, optional mechanism qualifier)` —
+  `p_mech @ A_conv`.  The qualifier is *not* a restatement of contact
+  (topology supplies the arcs); it selects *which mechanism family*
+  the shared var couples through — needed when a transport touches
+  multiple mechanisms (p drives convection, not diffusion — same
+  `token_momentum`, different efforts; token can't disambiguate).
+  Single-mechanism transports default to "all contacts": zero extra
+  authoring.
+- Bound index typing is a *port-var rule only*: a var used as a port
+  on an event-dynamic entity types by its contacted arc subset —
+  narrow, not a general context-typing of all vars.
+- Equations keep writing `p_mech`; `E_4` becomes
+  `(kConvX . Ayz) . (p_mech * F_conv)` — p is p, the arrow is the
+  contact, the qualifier lives in the assignment not the expression.
+
+### Shared multi-mechanism boundaries (user's sharpening)
+
+- Usually convection and diffusion couple through *different*
+  boundaries — no problem.  The load-bearing case: **one arc in two
+  mechanism sub-indices** (arc touches a multi-mechanism transport,
+  or a convection and a diffusion transport on the same boundary).
+- At such an arc element the boundary hosts two independent
+  couplings: `p_mech` (convection effort) *and* `μ` (diffusion
+  effort) on the effort side; `fmc_conv` and `fmc_diff` on the flow
+  side.  The capacity's balance correctly nets both —
+  `Σ F_conv·fmc_conv + Σ F_diff·fmc_diff` = convective + diffusive
+  influx at the same boundary.
+- So the coupling engine must know **which var couples through which
+  mechanism**.  That pairing is physics, not topology — the arc says
+  *where* contact is, not *what* acts across it.  Candidate homes:
+  - port-endpoint qualifier (B'); per-instance, repeats science in
+    every assignment;
+  - **mechanism→effort-kind rule in the vocabulary** — convection
+    declares "driven by momentum effort", diffusion by "chemical
+    potential" — pairing then automatic by quantity-kind, lives where
+    physics lives (preferred);
+  - the artifact var (A) smuggles it into the index declaration.
+- Degenerate edge: transport↔transport arc with *mixed* mechanisms —
+  both sub-indices, both endpoints stateless, no capacity to read
+  peer values from.  Parked (§15 deferred case).
+- Takeaway: the qualifier's job is var↔mechanism *pairing*, not arc
+  selection.  Single-mechanism entities default cleanly; shared
+  boundaries need the pairing, best sourced from vocabulary.
+
+### Mechanism as vocabulary object (user direction, pending design)
+
+User lean: declare mechanism rules in the vocabulary — the pairing
+is science.  What a mechanism must declare reduces to the **coupling
+signature**: what drives it + what it carries.  The law stays
+user-authored.
+
+- `promo:Mechanism` resource — first-class vocabulary, like seeded
+  `F_<mech>`/arc types.  Entity types link `promo:hasMechanism`;
+  sub-index membership already resolves via entity type.
+- Two slots (not one): **`drives`** = effort quantity-kind
+  (§24: effort axis + token); **`carries`** = flowing token.
+- Key subtlety: **effort token ≠ carried token** — convection is
+  driven by a *momentum* effort but carries *mass*.  Pairing can't
+  be token-only matching.
+
+  ```
+  convection   drives: effort(momentum)     carries: mass
+  diffusion    drives: effort(chem-pot)     carries: mass (per-species)
+  conduction   drives: effort(temperature)  carries: energy
+  radiation    drives: effort(temperature)  carries: energy
+  ```
+
+  Radiation/conduction share a signature — mechanisms answer *which
+  vars couple*, not *how they relate* (the law is the user's).
+- Open semantic questions: advected energy (one mechanism or
+  bulk-convection + derived T·fmc coupling?); species-indexed
+  diffusion efforts (`μ_s` carries S axis from scheme); transfer
+  class attribute (boundary-transfer vs source — work_source differs).
+
+### Coupled transport + entropy (user's continuation)
+
+Three distinct phenomena, different landings:
+
+- **Advected energy** — stays capacity-owned: the shared `fmc` IS
+  the energy carrier; the capacity's energy balance applies the
+  upstream enthalpy (`fmc·h_up`).  One coupling, energy derived
+  downstream.  Open modelling point: *which* upstream (upwind rule).
+- **Coupled transport** (Soret/Dufour/thermo-osmosis) — the law
+  itself mixes domains → `drives` becomes a SET: the transport needs
+  one effort view per kind at the same contact (`μ` AND `T`).
+  `carries` also a set when one coupled law produces both mass and
+  energy fluxes.  Onsager matrix stays user-authored; mechanism
+  declares only the coupling interface.
+- **Entropy** — production needs declared conjugate pairs:
+  `σ = Σ J_k·X_k`.  A `conjugates` slot pairing drives↔carries is
+  the signature's thermodynamic spine; enables a future entropy
+  token (advected `s·fmc` + conductive `q/T` boundary fluxes +
+  production inside transport AND capacity).
+
+Refined signature sketch:
+
+```
+convection      drives:{momentum}     carries:{mass}
+                conjugates:{(p, fmc)}
+conduction      drives:{temperature}  carries:{energy}
+                conjugates:{(T, q)}
+soret-diffusion drives:{chem-pot, T}  carries:{mass}
+                conjugates:{(μ, j)}
+coupled m+e     drives:{chem-pot, T}  carries:{mass, energy}
+                conjugates:{(μ, fm), (T, fe)}
+```
+
+### Film resistance & co. — user's ruling: explicit nodes, agreed
+
+- A film/contact layer has its own physics → it is a *system*, drawn
+  as a node (`capacity—arc—film—arc—capacity`), not hidden in a
+  boundary var.  Implicit-in-var treatment would make the boundary a
+  thing again — precisely what §31 removed.
+- A film *is* a stateless transport (n contacts, own resistance law)
+  — existing machinery handles it; e.g. a conduction film is just
+  `drives:{temperature}, carries:{energy}` on a node.
+- Consequence: **A's escape hatch evaporates** — arc-typed port vars
+  are an internal instantiation form (bound elements), never
+  user-authored.  B' is unqualified.
+
+### Semipermeable walls (use case, validated)
+
+- User case: a transport entity that *inhibits* species transfer —
+  black/white selectivity.  No objection: a membrane IS a stateless
+  transport; selectivity lives in its type/law, never in the arc.
+- Two levels:
+  - **Law-level (today)**: permeability `k_s [S]`, zero rows for
+    retained species — fluxes evaluate zero, extent stays full-S.
+  - **Signature-level (honest form)**: `carries` gets species scope
+    (`carries:{mass(water, urea)}`) — retained species never enter
+    the transport's species extent; impossible states unrepresentable.
+    Membrane classes (MF/UF/RO) are literally named by retention →
+    evidence for species-granular `carries`.
+- Modeller: nothing needed — arcs are species-agnostic carriers;
+  selectivity is entity-type content.  Membrane glyph = graphicals.
+- Dependency: per-entity species admission in the scheme's
+  distribution fixpoint — check when species content is authored.
+- Also a natural multi-mechanism shared boundary: selective mass
+  transport + heat conduction at the same contacts.
+
+### Ruled & implemented (stage 1, 2026-11-04)
+
+- **B' unqualified**: the shared var itself is the port — bound-typed
+  by the contacted arcs in the binding context.  The arc-typed
+  duplicate (p_conv/V_59) is gone from the vocabulary.
+- Index-checking runs in *binding context*: the same var may check to
+  different shapes under different assignments (p_mech `[N]` on a
+  capacity, `[A_conv]` on the transport).  The bound elements *are*
+  declared — in the model artefact — so the wall is moved to
+  instantiation, where binding is authoritative anyway.
+- Mechanics: `builder.contact_arc_domain` — a node-declared port var
+  on an event-dynamic entity binds its incident token-flow arcs under
+  the covering mechanism sub-index nearest the entity's own type
+  (`A_conv` for convection, never the `A_mass` union).  No covering
+  sub-index → `port-domain-unresolved`; several covering at equal
+  selector distance → `port-domain-ambiguous` (the var↔mechanism
+  pairing gap — stage 2 vocabulary).  `PlanBlock.var_bound` carries
+  the bound index IRIs to the emit-time check, which re-checks the
+  RHS in a scoped CompileSpace.
+- Verified on test_01: `p_mech * F_conv` contracts over `A_conv`,
+  gathers concatenate peer values in contact order, all three
+  dialects emit; E_4/E_11 repointed, V_59 deleted.

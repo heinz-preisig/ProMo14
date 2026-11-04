@@ -1,7 +1,7 @@
 # Docker + User-Data Workflow
 
 ProMo14 ships as a Docker image. The image contains the tool suite (backend
-and built frontend); the user's ontology / var/expr repository stays on the
+and built frontends); the user's artefact repository stays on the
 host and is mounted into the container at runtime.
 
 This keeps **tools** and **user data** separate:
@@ -11,14 +11,24 @@ This keeps **tools** and **user data** separate:
 - Upgrades do not touch user files; user experiments do not depend on a
   particular host Python/Node installation.
 
+The mount is also the delivery channel for **generated code**: the container
+never executes user models — emitted source (matlab/julia) must reach the
+host filesystem, and writing it into the mounted dir avoids the
+browser-download + unzip dance.
+
 ## Layout
 
 ```
 my-project/
-├── ontology.json
-├── variables_v8.json
-├── variableExpression.trig
-└── promo          # user-side launcher (copied from scripts/)
+├── ontology.trig        # authored artefacts (inputs, version-worthy)
+├── library.trig
+├── model.trig
+├── assignments.trig
+├── generated/           # derived products — emitted code, re-emittable
+│   ├── _GENERATED.txt   #   "do not edit" marker
+│   ├── <model>/         #   <model>.m, model_data.json, run.m
+│   └── @MultiDimVar/    #   shared runtime library
+└── promo                # user-side launcher (copied from scripts/)
 ```
 
 The container sees the same directory as `/data`:
@@ -26,6 +36,10 @@ The container sees the same directory as `/data`:
 ```
 PROMO_DATA_DIR=/data
 ```
+
+Two subtrees, two roles: `*.trig` at the root are authored artefacts;
+`generated/` is a pure re-emission target that may be deleted wholesale
+(it re-emits from the model artefact on every export).
 
 ## Quick start
 
@@ -48,9 +62,10 @@ PROMO_DATA_DIR=/data
     ./promo
     ```
 
-    The container mounts the current directory on `/data`, starts the
-    FastAPI backend, and serves the equation editor SPA on
-    <http://localhost:8000>.
+    The container mounts the current directory on `/data` (as the calling
+    user via `--user`, so everything the backend writes — artefact saves,
+    `generated/` exports — comes out user-owned), starts the FastAPI
+    backend, and serves the suite on <http://localhost:8000>.
 
 4.  Update the image later:
 
@@ -71,10 +86,23 @@ PROMO_DATA_DIR=/data
 
 ## Saving data
 
-The backend writes the edited ontology to
-`$PROMO_DATA_DIR/ontology.trig` when the user publishes.  The legacy
-`variables_v8.json` / `ontology.json` files are still read on first boot if
-`ontology.trig` is absent, so existing projects keep working.
+The backend writes artefact graphs as one `.trig` per artefact line under
+`$PROMO_DATA_DIR` on save/publish.
+
+## Generated code — two delivery channels
+
+Same file set (`<model>.m`, `model_data.json`, `run.m`, `@MultiDimVar/`),
+two sinks:
+
+- **Project-dir export** — `POST /api/instantiate/code/export` writes
+  `$PROMO_DATA_DIR/generated/<model>/…`. The Docker path: files land on the
+  user's filesystem directly. Needs a writable mount.
+- **Zip download** — `GET /api/instantiate/code/bundle` serves the same set
+  as `<model>.zip` over HTTP. The universal fallback: works with read-only
+  or remote mounts, and handy for grabbing a copy anywhere.
+
+Generated code is a derived product, never an artefact — nothing is lost
+if `generated/` is wiped; it re-renders from the model artefact.
 
 ## Building the image
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  bundleUrl,
+  exportToDir,
   generateCode,
   GRAPH_IRI,
   loadReport,
@@ -11,6 +13,7 @@ import {
 import type {
   CodeOut,
   EntityInstantiation,
+  ExportOut,
   InitialOut,
   InstantiationReport,
   VarBinding,
@@ -728,6 +731,7 @@ export default function App() {
   const [err, setErr] = useState<string | null>(null)
   const [target, setTarget] = useState<Target>('julia')
   const [code, setCode] = useState<CodeOut | null>(null)
+  const [exported, setExported] = useState<ExportOut | null>(null)
   const [busy, setBusy] = useState(false)
   const lab = useLabel(report)
 
@@ -741,6 +745,18 @@ export default function App() {
       setCode(await generateCode(target))
     } catch (e) {
       setCode({ ok: false, target, source: '', error: String(e), problems: [] })
+    } finally {
+      setBusy(false)
+    }
+  }, [target])
+
+  const exportDir = useCallback(async () => {
+    setBusy(true)
+    try {
+      setExported(await exportToDir(undefined, target))
+    } catch (e) {
+      setExported({ ok: false, target, dir: '', files: [],
+                    error: String(e), problems: [] })
     } finally {
       setBusy(false)
     }
@@ -782,6 +798,21 @@ export default function App() {
           <button style={S.btn(true)} onClick={generate} disabled={busy}>
             {busy ? '…' : 'Generate code'}
           </button>
+          <button
+            style={S.btn(false)}
+            onClick={() => { window.location.href = bundleUrl(undefined, target) }}
+            title="zip for the selected target — matlab is ready-to-run (<name>.m + model_data.json + run.m + @MultiDimVar); others carry source + model_data.json"
+          >
+            {target} bundle
+          </button>
+          <button
+            style={S.btn(false)}
+            onClick={exportDir}
+            disabled={busy}
+            title="write the same file set into <data>/generated/<name>/ — the Docker-volume delivery channel"
+          >
+            export to project dir
+          </button>
           <button style={S.btn(false)} onClick={() => saveStore()}>
             Save
           </button>
@@ -794,6 +825,26 @@ export default function App() {
             <div style={{ ...S.card, borderColor: '#dc2626' }}>
               <h3 style={{ ...S.h3, color: '#dc2626' }}>Report failed</h3>
               <pre style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{err}</pre>
+            </div>
+          )}
+          {exported && (
+            <div style={{
+              ...S.card,
+              borderColor: exported.ok ? '#16a34a' : '#dc2626',
+            }}>
+              <h3 style={{
+                ...S.h3,
+                color: exported.ok ? '#16a34a' : '#dc2626',
+              }}>
+                {exported.ok
+                  ? `Exported ${exported.files.length} files`
+                  : 'Export failed'}
+              </h3>
+              <pre style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>
+                {exported.ok
+                  ? `${exported.dir}\n${exported.files.join('\n')}`
+                  : exported.error}
+              </pre>
             </div>
           )}
           {report && <Problems report={report} />}

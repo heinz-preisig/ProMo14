@@ -38,6 +38,7 @@ from .builder import (
     Instantiation,
     Problem,
     VarBinding,
+    VarInfo,
     _arc_like,
     _node_like,
 )
@@ -140,6 +141,14 @@ class PlanBlock:
     #: the emitter size-check a rhs whose index set differs from the
     #: lhs's (positional binding is legal; a size gap is not).
     bound: Dict[str, List[str]] = field(default_factory=dict)
+    #: §32 bound-typing: var IRI → bound index IRIs, for vars whose
+    #: bound index set differs from the declared
+    #: ``index_structures`` (a node-declared port var on an
+    #: event-dynamic entity is typed by its contact arcs).  The
+    #: RHS check must run against this binding context — the
+    #: declared form would green-light ``p_mech * F_conv`` as an
+    #: N-contraction, which is the wrong math.
+    var_bound: Dict[str, List[str]] = field(default_factory=dict)
     #: The lhs needs an initial guess (a ``SolveRoot`` body in the
     #: canonical RHS) — emitters seed the nested solve with it.
     guess: bool = False
@@ -210,7 +219,8 @@ def plan(report: Instantiation, sched: Schedule,
          indices: Dict[str, IndexInfo],
          values: Optional[Dict[str, Dict[str, Any]]] = None,
          canonicals: Optional[Dict[str, Any]] = None,
-         occurrences: Optional[List[Dict[str, Any]]] = None
+         occurrences: Optional[List[Dict[str, Any]]] = None,
+         variables: Optional[Dict[str, VarInfo]] = None
          ) -> CodePlan:
     """Lower an instantiation report + schedule into a CodePlan.
 
@@ -446,6 +456,18 @@ def plan(report: Instantiation, sched: Schedule,
         m = et_bound.setdefault(et, {})
         for iri, els in (vb.indices or {}).items():
             m.setdefault(iri, els or [])
+    # §32 bound-typing: vars whose BOUND index set differs from the
+    # declared ``index_structures`` — the emit-time check must see
+    # the bound form (a node-declared port var on an event-dynamic
+    # entity types by its contact arcs).
+    et_var_bound: Dict[str, Dict[str, List[str]]] = {}
+    for (et, v_iri), vb in bindings.items():
+        var = (variables or {}).get(v_iri)
+        bound_keys = [k for k, els in (vb.indices or {}).items()
+                      if els is not None]
+        if (var is not None
+                and set(bound_keys) != set(var.index_structures)):
+            et_var_bound.setdefault(et, {})[v_iri] = bound_keys
     prescribed = {(e.entity_type, q.equation) for e in report.entity_types
                   for q in e.equations if q.constraint}
     for lvl in sched.levels:
@@ -468,6 +490,7 @@ def plan(report: Instantiation, sched: Schedule,
                 rhs=eq.rhs if eq else "",
                 loop=b.loop,
                 bound=et_bound.get(b.entity_type, {}),
+                var_bound=et_var_bound.get(b.entity_type, {}),
                 guess=needs_guess,
                 occurrence=_occ_of_elements(
                     [el for els in vb.indices.values() for el in els]
@@ -495,6 +518,7 @@ def plan(report: Instantiation, sched: Schedule,
                 inputs=list(eq.inputs) if eq else list(q.inputs),
                 rhs=eq.rhs if eq else "",
                 bound=et_bound.get(e.entity_type, {}),
+                var_bound=et_var_bound.get(e.entity_type, {}),
                 occurrence=_occ_of_elements(
                     [el for els in vb.indices.values() for el in els]
                     if vb else [],

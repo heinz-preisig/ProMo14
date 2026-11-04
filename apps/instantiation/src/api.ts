@@ -1,10 +1,11 @@
 import type {
   CodeOut,
+  ExportOut,
   InitialOut,
   InstantiationReport,
   ValueCellsOut,
 } from './types'
-import { createApiFetch, sessionParam } from '@promo/ui'
+import { createApiFetch, sessionParam, withParams } from '@promo/ui'
 
 export { GRAPH_IRI, getStoreStatus, saveStore } from '@promo/ui'
 
@@ -26,6 +27,32 @@ export async function generateCode(target: string): Promise<CodeOut> {
   )
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<CodeOut>
+}
+
+/** The target's bundle zip — navigate to this URL; the
+ *  ``Content-Disposition`` header makes the browser save
+ *  ``<artefact>.zip``.  The dispatcher/dir/zip take the artefact's
+ *  label (``test_01``) unless ``name`` overrides. */
+export function bundleUrl(name?: string, target = 'matlab'): string {
+  return withParams('/api/instantiate/code/bundle',
+                    { vars: VARS_IRI, name, target })
+}
+
+/** The same file set written into the mounted data dir —
+ *  ``<PROMO_DATA_DIR>/generated/<name>/``.  The Docker-volume
+ *  delivery channel: files land on the user's filesystem, no
+ *  download+unzip step. */
+export async function exportToDir(
+  name?: string,
+  target = 'matlab',
+): Promise<ExportOut> {
+  const res = await apiFetch(
+    withParams('/api/instantiate/code/export',
+               { vars: VARS_IRI, name, target }),
+    { method: 'POST' },
+  )
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<ExportOut>
 }
 
 /** Replace a variable's §20 value-cell table — ``values`` keys are

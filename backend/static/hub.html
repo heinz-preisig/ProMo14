@@ -301,7 +301,7 @@
         <text class="s" x="410" y="141">future — entity graphics</text>
       </g>
       <g class="stage" data-stage="codegen" onclick="stageClick([],
-        'Code generation has no app — GET /api/instantiate/code?graph=<model>&target=python|julia|matlab emits the derivative function.',
+        'Code generation lives in the Instantiation app — pick a target and Generate code; the matlab bundle button downloads a ready-to-run zip (model.m + model_data.json + run.m + shared MultiDimVar). API: GET /api/instantiate/code?graph=model-iri&target=… or /code/bundle?graph=model-iri for the zip.',
         [{types:['model','glass'], stage:'modeller', label:'a model artefact'}])">
         <rect x="835" y="15" width="150" height="44" rx="6"/>
         <text class="t" x="910" y="33">Code Generation</text>

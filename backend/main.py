@@ -31,6 +31,7 @@ _NON_MUTATING_POSTS = {
     "/api/behaviour/evaluate",
     "/api/ontology/save",
     "/api/ontology/publish",
+    "/api/instantiate/code/export",
 }
 
 

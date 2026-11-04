@@ -291,6 +291,7 @@ def build(nodes: Dict[str, NodeInfo],
           species_index: Optional[str] = None,
           reaction_index: Optional[str] = None,
           temporal_types: Optional[Dict[str, str]] = None,
+          parents: Optional[Dict[str, str]] = None,
           ) -> Instantiation:
     """Assemble the instantiated equation set for a model.
 
@@ -300,8 +301,10 @@ def build(nodes: Dict[str, NodeInfo],
     ``token_parents``/``token_kinds`` describe the token taxonomy.
     ``temporal_types`` maps entity-type IRI → ``temporalType``
     literal — an ``event-dynamic`` entity is distributed over its
-    boundary, so its port-connected vars bind contacted elements
-    (§31).
+    boundary, so its port-connected vars bind the contact arcs
+    under the covering mechanism sub-index (§32).
+    ``parents`` is the entity-type ``promo:parent`` chain, used to
+    pick the covering sub-index nearest the entity's own type.
     ``species``/``species_index`` are the §20 distribution output and
     the species index IRI — when present, a species index binds to the
     union of species over the variable's topological extent.
@@ -381,21 +384,54 @@ def build(nodes: Dict[str, NodeInfo],
             return list(t_nodes)
         return arc_elements(idx_iri, type_node_set)
 
-    def contacted_elements(t_nodes: List[str]) -> List[str]:
-        """§31 boundary extent: the peers' elements at the type's
-        contacts — one slot per contact, deduplicated in
-        incident-arc order.  An event-dynamic entity's domain
-        degenerates to its boundary, so its port-connected vars
-        bind these instead of its own nodes."""
-        out: List[str] = []
-        for n in t_nodes:
-            for a_iri in incident.get(n, []):
-                arc = arcs[a_iri]
-                for end in (arc.source, arc.target):
-                    if (end is not None and end != n
-                            and end not in out):
-                        out.append(end)
-        return out
+    def contact_arc_domain(et: str, t_set: Set[str],
+                           ) -> Tuple[Optional[str], List[str], bool]:
+        """§32 B' port domain for an event-dynamic entity: the
+        contact slots of a node-declared port var are the incident
+        token-flow ARCS (the contact IS the arc — the peer-node
+        extent was the §31 interim).  Returns the covering
+        mechanism sub-index IRI, the bound arc list, and an
+        ``ambiguous`` flag.
+
+        The covering sub-index is the one whose ``selector`` is
+        NEAREST the entity's own type along the ``promo:parent``
+        chain — a convection transport's contacts bind under
+        ``A_conv`` rather than the ``A_mass`` union.  Several
+        sub-indices covering at equal selector distance means the
+        entity hosts several mechanisms and no var↔mechanism
+        pairing exists yet (§32 stage-2) — reported upstream.
+        ``None`` index = no mechanism sub-index covers the
+        contacts (also reported upstream)."""
+        contact = sorted(
+            {a for n in t_set for a in incident.get(n, [])}
+            & set(token_flow_arcs))
+        if not contact:
+            return None, [], False
+        covers = [si for si in sub_indices.values()
+                  if set(contact) <= set(members.get(si.iri, []))]
+        if not covers:
+            return None, contact, False
+
+        def _dist(si: SubIndexInfo) -> int:
+            """Steps from ``et`` to ``si.selector`` up the parent
+            chain — 0 when the sub-index is defined by this very
+            mechanism type."""
+            d, cur = 0, et
+            seen: Set[str] = set()
+            while cur is not None and cur not in seen:
+                if cur == si.selector:
+                    return d
+                seen.add(cur)
+                cur = (parents or {}).get(cur)
+                d += 1
+            return len(sub_indices) + 1
+
+        covers.sort(key=lambda si: (
+            _dist(si), len(members.get(si.iri, [])), si.iri))
+        best = covers[0]
+        ambiguous = (len(covers) > 1
+                     and _dist(covers[1]) == _dist(best))
+        return best.iri, contact, ambiguous
 
     def species_elements(arc_idx: Optional[str], node_idx: Optional[str],
                          type_node_set: Set[str], t_nodes: List[str]
@@ -451,13 +487,33 @@ def build(nodes: Dict[str, NodeInfo],
                 message=f"assignment for {_frag(et)} is not closed",
                 entity_type=et))
 
-        # §31: an event-dynamic entity's domain is its boundary —
-        # its port-connected vars bind the contacted peer elements
-        # (one slot per contact) rather than its own nodes.
-        boundary_extent: Optional[List[str]] = (
-            contacted_elements(t_nodes)
-            if (temporal_types or {}).get(et) == "event-dynamic"
-            else None)
+        # §32 B': an event-dynamic entity's domain is its
+        # boundary — a node-declared port var's contact slots are
+        # the incident ARCS, bound under the covering mechanism
+        # sub-index (A_conv for a convection transport).  The
+        # bound index IRI differs from the declared one — the RHS
+        # check must run in this binding context (plan.py carries
+        # it to the emit-time check).
+        port_arc_index: Optional[str] = None
+        port_arcs: List[str] = []
+        if (temporal_types or {}).get(et) == "event-dynamic":
+            port_arc_index, port_arcs, ambiguous = \
+                contact_arc_domain(et, t_set)
+            if port_arcs and port_arc_index is None:
+                problems.append(Problem(
+                    kind="port-domain-unresolved",
+                    message=f"no arc sub-index covers "
+                            f"{_frag(et)}'s contacts — port vars "
+                            f"can't be bound-typed (§32)",
+                    entity_type=et))
+            elif ambiguous:
+                problems.append(Problem(
+                    kind="port-domain-ambiguous",
+                    message=f"{_frag(et)}'s contacts are covered "
+                            f"by several mechanism sub-indices at "
+                            f"equal depth — port vars need "
+                            f"var↔mechanism pairing (§32)",
+                    entity_type=et))
 
         # ADR-008 layer 2 — promo:fix marks on this type's nodes.
         # Bindings are per-entity-type, so a mark only binds cleanly
@@ -599,10 +655,19 @@ def build(nodes: Dict[str, NodeInfo],
                         arc_idx, node_idx, t_set, t_nodes)
                 elif reaction_index is not None and i == reaction_index:
                     bound_indices[i] = reaction_elements(t_nodes)
-                elif (boundary_extent is not None
+                elif (port_arcs
                       and v_iri in asg.ports
                       and _node_like(indices.get(i), indices)):
-                    bound_indices[i] = list(boundary_extent)
+                    # §32 B': the shared var stays itself — it is
+                    # bound-typed by the contact arcs under the
+                    # covering mechanism sub-index (or the base
+                    # arc index when nothing covers).
+                    idx_key = port_arc_index or base_arc_index
+                    if idx_key is not None:
+                        bound_indices[idx_key] = list(port_arcs)
+                    else:
+                        bound_indices[i] = index_elements(
+                            i, t_set, t_nodes)
                 else:
                     bound_indices[i] = index_elements(i, t_set, t_nodes)
 

@@ -111,6 +111,18 @@ export interface CodeOut {
   problems: string[]
 }
 
+/** POST /api/instantiate/code/export response — the bundle file set
+ *  written under ``<PROMO_DATA_DIR>/generated/`` (Docker-volume
+ *  delivery channel; the zip needs no writable mount). */
+export interface ExportOut {
+  ok: boolean
+  target: string
+  dir: string
+  files: string[]
+  error: string | null
+  problems: string[]
+}
+
 /** GET/PUT /api/instantiate/values response. */
 export interface ValueCellsOut {
   variable: string

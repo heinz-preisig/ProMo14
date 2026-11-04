@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Tuple
 
 from backend.equation.checker import check
@@ -164,6 +164,45 @@ def bound_dims(indices: Dict[str, List[str]]) -> List[int]:
     return [max(1, len(els or [])) for els in indices.values()]
 
 
+def gather_groups(cp: CodePlan) -> List[List]:
+    """``cp.gathers`` deduplicated into sibling groups — all pieces
+    sharing one ``instance`` (one port binding) travel together."""
+    seen: set = set()
+    groups: List[List] = []
+    for g in cp.gathers:
+        if g.instance in seen:
+            continue
+        seen.add(g.instance)
+        groups.append([s for s in cp.gathers
+                       if s.instance == g.instance])
+    return groups
+
+
+def split_gathers(cp: CodePlan, inner_names: set
+                  ) -> Tuple[List[List], List[List]]:
+    """Partition the gather groups into ``(invariant, dependent)`` for
+    a nested residual solve: a group is invariant when none of its
+    pieces references a name bound by the residual's unknown unpack —
+    it is then emitted once, outside the iterated function body, which
+    is where the §31 shared-variable coupling lands most boundary
+    gathers (their peers are parameters).  A peer naming another
+    gather's port keeps the group inside as well (relative ordering
+    of the two groups could not be checked)."""
+    gather_names = {g.name or inst_name(g.instance)
+                    for g in cp.gathers}
+
+    def invariant(pieces) -> bool:
+        own = pieces[0].name or inst_name(pieces[0].instance)
+        bound_inside = inner_names | (gather_names - {own})
+        return all(
+            (s.peer_name or inst_name(s.peer_instance))
+            not in bound_inside for s in pieces)
+
+    groups = gather_groups(cp)
+    return ([p for p in groups if invariant(p)],
+            [p for p in groups if not invariant(p)])
+
+
 @dataclass
 class T0Layout:
     """The t=0 solve layout shared by the dialects.
@@ -301,8 +340,29 @@ class Dialect:
         if not block.rhs:
             return self.no_rhs
         lhs = Var(inst_name(block.lhs_instance))
-        checked = check(parse(block.rhs), space, lhs)
-        rnd = Renderer(space, self.target, lhs=lhs.name,
+        check_space = space
+        if block.var_bound:
+            # §32 bound-typing: vars whose bound index set differs
+            # from the declared one (a node-declared port var on an
+            # event-dynamic entity types by its contact arcs) —
+            # re-check the rhs against the BOUND structure, not the
+            # declaration.  ``p_mech * F_conv`` must contract over
+            # the shared arc sub-index here; checked against the
+            # declared [N] it would green-light the wrong math.
+            variables = dict(space.variables)
+            for v_iri, idxs in block.var_bound.items():
+                v = variables.get(v_iri)
+                if v is not None:
+                    variables[v_iri] = replace(
+                        v, index_structures=list(idxs))
+            check_space = CompileSpace(
+                variables, space.indices,
+                space.variable_definition_network,
+                space.expression_definition_network,
+                space.table, space.accessible_networks,
+                space.network_tree)
+        checked = check(parse(block.rhs), check_space, lhs)
+        rnd = Renderer(check_space, self.target, lhs=lhs.name,
                        names=names, sparse=self.sparse_names)
         src = rnd.render(checked)
         if rnd._is_sparse(checked):
