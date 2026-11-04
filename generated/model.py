@@ -13,103 +13,88 @@ def _mx(n):
     e = _DATA['matrices'][n]
     return scipy.sparse.coo_array(        (e['v'], (e['i'], e['j'])),        shape=(e['m'], e['n']))
 
-V_25_convection_transport = _mx("V_25_convection_transport")  # F over [1 x 2]
-V_25_lumped = _mx("V_25_lumped")  # F over [1 x 1]
+def _tab(n):
+    e = _DATA['values'][n]
+    return np.array(e['flat']).reshape(e['dims'])
 
-def derivative(t, y, par):
-    dy = np.zeros(3)
-    V_31_convection_transport = y[0:2]
-    V_6 = y[2:3]
-    V_17_convection_transport = par["V_17_convection_transport"]
-    V_13_convection_transport = par["V_13_convection_transport"]
-    V_29_convection_transport = par["V_29_convection_transport"]
-    V_10_environment = par["V_10_environment"]
-    V_24_environment = par["V_24_environment"]
-    V_10_lumped = par["V_10_lumped"]
-    V_17_lumped = par["V_17_lumped"]
-    V_13_lumped = par["V_13_lumped"]
-    V_29_lumped = par["V_29_lumped"]
-    V_11 = par["V_11"]
-    V_22 = par["V_22"]
-    V_21 = par["V_21"]
-    # level 0
-    V_10_convection_transport = V_10_environment[[0, -1]]  # port gather
-    V_26_convection_transport = np.sign(( V_25_convection_transport @ V_10_convection_transport ))
-    V_30_convection_transport = ( ( V_25_convection_transport.multiply(np.asarray(( ( 1 / V_29_convection_transport * V_13_convection_transport ) * V_17_convection_transport ))) ).multiply(np.asarray(V_10_convection_transport)) )
-    V_26_lumped = np.sign(( V_25_lumped @ V_10_lumped ))
-    V_30_lumped = ( ( V_25_lumped.multiply(np.asarray(( ( 1 / V_29_lumped * V_13_lumped ) * V_17_lumped ))) ).multiply(np.asarray(V_10_lumped)) )
-    # level 1
-    V_24_convection_transport = V_24_environment[[0, 0]]  # port gather
-    V_24_lumped = V_24_environment[[0]]  # port gather
-    V_27_convection_transport = ( ( ( V_25_convection_transport - ( np.abs(V_25_convection_transport).multiply(np.asarray(V_26_convection_transport)) ) ).multiply(np.asarray(0.5)) ) @ V_24_convection_transport )
-    V_27_lumped = ( ( ( V_25_lumped - ( np.abs(V_25_lumped).multiply(np.asarray(V_26_lumped)) ) ).multiply(np.asarray(0.5)) ) @ V_24_lumped )
-    # level 2
-    dy[0:2] = _d(( V_30_convection_transport.multiply(np.asarray(V_27_convection_transport)) ))
-    V_31_lumped = ( V_30_lumped.multiply(np.asarray(V_27_lumped)) )
-    # level 3
-    V_32 = ( V_25_lumped.multiply(V_31_lumped) )
-    # level 4
-    V_33 = V_32
-    # level 5
-    dy[2:3] = _d(scipy.integrate.quad_vec(lambda V_11: (V_33).toarray(), V_21, V_22)[0])
+def _ictab(n):
+    e = _DATA['ics'][n]
+    return np.array(e['flat']).reshape(e['dims'])
+
+F_conv_convection_transport = _mx("F_conv_convection_transport")  # F over [1 x 2]
+F_conv_lumped = _mx("F_conv_lumped")  # F over [1 x 1]
+
+def derivative(t, y, par, out=None):
+    dy = np.zeros(1)
+    V_57_lumped = y[0:1].reshape((1, 1))
+    V_39 = _tab("V_39")  # value cells
+    V_54 = _tab("V_54")  # value cells
+    V_57_convection_transport = _tab("V_57_convection_transport")  # value cells
+    V_34_environment = _tab("V_34_environment")  # value cells
+    V_34_lumped = _tab("V_34_lumped")  # value cells
+    V_34_convection_transport = np.concatenate([np.ravel(V_34_environment[[0]]), np.ravel(V_34_lumped[[0]])])  # port gather
+    def _balance(u):
+        V_56_convection_transport = u[0:2].reshape((2, 1))
+        dV_57_lumped = u[2:3].reshape((1, 1))
+        V_56_lumped = V_56_convection_transport[[1]]  # port gather
+        _r0 = np.ravel((_d(np.broadcast_to(np.asarray(( ( V_39 * V_54 ) * ( V_34_convection_transport @ F_conv_convection_transport ) )).reshape((1, 1)), (2, 1)))) - V_56_convection_transport)
+        _r1 = np.ravel((_d(np.asarray(np.sum(( F_conv_lumped.multiply(np.asarray(V_56_lumped)) ), axis=0)).reshape((1, 1)))) - dV_57_lumped)
+        _r2 = np.ravel((_d(np.broadcast_to(np.asarray(np.sum(( F_conv_convection_transport.multiply(np.asarray(V_56_convection_transport)) ), axis=0)).reshape((1, 1)), (2, 1)))) - V_57_convection_transport)
+        return np.concatenate([_r0, _r1, _r2])
+    _u = _solve_balance(_balance, 3)
+    V_56_convection_transport = _u[0:2].reshape((2, 1))
+    dV_57_lumped = _u[2:3].reshape((1, 1))
+    dy[0:1] = np.ravel(dV_57_lumped)
+    if out is not None:  # §21 outputs
+        out["V_56_convection_transport"] = _d(V_56_convection_transport)
     return dy
 
+def outputs(t, y, par):
+    _o = {}
+    derivative(t, y, par, out=_o)
+    return _o
+
 def initial(par, steady_state=False):
-    V_17_convection_transport = par["V_17_convection_transport"]
-    V_13_convection_transport = par["V_13_convection_transport"]
-    V_29_convection_transport = par["V_29_convection_transport"]
-    V_10_environment = par["V_10_environment"]
-    V_24_environment = par["V_24_environment"]
-    V_10_lumped = par["V_10_lumped"]
-    V_17_lumped = par["V_17_lumped"]
-    V_13_lumped = par["V_13_lumped"]
-    V_29_lumped = par["V_29_lumped"]
-    V_11 = par["V_11"]
-    V_22 = par["V_22"]
-    V_21 = par["V_21"]
+    V_39 = _tab("V_39")  # value cells
+    V_54 = _tab("V_54")  # value cells
+    V_57_convection_transport = _tab("V_57_convection_transport")  # value cells
+    V_34_environment = _tab("V_34_environment")  # value cells
+    V_34_lumped = _tab("V_34_lumped")  # value cells
+    V_34_convection_transport = np.concatenate([np.ravel(V_34_environment[[0]]), np.ravel(V_34_lumped[[0]])])  # port gather
     def _t0(u):  # t=0 residual system
-        V_31_convection_transport = u[0:2]
-        V_6 = u[2:3]
-        V_26_convection_transport = u[3:5]
-        V_30_convection_transport = u[5:7]
-        V_26_lumped = u[7:8]
-        V_30_lumped = u[8:9]
-        V_27_convection_transport = u[9:11]
-        V_27_lumped = u[11:12]
-        V_31_lumped = u[12:13]
-        V_32 = u[13:14]
-        V_33 = u[14:15]
-        dV_31_convection_transport = u[15:17]
-        dV_6 = u[17:18]
+        V_57_lumped = u[0:1].reshape((1, 1))
+        V_56_convection_transport = u[1:3].reshape((2, 1))
+        dV_57_lumped = u[3:4].reshape((1, 1))
         if steady_state:
             total_diff = lambda x, y: np.zeros_like(x)  # der = 0
-        V_10_convection_transport = V_10_environment[[0, -1]]  # port gather
-        V_24_convection_transport = V_24_environment[[0, 0]]  # port gather
-        V_24_lumped = V_24_environment[[0]]  # port gather
-        _r0 = (_d(np.sign(( V_25_convection_transport @ V_10_convection_transport )))) - V_26_convection_transport
-        _r1 = (_d(( ( V_25_convection_transport.multiply(np.asarray(( ( 1 / V_29_convection_transport * V_13_convection_transport ) * V_17_convection_transport ))) ).multiply(np.asarray(V_10_convection_transport)) ))) - V_30_convection_transport
-        _r2 = (_d(np.sign(( V_25_lumped @ V_10_lumped )))) - V_26_lumped
-        _r3 = (_d(( ( V_25_lumped.multiply(np.asarray(( ( 1 / V_29_lumped * V_13_lumped ) * V_17_lumped ))) ).multiply(np.asarray(V_10_lumped)) ))) - V_30_lumped
-        _r4 = (_d(( ( ( V_25_convection_transport - ( np.abs(V_25_convection_transport).multiply(np.asarray(V_26_convection_transport)) ) ).multiply(np.asarray(0.5)) ) @ V_24_convection_transport ))) - V_27_convection_transport
-        _r5 = (_d(( ( ( V_25_lumped - ( np.abs(V_25_lumped).multiply(np.asarray(V_26_lumped)) ) ).multiply(np.asarray(0.5)) ) @ V_24_lumped ))) - V_27_lumped
-        _r6 = (_d(( V_30_convection_transport.multiply(np.asarray(V_27_convection_transport)) ))) - dV_31_convection_transport
-        _r7 = (_d(( V_30_lumped.multiply(np.asarray(V_27_lumped)) ))) - V_31_lumped
-        _r8 = (_d(( V_25_lumped.multiply(V_31_lumped) ))) - V_32
-        _r9 = (_d(V_32)) - V_33
-        _r10 = (_d(scipy.integrate.quad_vec(lambda V_11: (V_33).toarray(), V_21, V_22)[0])) - dV_6
-        _rs = [np.atleast_1d(_r0), np.atleast_1d(_r1), np.atleast_1d(_r2), np.atleast_1d(_r3), np.atleast_1d(_r4), np.atleast_1d(_r5), np.atleast_1d(_r6), np.atleast_1d(_r7), np.atleast_1d(_r8), np.atleast_1d(_r9), np.atleast_1d(_r10)]
+        V_56_lumped = V_56_convection_transport[[1]]  # port gather
+        _r0 = (_d(np.broadcast_to(np.asarray(( ( V_39 * V_54 ) * ( V_34_convection_transport @ F_conv_convection_transport ) )).reshape((1, 1)), (2, 1)))) - V_56_convection_transport
+        _r1 = (_d(np.asarray(np.sum(( F_conv_lumped.multiply(np.asarray(V_56_lumped)) ), axis=0)).reshape((1, 1)))) - dV_57_lumped
+        _r2 = (_d(np.broadcast_to(np.asarray(np.sum(( F_conv_convection_transport.multiply(np.asarray(V_56_convection_transport)) ), axis=0)).reshape((1, 1)), (2, 1)))) - V_57_convection_transport
+        _rs = [np.ravel(_r0), np.ravel(_r1), np.ravel(_r2)]
         if steady_state:
-            _rs += [np.atleast_1d(dV_31_convection_transport), np.atleast_1d(dV_6)]  # der = 0
+            _rs += [np.ravel(dV_57_lumped)]  # der = 0
         else:
-            _e0 = (par["ic0_V_31_convection_transport"]) - V_31_convection_transport  # IC pin
-            _e1 = (par["ic0_V_6"]) - V_6  # IC pin
-            _rs += [np.atleast_1d(_e0), np.atleast_1d(_e1)]
+            _e0 = (_ictab("V_57_lumped")) - V_57_lumped  # IC pin
+            _rs += [np.ravel(_e0)]
         return np.concatenate(_rs) if _rs else np.zeros_like(u)
-    _u = fsolve(_t0, np.zeros(18))
-    V_31_convection_transport = _u[0:2]
-    V_6 = _u[2:3]
-    return np.concatenate([np.atleast_1d(V_31_convection_transport), np.atleast_1d(V_6)])
+    _u = _solve_balance(_t0, 4)
+    V_57_lumped = _u[0:1].reshape((1, 1))
+    return np.concatenate([np.ravel(V_57_lumped)])
 
 
 def _d(x):
-    return x.toarray() if scipy.sparse.issparse(x) else x
+    return x.toarray() if hasattr(x, 'toarray') else x
+
+def _solve_balance(fun, size):
+    guess = np.zeros(size)
+    if size == 0:
+        if not np.allclose(fun(guess), 0, atol=1e-8):
+            raise ValueError('prescribed balance is inconsistent')
+        return guess
+    result = scipy.optimize.least_squares(fun, guess, ftol=1e-12, xtol=1e-12, gtol=1e-12)
+    if not result.success or not np.all(np.isfinite(result.fun)) or np.max(np.abs(result.fun), initial=0) > 1e-8:
+        raise ValueError('prescribed balance solve failed: ' + result.message)
+    if np.linalg.matrix_rank(result.jac) < size:
+        raise ValueError('prescribed balance system is underdetermined')
+    return result.x

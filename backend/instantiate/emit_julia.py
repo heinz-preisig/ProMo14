@@ -50,6 +50,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    split_gathers,
     t0_layout,
     tear_loop,
 )
@@ -106,6 +107,9 @@ class _Julia(Dialect):
             # NLsolve backs the algebraic-loop residuals, the t=0
             # solve and the prescribed-balance check.
             out.append("using NLsolve")
+        if cp.constraints:
+            # rank() — the underdetermined guard in _solve_balance.
+            out.append("using LinearAlgebra")
         if kinds:
             # the shared data file — matrices + value/IC tables live
             # in model_data.json next to this file (the language-
@@ -114,18 +118,21 @@ class _Julia(Dialect):
                     '_DATA = JSON.parsefile(joinpath(@__DIR__, '
                     '"model_data.json"))']
         if "matrices" in kinds:
+            # JSON.parsefile yields Vector{Any} — Int/Float64 the
+            # pieces or sparse() and the solvers see Any-typed data.
             out += ["", "function _mx(n)",
                     "    e = _DATA[\"matrices\"][n]",
-                    "    return sparse(e[\"i\"] .+ 1, e[\"j\"] .+ 1, "
-                    "e[\"v\"], e[\"m\"], e[\"n\"])",
+                    "    return sparse(Int.(e[\"i\"]) .+ 1, "
+                    "Int.(e[\"j\"]) .+ 1, "
+                    "Float64.(e[\"v\"]), e[\"m\"], e[\"n\"])",
                     "end"]
         if {"values", "ics"} & kinds:
             out += ["", "function _shape(e)",
                     "    d = Int.(e[\"dims\"])",
-                    "    length(d) <= 1 && return e[\"flat\"]",
+                    "    length(d) <= 1 && return Float64.(e[\"flat\"])",
                     "    # C-order flat → column-major: reshape the "
                     "    # reversed dims, permute back",
-                    "    return permutedims(reshape(e[\"flat\"], "
+                    "    return permutedims(reshape(Float64.(e[\"flat\"]), "
                     "        reverse(d)...), reverse(1:length(d)))",
                     "end"]
         if "values" in kinds:
@@ -276,21 +283,21 @@ class _Julia(Dialect):
         spec = t0_layout(cp)
         state_names = {s.name or inst_name(s.instance) for s in cp.states}
         unknowns = [u for u in spec.unknowns if u[0] not in state_names]
+        invariant, dependent = split_gathers(
+            cp, {n for n, _, _ in unknowns})
+        for pieces in invariant:
+            out.append(self.gather(pieces[0], space) if len(pieces) == 1
+                       else self.gather_multi(pieces, space))
         out.append("    function _balance(u)")
         offset = 0
         for name, size, _idx in unknowns:
             out.append("        %s = u[%d:%d]" % (name, offset + 1,
                                                   offset + size))
             offset += size
-        seen = set()
-        for g in cp.gathers:
-            if g.instance in seen:
-                continue
-            seen.add(g.instance)
-            pieces = [p for p in cp.gathers if p.instance == g.instance]
+        for pieces in dependent:
             out.append("    " + (self.gather(pieces[0], space)
-                                  if len(pieces) == 1
-                                  else self.gather_multi(pieces, space)))
+                                 if len(pieces) == 1
+                                 else self.gather_multi(pieces, space)))
         for i, (block, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(block, space,
                                   cp.names.get(block.entity_type, {}))
@@ -298,7 +305,11 @@ class _Julia(Dialect):
         out.append("        return vcat(%s)" % ", ".join(
             "_r%d" % i for i in range(len(spec.residuals))))
         out.append("    end")
-        out.append("    _u = _solve_balance(_balance, %d)" % offset)
+        # :balance — callsite key for the cached finite-diff A in
+        # _solve_balance (a fresh closure each call can't be hashed
+        # stably; the affine u-coefficients are capture-invariant).
+        out.append("    _u = _solve_balance(_balance, %d, :balance)"
+                   % offset)
         offset = 0
         for name, size, _idx in unknowns:
             out.append("    %s = _u[%d:%d]" % (name, offset + 1,
@@ -310,20 +321,78 @@ class _Julia(Dialect):
 
     def footer(self, out: List[str], cp: CodePlan,
                space: CompileSpace) -> None:
-        """``_solve_balance`` — the checked-solve shim shared by the
-        constrained ``_balance`` and the t=0 solve: a consistency
-        check at size 0, convergence + residual bound otherwise.
-        The underdetermined-rank guard the other dialects emit is
-        skipped — NLsolve does not return a Jacobian."""
+        """Emits the helpers the rendered body can reference:
+        ``contract`` (the Reduce → ``contract(a,b,(li,),(ri,))``
+        codegen emits) whenever it appears, then ``_solve_balance`` —
+        the checked-solve shim shared by the constrained ``_balance``
+        and the t=0 solve: a consistency check at size 0, convergence
+        + residual bound otherwise.  The underdetermined-rank guard
+        the other dialects emit is skipped — NLsolve does not return
+        a Jacobian."""
+        if any("contract(" in l for l in out):
+            # generic tensor contraction: permute the contracted axes
+            # to a's end / b's front, reshape to a matmul, reshape
+            # back to the remaining axes (1×1 when all contract).
+            out += ["function contract(a, b, da, db)",
+                    "    ca = collect(da); cb = collect(db)",
+                    "    fa = setdiff(collect(1:ndims(a)), ca)",
+                    "    fb = setdiff(collect(1:ndims(b)), cb)",
+                    "    A = reshape(permutedims(a, vcat(fa, ca)), :,",
+                    "                prod(size(a)[ca]))",
+                    "    B = reshape(permutedims(b, vcat(cb, fb)),",
+                    "                prod(size(b)[cb]), :)",
+                    "    dims = (size(a)[fa]..., size(b)[fb]...)",
+                    "    return isempty(dims) ? A * B : "
+                    "reshape(A * B, dims)",
+                    "end"]
         if not cp.constraints:
             return
-        out += ["function _solve_balance(fun, count)",
+        # Emitted balance residuals are affine in u — and can be
+        # overdetermined (nlsolve is square-only).  Affine fast-path:
+        # a finite-difference A built once per callsite key, then
+        # u = -(A \ r0) — backslash is QR least-squares when
+        # length(r) > count — plus one residual verify.  Verify-fail
+        # or rank-deficiency demotes: underdetermined → hard error
+        # (mirrors the other dialects), square → nlsolve fallback,
+        # non-square nonlinear → no Julia solver — explicit error.
+        out += ["const _BAL_CACHE = Dict{Any, Any}()",
+                "function _solve_balance(fun, count, key)",
                 "    if count == 0",
                 "        u = zeros(0); r = fun(u)",
                 "        (all(isfinite, r) && all(abs.(r) .<= 1e-8)) "
                 "|| error(\"inconsistent prescribed balance\")",
                 "        return u",
                 "    end",
+                "    cached = get(_BAL_CACHE, key, nothing)",
+                "    cached === :nonlin && "
+                "return _nlsolve_balance(fun, count)",
+                "    r0 = fun(zeros(count))",
+                "    n = length(r0)",
+                "    if cached === nothing",
+                "        cached = zeros(n, count)",
+                "        for k in 1:count",
+                "            ek = zeros(count); ek[k] = 1.0",
+                "            cached[:, k] = fun(ek) .- r0",
+                "        end",
+                "        _BAL_CACHE[key] = cached",
+                "    end",
+                "    A = cached",
+                "    if rank(A) >= count",
+                "        u = -(A \\ r0)",
+                "        r = fun(u)",
+                "        (all(isfinite, r) && all(abs.(r) .<= 1e-8)) "
+                "&& return u",
+                "    else",
+                "        error(\"prescribed balance system is "
+                "underdetermined\")",
+                "    end",
+                "    n == count || error(\"prescribed balance: "
+                "nonlinear overdetermined system — unsupported\")",
+                "    _BAL_CACHE[key] = :nonlin",
+                "    return _nlsolve_balance(fun, count)",
+                "end",
+                "",
+                "function _nlsolve_balance(fun, count)",
                 "    res = nlsolve(fun, zeros(count))",
                 "    r = fun(res.zero)",
                 "    (NLsolve.converged(res) && all(isfinite, r) && "
@@ -349,6 +418,11 @@ class _Julia(Dialect):
             out.append(self.param(p, space))
         y0 = "; ".join(s.name or inst_name(s.instance)
                       for s in cp.states)
+        invariant, dependent = split_gathers(
+            cp, {n for n, _, _ in spec.unknowns})
+        for pieces in invariant:
+            out.append(self.gather(pieces[0], space) if len(pieces) == 1
+                       else self.gather_multi(pieces, space))
         out.append("    function _t0(u)  # t=0 residual system")
         off = 0
         for nm, sz, _idx in spec.unknowns:
@@ -358,15 +432,10 @@ class _Julia(Dialect):
         out.append("            total_diff = (x, y) -> x .* 0  "
                    "# der = 0")
         out.append("        end")
-        seen_g = set()
-        for g in cp.gathers:
-            if g.instance in seen_g:
-                continue
-            seen_g.add(g.instance)
-            sibs = [s for s in cp.gathers if s.instance == g.instance]
-            out.append("    " + (self.gather(sibs[0], space)
-                                  if len(sibs) == 1
-                                  else self.gather_multi(sibs, space)))
+        for pieces in dependent:
+            out.append("    " + (self.gather(pieces[0], space)
+                                 if len(pieces) == 1
+                                 else self.gather_multi(pieces, space)))
         for b in spec.guesses:
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("        x0 = %s  # root! guess" % nm)
@@ -399,7 +468,10 @@ class _Julia(Dialect):
                    "vcat(_rs...)")
         out.append("    end")
         if cp.constraints:
-            out.append("    _u = _solve_balance(_t0, %d)"
+            # (:t0, steady_state) — the flag changes _t0's residual
+            # set, so it must key the cached finite-diff A too.
+            out.append("    _u = _solve_balance(_t0, %d, "
+                       "(:t0, steady_state))"
                        % sum(sz for _, sz, _ in spec.unknowns))
         else:
             out.append("    _u = nlsolve(_t0, zeros(%d)).zero"
@@ -411,7 +483,9 @@ class _Julia(Dialect):
                 out.append("    %s = _u[%d:%d]" % (nm, off + 1,
                                                   off + sz))
             off += sz
-        out.append("    return [%s]" % y0)
+        # vcat, not […] — Julia [x] nests (Vector{Vector}), Matlab
+        # [x] concatenates; the solver wants the flat y0 vector.
+        out.append("    return vcat(%s)" % y0)
         out.append("end")
         out.append("")
 
@@ -419,3 +493,98 @@ class _Julia(Dialect):
 def emit_julia(cp: CodePlan, space: CompileSpace) -> str:
     """Emit the in-place derivative function for a code plan."""
     return emit_plan(cp, space, _Julia())
+
+
+def julia_project(src: str) -> str:
+    """The bundle's ``Project.toml`` — the package deps of the emitted
+    ``src`` so ``run.jl`` can ``Pkg.instantiate()`` them.  Scanned
+    rather than declared unconditionally: NLsolve/JSON only appear in
+    the header when the model needs them, and Integral blocks render
+    ``quadgk(...)`` — a real package dep.
+    SparseArrays is stdlib but must still be listed once a project
+    environment is active."""
+    lines = ["[deps]",
+             'SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"']
+    if "using LinearAlgebra" in src:
+        lines.append('LinearAlgebra = '
+                     '"37e2e46d-f89d-539d-b4ee-838fcccc9c8e"')
+    if "using JSON" in src:
+        lines.append('JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"')
+    if "using NLsolve" in src:
+        lines.append('NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"')
+    if "quadgk(" in src:
+        lines.append('QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"')
+    return "\n".join(lines) + "\n"
+
+
+def julia_run_script(name: str, cp: CodePlan) -> str:
+    """A runnable driver emitted beside ``<name>.jl``: activate the
+    bundled Project.toml (first run resolves + precompiles NLsolve/
+    JSON, afterwards a cached no-op), include the model, then the t=0
+    initialisation and a fixed-step RK4 integration — no ODE-package
+    dependency, keeping the environment small."""
+    params = ", ".join(p.name for p in cp.params) or "none"
+    lines = [
+        "# %s — generated driver (run: bash run_julia.sh)." % name,
+        "# First run instantiates the bundled Project.toml; afterwards",
+        "# Pkg.instantiate() is a cached no-op.",
+        "using Pkg",
+        "Pkg.activate(@__DIR__)",
+        "Pkg.instantiate()",
+        "",
+        'include(joinpath(@__DIR__, "%s.jl"))' % name,
+        "",
+        'par = Dict{String, Float64}()  # parameter keys: %s' % params,
+    ]
+    if cp.states:
+        lines += [
+            "# t=0 from the prescribed ICs.  initial(par; steady_state=true)",
+            "# instead solves for a der=0 steady state — only for models",
+            "# that have one (a pure integrator does not).",
+            "y0 = initial(par; steady_state=false)",
+            "",
+            "# Plain fixed-step RK4 — OrdinaryDiffEq would add adaptivity",
+            "# but a much bigger dependency tree.",
+            "t0, t1, n = 0.0, 1.0, 101",
+            "t = collect(range(t0, t1; length=n))",
+            "dt = (t1 - t0) / (n - 1)",
+            "y = copy(y0)",
+            "traj = zeros(length(y), n)",
+            "traj[:, 1] .= y",
+            "for k in 1:n-1",
+            "    k1 = similar(y); k2 = similar(y)",
+            "    k3 = similar(y); k4 = similar(y)",
+            "    derivative!(k1, y, par, t[k])",
+            "    derivative!(k2, y .+ (dt / 2) .* k1, par, t[k] + dt / 2)",
+            "    derivative!(k3, y .+ (dt / 2) .* k2, par, t[k] + dt / 2)",
+            "    derivative!(k4, y .+ dt .* k3, par, t[k] + dt)",
+            "    y .+= (dt / 6) .* (k1 .+ 2 .* k2 .+ 2 .* k3 .+ k4)",
+            "    traj[:, k + 1] .= y",
+            "end",
+            'println("t: ", round.(t[1:10:end]; digits=3))',
+            'println("y: ", round.(traj[:, 1:10:end]\'; digits=6))',
+        ]
+    else:
+        lines += ["# no states — call the derivative directly:",
+                  "# dy = zeros(0); model.derivative!(dy, y, par, 0.0)"]
+    return "\n".join(lines) + "\n"
+
+
+def julia_shell_script() -> str:
+    """``run_julia.sh`` — a cwd-independent launcher emitted beside
+    ``run.jl``.  Julia's own Project/instantiate machinery covers the
+    dependencies, so the shell side only needs to find julia."""
+    return '''#!/usr/bin/env bash
+# run_julia.sh — run the emitted model driver (run.jl) from anywhere.
+# The bundled Project.toml declares the model's packages; run.jl
+# calls Pkg.instantiate() — the first run resolves and precompiles
+# them, afterwards it is a cached no-op.
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+command -v julia >/dev/null 2>&1 || {
+    echo "run_julia.sh: julia not found — install it (julialang.org)" >&2
+    exit 1
+}
+exec julia "$HERE/run.jl" "$@"
+'''

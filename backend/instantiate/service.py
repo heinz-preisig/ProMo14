@@ -28,13 +28,17 @@ state pins and solves ``der = 0``).
 
 from __future__ import annotations
 
+import io
 import json
+import re
+import zipfile
 from dataclasses import asdict
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from rdflib import RDF, RDFS, Literal, URIRef
 
@@ -45,6 +49,7 @@ from backend.behaviour.service import (
 from backend.core.capabilities import (
     entity_capabilities, graph_violations,
 )
+from backend.core.config import get_data_dir
 from backend.core.graph_store import PROMO, get_store
 from backend.core.iri import assignments_graph_iri, occurrence_prefix
 from backend.core.deps import editable_param, graph_param, resolve_graph
@@ -68,9 +73,11 @@ from .builder import (
 )
 from .builder import build as build_model
 from .emit_common import emit_data, inst_name
-from .emit_julia import emit_julia
-from .emit_matlab import emit_matlab
-from .emit_python import emit_python
+from .emit_julia import (emit_julia, julia_project, julia_run_script,
+                         julia_shell_script)
+from .emit_matlab import emit_matlab, matlab_run_script
+from .emit_python import (emit_python, python_run_script,
+                          python_shell_script)
 from .fbuilder import build
 from .distribute import (
     Reaction,
@@ -80,7 +87,7 @@ from .distribute import (
     SpeciesNode,
     distribute,
 )
-from .plan import plan, code_plan_from_dict, sub_plan_slice
+from .plan import CodePlan, plan, code_plan_from_dict, sub_plan_slice
 from .scheduler import schedule
 from .resolver import (
     ArcInfo,
@@ -217,6 +224,18 @@ class CodeOut(BaseModel):
     ok: bool
     target: str
     source: str = ""
+    error: Optional[str] = None
+    problems: List[str] = Field(default_factory=list)
+
+
+class ExportOut(BaseModel):
+    """Project-dir export result (``POST /code/export``): the bundle
+    file set written under ``<PROMO_DATA_DIR>/generated/``."""
+
+    ok: bool
+    target: str = "matlab"
+    dir: str = ""
+    files: List[str] = Field(default_factory=list)
     error: Optional[str] = None
     problems: List[str] = Field(default_factory=list)
 
@@ -1067,7 +1086,8 @@ def model_instantiation(
         token_parents, token_kinds,
         species=dist, species_index=species_index,
         reaction_index=reaction_index,
-        temporal_types=temporal_types)
+        temporal_types=temporal_types,
+        parents=parents)
     # §20 gesture admissibility — persisted model may predate the save
     # gate or have been written by another client; report violations
     # instead of silently instantiating them.
@@ -1088,7 +1108,7 @@ def model_instantiation(
     plan(report, sched, inc, equations, indices,
          values={v.var: store.value_cells(model_graph, v.var)
                  for e in report.entity_types for v in e.variables},
-         canonicals=canonicals)
+         canonicals=canonicals, variables=variables)
 
     return InstantiationReportOut(
         model=str(model_graph.identifier),
@@ -1194,7 +1214,8 @@ def _plan_for(graph_iri: str, vars: Optional[str],
         token_parents, token_kinds,
         species=dist, species_index=species_index,
         reaction_index=reaction_index,
-        temporal_types=temporal_types)
+        temporal_types=temporal_types,
+        parents=parents)
     for msg in graph_violations(store, model_graph):
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))
@@ -1208,7 +1229,8 @@ def _plan_for(graph_iri: str, vars: Optional[str],
                   cell_source.get(v.var, model_graph), v.var)
               for e in report.entity_types for v in e.variables}
     cp = plan(report, sched, inc, equations, indices, values=values,
-              canonicals=canonicals, occurrences=occurrences)
+              canonicals=canonicals, occurrences=occurrences,
+              variables=variables)
     return cp, report, store
 
 
@@ -1262,6 +1284,191 @@ def model_code(
                        problems=[p.kind for p in report.problems])
     return CodeOut(ok=True, target=target, source=source,
                    problems=[p.kind for p in report.problems])
+
+
+_MDV_DIR = (Path(__file__).resolve().parents[2]
+            / "runtime" / "matlab" / "@MultiDimVar")
+
+_GENERATED_MARKER = """\
+GENERATED — do not edit.
+Every file under generated/ is re-emitted on each export and the
+whole directory may be deleted: it reproduces from the model
+artefact via POST /api/instantiate/code/export (or the /code/bundle
+zip, which carries the same file set).
+"""
+
+
+def _plan_and_name(
+    name: Optional[str],
+    graph_iri: Optional[str],
+    vars: Optional[str],
+    species: Optional[str],
+    instantiation: Optional[str],
+):
+    """Shared plan + artefact-name resolution for the code-bundle
+    sinks (zip download and project-dir export).  Returns
+    ``(cp, problems, store, scope_vars, safe)``."""
+    if not graph_iri and not instantiation:
+        raise HTTPException(
+            status_code=400,
+            detail="graph= or instantiation= is required")
+    if instantiation:
+        store = get_store()
+        cp, problems, pin = _pinned_plan(store, instantiation)
+        scope_vars = vars or pin
+    else:
+        cp, report, store = _plan_for(graph_iri, vars, species)
+        problems = [p.kind for p in report.problems]
+        scope_vars = vars
+    if not name:
+        src = graph_iri or instantiation or "model"
+        ref = URIRef(src)
+        g = store.dataset.get_context(ref)
+        lbl = g.value(ref, RDFS.label)
+        name = str(lbl) if lbl else src.rstrip("/").rsplit("/", 1)[-1]
+    safe = re.sub(r"[^A-Za-z0-9_]", "_", name)
+    if not safe or not safe[0].isalpha():
+        safe = "m_" + safe
+    return cp, problems, store, scope_vars, safe
+
+
+#: Source-file extension per codegen target — the bundle names the
+#: emitted file ``<safe>.<ext>``.
+_EXT = {"python": "py", "julia": "jl", "matlab": "m", "data": "json"}
+
+
+def _bundle_files(safe: str, cp: CodePlan, space: CompileSpace,
+                  target: str = "matlab") -> Dict[str, bytes]:
+    """The model directory as ``{relpath: bytes}`` — served as a zip
+    by ``/code/bundle`` or written into the mounted data dir by
+    ``/code/export``.
+
+    ``<safe>/<safe>.<ext>`` is the emitted source (matlab gets the
+    dispatcher renamed to the model — no filename-mismatch warning)
+    plus ``model_data.json``.  Matlab additionally carries the
+    ``run.m`` driver and a shared ``@MultiDimVar`` copy one level up;
+    python carries ``run.py`` and ``run_python.sh`` (a dependency-
+    resolving launcher that works from any cwd)."""
+    if target == "data":
+        return {"%s/model_data.json" % safe:
+                emit_data(cp, space).encode()}
+    src = (emit_matlab(cp, space, function_name=safe)
+           if target == "matlab"
+           else _EMITTERS[target](cp, space))
+    files = {
+        "%s/%s.%s" % (safe, safe, _EXT[target]): src.encode(),
+        "%s/model_data.json" % safe: emit_data(cp, space).encode(),
+    }
+    if target == "python":
+        # ready-to-run too: run.py driver + run_python.sh, a shell
+        # bootstrap that resolves numpy/scipy (uv → system → .venv)
+        # and works from any cwd.
+        files["%s/run.py" % safe] = python_run_script(safe, cp).encode()
+        files["%s/run_python.sh" % safe] = python_shell_script().encode()
+    if target == "julia":
+        # ready-to-run: run.jl + run_julia.sh + Project.toml — run.jl
+        # activates and instantiates the declared env on first use.
+        files["%s/Project.toml" % safe] = julia_project(src).encode()
+        files["%s/run.jl" % safe] = julia_run_script(safe, cp).encode()
+        files["%s/run_julia.sh" % safe] = julia_shell_script().encode()
+    if target == "matlab":
+        files["%s/run.m" % safe] = matlab_run_script(safe, cp).encode()
+        for f in sorted(_MDV_DIR.glob("*.m")):
+            files["@MultiDimVar/%s" % f.name] = f.read_bytes()
+    return files
+
+
+def _check_target(target: str) -> str:
+    if target not in _EMITTERS:
+        raise HTTPException(
+            status_code=400,
+            detail="target must be one of %s" % sorted(_EMITTERS))
+    return target
+
+
+@router.get("/code/bundle")
+def code_bundle(
+    name: Optional[str] = None,
+    graph_iri: Optional[str] = Depends(graph_param),
+    vars: Optional[str] = None,
+    species: Optional[str] = None,
+    instantiation: Optional[str] = None,
+    target: str = "matlab",
+) -> Response:
+    """A model directory, zipped — the ``_bundle_files`` set for
+    ``target`` delivered over HTTP.  Unpack anywhere.  Matlab,
+    python and julia are ready-to-run (``run.m`` + ``@MultiDimVar``,
+    ``run.py`` + ``run_python.sh``, ``run.jl`` + ``run_julia.sh`` +
+    ``Project.toml``).
+
+    ``name`` defaults to the artefact's rdfs:label — the zip and the
+    dispatcher are then named like the catalogue line (``test_01``)."""
+    target = _check_target(target)
+    cp, problems, store, scope_vars, safe = _plan_and_name(
+        name, graph_iri, vars, species, instantiation)
+    try:
+        files = _bundle_files(safe, cp, _code_space(store, scope_vars),
+                              target)
+    except (ParseError, VarError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for path, data in files.items():
+            # writestr stamps 0600 by default — a distributed bundle
+            # wants the conventional 0644 after unzip.
+            zi = zipfile.ZipInfo(path, date_time=datetime.now().timetuple()[:6])
+            zi.external_attr = (0o755 if path.endswith(".sh")
+                                else 0o644) << 16
+            z.writestr(zi, data)
+    headers = {"Content-Disposition":
+               'attachment; filename="%s.zip"' % safe}
+    if problems:
+        headers["X-ProMo-Problems"] = json.dumps(problems)
+    return Response(content=buf.getvalue(),
+                    media_type="application/zip", headers=headers)
+
+
+@router.post("/code/export", response_model=ExportOut)
+def code_export(
+    name: Optional[str] = None,
+    graph_iri: Optional[str] = Depends(graph_param),
+    vars: Optional[str] = None,
+    species: Optional[str] = None,
+    instantiation: Optional[str] = None,
+    target: str = "matlab",
+) -> ExportOut:
+    """Write the same ``_bundle_files`` set into the mounted data
+    dir: ``<PROMO_DATA_DIR>/generated/<name>/…`` plus a shared
+    ``generated/@MultiDimVar/`` — the Docker-volume delivery channel
+    (the browser zip needs no writable mount; this one does).
+
+    POST because it mutates the host filesystem — it writes no
+    triples, so it is exempt from dirty tracking.  ``generated/`` is
+    a pure re-emission target: files may be wiped on each export, a
+    ``_GENERATED`` marker tells the user not to hand-edit."""
+    target = _check_target(target)
+    cp, problems, store, scope_vars, safe = _plan_and_name(
+        name, graph_iri, vars, species, instantiation)
+    try:
+        files = _bundle_files(safe, cp, _code_space(store, scope_vars),
+                              target)
+    except (ParseError, VarError) as e:
+        return ExportOut(ok=False, error=str(e), problems=problems)
+    gen = get_data_dir() / "generated"
+    try:
+        (gen / "_GENERATED.txt").parent.mkdir(parents=True,
+                                             exist_ok=True)
+        (gen / "_GENERATED.txt").write_text(_GENERATED_MARKER)
+        for rel, data in files.items():
+            p = gen / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(data)
+            if rel.endswith(".sh"):
+                p.chmod(0o755)
+    except OSError as e:
+        return ExportOut(ok=False, error=str(e), problems=problems)
+    return ExportOut(ok=True, target=target, dir=str(gen.resolve()),
+                     files=sorted(files), problems=problems)
 
 
 @router.post("/initial", response_model=InitialOut)

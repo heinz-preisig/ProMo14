@@ -43,6 +43,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    split_gathers,
     t0_layout,
     tear_loop,
 )
@@ -143,6 +144,11 @@ class _Python(Dialect):
                   space=None) -> str:
         if not dims:
             return src
+        if mapped == dims:
+            # every lhs-only axis is a singleton — a reshape alone
+            # lands on the bound shape; nothing to broadcast.
+            return "np.asarray(%s).reshape((%s))" % (
+                src, ", ".join(str(d) for d in dims))
         return "np.broadcast_to(np.asarray(%s).reshape((%s)), (%s))" % (
             src,
             ", ".join(str(d) for d in mapped),
@@ -278,20 +284,21 @@ class _Python(Dialect):
         spec = t0_layout(cp)
         state_names = {s.name or inst_name(s.instance) for s in cp.states}
         unknowns = [u for u in spec.unknowns if u[0] not in state_names]
+        invariant, dependent = split_gathers(
+            cp, {n for n, _, _ in unknowns})
+        for pieces in invariant:
+            out.append(self.gather(pieces[0], space) if len(pieces) == 1
+                       else self.gather_multi(pieces, space))
         out.append("    def _balance(u):")
         offset = 0
         for name, size, idx in unknowns:
             out.append("        %s = u[%d:%d]%s" % (
                 name, offset, offset + size, self._shape(idx)))
             offset += size
-        seen = set()
-        for g in cp.gathers:
-            if g.instance in seen:
-                continue
-            seen.add(g.instance)
-            pieces = [p for p in cp.gathers if p.instance == g.instance]
-            out.append("    " + (self.gather(g, space) if len(pieces) == 1
-                                  else self.gather_multi(pieces, space)))
+        for pieces in dependent:
+            out.append("    " + (self.gather(pieces[0], space)
+                                 if len(pieces) == 1
+                                 else self.gather_multi(pieces, space)))
         for i, (block, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(block, space, cp.names.get(block.entity_type, {}))
             out.append("        _r%d = np.ravel((%s) - %s)" % (i, self._den(rhs), term))
@@ -382,6 +389,11 @@ class _Python(Dialect):
             if p.kind == "constant" and p.value is not None:
                 continue
             out.append(self.param(p, space))
+        invariant, dependent = split_gathers(
+            cp, {n for n, _, _ in spec.unknowns})
+        for pieces in invariant:
+            out.append(self.gather(pieces[0], space) if len(pieces) == 1
+                       else self.gather_multi(pieces, space))
         y0 = "np.concatenate([%s])" % ", ".join(
             "np.ravel(%s)" % (s.name or inst_name(s.instance))
             for s in cp.states)
@@ -394,15 +406,10 @@ class _Python(Dialect):
         out.append("        if steady_state:")
         out.append("            total_diff = lambda x, y: "
                    "np.zeros_like(x)  # der = 0")
-        seen_g: set = set()
-        for g in cp.gathers:
-            if g.instance in seen_g:
-                continue
-            seen_g.add(g.instance)
-            sibs = [s for s in cp.gathers if s.instance == g.instance]
-            out.append("    " + (self.gather(sibs[0], space)
-                                  if len(sibs) == 1
-                                  else self.gather_multi(sibs, space)))
+        for pieces in dependent:
+            out.append("    " + (self.gather(pieces[0], space)
+                                 if len(pieces) == 1
+                                 else self.gather_multi(pieces, space)))
         for b in spec.guesses:
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("        x0 = np.ravel(%s)  # root! guess"
@@ -455,3 +462,77 @@ class _Python(Dialect):
 def emit_python(cp: CodePlan, space: CompileSpace) -> str:
     """Emit the derivative function for a code plan."""
     return emit_plan(cp, space, _Python())
+
+
+def python_run_script(name: str, cp: CodePlan) -> str:
+    """A runnable driver emitted beside ``<name>.py``: sys.path the
+    script's own directory so it imports the emitted module from any
+    cwd, fill ``par`` (the comment lists the emitted parameter names),
+    then the t=0 initialisation and a short solve_ivp run."""
+    params = ", ".join(p.name for p in cp.params) or "none"
+    lines = [
+        '"""%s — generated driver (run: bash run_python.sh)."""' % name,
+        "import os.path as _osp",
+        "import sys as _sys",
+        "",
+        "_sys.path.insert(0, _osp.dirname(_osp.abspath(__file__)))",
+        "import numpy as np",
+        "from scipy.integrate import solve_ivp",
+        "import %s as model" % name,
+        "",
+        "par = {}  # parameter fields: %s" % params,
+    ]
+    if cp.states:
+        lines += [
+            "# t=0 from the prescribed ICs.  initial(par, True) instead",
+            "# solves for a der=0 steady state — only for models that",
+            "# have one (a pure integrator does not).",
+            "y0 = model.initial(par, False)",
+            "sol = solve_ivp(lambda t, y: model.derivative(t, y, par),",
+            "                (0, 1), y0, rtol=1e-6, atol=1e-8,",
+            "                dense_output=True)",
+            "t = np.linspace(0, 1, 21)",
+            'print("t:", np.array2string(t, precision=3))',
+            'print("y:", np.array2string(sol.sol(t).T, precision=6,',
+            '                            suppress_small=True))',
+        ]
+    else:
+        lines += ["# no states — call the derivative directly:",
+                  "# dy = model.derivative(0, y, par)"]
+    return "\n".join(lines) + "\n"
+
+
+def python_shell_script() -> str:
+    """``run_python.sh`` — an environment bootstrap emitted beside
+    ``run.py``.  Works from any cwd (paths resolve relative to the
+    script); dependency strategy: uv ephemeral env → system python
+    that already has numpy/scipy → a once-created local ``.venv``."""
+    return '''#!/usr/bin/env bash
+# run_python.sh — run the emitted model driver (run.py) from anywhere.
+# Needs numpy + scipy; resolves them in this order:
+#   1. uv — an ephemeral env (nothing installed permanently)
+#   2. the system python3, if it already has numpy + scipy
+#   3. a .venv created once next to this script, then reused
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if command -v uv >/dev/null 2>&1; then
+    exec uv run --no-project --with numpy --with scipy \
+        python "$HERE/run.py" "$@"
+fi
+
+if python3 -c "import numpy, scipy" 2>/dev/null; then
+    exec python3 "$HERE/run.py" "$@"
+fi
+
+VENV="$HERE/.venv"
+if [ ! -x "$VENV/bin/python" ]; then
+    echo "run_python.sh: creating $VENV (numpy/scipy not found)" >&2
+    python3 -m venv "$VENV" || {
+        echo "run_python.sh: python3-venv unavailable — install it or uv" >&2
+        exit 1
+    }
+    "$VENV/bin/python" -m pip install --quiet --upgrade pip numpy scipy
+fi
+exec "$VENV/bin/python" "$HERE/run.py" "$@"
+'''

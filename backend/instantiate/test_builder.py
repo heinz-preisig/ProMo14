@@ -6,9 +6,13 @@ equations and behaviour assignments into a throwaway store and checks
 the assembled report.
 """
 
+import io
 import json
 import shutil
 import subprocess
+import tempfile
+import zipfile
+from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
@@ -57,6 +61,7 @@ from backend.instantiate.emit_python import _Python, emit_python
 from backend.instantiate.fbuilder import build as fbuild
 from backend.instantiate.plan import (
     CodePlan,
+    Gather,
     ParamSlot,
     PlanBlock,
     StateSlot,
@@ -388,6 +393,52 @@ def test_arc_indexed_port_binds_per_contact():
     assert by_arc["a1"].peer_var == _var("p")
     assert by_arc["a1"].element == "c1"          # p is node-indexed
     assert by_arc["a2"].element == "c2"
+
+
+def test_event_dynamic_port_binds_contact_arcs():
+    """§32 B': a node-declared port var on an event-dynamic entity
+    binds the contact ARCS under the covering mechanism sub-index —
+    the shared var stays itself, bound-typed (no arc-typed
+    duplicate).  The plan carries the bound form to the emit-time
+    check: `p * F` contracts over A_diff leaving [N] to broadcast
+    to the lhs's [A_diff]; checked against the DECLARED [N] it
+    would contract N and green-light the wrong math."""
+    equations = dict(EQUATIONS)
+    equations[_eq("flow")] = EqInfo(
+        _eq("flow"), _var("J"),
+        [_var("k"), _var("p"), _var("F")],
+        "E_3", rhs="V_5 . (V_2 * V_4)")
+    # J declared [N, A_diff] — the flow law produces a per-node rate
+    # that broadcasts onto the contact arcs (test_01's fmc shape).
+    variables = dict(VARIABLES)
+    variables[_var("J")] = VarInfo(
+        _var("J"), "diffusive flow", "V_3",
+        index_structures=[_idx("idx_node"), _idx("idx_arc_diffusion")],
+        tokens=[_tok("mass")], port_variable=True)
+    assignments = dict(ASSIGNMENTS)
+    assignments[_et("diffusion_transport")] = AssignmentInfo(
+        entity_type=_et("diffusion_transport"),
+        sequence=[_eq("flow")],
+        ports=[_var("p")],
+        instantiated=[_var("k")],
+        closed=True)
+    memberships = resolve(NODES, ARCS, SUB_INDICES, PARENTS)
+    rep = build(NODES, ARCS, memberships, SUB_INDICES, INDICES,
+                assignments, variables, equations,
+                TOKEN_PARENTS, TOKEN_KINDS,
+                temporal_types={_et("diffusion_transport"):
+                                "event-dynamic"},
+                parents=PARENTS)
+    p = _binding(_entity(rep, _et("diffusion_transport")), _var("p"))
+    assert p.indices == {_idx("idx_arc_diffusion"): ["a1", "a2"]}
+    cp = plan(rep, schedule(rep),
+              fbuild(NODES, ARCS, memberships, SUB_INDICES),
+              equations, INDICES, variables=variables)
+    blk = next(b for lvl in cp.levels for b in lvl
+               if b.entity_type == _et("diffusion_transport"))
+    assert blk.var_bound == {_var("p"): [_idx("idx_arc_diffusion")]}
+    src = emit_python(cp, _emit_space())
+    assert "broadcast" in src
 
 
 def test_flow_port_binds_at_arc_element():
@@ -834,7 +885,7 @@ def test_emit_matlab():
     unwraps via a d<lhs> temp."""
     src = emit_matlab(_plan(_build()), _emit_space())
     assert ("V_4 = MultiDimVar({'N', 'A_diff'}, [2 2], "
-            "{'N', 'A_diff'}, promo_mx(\"V_4\"));"
+            "{'N', 'A_diff'}, full(promo_mx(\"V_4\")));"
             in src)
     assert "function [dy, outs] = promo_derivative(t, y, par)" in src
     assert "V_1 = MultiDimVar({'N'}, 2, {'N'}, y(1:2));" in src
@@ -849,6 +900,17 @@ def test_emit_matlab():
     assert ("dV_1 = einsum(V_4, V_3_lumped_capacity, {'A_diff'});"
             in src)
     assert "dy(1:2) = dV_1.value;" in src
+    # dispatcher structure: every emitted function nests INSIDE it so
+    # the matrix binds (dispatcher locals) are visible — as siblings
+    # they couldn't see them (F_conv_* undefined inside _t0).  The
+    # call is followed by the nested defs; the dispatcher 'end' is the
+    # file's last line.
+    tail = src.splitlines()
+    call = tail.index(
+        "  [result, outs] = promo_derivative(varargin{:});")
+    assert tail[call + 1].startswith(
+        "function [dy, outs] = promo_derivative")
+    assert tail[-1] == "end"
 
 
 def test_emit_values_indexed():
@@ -868,8 +930,9 @@ def test_emit_values_indexed():
     assert "par.V_5" not in src
 
     src = emit_matlab(cp, _emit_space())
+    # value-cell tables are static: bound once at dispatcher scope
     assert ("V_5 = MultiDimVar({'A_diff'}, 2, {'A_diff'}, "
-            'promo_tab("V_5"));  % value cells' in src)
+            'promo_tab("V_5"));  % bound once' in src)
     assert "par.V_5" not in src
 
     cp = _plan(_build_indexed_k(), values={_var("k"): {"a1": 1.5}})
@@ -1488,7 +1551,7 @@ def test_emit_julia_initial():
     assert "append!(_rs, Any[vec(dV_1)])  # der = 0" in src
     assert "_e0 = vec((par.ic0_V_1) .- V_1)  # IC pin" in src
     assert "_u = nlsolve(_t0, zeros(8)).zero" in src
-    assert "return [V_1]" in src
+    assert "return vcat(V_1)" in src
 
 
 def test_emit_julia_constrained():
@@ -1515,9 +1578,10 @@ def test_emit_julia_constrained():
     assert "_r0 = vec((V_1) .- V_2)" in src
     assert "_r1 = vec((V_2) .- V_3)" in src
     assert "return vcat(_r0, _r1)" in src
-    assert "_u = _solve_balance(_balance, 1)" in src
+    assert "_u = _solve_balance(_balance, 1, :balance)" in src
     assert "V_2 = _u[1:1]" in src
-    assert "\nfunction _solve_balance(fun, count)" in src  # module-level
+    assert ("\nfunction _solve_balance(fun, count, key)" in src
+            )                                        # module-level
     assert "res = nlsolve(fun, zeros(count))" in src
     assert "return res.zero" in src
 
@@ -1540,7 +1604,8 @@ def test_emit_julia_constrained():
     src = emit_julia(cp, _emit_space())
     assert "dV_1 = _u[2:2]" in src
     assert "dy[1:1] = vec(dV_1)" in src
-    assert "_u = _solve_balance(_t0, 3)" in src     # t0 solve checked
+    assert ("_u = _solve_balance(_t0, 3, (:t0, steady_state))" in src
+            )                                        # t0 solve checked
 
 
 def test_emit_matlab_initial():
@@ -1555,8 +1620,11 @@ def test_emit_matlab_initial():
     assert "r = [promo_r0.value; promo_r1.value; promo_r2.value];" in src
     assert "totalDiff = @(x, y) x .* 0;" in src
     assert "r = [r; dV_1.value];  % der = 0" in src
-    assert ("promo_e0 = (MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1)) - V_1;"
-            "  % IC pin" in src)
+    # the pin wrap references no u-local name — hoisted to a
+    # function-level bind; the residual keeps just the reference.
+    assert ("promo_k1 = MultiDimVar({'N'}, 2, {'N'}, par.ic0_V_1);"
+            "  % u-independent" in src)
+    assert "promo_e0 = (promo_k1) - V_1;  % IC pin" in src
     assert "promo_u = fsolve(@promo_t0, zeros(8, 1));" in src
     assert "y0 = [V_1.value(:)];" in src
 
@@ -1962,6 +2030,97 @@ def _seed_referenced_composite(store):
             Literal(json.dumps([{"iri": b1, "isSource": False}]))))
     return {"host": HOST, "sub": SUB, "comp": str(comp),
             "hc": hc, "b1": b1, "st": st, "sc": sc}
+
+
+def test_code_bundle_endpoint(client):
+    """GET /api/instantiate/code/bundle — the model directory as a
+    zip: <name>/<name>.m (dispatcher renamed → no filename
+    mismatch), model_data.json, run.m, and a self-contained
+    @MultiDimVar copy."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+
+    r = client.get("/api/instantiate/code/bundle",
+                   params={"graph": graph, "vars": graph,
+                           "name": "test_01"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/zip"
+    assert "test_01.zip" in r.headers["content-disposition"]
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    names = set(zf.namelist())
+    assert {"test_01/test_01.m", "test_01/model_data.json",
+            "test_01/run.m",
+            "@MultiDimVar/MultiDimVar.m"} <= names
+    assert not any(n.startswith("test_01/@MultiDimVar") for n in names)
+    src = zf.read("test_01/test_01.m").decode()
+    assert "function [result, outs] = test_01(varargin)" in src
+    assert "function [dy, outs] = promo_derivative" in src
+    data = json.loads(zf.read("test_01/model_data.json"))
+    assert "matrices" in data
+    run = zf.read("test_01/run.m").decode()
+    assert "m = test_01();" in run
+    assert "fullfile(here, '..')" in run and "m.initial" in run
+    assert "V_5" in run                        # param names listed
+
+    # no name= — falls back to the artefact label / IRI tail
+    r = client.get("/api/instantiate/code/bundle",
+                   params={"graph": graph, "vars": graph})
+    assert r.status_code == 200, r.text
+    base = (r.headers["content-disposition"]
+            .rsplit('filename="', 1)[-1].rstrip('".zip'))
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    assert f"{base}/{base}.m" in set(zf.namelist())
+    assert f"{base}(varargin)" in zf.read(
+        f"{base}/{base}.m").decode()
+
+
+def test_code_export_endpoint(client, tmp_path, monkeypatch):
+    """POST /api/instantiate/code/export — the same file set as the
+    zip, written under <PROMO_DATA_DIR>/generated/: the Docker-volume
+    delivery channel (the bundle needs no writable mount; this does).
+    generated/ is a pure re-emission target — _GENERATED.txt marks
+    the subtree."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    graph = str(store.ONTOLOGY_GRAPH_IRI)
+    monkeypatch.setenv("PROMO_DATA_DIR", str(tmp_path))
+    store.dirty = False               # seed POSTs dirtied it already
+
+    r = client.post("/api/instantiate/code/export",
+                    params={"graph": graph, "vars": graph,
+                            "name": "test_01"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["ok"] and out["target"] == "matlab"
+    gen = tmp_path / "generated"
+    assert out["dir"] == str(gen.resolve())
+    assert (gen / "_GENERATED.txt").read_text().startswith("GENERATED")
+    for rel in ("test_01/test_01.m", "test_01/model_data.json",
+                "test_01/run.m", "@MultiDimVar/MultiDimVar.m"):
+        assert (gen / rel).exists(), rel
+        assert rel in out["files"]
+    src = (gen / "test_01" / "test_01.m").read_text()
+    assert "function [result, outs] = test_01(varargin)" in src
+    assert not store.dirty        # file write, not a store mutation
+
+    # non-matlab target: source + data only — no run.m/@MultiDimVar
+    r = client.post("/api/instantiate/code/export",
+                    params={"graph": graph, "vars": graph,
+                            "name": "test_01", "target": "julia"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["ok"] and out["target"] == "julia"
+    assert (gen / "test_01" / "test_01.jl").exists()
+    assert (gen / "test_01" / "model_data.json").exists()
+    assert "test_01/run.m" not in out["files"]
+
+    r = client.post("/api/instantiate/code/export",
+                    params={"graph": graph, "vars": graph,
+                            "name": "test_01", "target": "fortran"})
+    assert r.status_code == 400
 
 
 def test_referenced_composite_endpoint(client):
@@ -2508,6 +2667,61 @@ def test_prescribed_balance_python_execution():
     assert restored.constraints == cp.constraints
 
 
+def test_invariant_gathers_hoist_out_of_residuals():
+    """§31 shared-variable coupling: a port gather whose peer is bound
+    outside the solve (parameter/state-unpack) is emitted once at
+    function level — the iterated residual body carries only gathers
+    whose peers are solved unknowns."""
+    cp = CodePlan(
+        states=[StateSlot(var=_var("m"), instance="V_1@et",
+                          entity_type="et", name="V_1", size=1)],
+        params=[ParamSlot(var=_var("k"), instance="V_5@et",
+                          name="V_5", kind="parameter")],
+        gathers=[
+            Gather(var=_var("p_conv"), instance="V_9@et",
+                   peer_instance="V_5@et", name="V_9",
+                   peer_name="V_5", map=[0], scalar=True),
+            Gather(var=_var("fmc"), instance="V_10@et",
+                   peer_instance="V_3@et", name="V_10",
+                   peer_name="V_3", map=[0], scalar=True)],
+        levels=[[PlanBlock(entity_type="et", equation="law",
+                           lhs=_var("J"), lhs_instance="V_3@et",
+                           lhs_name="V_3", rhs="V_5")]],
+        constraints=[PlanBlock(entity_type="et", equation="balance",
+                               lhs=_var("m"), lhs_instance="V_1@et",
+                               lhs_name="V_1", rhs="V_3")])
+    src = emit_python(cp, _emit_space())
+    bal = src.index("def _balance(u):")
+    init = src.index("def initial")
+    t0 = src.index("def _t0(u):")
+    assert src.index("V_9 = V_5[0]") < bal           # hoisted
+    assert bal < src.index("V_10 = V_3[0]")          # stays inside
+    assert init < src.index("V_9 = V_5[0]", init) < t0
+    assert t0 < src.index("V_10 = V_3[0]", init)
+
+    src = emit_julia(cp, _emit_space())
+    assert src.index("V_9 = V_5[1]") < src.index("function _balance(u)")
+    assert (src.index("function _balance(u)")
+            < src.index("V_10 = V_3[1]"))
+
+
+@contextmanager
+def _octave_scratch(tmp_path):
+    """A cwd Octave can actually read: snap builds can't see
+    ``/tmp/pytest-*`` (``load_path: .: Permission denied``), so run in
+    a non-hidden dir under $HOME — snap's ``home`` plug allows that.
+    Non-snap Octave just uses ``tmp_path``."""
+    if "/snap/" in shutil.which("octave"):
+        d = Path(tempfile.mkdtemp(prefix="promo-octave-",
+                                  dir=str(Path.home())))
+        try:
+            yield d
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+    else:
+        yield tmp_path
+
+
 def test_prescribed_balance_octave_execution(tmp_path):
     if not shutil.which("octave"):
         pytest.skip("Octave is not installed")
@@ -2518,14 +2732,15 @@ def test_prescribed_balance_octave_execution(tmp_path):
                            lhs_instance="V_2@et", lhs_name="V_2", rhs="V_1")]],
         constraints=[PlanBlock(entity_type="et", equation="balance", lhs=_var("J"),
                                lhs_instance="V_3@et", lhs_name="V_3", rhs="V_2")])
-    (tmp_path / "derivative.m").write_text(emit_matlab(cp, _emit_space()))
     runtime = Path(__file__).resolve().parents[2] / "runtime" / "matlab"
     expression = (f"addpath('{runtime}'); model=derivative(); "
                   "par=struct('V_1',4,'V_3',4); result=model.derivative(0,[],par); "
                   "assert(isempty(result)); par.V_3=0; failed=false; "
                   "try model.derivative(0,[],par); catch failed=true; end; assert(failed);")
-    result = subprocess.run(["octave", "--no-gui", "--quiet", "--eval", expression],
-                            cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    with _octave_scratch(tmp_path) as cwd:
+        (cwd / "derivative.m").write_text(emit_matlab(cp, _emit_space()))
+        result = subprocess.run(["octave", "--no-gui", "--quiet", "--eval", expression],
+                                cwd=cwd, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -2551,13 +2766,14 @@ def test_prescribed_balance_initial_and_simulation(tmp_path):
     assert solution.y[0, -1] == pytest.approx(14.0)
     if not shutil.which("octave"):
         return
-    (tmp_path / "derivative.m").write_text(emit_matlab(cp, _emit_space()))
     runtime = Path(__file__).resolve().parents[2] / "runtime" / "matlab"
     expression = (f"addpath('{runtime}'); model=derivative(); "
                   "par=struct('V_5',4,'V_3',0,'ic0_V_1',2); y0=model.initial(par,false); "
                   "assert(abs(y0-2)<1e-8); "
                   "[t,y]=ode45(@(t,y) model.derivative(t,y,par),[0,3],y0); "
                   "assert(abs(y(end)-14)<1e-6);")
-    result = subprocess.run(["octave", "--no-gui", "--quiet", "--eval", expression],
-                            cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    with _octave_scratch(tmp_path) as cwd:
+        (cwd / "derivative.m").write_text(emit_matlab(cp, _emit_space()))
+        result = subprocess.run(["octave", "--no-gui", "--quiet", "--eval", expression],
+                                cwd=cwd, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr

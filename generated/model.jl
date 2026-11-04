@@ -1,110 +1,140 @@
 using SparseArrays
+using NLsolve
+using LinearAlgebra
 using JSON
 
 _DATA = JSON.parsefile(joinpath(@__DIR__, "model_data.json"))
 
 function _mx(n)
     e = _DATA["matrices"][n]
-    return sparse(e["i"] .+ 1, e["j"] .+ 1, e["v"], e["m"], e["n"])
+    return sparse(Int.(e["i"]) .+ 1, Int.(e["j"]) .+ 1, Float64.(e["v"]), e["m"], e["n"])
 end
 
-V_25_convection_transport = _mx("V_25_convection_transport")  # F over [1 x 2]
-V_25_lumped = _mx("V_25_lumped")  # F over [1 x 1]
+function _shape(e)
+    d = Int.(e["dims"])
+    length(d) <= 1 && return Float64.(e["flat"])
+    # C-order flat → column-major: reshape the     # reversed dims, permute back
+    return permutedims(reshape(Float64.(e["flat"]),         reverse(d)...), reverse(1:length(d)))
+end
 
-function derivative!(dy, y, par, t)
-    V_31_convection_transport = @view y[1:2]
-    V_6 = @view y[3:3]
-    V_17_convection_transport = par.V_17_convection_transport
-    V_13_convection_transport = par.V_13_convection_transport
-    V_29_convection_transport = par.V_29_convection_transport
-    V_10_environment = par.V_10_environment
-    V_24_environment = par.V_24_environment
-    V_10_lumped = par.V_10_lumped
-    V_17_lumped = par.V_17_lumped
-    V_13_lumped = par.V_13_lumped
-    V_29_lumped = par.V_29_lumped
-    V_11 = par.V_11
-    V_22 = par.V_22
-    V_21 = par.V_21
-    # level 0
-    V_10_convection_transport = V_10_environment[[1, 0]]  # port gather
-    V_26_convection_transport = sign.(( V_25_convection_transport * V_10_convection_transport ))
-    V_30_convection_transport = ( ( ( ( 1 ./ V_29_convection_transport .* V_13_convection_transport ) .* V_17_convection_transport ) .* V_25_convection_transport ) .* V_10_convection_transport )
-    V_26_lumped = sign.(( V_25_lumped * V_10_lumped ))
-    V_30_lumped = ( ( ( ( 1 ./ V_29_lumped .* V_13_lumped ) .* V_17_lumped ) .* V_25_lumped ) .* V_10_lumped )
-    # level 1
-    V_24_convection_transport = V_24_environment[[1, 1]]  # port gather
-    V_24_lumped = V_24_environment[[1]]  # port gather
-    V_27_convection_transport = ( contract(( 0.5 .* ( V_25_convection_transport - ( V_26_convection_transport .* abs.(V_25_convection_transport) ) ) ), V_24_convection_transport, (2,), (1,)) )
-    V_27_lumped = ( contract(( 0.5 .* ( V_25_lumped - ( V_26_lumped .* abs.(V_25_lumped) ) ) ), V_24_lumped, (2,), (1,)) )
-    # level 2
-    dy[1:2] = ( V_27_convection_transport .* V_30_convection_transport )
-    V_31_lumped = ( V_27_lumped .* V_30_lumped )
-    # level 3
-    V_32 = ( V_25_lumped .* V_31_lumped )
-    # level 4
-    V_33 = V_32
-    # level 5
-    dy[3:3] = quadgk(V_11 -> V_33, V_21, V_22)[1]
+_tab(n) = _shape(_DATA["values"][n])
+
+_ictab(n) = _shape(_DATA["ics"][n])
+
+F_conv_convection_transport = _mx("F_conv_convection_transport")  # F over [1 x 2]
+F_conv_lumped = _mx("F_conv_lumped")  # F over [1 x 1]
+
+function derivative!(dy, y, par, t; outs=nothing)
+    V_57_lumped = @view y[1:1]
+    V_39 = _tab("V_39")  # value cells
+    V_54 = _tab("V_54")  # value cells
+    V_57_convection_transport = _tab("V_57_convection_transport")  # value cells
+    V_34_environment = _tab("V_34_environment")  # value cells
+    V_34_lumped = _tab("V_34_lumped")  # value cells
+    V_34_convection_transport = vcat(V_34_environment[[1]], V_34_lumped[[1]])  # port gather
+    function _balance(u)
+        V_56_convection_transport = u[1:2]
+        dV_57_lumped = u[3:3]
+        V_56_lumped = V_56_convection_transport[[2]]  # port gather
+        _r0 = vec((reshape(( ( V_39 .* V_54 ) .* ( contract(V_34_convection_transport, F_conv_convection_transport, (1,), (1,)) ) ), (1, 1))) .- V_56_convection_transport)
+        _r1 = vec((reshape(dropdims(sum(( F_conv_lumped .* V_56_lumped ), dims=1), dims=1), (1, 1))) .- dV_57_lumped)
+        _r2 = vec((reshape(dropdims(sum(( F_conv_convection_transport .* V_56_convection_transport ), dims=1), dims=1), (1, 1))) .- V_57_convection_transport)
+        return vcat(_r0, _r1, _r2)
+    end
+    _u = _solve_balance(_balance, 3, :balance)
+    V_56_convection_transport = _u[1:2]
+    dV_57_lumped = _u[3:3]
+    dy[1:1] = vec(dV_57_lumped)
+    if outs !== nothing  # §21 outputs
+        outs[:V_56_convection_transport] = V_56_convection_transport
+    end
     return nothing
 end
 
+function outputs(y, par, t)
+    outs = Dict{Symbol,Any}()
+    derivative!(zeros(length(y)), y, par, t; outs=outs)
+    return outs
+end
+
 function initial(par; steady_state=false)
-    V_17_convection_transport = par.V_17_convection_transport
-    V_13_convection_transport = par.V_13_convection_transport
-    V_29_convection_transport = par.V_29_convection_transport
-    V_10_environment = par.V_10_environment
-    V_24_environment = par.V_24_environment
-    V_10_lumped = par.V_10_lumped
-    V_17_lumped = par.V_17_lumped
-    V_13_lumped = par.V_13_lumped
-    V_29_lumped = par.V_29_lumped
-    V_11 = par.V_11
-    V_22 = par.V_22
-    V_21 = par.V_21
+    V_39 = _tab("V_39")  # value cells
+    V_54 = _tab("V_54")  # value cells
+    V_57_convection_transport = _tab("V_57_convection_transport")  # value cells
+    V_34_environment = _tab("V_34_environment")  # value cells
+    V_34_lumped = _tab("V_34_lumped")  # value cells
+    V_34_convection_transport = vcat(V_34_environment[[1]], V_34_lumped[[1]])  # port gather
     function _t0(u)  # t=0 residual system
-        V_31_convection_transport = u[1:2]
-        V_6 = u[3:3]
-        V_26_convection_transport = u[4:5]
-        V_30_convection_transport = u[6:7]
-        V_26_lumped = u[8:8]
-        V_30_lumped = u[9:9]
-        V_27_convection_transport = u[10:11]
-        V_27_lumped = u[12:12]
-        V_31_lumped = u[13:13]
-        V_32 = u[14:14]
-        V_33 = u[15:15]
-        dV_31_convection_transport = u[16:17]
-        dV_6 = u[18:18]
+        V_57_lumped = u[1:1]
+        V_56_convection_transport = u[2:3]
+        dV_57_lumped = u[4:4]
         if steady_state
             total_diff = (x, y) -> x .* 0  # der = 0
         end
-        V_10_convection_transport = V_10_environment[[1, 0]]  # port gather
-        V_24_convection_transport = V_24_environment[[1, 1]]  # port gather
-        V_24_lumped = V_24_environment[[1]]  # port gather
-        _r0 = (sign.(( V_25_convection_transport * V_10_convection_transport ))) .- V_26_convection_transport
-        _r1 = (( ( ( ( 1 ./ V_29_convection_transport .* V_13_convection_transport ) .* V_17_convection_transport ) .* V_25_convection_transport ) .* V_10_convection_transport )) .- V_30_convection_transport
-        _r2 = (sign.(( V_25_lumped * V_10_lumped ))) .- V_26_lumped
-        _r3 = (( ( ( ( 1 ./ V_29_lumped .* V_13_lumped ) .* V_17_lumped ) .* V_25_lumped ) .* V_10_lumped )) .- V_30_lumped
-        _r4 = (( contract(( 0.5 .* ( V_25_convection_transport - ( V_26_convection_transport .* abs.(V_25_convection_transport) ) ) ), V_24_convection_transport, (2,), (1,)) )) .- V_27_convection_transport
-        _r5 = (( contract(( 0.5 .* ( V_25_lumped - ( V_26_lumped .* abs.(V_25_lumped) ) ) ), V_24_lumped, (2,), (1,)) )) .- V_27_lumped
-        _r6 = (( V_27_convection_transport .* V_30_convection_transport )) .- dV_31_convection_transport
-        _r7 = (( V_27_lumped .* V_30_lumped )) .- V_31_lumped
-        _r8 = (( V_25_lumped .* V_31_lumped )) .- V_32
-        _r9 = (V_32) .- V_33
-        _r10 = (quadgk(V_11 -> V_33, V_21, V_22)[1]) .- dV_6
-        _rs = Any[_r0, _r1, _r2, _r3, _r4, _r5, _r6, _r7, _r8, _r9, _r10]
+        V_56_lumped = V_56_convection_transport[[2]]  # port gather
+        _r0 = vec((reshape(( ( V_39 .* V_54 ) .* ( contract(V_34_convection_transport, F_conv_convection_transport, (1,), (1,)) ) ), (1, 1))) .- V_56_convection_transport)
+        _r1 = vec((reshape(dropdims(sum(( F_conv_lumped .* V_56_lumped ), dims=1), dims=1), (1, 1))) .- dV_57_lumped)
+        _r2 = vec((reshape(dropdims(sum(( F_conv_convection_transport .* V_56_convection_transport ), dims=1), dims=1), (1, 1))) .- V_57_convection_transport)
+        _rs = Any[_r0, _r1, _r2]
         if steady_state
-            append!(_rs, Any[dV_31_convection_transport, dV_6])  # der = 0
+            append!(_rs, Any[vec(dV_57_lumped)])  # der = 0
         else
-            _e0 = (par.ic0_V_31_convection_transport) .- V_31_convection_transport  # IC pin
-            _e1 = (par.ic0_V_6) .- V_6  # IC pin
-            append!(_rs, Any[_e0, _e1])
+            _e0 = vec((_ictab("V_57_lumped")) .- V_57_lumped)  # IC pin
+            append!(_rs, Any[_e0])
         end
         return isempty(_rs) ? zeros(length(u)) : vcat(_rs...)
     end
-    _u = nlsolve(_t0, zeros(18)).zero
-    V_31_convection_transport = _u[1:2]
-    V_6 = _u[3:3]
-    return [V_31_convection_transport; V_6]
+    _u = _solve_balance(_t0, 4, (:t0, steady_state))
+    V_57_lumped = _u[1:1]
+    return vcat(V_57_lumped)
+end
+
+function contract(a, b, da, db)
+    ca = collect(da); cb = collect(db)
+    fa = setdiff(collect(1:ndims(a)), ca)
+    fb = setdiff(collect(1:ndims(b)), cb)
+    A = reshape(permutedims(a, vcat(fa, ca)), :,
+                prod(size(a)[ca]))
+    B = reshape(permutedims(b, vcat(cb, fb)),
+                prod(size(b)[cb]), :)
+    dims = (size(a)[fa]..., size(b)[fb]...)
+    return isempty(dims) ? A * B : reshape(A * B, dims)
+end
+const _BAL_CACHE = Dict{Any, Any}()
+function _solve_balance(fun, count, key)
+    if count == 0
+        u = zeros(0); r = fun(u)
+        (all(isfinite, r) && all(abs.(r) .<= 1e-8)) || error("inconsistent prescribed balance")
+        return u
+    end
+    cached = get(_BAL_CACHE, key, nothing)
+    cached === :nonlin && return _nlsolve_balance(fun, count)
+    r0 = fun(zeros(count))
+    n = length(r0)
+    if cached === nothing
+        cached = zeros(n, count)
+        for k in 1:count
+            ek = zeros(count); ek[k] = 1.0
+            cached[:, k] = fun(ek) .- r0
+        end
+        _BAL_CACHE[key] = cached
+    end
+    A = cached
+    if rank(A) >= count
+        u = -(A \ r0)
+        r = fun(u)
+        (all(isfinite, r) && all(abs.(r) .<= 1e-8)) && return u
+    else
+        error("prescribed balance system is underdetermined")
+    end
+    n == count || error("prescribed balance: nonlinear overdetermined system — unsupported")
+    _BAL_CACHE[key] = :nonlin
+    return _nlsolve_balance(fun, count)
+end
+
+function _nlsolve_balance(fun, count)
+    res = nlsolve(fun, zeros(count))
+    r = fun(res.zero)
+    (NLsolve.converged(res) && all(isfinite, r) && all(abs.(r) .<= 1e-8)) || error("prescribed balance solve failed")
+    return res.zero
 end

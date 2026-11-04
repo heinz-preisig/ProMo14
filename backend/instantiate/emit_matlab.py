@@ -50,7 +50,7 @@ are packed flat without reshape.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from backend.equation.compile_space import CompileSpace
 
@@ -61,6 +61,7 @@ from .emit_common import (
     emit_plan,
     inst_name,
     loop_layout,
+    split_gathers,
     tear_loop,
     t0_layout,
 )
@@ -80,6 +81,84 @@ class _Matlab(Dialect):
     occ_fns = True
     #: local functions must follow the main function in a .m file.
     occ_fns_at_end = True
+
+    def __init__(self) -> None:
+        # const_binds: name -> rhs hoisted to dispatcher scope — bound
+        # once per dispatcher call and shared by every nested function
+        # via closure.  const_names: names visible at dispatcher level
+        # (matrices, value-table binds, earlier hoists) so a later
+        # expression can be proven constant against them.
+        self.const_binds: Dict[str, str] = {}
+        self.const_names: Set[str] = set()
+        self._const_n = 0
+        # set when a residual is proven static (every free name is a
+        # solve unknown or a dispatcher constant) — footer then emits
+        # the promo_solve_once helper its call site uses.
+        self._uses_once = False
+
+    #: Identifier tokens that are builtins or emitted helpers, never
+    #: free variables — the dependency classifier for hoisting.
+    _RESERVED = frozenset({
+        "einsum", "reducesum", "MultiDimVar", "repmat", "reshape",
+        "permute", "vertcat", "horzcat", "full", "value", "zeros",
+        "ones", "true", "false", "if", "else", "end", "for",
+        "function", "return", "size", "numel", "length", "isempty",
+        "rank", "sum", "prod", "max", "min", "abs", "sqrt", "exp",
+        "log", "sin", "cos", "inv", "norm", "linspace",
+        "_tab", "_ictab", "_mx", "_shape", "_model_data",
+        "promo_tab", "promo_ictab", "promo_mx", "promo_shape",
+        "promo_model_data", "promo_solve_balance", "promo_fsolve_balance",
+        "promo_derivative", "promo_balance", "promo_t0"})
+
+    def _free_names(self, src: str) -> Set[str]:
+        """Identifier tokens in a rendered expression minus builtins
+        and helpers — the names it actually depends on.  Quoted index
+        labels are stripped first so {'A_conv','N'} doesn't read as a
+        free name."""
+        src = re.sub(r"'[^']*'", "", src)
+        src = re.sub(r'"[^"]*"', "", src)
+        return set(re.findall(r"[A-Za-z_]\w*", src)) - self._RESERVED
+
+    def _hoist(self, src: str, dependent: Set[str],
+               hoists: List[str]) -> str:
+        """Precompute an emitted expression once per call: unchanged
+        when it touches a dependent (u-local) name; bound at dispatcher
+        scope when every free name is a constant there; else bound once
+        in the enclosing function body via ``hoists``."""
+        if src == self.no_rhs:
+            return src
+        free = self._free_names(src)
+        if free & dependent:
+            return src
+        if free <= self.const_names:
+            for existing, rhs in self.const_binds.items():
+                if rhs == src:
+                    return existing       # same expr already hoisted
+        self._const_n += 1
+        nm = "_k%d" % self._const_n
+        if free <= self.const_names:
+            self.const_binds[nm] = src
+            self.const_names.add(nm)
+        else:
+            hoists.append("  %s = %s;  %% u-independent — hoisted"
+                          % (nm, src))
+        return nm
+
+    def _emit_gather(self, out: List[str], pieces, space) -> None:
+        """An invariant (u-independent) port gather: bind it at
+        dispatcher scope when every input is a constant there."""
+        line = (self.gather(pieces[0], space) if len(pieces) == 1
+                else self.gather_multi(pieces, space))
+        m = re.match(r"\s*(\w+)\s*=\s*(.*);", line)
+        if m:
+            nm, rhs = m.group(1), m.group(2)
+            if nm in self.const_names:
+                return                      # already bound up top
+            if self._free_names(rhs) <= self.const_names:
+                self.const_binds[nm] = rhs
+                self.const_names.add(nm)
+                return
+        out.append(line)
 
     def occ_fn_open(self, name: str, params: List[str],
                     returns: List[str]) -> List[str]:
@@ -145,15 +224,25 @@ class _Matlab(Dialect):
             return src
         rep = [str(d if m == 1 and d > 1 else 1)
                for m, d in zip(mapped, dims)]
-        val = "repmat(reshape((%s).value, [%s]), [%s])" % (
-            src,
-            " ".join(str(d) for d in mapped),
-            " ".join(rep))
+        if set(rep) == {"1"}:
+            # every lhs-only axis is a singleton — the reshape alone
+            # lands on the bound shape; nothing to repmat.
+            val = "reshape((%s).value, [%s])" % (
+                src, " ".join(str(d) for d in dims))
+        else:
+            val = "repmat(reshape((%s).value, [%s]), [%s])" % (
+                src,
+                " ".join(str(d) for d in mapped),
+                " ".join(rep))
         return self._mdv(dict(lhs_indices or {}), space, val)
 
     def matrix(self, mx, space: CompileSpace) -> str:
         nm = mx.name or inst_name(mx.instance)
-        lit = '_mx("%s")' % nm
+        self.const_names.add(nm)   # dispatcher-level constant
+        # einsum reshapes operands to 3-D page matrices — sparse can't
+        # be N-D in Matlab or Octave, so the F literal must be dense
+        # before the MultiDimVar wrap (small matrices anyway).
+        lit = 'full(_mx("%s"))' % nm
         # Wrap so einsum sees the [row, col] index labels.
         idx = dict(mx.indices or {})
         return "%s = %s;  %% F over [%d x %d]" % (
@@ -177,8 +266,13 @@ class _Matlab(Dialect):
     def param(self, p, space: CompileSpace) -> str:
         nm = p.name or inst_name(p.instance)
         if p.values is not None:
-            return "  %s = %s;  %% value cells" % (
-                nm, self._mdv(p.indices, space, '_tab("%s")' % nm))
+            # value-cell table: static data — bind once at dispatcher
+            # scope instead of re-wrapping the MultiDimVar per call.
+            if nm not in self.const_binds:
+                self.const_binds[nm] = self._mdv(
+                    p.indices, space, '_tab("%s")' % nm)
+                self.const_names.add(nm)
+            return "  %% %s — bound once in the dispatcher" % nm
         return "  %s = %s;" % (nm, self._mdv(p.indices, space,
                                              "par.%s" % nm))
 
@@ -303,6 +397,38 @@ class _Matlab(Dialect):
         y_names = {s.name or inst_name(s.instance) for s in cp.states}
         y0 = ["%s.value(:)" % (s.name or inst_name(s.instance))
               for s in cp.states]
+        invariant, dependent = split_gathers(
+            cp, {n for n, _, _ in spec.unknowns})
+        for pieces in invariant:
+            self._emit_gather(out, pieces, space)
+        # residual-local names: u unpacks, dependent gathers, the arg
+        # and the steady-state totalDiff helper defined inside _t0.
+        dep = {n for n, _, _ in spec.unknowns} | {
+            pieces[0].name or inst_name(pieces[0].instance)
+            for pieces in dependent} | {"u", "totalDiff"}
+        hoists: List[str] = []
+        rlines: List[str] = []
+        for i, (b, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            rhs = self._hoist(rhs, dep, hoists)
+            rlines.append("    _r%d = (%s) - %s;" % (i, rhs, term))
+        elines: List[str] = []
+        ne = 0
+        for b, term in spec.initials:
+            rhs = self.render_rhs(b, space,
+                                  cp.names.get(b.entity_type, {}))
+            rhs = self._hoist(rhs, dep, hoists)
+            elines.append("      _e%d = (%s) - %s;  %% initialise"
+                          % (ne, rhs, term))
+            ne += 1
+        for st in spec.pins:
+            nm = st.name or inst_name(st.instance)
+            rhs = self._hoist(self.pin_term(st, space), dep, hoists)
+            elines.append("      _e%d = (%s) - %s;  %% IC pin"
+                          % (ne, rhs, nm))
+            ne += 1
+        out += hoists
         out.append("  function r = _t0(u)  %% t=0 residual system")
         off = 0
         for nm, sz, idx in spec.unknowns:
@@ -313,22 +439,14 @@ class _Matlab(Dialect):
         out.append("    if steady_state")
         out.append("      totalDiff = @(x, y) x .* 0;  %% der = 0")
         out.append("    end")
-        seen_g = set()
-        for g in cp.gathers:
-            if g.instance in seen_g:
-                continue
-            seen_g.add(g.instance)
-            sibs = [s for s in cp.gathers if s.instance == g.instance]
-            out.append("  " + (self.gather(sibs[0], space)
-                                if len(sibs) == 1
-                                else self.gather_multi(sibs, space)))
+        for pieces in dependent:
+            out.append("  " + (self.gather(pieces[0], space)
+                               if len(pieces) == 1
+                               else self.gather_multi(pieces, space)))
         for b in spec.guesses:
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("    x0 = %s.value;  %% root! guess" % nm)
-        for i, (b, term) in enumerate(spec.residuals):
-            rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
-            out.append("    _r%d = (%s) - %s;" % (i, rhs, term))
+        out += rlines
         if spec.residuals:
             out.append("    r = [%s];" % "; ".join(
                 "_r%d.value" % i
@@ -339,18 +457,7 @@ class _Matlab(Dialect):
         out.append("      r = [r; %s];  %% der = 0" % "; ".join(
             "%s.value" % n for n in spec.dx))
         out.append("    else")
-        ne = 0
-        for b, term in spec.initials:
-            rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
-            out.append("      _e%d = (%s) - %s;  %% initialise"
-                       % (ne, rhs, term))
-            ne += 1
-        for st in spec.pins:
-            nm = st.name or inst_name(st.instance)
-            out.append("      _e%d = (%s) - %s;  %% IC pin"
-                       % (ne, self.pin_term(st, space), nm))
-            ne += 1
+        out += elines
         out.append("      r = [r; %s];" % "; ".join(
             "_e%d.value" % i for i in range(ne)))
         out.append("    end")
@@ -377,27 +484,53 @@ class _Matlab(Dialect):
         spec = t0_layout(cp)
         states = {s.name or inst_name(s.instance) for s in cp.states}
         unknowns = [u for u in spec.unknowns if u[0] not in states]
+        invariant, dependent = split_gathers(
+            cp, {n for n, _, _ in unknowns})
+        for pieces in invariant:
+            self._emit_gather(out, pieces, space)
+        # residual-local names: u unpacks, dependent gathers, the arg.
+        dep = {n for n, _, _ in unknowns} | {
+            pieces[0].name or inst_name(pieces[0].instance)
+            for pieces in dependent} | {"u"}
+        hoists: List[str] = []
+        rlines: List[str] = []
+        for i, (block, term) in enumerate(spec.residuals):
+            rhs = self.render_rhs(block, space,
+                                  cp.names.get(block.entity_type, {}))
+            rhs = self._hoist(rhs, dep, hoists)
+            rlines.append("    promo_r%d = (%s) - %s;" % (i, rhs, term))
+        rlines.append("    r = [%s];" % "; ".join(
+            "promo_r%d.value(:)" % i for i in range(len(spec.residuals))))
+        dep_g_lines = [
+            "  " + (self.gather(pieces[0], space)
+                   if len(pieces) == 1
+                   else self.gather_multi(pieces, space))
+            for pieces in dependent]
+        # Is the residual time-invariant?  Every free name must be a
+        # solve unknown or a dispatcher constant — a reference to a
+        # y/par/function-level name anywhere makes it dynamic.  The
+        # r-assembly line (rlines[-1]) only concatenates the residual
+        # parts; trailing %-comments are stripped before tokenising.
+        allowed = dep | self.const_names
+        static = all(
+            self._free_names(l.split("=", 1)[-1].split("%", 1)[0])
+            <= allowed
+            for l in rlines[:-1] + dep_g_lines)
+        out += hoists
         out.append("  function r = promo_balance(u)")
         offset = 0
         for name, size, idx in unknowns:
             out.append("    %s = %s;" % (name, self._mdv(
                 idx, space, "u(%d:%d)" % (offset + 1, offset + size))))
             offset += size
-        seen = set()
-        for g in cp.gathers:
-            if g.instance in seen:
-                continue
-            seen.add(g.instance)
-            pieces = [p for p in cp.gathers if p.instance == g.instance]
-            out.append("  " + (self.gather(g, space) if len(pieces) == 1
-                                  else self.gather_multi(pieces, space)))
-        for i, (block, term) in enumerate(spec.residuals):
-            rhs = self.render_rhs(block, space, cp.names.get(block.entity_type, {}))
-            out.append("    promo_r%d = (%s) - %s;" % (i, rhs, term))
-        out.append("    r = [%s];" % "; ".join(
-            "promo_r%d.value(:)" % i for i in range(len(spec.residuals))))
+        out += dep_g_lines
+        out += rlines
         out.append("  end")
-        out.append("  promo_u = promo_solve_balance(@promo_balance, %d);" % offset)
+        if static:
+            self._uses_once = True
+        out.append("  promo_u = %s(@promo_balance, %d);" % (
+            "promo_solve_once" if static else "promo_solve_balance",
+            offset))
         offset = 0
         for name, size, idx in unknowns:
             out.append("  %s = %s;" % (name, self._mdv(
@@ -442,7 +575,9 @@ class _Matlab(Dialect):
         if {"values", "ics"} & kinds:
             out += ["",
                     "function a = _shape(e)",
-                    "  d = e.dims;",
+                    "  % jsondecode hands column vectors — row them,",
+                    "  % fliplr on a column is a no-op",
+                    "  d = e.dims(:).';",
                     "  if numel(d) <= 1, a = e.flat(:); return; end",
                     "  a = permute(reshape(e.flat, fliplr(d)), "
                     "fliplr(1:numel(d)));",
@@ -466,6 +601,56 @@ class _Matlab(Dialect):
                     "    if any(~isfinite(r)) || any(abs(r) > 1e-8), error('inconsistent prescribed balance'); end",
                     "    return;",
                     "  end",
+                    "  % Emitted balance residuals are affine in u — solve",
+                    "  % A u = -r(0) with a finite-difference A, cached per",
+                    "  % residual (keyed on the function name) so the inner",
+                    "  % solve in promo_derivative costs ~2 residual evals",
+                    "  % per ODE step instead of an fsolve.  fsolve stays",
+                    "  % the fallback for genuinely nonlinear residuals.",
+                    "  persistent affine nonlin;",
+                    "  if isempty(affine), affine = struct(); nonlin = struct(); end",
+                    "  key = ['f_' regexprep(func2str(fun), '[^A-Za-z0-9_]', '_')];",
+                    "  if isfield(nonlin, key)",
+                    "    u = promo_fsolve_balance(fun, count); return;",
+                    "  end",
+                    "  r0 = fun(zeros(count, 1));",
+                    "  if isfield(affine, key)",
+                    "    u = -(affine.(key) \\ r0);",
+                    "    r = fun(u);",
+                    "    if all(isfinite(r)) && all(abs(r) <= 1e-8), return; end",
+                    "    affine = rmfield(affine, key); nonlin.(key) = true;",
+                    "    u = promo_fsolve_balance(fun, count); return;",
+                    "  end",
+                    "  A = zeros(numel(r0), count);",
+                    "  for k = 1:count",
+                    "    ek = zeros(count, 1); ek(k) = 1;",
+                    "    A(:,k) = fun(ek) - r0;",
+                    "  end",
+                    "  if rank(A) >= count",
+                    "    u = -(A \\ r0);",
+                    "    r = fun(u);",
+                    "    if all(isfinite(r)) && all(abs(r) <= 1e-8)",
+                    "      affine.(key) = A; return;",
+                    "    end",
+                    "  end",
+                    "  nonlin.(key) = true;",
+                    "  u = promo_fsolve_balance(fun, count);",
+                    "end"] + ([
+                    "",
+                    "function u = promo_solve_once(fun, count)",
+                    "  % The emitter proved this residual time-invariant:",
+                    "  % every input is a dispatcher constant or a solve",
+                    "  % unknown, so the solution never changes — solve",
+                    "  % once, then reuse it for the rest of the run.",
+                    "  persistent cache;",
+                    "  if isempty(cache), cache = struct(); end",
+                    "  key = ['f_' regexprep(func2str(fun), '[^A-Za-z0-9_]', '_')];",
+                    "  if isfield(cache, key), u = cache.(key); return; end",
+                    "  u = promo_solve_balance(fun, count);",
+                    "  cache.(key) = u;",
+                    "end"] if self._uses_once else []) + [
+                    "",
+                    "function u = promo_fsolve_balance(fun, count)",
                     "  options = optimset('TolFun', 1e-12, 'TolX', 1e-12, 'Display', 'off');",
                     "  [u, r, flag, output, jac] = fsolve(fun, zeros(count, 1), options);",
                     "  if flag <= 0 || any(~isfinite(r)) || any(abs(r) > 1e-8), error('prescribed balance solve failed'); end",
@@ -473,20 +658,80 @@ class _Matlab(Dialect):
                     "end"]
 
 
-def emit_matlab(cp: CodePlan, space: CompileSpace) -> str:
-    """Emit the derivative function for a code plan."""
-    source = emit_plan(cp, space, _Matlab())
+def emit_matlab(cp: CodePlan, space: CompileSpace,
+                function_name: str = "derivative") -> str:
+    """Emit the derivative function for a code plan.
+
+    ``function_name`` names the dispatcher — set it to the model/file
+    name so the file's first function agrees with its filename
+    (Matlab warns otherwise)."""
+    name = re.sub(r"[^A-Za-z0-9_]", "_", function_name)
+    if not name or not name[0].isalpha():
+        name = "derivative"
+    d = _Matlab()
+    source = emit_plan(cp, space, d)
     source = source.replace("= derivative(t, y, par)", "= promo_derivative(t, y, par)")
     source = re.sub(r"\b_([A-Za-z][A-Za-z0-9_]*)", r"promo_\1", source)
-    prefix = ["function [result, outs] = derivative(varargin)", "  outs = struct();"]
+    prefix = ["function [result, outs] = %s(varargin)" % name,
+              "  outs = struct();"]
     if not cp.outputs:
         source = source.replace("function dy = promo_derivative(t, y, par)",
                                 "function [dy, outs] = promo_derivative(t, y, par)\n  outs = struct();")
     start = source.index("function ")
     matrices, functions = source[:start], source[start:]
     prefix.append(matrices)
+    for cnm, crhs in d.const_binds.items():
+        # Constants bound once per dispatcher call — visible to every
+        # nested function via closure.  The promo_ rename ran on the
+        # emit_plan source already; apply it here too (_tab→promo_tab,
+        # _k1→promo_k1).
+        prefix.append(re.sub(r"\b_([A-Za-z][A-Za-z0-9_]*)", r"promo_\1",
+                             "  %s = %s;  %% bound once" % (cnm, crhs)))
     prefix += ["  if nargin == 0", "    result.derivative = @promo_derivative;"]
     if cp.states:
         prefix.append("    result.initial = @initial;")
-    prefix += ["    return;", "  end", "  [result, outs] = promo_derivative(varargin{:});", functions, "end"]
-    return "\n".join(prefix)
+    # Everything emit_plan produced nests INSIDE the dispatcher: the
+    # matrix binds above are dispatcher locals, and sibling functions
+    # can't see them — F_conv_*/V_*_* matrices would be undefined in
+    # promo_derivative/initial.  Nesting shares the workspace; the
+    # returned handles keep it alive via closure (run.m only touches
+    # result.*), and every emitted function already closes with `end`.
+    prefix += ["    return;", "  end",
+               "  [result, outs] = promo_derivative(varargin{:});",
+               functions, "end"]
+    header = ["% ProMo-generated model file.  Companions required:",
+              "%   model_data.json — /code?target=data output, place next to this file",
+              "%   @MultiDimVar    — vendored Einstein-notation library,",
+              "%                     addpath('<repo>/runtime/matlab')"]
+    return "\n".join(header + prefix)
+
+
+def matlab_run_script(name: str, cp: CodePlan) -> str:
+    """A runnable driver emitted beside ``<name>.m``: addpath for the
+    bundled ``@MultiDimVar`` copy, fetch the model handles, fill
+    ``par`` (the comment lists the emitted parameter names), then the
+    t=0 balance and a short ode45 run."""
+    params = ", ".join(p.name for p in cp.params) or "none"
+    lines = [
+        f"% {name} — generated driver (run from this directory)",
+        f"% companions: {name}.m, model_data.json in this directory;",
+        "% @MultiDimVar/ one level up (shared by all model dirs)",
+        "here = fileparts(mfilename('fullpath'));",
+        "addpath(fullfile(here, '..'));",
+        "",
+        f"m = {name}();",
+        f"par = struct();  % parameter fields: {params}",
+    ]
+    if cp.states:
+        lines += [
+            "% t=0 from the prescribed ICs.  initial(par, true) instead",
+            "% solves for a der=0 steady state — only for models that",
+            "% have one (a pure integrator does not).",
+            "y0 = m.initial(par, false);",
+            "[t, y] = ode45(m.derivative, [0 1], y0);",
+            "plot(t, y);",
+        ]
+    else:
+        lines += ["% no states — call the derivative directly:",
+                  "% dy = m.derivative(0, y, par);"]
+    return "\n".join(lines) + "\n"

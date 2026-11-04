@@ -1,22 +1,22 @@
 {
  "matrices": {
-  "V_25_convection_transport": {
-   "m": 1,
-   "n": 2,
+  "F_conv_convection_transport": {
+   "m": 2,
+   "n": 1,
    "i": [
     0,
-    0
+    1
    ],
    "j": [
     0,
-    1
+    0
    ],
    "v": [
     1,
     -1
    ]
   },
-  "V_25_lumped": {
+  "F_conv_lumped": {
    "m": 1,
    "n": 1,
    "i": [
@@ -30,6 +30,59 @@
    ]
   }
  },
- "values": {},
- "ics": {}
+ "values": {
+  "V_39": {
+   "flat": [
+    1
+   ],
+   "dims": [
+    1
+   ]
+  },
+  "V_54": {
+   "flat": [
+    10
+   ],
+   "dims": [
+    1
+   ]
+  },
+  "V_57_convection_transport": {
+   "flat": [
+    0,
+    0
+   ],
+   "dims": [
+    2,
+    1
+   ]
+  },
+  "V_34_environment": {
+   "flat": [
+    5
+   ],
+   "dims": [
+    1
+   ]
+  },
+  "V_34_lumped": {
+   "flat": [
+    1
+   ],
+   "dims": [
+    1
+   ]
+  }
+ },
+ "ics": {
+  "V_57_lumped": {
+   "flat": [
+    0
+   ],
+   "dims": [
+    1,
+    1
+   ]
+  }
+ }
 }

@@ -1,114 +1,85 @@
-V_25_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, _mx("V_25_convection_transport"));  % F over [1 x 2]
-V_25_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, _mx("V_25_lumped"));  % F over [1 x 1]
+% ProMo-generated model file.  Companions required:
+%   model_data.json — /code?target=data output, place next to this file
+%   @MultiDimVar    — vendored Einstein-notation library,
+%                     addpath('<repo>/runtime/matlab')
+function [result, outs] = model(varargin)
+  outs = struct();
+F_conv_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, full(promo_mx("F_conv_convection_transport")));  % F over [1 x 2]
+F_conv_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, full(promo_mx("F_conv_lumped")));  % F over [1 x 1]
 
-function dy = derivative(t, y, par)
-  dy = zeros(3, 1);
-  V_31_convection_transport = MultiDimVar({'A_conv', 'N', 'S'}, [2 1 1], {'A_conv', 'N', 'S'}, y(1:2));
-  V_6 = MultiDimVar({'N', 'S', 'A_conv'}, [1 1 1], {'N', 'S', 'A_conv'}, y(3:3));
-  V_17_convection_transport = MultiDimVar({'N'}, 1, {'N'}, par.V_17_convection_transport);
-  V_13_convection_transport = MultiDimVar({'N'}, 1, {'N'}, par.V_13_convection_transport);
-  V_29_convection_transport = MultiDimVar({'N'}, 1, {'N'}, par.V_29_convection_transport);
-  V_10_environment = MultiDimVar({'N'}, 1, {'N'}, par.V_10_environment);
-  V_24_environment = MultiDimVar({'N', 'S'}, [1 1], {'N', 'S'}, par.V_24_environment);
-  V_10_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_10_lumped);
-  V_17_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_17_lumped);
-  V_13_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_13_lumped);
-  V_29_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_29_lumped);
-  V_11 = MultiDimVar({}, 1, {}, par.V_11);
-  V_22 = MultiDimVar({}, 1, {}, par.V_22);
-  V_21 = MultiDimVar({}, 1, {}, par.V_21);
-  % level 0
-  V_10_convection_transport = MultiDimVar({'N'}, 1, {'N'}, V_10_environment.value([1 0]));  % port gather
-  V_26_convection_transport = sign(( einsum(V_25_convection_transport, V_10_convection_transport, {'N'}) ));
-  V_30_convection_transport = ( einsum(( einsum(( einsum(( einsum(1 ./ V_29_convection_transport, V_13_convection_transport) ), V_17_convection_transport) ), V_25_convection_transport) ), V_10_convection_transport) );
-  V_26_lumped = sign(( einsum(V_25_lumped, V_10_lumped, {'N'}) ));
-  V_30_lumped = ( einsum(( einsum(( einsum(( einsum(1 ./ V_29_lumped, V_13_lumped) ), V_17_lumped) ), V_25_lumped) ), V_10_lumped) );
-  % level 1
-  V_24_convection_transport = MultiDimVar({'N', 'S'}, [1 1], {'N', 'S'}, V_24_environment.value([1 1]));  % port gather
-  V_24_lumped = MultiDimVar({'N', 'S'}, [1 1], {'N', 'S'}, V_24_environment.value([1]));  % port gather
-  V_27_convection_transport = ( einsum(( einsum(0.5, ( V_25_convection_transport - ( einsum(V_26_convection_transport, abs(V_25_convection_transport)) ) )) ), V_24_convection_transport, {'N'}) );
-  V_27_lumped = ( einsum(( einsum(0.5, ( V_25_lumped - ( einsum(V_26_lumped, abs(V_25_lumped)) ) )) ), V_24_lumped, {'N'}) );
-  % level 2
-  dV_31_convection_transport = ( einsum(V_27_convection_transport, V_30_convection_transport) );
-  dy(1:2) = dV_31_convection_transport.value;
-  V_31_lumped = ( einsum(V_27_lumped, V_30_lumped) );
-  % level 3
-  V_32 = ( einsum(V_25_lumped, V_31_lumped) );
-  % level 4
-  V_33 = V_32;
-  % level 5
-  dV_6 = integral(@(V_11) _mdv_value(V_33), V_21, V_22, 'ArrayValued', true);
-  dy(3:3) = dV_6.value;
+
+  V_39 = MultiDimVar({'N'}, 1, {'N'}, promo_tab("V_39"));  % bound once
+  V_54 = MultiDimVar({'N'}, 1, {'N'}, promo_tab("V_54"));  % bound once
+  V_57_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, promo_tab("V_57_convection_transport"));  % bound once
+  V_34_environment = MultiDimVar({'N'}, 1, {'N'}, promo_tab("V_34_environment"));  % bound once
+  V_34_lumped = MultiDimVar({'N'}, 1, {'N'}, promo_tab("V_34_lumped"));  % bound once
+  V_34_convection_transport = MultiDimVar({'A_conv'}, 2, {'A_conv'}, vertcat(V_34_environment.value([1]), V_34_lumped.value([1])));  % bound once
+  promo_k1 = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, repmat(reshape((( einsum(( einsum(V_39, V_54) ), ( einsum(V_34_convection_transport, F_conv_convection_transport, {'A_conv'}) )) )).value, [1 1]), [2 1]));  % bound once
+  promo_k2 = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, promo_ictab("V_57_lumped"));  % bound once
+  if nargin == 0
+    result.derivative = @promo_derivative;
+    result.initial = @initial;
+    return;
+  end
+  [result, outs] = promo_derivative(varargin{:});
+function [dy, outs] = promo_derivative(t, y, par)
+  dy = zeros(1, 1);
+  V_57_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, y(1:1));
+  % V_39 — bound once in the dispatcher
+  % V_54 — bound once in the dispatcher
+  % V_57_convection_transport — bound once in the dispatcher
+  % V_34_environment — bound once in the dispatcher
+  % V_34_lumped — bound once in the dispatcher
+  function r = promo_balance(u)
+    V_56_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, u(1:2));
+    dV_57_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, u(3:3));
+    V_56_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, V_56_convection_transport.value([2]));  % port gather
+    promo_r0 = (promo_k1) - V_56_convection_transport;
+    promo_r1 = (MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, reshape((reducesum(( einsum(F_conv_lumped, V_56_lumped) ), {'A_conv'})).value, [1 1]))) - dV_57_lumped;
+    promo_r2 = (MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, repmat(reshape((reducesum(( einsum(F_conv_convection_transport, V_56_convection_transport) ), {'A_conv'})).value, [1 1]), [2 1]))) - V_57_convection_transport;
+    r = [promo_r0.value(:); promo_r1.value(:); promo_r2.value(:)];
+  end
+  promo_u = promo_solve_once(@promo_balance, 3);
+  V_56_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, promo_u(1:2));
+  dV_57_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, promo_u(3:3));
+  dy(1:1) = dV_57_lumped.value(:);
+  outs.V_56_convection_transport = V_56_convection_transport.value;  % §21 output
 end
 
 function y0 = initial(par, steady_state)
-  V_17_convection_transport = MultiDimVar({'N'}, 1, {'N'}, par.V_17_convection_transport);
-  V_13_convection_transport = MultiDimVar({'N'}, 1, {'N'}, par.V_13_convection_transport);
-  V_29_convection_transport = MultiDimVar({'N'}, 1, {'N'}, par.V_29_convection_transport);
-  V_10_environment = MultiDimVar({'N'}, 1, {'N'}, par.V_10_environment);
-  V_24_environment = MultiDimVar({'N', 'S'}, [1 1], {'N', 'S'}, par.V_24_environment);
-  V_10_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_10_lumped);
-  V_17_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_17_lumped);
-  V_13_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_13_lumped);
-  V_29_lumped = MultiDimVar({'N'}, 1, {'N'}, par.V_29_lumped);
-  V_11 = MultiDimVar({}, 1, {}, par.V_11);
-  V_22 = MultiDimVar({}, 1, {}, par.V_22);
-  V_21 = MultiDimVar({}, 1, {}, par.V_21);
-  function r = _t0(u)  %% t=0 residual system
-    V_31_convection_transport = MultiDimVar({'A_conv', 'N', 'S'}, [2 1 1], {'A_conv', 'N', 'S'}, u(1:2));
-    V_6 = MultiDimVar({'N', 'S', 'A_conv'}, [1 1 1], {'N', 'S', 'A_conv'}, u(3:3));
-    V_26_convection_transport = MultiDimVar({'A_conv'}, 2, {'A_conv'}, u(4:5));
-    V_30_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, u(6:7));
-    V_26_lumped = MultiDimVar({'A_conv'}, 1, {'A_conv'}, u(8:8));
-    V_30_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, u(9:9));
-    V_27_convection_transport = MultiDimVar({'A_conv', 'S'}, [2 1], {'A_conv', 'S'}, u(10:11));
-    V_27_lumped = MultiDimVar({'A_conv', 'S'}, [1 1], {'A_conv', 'S'}, u(12:12));
-    V_31_lumped = MultiDimVar({'A_conv', 'N', 'S'}, [1 1 1], {'A_conv', 'N', 'S'}, u(13:13));
-    V_32 = MultiDimVar({'A_conv', 'N', 'S'}, [1 1 1], {'A_conv', 'N', 'S'}, u(14:14));
-    V_33 = MultiDimVar({'A_conv', 'N', 'S'}, [1 1 1], {'A_conv', 'N', 'S'}, u(15:15));
-    dV_31_convection_transport = MultiDimVar({'A_conv', 'N', 'S'}, [2 1 1], {'A_conv', 'N', 'S'}, u(16:17));
-    dV_6 = MultiDimVar({'N', 'S', 'A_conv'}, [1 1 1], {'N', 'S', 'A_conv'}, u(18:18));
+  % V_39 — bound once in the dispatcher
+  % V_54 — bound once in the dispatcher
+  % V_57_convection_transport — bound once in the dispatcher
+  % V_34_environment — bound once in the dispatcher
+  % V_34_lumped — bound once in the dispatcher
+  function r = promo_t0(u)  %% t=0 residual system
+    V_57_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, u(1:1));
+    V_56_convection_transport = MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, u(2:3));
+    dV_57_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, u(4:4));
     if steady_state
       totalDiff = @(x, y) x .* 0;  %% der = 0
     end
-    V_10_convection_transport = MultiDimVar({'N'}, 1, {'N'}, V_10_environment.value([1 0]));  % port gather
-    V_24_convection_transport = MultiDimVar({'N', 'S'}, [1 1], {'N', 'S'}, V_24_environment.value([1 1]));  % port gather
-    V_24_lumped = MultiDimVar({'N', 'S'}, [1 1], {'N', 'S'}, V_24_environment.value([1]));  % port gather
-    _r0 = (sign(( einsum(V_25_convection_transport, V_10_convection_transport, {'N'}) ))) - V_26_convection_transport;
-    _r1 = (( einsum(( einsum(( einsum(( einsum(1 ./ V_29_convection_transport, V_13_convection_transport) ), V_17_convection_transport) ), V_25_convection_transport) ), V_10_convection_transport) )) - V_30_convection_transport;
-    _r2 = (sign(( einsum(V_25_lumped, V_10_lumped, {'N'}) ))) - V_26_lumped;
-    _r3 = (( einsum(( einsum(( einsum(( einsum(1 ./ V_29_lumped, V_13_lumped) ), V_17_lumped) ), V_25_lumped) ), V_10_lumped) )) - V_30_lumped;
-    _r4 = (( einsum(( einsum(0.5, ( V_25_convection_transport - ( einsum(V_26_convection_transport, abs(V_25_convection_transport)) ) )) ), V_24_convection_transport, {'N'}) )) - V_27_convection_transport;
-    _r5 = (( einsum(( einsum(0.5, ( V_25_lumped - ( einsum(V_26_lumped, abs(V_25_lumped)) ) )) ), V_24_lumped, {'N'}) )) - V_27_lumped;
-    _r6 = (( einsum(V_27_convection_transport, V_30_convection_transport) )) - dV_31_convection_transport;
-    _r7 = (( einsum(V_27_lumped, V_30_lumped) )) - V_31_lumped;
-    _r8 = (( einsum(V_25_lumped, V_31_lumped) )) - V_32;
-    _r9 = (V_32) - V_33;
-    _r10 = (integral(@(V_11) _mdv_value(V_33), V_21, V_22, 'ArrayValued', true)) - dV_6;
-    r = [_r0.value; _r1.value; _r2.value; _r3.value; _r4.value; _r5.value; _r6.value; _r7.value; _r8.value; _r9.value; _r10.value];
+    V_56_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, V_56_convection_transport.value([2]));  % port gather
+    promo_r0 = (promo_k1) - V_56_convection_transport;
+    promo_r1 = (MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, reshape((reducesum(( einsum(F_conv_lumped, V_56_lumped) ), {'A_conv'})).value, [1 1]))) - dV_57_lumped;
+    promo_r2 = (MultiDimVar({'A_conv', 'N'}, [2 1], {'A_conv', 'N'}, repmat(reshape((reducesum(( einsum(F_conv_convection_transport, V_56_convection_transport) ), {'A_conv'})).value, [1 1]), [2 1]))) - V_57_convection_transport;
+    r = [promo_r0.value; promo_r1.value; promo_r2.value];
     if steady_state
-      r = [r; dV_31_convection_transport.value; dV_6.value];  % der = 0
+      r = [r; dV_57_lumped.value];  % der = 0
     else
-      _e0 = (MultiDimVar({'A_conv', 'N', 'S'}, [2 1 1], {'A_conv', 'N', 'S'}, par.ic0_V_31_convection_transport)) - V_31_convection_transport;  % IC pin
-      _e1 = (MultiDimVar({'N', 'S', 'A_conv'}, [1 1 1], {'N', 'S', 'A_conv'}, par.ic0_V_6)) - V_6;  % IC pin
-      r = [r; _e0.value; _e1.value];
+      promo_e0 = (promo_k2) - V_57_lumped;  % IC pin
+      r = [r; promo_e0.value];
     end
   end
-  _u = fsolve(@_t0, zeros(18, 1));
-  V_31_convection_transport = MultiDimVar({'A_conv', 'N', 'S'}, [2 1 1], {'A_conv', 'N', 'S'}, _u(1:2));
-  V_6 = MultiDimVar({'N', 'S', 'A_conv'}, [1 1 1], {'N', 'S', 'A_conv'}, _u(3:3));
-  y0 = [V_31_convection_transport.value(:); V_6.value(:)];
+  promo_u = promo_solve_balance(@promo_t0, 4);
+  V_57_lumped = MultiDimVar({'A_conv', 'N'}, [1 1], {'A_conv', 'N'}, promo_u(1:1));
+  y0 = [V_57_lumped.value(:)];
 end
 
-
-function v = _mdv_value(x)
-  if isa(x, 'MultiDimVar'), x = x.value; end
-  v = x;
-end
 
 % the shared data file — the language-neutral half
 % of the data/code split (parsed once, persistent)
-function d = _model_data()
+function d = promo_model_data()
   persistent d_
   if isempty(d_)
     d_ = jsondecode(fileread(fullfile(fileparts(mfilename('fullpath')), 'model_data.json')));
@@ -116,8 +87,89 @@ function d = _model_data()
   d = d_;
 end
 
-function a = _mx(n)
-  d = _model_data();
+function a = promo_mx(n)
+  d = promo_model_data();
   e = d.matrices.(n);
   a = sparse(e.i + 1, e.j + 1, e.v, e.m, e.n);
+end
+
+function a = promo_shape(e)
+  % jsondecode hands column vectors — row them,
+  % fliplr on a column is a no-op
+  d = e.dims(:).';
+  if numel(d) <= 1, a = e.flat(:); return; end
+  a = permute(reshape(e.flat, fliplr(d)), fliplr(1:numel(d)));
+end
+
+function a = promo_tab(n)
+  d = promo_model_data();
+  a = promo_shape(d.values.(n));
+end
+
+function a = promo_ictab(n)
+  d = promo_model_data();
+  a = promo_shape(d.ics.(n));
+end
+
+function u = promo_solve_balance(fun, count)
+  if count == 0
+    u = zeros(0, 1); r = fun(u);
+    if any(~isfinite(r)) || any(abs(r) > 1e-8), error('inconsistent prescribed balance'); end
+    return;
+  end
+  % Emitted balance residuals are affine in u — solve
+  % A u = -r(0) with a finite-difference A, cached per
+  % residual (keyed on the function name) so the inner
+  % solve in promo_derivative costs ~2 residual evals
+  % per ODE step instead of an fsolve.  fsolve stays
+  % the fallback for genuinely nonlinear residuals.
+  persistent affine nonlin;
+  if isempty(affine), affine = struct(); nonlin = struct(); end
+  key = ['f_' regexprep(func2str(fun), '[^A-Za-z0-9_]', '_')];
+  if isfield(nonlin, key)
+    u = promo_fsolve_balance(fun, count); return;
+  end
+  r0 = fun(zeros(count, 1));
+  if isfield(affine, key)
+    u = -(affine.(key) \ r0);
+    r = fun(u);
+    if all(isfinite(r)) && all(abs(r) <= 1e-8), return; end
+    affine = rmfield(affine, key); nonlin.(key) = true;
+    u = promo_fsolve_balance(fun, count); return;
+  end
+  A = zeros(numel(r0), count);
+  for k = 1:count
+    ek = zeros(count, 1); ek(k) = 1;
+    A(:,k) = fun(ek) - r0;
+  end
+  if rank(A) >= count
+    u = -(A \ r0);
+    r = fun(u);
+    if all(isfinite(r)) && all(abs(r) <= 1e-8)
+      affine.(key) = A; return;
+    end
+  end
+  nonlin.(key) = true;
+  u = promo_fsolve_balance(fun, count);
+end
+
+function u = promo_solve_once(fun, count)
+  % The emitter proved this residual time-invariant:
+  % every input is a dispatcher constant or a solve
+  % unknown, so the solution never changes — solve
+  % once, then reuse it for the rest of the run.
+  persistent cache;
+  if isempty(cache), cache = struct(); end
+  key = ['f_' regexprep(func2str(fun), '[^A-Za-z0-9_]', '_')];
+  if isfield(cache, key), u = cache.(key); return; end
+  u = promo_solve_balance(fun, count);
+  cache.(key) = u;
+end
+
+function u = promo_fsolve_balance(fun, count)
+  options = optimset('TolFun', 1e-12, 'TolX', 1e-12, 'Display', 'off');
+  [u, r, flag, output, jac] = fsolve(fun, zeros(count, 1), options);
+  if flag <= 0 || any(~isfinite(r)) || any(abs(r) > 1e-8), error('prescribed balance solve failed'); end
+  if rank(jac) < count, error('prescribed balance system is underdetermined'); end
+end
 end
