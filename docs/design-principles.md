@@ -134,14 +134,28 @@ ancestry chains supply the subclass/subproperty semantics the suite
 needs.  Richer inference is resolved in code over declared predicates,
 not in a reasoner.
 
+## 11. The suite emits; the user runs
+
+The suite's contract ends at the **model interface** — it emits
+self-contained bundles, it does not execute simulations (ruled
+2026-11-05).  Each target's export (`POST /api/instantiate/code/export`)
+carries everything an external run needs: the model source
+(`derivative`/`initial`/`outputs`), `model_data.json` (incidence
+matrices + value-cell literals + IC pins), a `run.*` driver script and
+target harness (python `.sh` wrapper, julia `Project.toml`, matlab
+`@MultiDimVar` vendored class).  Simulation execution is external and
+**user-owned** — the suite ships in a small docker without solver
+runtimes.  In-service `POST /initial` remains for verification (t=0
+consistency), not production runs.
+
 ---
 
 ## Open deviations / known gaps
 
 - `E_29` sibling sub-index contraction (`idx_arc_convection` vs
-  `idx_arc_mass`) — checker machinery gap; options recorded in the
+  `idx_arc_mass`) — checker machinery gap; the current model avoids it
+  (uses same-index `F_conv . fmc`).  Options recorded in the
   2026-11-03 handoff.
-- `V_34@ct` double-bound port — open.
 - Overdetermination check for token granularity — designed (§5),
   unimplemented.
 - Cross-artefact consistency review — deferred until all apps are
