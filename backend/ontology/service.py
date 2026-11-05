@@ -743,6 +743,9 @@ def create_entity_type(
         raise HTTPException(
             status_code=422,
             detail=f"branch must be one of {sorted(branches)}")
+    if record.token:
+        _require_typed(graph, record.token, PROMO["Token"],
+                       "Mechanism token")
     store.add_entity_type(
         graph,
         URIRef(record.iri),
@@ -754,6 +757,7 @@ def create_entity_type(
         description=record.description,
         scale_values=record.scale_values,
         parent=URIRef(record.parent) if record.parent else None,
+        token=URIRef(record.token) if record.token else None,
     )
     return record
 
@@ -1247,6 +1251,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
         branch = graph.value(s, PROMO["branch"])
         doc = graph.value(s, PROMO["doc"])
         parent = graph.value(s, PROMO["parent"])
+        token = graph.value(s, PROMO["token"])
         scale_values = [str(sv) for sv in graph.objects(s, PROMO["hasScaleValue"])]
         records.append(
             EntityTypeRecord(
@@ -1260,6 +1265,7 @@ def _list_entity_type_records(ctx) -> List[EntityTypeRecord]:
                 description=str(doc) if doc else "",
                 parent=str(parent) if parent else None,
                 capabilities=_capabilities(graph, s),
+                token=str(token) if token else None,
             )
         )
     return records

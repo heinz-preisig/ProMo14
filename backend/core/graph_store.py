@@ -838,6 +838,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
         description: str = "",
         scale_values: Optional[List[Union[str, URIRef]]] = None,
         parent: Optional[Union[str, URIRef]] = None,
+        token: Optional[Union[str, URIRef]] = None,
     ) -> URIRef:
         """Add an entity type (CWA 17960 taxonomy) to the graph."""
         graph.add((iri, RDF.type, PROMO["EntityType"]))
@@ -848,6 +849,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
             if isinstance(parent, str):
                 parent = URIRef(parent)
             graph.set((iri, PROMO["parent"], parent))
+        if token is not None:
+            if isinstance(token, str):
+                token = URIRef(token)
+            graph.set((iri, PROMO["token"], token))
         if spatial_type is not None:
             self._set_literal(graph, iri, PROMO["spatialType"], spatial_type)
         if spatial_size is not None:

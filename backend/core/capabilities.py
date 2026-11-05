@@ -53,6 +53,37 @@ def entity_capabilities(store, graph_iri) -> Dict[str, Set[str]]:
     return out
 
 
+def mechanism_token(store, graph_iri, entity_type: str) -> Optional[str]:
+    """The token family a mechanism transports — ``promo:token`` on the
+    nearest ancestor entity type that declares it (the grouping types
+    ``mass_transport``/``energy_transport``), resolved across the
+    artefact's resolution scope.  ``None`` when no ancestor declares
+    one — a non-mechanism type.
+
+    The declared token names the *family* (e.g. ``token_mass``);
+    granularity within it (``mass`` vs ``component_mass``) is a
+    model-objective choice resolved via token ancestry.
+    """
+    tokens: Dict[str, str] = {}
+    parents: Dict[str, str] = {}
+    for gi in store.resolution_scope(graph_iri):
+        g = store.dataset.graph(gi)
+        for et in g.subjects(RDF.type, PROMO["EntityType"]):
+            tok = g.value(et, PROMO["token"])
+            if tok is not None:
+                tokens[str(et)] = str(tok)
+            p = g.value(et, PROMO["parent"])
+            if p is not None:
+                parents[str(et)] = str(p)
+    cur, seen = entity_type, set()
+    while cur and cur not in seen:
+        seen.add(cur)
+        if cur in tokens:
+            return tokens[cur]
+        cur = parents.get(cur)
+    return None
+
+
 def violations(
     store,
     graph_iri,

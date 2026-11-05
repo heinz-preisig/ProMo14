@@ -205,6 +205,11 @@ class EntityTypeRecord(BaseModel):
     description: str = ""
     parent: Optional[str] = None  # promo:parent — entity-type taxonomy
     capabilities: List[str] = Field(default_factory=list)  # §20, via ancestry
+    #: promo:token — declared on mechanism *grouping* types
+    #: (mass/energy transport): the token family the mechanism moves.
+    #: Granularity within the family (e.g. mass vs component_mass) is
+    #: a model-objective choice resolved via token ancestry.
+    token: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

@@ -1320,7 +1320,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:neef1b1ef2ce746288a2b412cea4b8158b1 ;
+        promo:hasArguments _:na492e02516b94ef5850016f2b0f7e086b1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
@@ -1338,7 +1338,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial V}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:neef1b1ef2ce746288a2b412cea4b8158b2 ;
+        promo:hasArguments _:na492e02516b94ef5850016f2b0f7e086b2 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -1356,7 +1356,7 @@
         promo:rhsLatex "\\left( r_{x,N} \\circ r_{y,N} \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:N2e2f17b91e9d4fa48a0cdd5ac84aa490 ;
+        promo:hasArguments _:na492e02516b94ef5850016f2b0f7e086b3 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -1374,7 +1374,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:neef1b1ef2ce746288a2b412cea4b8158b4 ;
+        promo:hasArguments _:na492e02516b94ef5850016f2b0f7e086b4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -1392,7 +1392,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:neef1b1ef2ce746288a2b412cea4b8158b5 ;
+        promo:hasArguments _:na492e02516b94ef5850016f2b0f7e086b5 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#V_10> a promo:Variable ;
@@ -2189,7 +2189,8 @@
         promo:parent <https://w3id.org/promo/ontology#etype_transport_system> ;
         promo:spatialSize "finite" ;
         promo:spatialType "distributed" ;
-        promo:temporalType "event-dynamic" .
+        promo:temporalType "event-dynamic" ;
+        promo:token <https://w3id.org/promo/ontology#token_mass> .
 
     <https://w3id.org/promo/ontology#sval_time_continuum> a promo:ScaleValue ;
         rdfs:label "continuum" ;
@@ -2226,7 +2227,8 @@
         promo:parent <https://w3id.org/promo/ontology#etype_transport_system> ;
         promo:spatialSize "finite" ;
         promo:spatialType "distributed" ;
-        promo:temporalType "event-dynamic" .
+        promo:temporalType "event-dynamic" ;
+        promo:token <https://w3id.org/promo/ontology#token_energy> .
 
     <https://w3id.org/promo/ontology#sval_length_continuum> a promo:ScaleValue ;
         rdfs:label "continuum" ;
@@ -2246,10 +2248,6 @@
         rdfs:label "parameter" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
 
-    <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
-        rdfs:label "Energy" ;
-        promo:tokenKind "conserved" .
-
     <https://w3id.org/promo/ontology#token_signal> a promo:Token ;
         rdfs:label "Signal" ;
         promo:tokenKind "reference" .
@@ -2258,8 +2256,8 @@
         promo:hasDomain <https://w3id.org/promo/ontology#domain_information> ;
         promo:name "role" .
 
-    <https://w3id.org/promo/ontology#token_mass> a promo:Token ;
-        rdfs:label "Mass" ;
+    <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
+        rdfs:label "Energy" ;
         promo:tokenKind "conserved" .
 
     <https://w3id.org/promo/ontology#domain_information> a promo:Domain ;
@@ -2271,6 +2269,10 @@
         rdfs:label "distributed" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
         promo:parent <https://w3id.org/promo/ontology#sval_length_microscopic> .
+
+    <https://w3id.org/promo/ontology#token_mass> a promo:Token ;
+        rdfs:label "Mass" ;
+        promo:tokenKind "conserved" .
 
     <https://w3id.org/promo/ontology#term_determination_constant> a promo:AxisTerm ;
         rdfs:label "constant" ;
@@ -2324,28 +2326,28 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:N131ddef2dbd54c59b87c99d8d290ca91 rdf:first <https://w3id.org/promo/ontology#V_15> ;
+    _:na492e02516b94ef5850016f2b0f7e086b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:na492e02516b94ef5850016f2b0f7e086b7 .
+
+    _:na492e02516b94ef5850016f2b0f7e086b2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:na492e02516b94ef5850016f2b0f7e086b8 .
+
+    _:na492e02516b94ef5850016f2b0f7e086b3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
+        rdf:rest _:na492e02516b94ef5850016f2b0f7e086b6 .
+
+    _:na492e02516b94ef5850016f2b0f7e086b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:N2e2f17b91e9d4fa48a0cdd5ac84aa490 rdf:first <https://w3id.org/promo/ontology#V_14> ;
-        rdf:rest _:N131ddef2dbd54c59b87c99d8d290ca91 .
-
-    _:neef1b1ef2ce746288a2b412cea4b8158b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:neef1b1ef2ce746288a2b412cea4b8158b6 .
-
-    _:neef1b1ef2ce746288a2b412cea4b8158b2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:neef1b1ef2ce746288a2b412cea4b8158b7 .
-
-    _:neef1b1ef2ce746288a2b412cea4b8158b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:na492e02516b94ef5850016f2b0f7e086b5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:neef1b1ef2ce746288a2b412cea4b8158b5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:na492e02516b94ef5850016f2b0f7e086b6 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest () .
 
-    _:neef1b1ef2ce746288a2b412cea4b8158b6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+    _:na492e02516b94ef5850016f2b0f7e086b7 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:neef1b1ef2ce746288a2b412cea4b8158b7 rdf:first <https://w3id.org/promo/ontology#V_23> ;
+    _:na492e02516b94ef5850016f2b0f7e086b8 rdf:first <https://w3id.org/promo/ontology#V_23> ;
         rdf:rest () .
 }
 
