@@ -156,8 +156,21 @@ consistency), not production runs.
   `idx_arc_mass`) — checker machinery gap; the current model avoids it
   (uses same-index `F_conv . fmc`).  Options recorded in the
   2026-11-03 handoff.
-- Overdetermination check for token granularity — designed (§5),
-  unimplemented.
+- Overdetermination check — designed (§5), unimplemented.
+  Overdetermination = **declared constraints creating algebraic
+  dependencies between vars declared independently**.  Sources:
+  constancy constraints (`V` const → `m = ρV` links mass/density),
+  constitutive closures (EOS, incompressibility), normalization
+  (`Σ x_i = 1`), token granularity (`mass = Σ n_i·M_i`).
+  **Constancy is instance-scoped** (ruled 2026-11-05): the same var
+  may be dynamic on one entity and pinned on another — even within
+  one model — so it cannot be `var_class=constant` on the record.
+  It is a per-element pin like an IC but for all `t`; the natural
+  home is the instantiation/value channel alongside `valueCell`
+  (a `promo:hold`-style declaration), demoting the pinned element's
+  state to a `der=0` constraint.  The check itself is DOF counting
+  over declared structure: `states + algebraics` vs
+  `equations + constraints`.
 - Cross-artefact consistency review — deferred until all apps are
   operational (impact analysis, publish-boundary SHACL, transactional
   mutation, atomic multi-file persistence, stale `closed` assignments).
