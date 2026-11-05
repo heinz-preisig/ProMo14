@@ -1020,7 +1020,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_conv\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         promo:doc "incidence matrix for the convection arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1031,7 +1030,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#F_diff> a promo:Variable ;
@@ -1039,7 +1037,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_diff\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         promo:doc "incidence matrix for the diffusion arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1050,7 +1047,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#F_energy> a promo:Variable ;
@@ -1058,7 +1054,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_energy\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
         promo:doc "incidence matrix for the energy arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1069,7 +1064,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_energy\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#F_heat> a promo:Variable ;
@@ -1077,7 +1071,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_heat\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
         promo:doc "incidence matrix for the heat arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1088,7 +1081,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_energy\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#F_mass> a promo:Variable ;
@@ -1096,7 +1088,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_mass\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
         promo:doc "incidence matrix for the mass arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1107,7 +1098,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#F_rad> a promo:Variable ;
@@ -1115,7 +1105,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_rad\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
         promo:doc "incidence matrix for the radiation arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1126,7 +1115,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_energy\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#F_work> a promo:Variable ;
@@ -1134,7 +1122,6 @@
         promo:aliases "{\"latex\": \"F\", \"global_ID\": \"https://w3id.org/promo/ontology#F_work\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
             <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
         promo:doc "incidence matrix for the work arc" ;
         promo:frozen false ;
         promo:imported false ;
@@ -1145,7 +1132,6 @@
         promo:latex "F" ;
         promo:network "physical" ;
         promo:portVariable false ;
-        promo:tokenVector "{\"token_energy\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#V_12> a promo:Variable ;
@@ -2226,6 +2212,10 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
         promo:parent <https://w3id.org/promo/ontology#sval_time_continuum> .
 
+    <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
+        rdfs:label "Energy" ;
+        promo:tokenKind "conserved" .
+
     <https://w3id.org/promo/ontology#etype_energy_transport> a promo:EntityType ;
         rdfs:label "Energy Transport" ;
         promo:branch "physical" ;
@@ -2249,6 +2239,10 @@
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:name "function" .
 
+    <https://w3id.org/promo/ontology#token_mass> a promo:Token ;
+        rdfs:label "Mass" ;
+        promo:tokenKind "conserved" .
+
     <https://w3id.org/promo/ontology#scale_phase> a promo:ScaleDimension ;
         promo:dimensionKind "content" ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
@@ -2266,10 +2260,6 @@
         rdfs:label "parameter" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
 
-    <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
-        rdfs:label "Energy" ;
-        promo:tokenKind "conserved" .
-
     <https://w3id.org/promo/ontology#domain_information> a promo:Domain ;
         promo:branch "information" ;
         promo:name "information" ;
@@ -2279,10 +2269,6 @@
         rdfs:label "distributed" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
         promo:parent <https://w3id.org/promo/ontology#sval_length_microscopic> .
-
-    <https://w3id.org/promo/ontology#token_mass> a promo:Token ;
-        rdfs:label "Mass" ;
-        promo:tokenKind "conserved" .
 
     <https://w3id.org/promo/ontology#term_determination_constant> a promo:AxisTerm ;
         rdfs:label "constant" ;

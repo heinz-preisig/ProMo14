@@ -159,10 +159,10 @@
         promo:network "macroscopic" ;
         promo:rhs "sign( ( physical!F_conv . physical!p_mech ) )" ;
         promo:rhsExpression <https://w3id.org/promo/library#E_11/expression> ;
-        promo:rhsLatex "\\mathrm{sign}\\left( \\left( {F}_{A\\_conv,N} \\circ p_{\\mathrm{m},A\\_conv} \\right) \\right)" .
+        promo:rhsLatex "\\mathrm{sign}\\left( \\left( {F}_{A\\_conv,N} \\circ p_{\\mathrm{m},N} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_11/expression> a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b2 ;
+        promo:hasArguments _:N0867c6115acf4ae0a0c839b0458181ab ;
         promo:hasOperation promolg:sign .
 
     <https://w3id.org/promo/library#E_12> a promo:Equation ;
@@ -468,7 +468,7 @@
         promo:rhsLatex "\\left( \\left( {k^q}_{x,N} \\circ A_{yz,N} \\right) \\circ \\left( \\sum_{N} {F}_{A\\_heat,N} \\, {T}_{N} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_28/expression> a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b19 ;
+        promo:hasArguments _:N02837a624b6e4358bbe9df8e7584b742 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_29> a promo:Equation ;
@@ -486,7 +486,7 @@
         promo:rhsLatex "\\sum_{A\\_conv} \\left( {F}_{A\\_conv,N} \\circ {\\hat{m}^c}_{A\\_conv,N} \\right)" .
 
     <https://w3id.org/promo/library#E_29/expression> a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b20 ;
+        promo:hasArguments _:Nc426467f9d954e67abf6751d8c8179cc ;
         promo:hasOperation promolg:SumOverIndex .
 
     <https://w3id.org/promo/library#E_30> a promo:Equation ;
@@ -522,7 +522,7 @@
         promo:rhsLatex "\\left( \\left( {k^c}_{x,N} \\circ A_{yz,N} \\right) \\circ \\left( \\sum_{N} p_{\\mathrm{m},N} \\, {F}_{A\\_conv,N} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_4/expression> a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b22 ;
+        promo:hasArguments _:N14b8d1857a504f0683afcfd9a7ed2e04 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_5> a promo:Equation ;
@@ -1062,6 +1062,9 @@
         promo:hasArguments _:N6352adeaa3304f7c84153a06c78948b6 ;
         promo:hasOperation promolg:inv .
 
+    _:N02837a624b6e4358bbe9df8e7584b742 rdf:first _:Na26beb1a895b42ec86ea12e44ff102e2 ;
+        rdf:rest _:N14335831b2f649f58b5e64bf4ba830c7 .
+
     _:N051298526fb342628698f68d9207033c rdf:first <https://w3id.org/promo/ontology#V_16> ;
         rdf:rest () .
 
@@ -1076,6 +1079,13 @@
     _:N07dc61ce17164535a1b1c1956a30360a a promo:Expression ;
         promo:hasArguments _:N8a141208eade4590b511bfda7620b7ae ;
         promo:hasOperation promolg:PartialDerivative .
+
+    _:N0867c6115acf4ae0a0c839b0458181ab rdf:first _:N43d213bde23c479086fd440ed01ed02a ;
+        rdf:rest () .
+
+    _:N09e425c9dc7b40a49d6b71dc41f1d025 a promo:Expression ;
+        promo:hasArguments _:N217f38fdb5094ee3b163ed9d26c871a0 ;
+        promo:hasOperation promolg:ReduceProduct .
 
     _:N0a2dbb90ce3c458c860df0d2a7b37cb2 a promo:Expression ;
         promo:hasArguments _:N5597b4435e8748fa9194ecc6ea1551e7 ;
@@ -1097,11 +1107,23 @@
     _:N139fd88b5bb449309aa9790d19d3b333 rdf:first _:Ned82f1ed47584da6abc157e5efa9cd6c ;
         rdf:rest () .
 
+    _:N14335831b2f649f58b5e64bf4ba830c7 rdf:first _:N09e425c9dc7b40a49d6b71dc41f1d025 ;
+        rdf:rest () .
+
+    _:N14b44cdbba6346f9848b694d5f9a42d8 rdf:first <https://w3id.org/promo/library#V_50> ;
+        rdf:rest _:Ndb9a4c00f5bf459e84fdf64ba189cc47 .
+
+    _:N14b8d1857a504f0683afcfd9a7ed2e04 rdf:first _:N91c545e59d7e4551965d0e0fbf474d00 ;
+        rdf:rest _:Nd32d49d7e6b84ff5a9945012b2546ed9 .
+
     _:N176774d3df0744acba7ee2d8e90b3822 rdf:first <https://w3id.org/promo/library#V_48> ;
         rdf:rest () .
 
     _:N18fb3b1800c94720928de9ff44199174 rdf:first <https://w3id.org/promo/library#V_37> ;
         rdf:rest _:N42435436fe2940b1ae432fde0c038b88 .
+
+    _:N1aa256c883c54c699e531bcd9d1330b7 rdf:first <https://w3id.org/promo/library#V_56> ;
+        rdf:rest () .
 
     _:N1ae934f576ab44d0a9114a4a6a7254a6 a promo:Expression ;
         promo:hasArguments _:N27b97893bb194bb88b617245b3d2acc6 ;
@@ -1112,6 +1134,9 @@
 
     _:N1faba9c5ff614a14996bccb842f12e47 rdf:first _:N290de1e9c8244d4b9142c789b663bd25 ;
         rdf:rest _:N4e97fcb0336740c1b4bef2c0ec13f03a .
+
+    _:N217f38fdb5094ee3b163ed9d26c871a0 rdf:first <https://w3id.org/promo/ontology#F_heat> ;
+        rdf:rest _:Nb936014c51a747a1a2daafd3457b3252 .
 
     _:N219188c960534320821ae3b28e0d5a42 rdf:first <https://w3id.org/promo/library#V_38> ;
         rdf:rest () .
@@ -1169,6 +1194,12 @@
     _:N37f90608ae56492f860a8c6d28f32ef4 rdf:first <https://w3id.org/promo/library#V_35> ;
         rdf:rest () .
 
+    _:N38892f507d454cf7bacd76a58aa5dcfd rdf:first <https://w3id.org/promo/library#V_39> ;
+        rdf:rest _:Nd1b515934c9f4931870c084c357ec9ec .
+
+    _:N38bfc01f50774df788b17cefc8d4e770 rdf:first <https://w3id.org/promo/ontology#V_34> ;
+        rdf:rest _:N942e3ac00354499b9a8778bbe923cd24 .
+
     _:N395b48c071674e9288febfef5d8de057 rdf:first <https://w3id.org/promo/library#V_35> ;
         rdf:rest () .
 
@@ -1195,6 +1226,10 @@
 
     _:N42435436fe2940b1ae432fde0c038b88 rdf:first _:Na16aa74f5c434708aeec8f02428ae7c0 ;
         rdf:rest () .
+
+    _:N43d213bde23c479086fd440ed01ed02a a promo:Expression ;
+        promo:hasArguments _:N88694e3aa10d48b4b80e849596df5b79 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     _:N47ab779b600746f8bd9197505b081029 rdf:first <https://w3id.org/promo/ontology#V_10> ;
         rdf:rest () .
@@ -1306,6 +1341,9 @@
         promo:hasArguments _:Necea5335a91748b88e26bcb7e806545d ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
+    _:N7f449bda3651463a868c17c48629a516 rdf:first <https://w3id.org/promo/ontology#V_34> ;
+        rdf:rest () .
+
     _:N83667d8aca894b87869259345e394173 rdf:first <https://w3id.org/promo/library#V_37> ;
         rdf:rest () .
 
@@ -1318,6 +1356,9 @@
     _:N882ec2c6e8f442ddb02ad07155b02681 a promo:Expression ;
         promo:hasArguments _:N4842a76986ff44428a99c5555c7a9f01 ;
         promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N88694e3aa10d48b4b80e849596df5b79 rdf:first <https://w3id.org/promo/ontology#F_conv> ;
+        rdf:rest _:N7f449bda3651463a868c17c48629a516 .
 
     _:N88ca6d1ba222479fb95fadeeede80d07 a promo:Expression ;
         promo:hasArguments _:Ncf5d245719cb43b3bea5bd5f736aa416 ;
@@ -1345,12 +1386,23 @@
         promo:hasArguments _:N11cbb15579f74b9d993f882bfd6fd15e ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
+    _:N91c545e59d7e4551965d0e0fbf474d00 a promo:Expression ;
+        promo:hasArguments _:N38892f507d454cf7bacd76a58aa5dcfd ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N942e3ac00354499b9a8778bbe923cd24 rdf:first <https://w3id.org/promo/ontology#F_conv> ;
+        rdf:rest () .
+
     _:N94999d252bcc44b29844e02b553982d3 a promo:Expression ;
         promo:hasArguments _:Nc0bc2c7c1fb44b4d84269739ab70af03 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     _:N96b53835f64248a187588ae41802d4c3 rdf:first _:Na64c4a8f6ee14f32a4ab831e6c5a9250 ;
         rdf:rest () .
+
+    _:N98160b57137149d9afa058cb9b0b9161 a promo:Expression ;
+        promo:hasArguments _:N38bfc01f50774df788b17cefc8d4e770 ;
+        promo:hasOperation promolg:ReduceProduct .
 
     _:N9ac83c90bc2a41558428c0a5214cdd9b rdf:first _:N63e43cb18d52456aa36dee753337241b ;
         rdf:rest _:N362b26b4d458469eb4db1b7547ace230 .
@@ -1363,6 +1415,10 @@
 
     _:Na16aa74f5c434708aeec8f02428ae7c0 a promo:Expression ;
         promo:hasArguments _:N8962e7ed5cc14496bc2d7680207b2502 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Na26beb1a895b42ec86ea12e44ff102e2 a promo:Expression ;
+        promo:hasArguments _:N14b44cdbba6346f9848b694d5f9a42d8 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     _:Na2b02ce3b1b54ea4b32535191c327a88 rdf:first _:N609bf27f7fb4416b901a9d28b430c768 ;
@@ -1388,6 +1444,9 @@
     _:Nb796d1c374b24ce8a7ceb68a46c8ddea rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:N32f149cbaa8048a7b7c75b332fe81fd1 .
 
+    _:Nb936014c51a747a1a2daafd3457b3252 rdf:first <https://w3id.org/promo/ontology#V_9> ;
+        rdf:rest () .
+
     _:Nbcaf92483b5c42c38533c7fd26e5f5ef a promo:Expression ;
         promo:hasArguments _:N18fb3b1800c94720928de9ff44199174 ;
         promo:hasOperation promolg:IndexPreservingProduct .
@@ -1398,11 +1457,27 @@
     _:Nc18d83b83a6b4621bdc293d5325b54c4 rdf:first _:Nca9a030a96094885a22f04d6ceb46a9e ;
         rdf:rest _:N0a65bab0b35e4f3e944a87f9d83a6fba .
 
+    _:Nc2ed81ffa9ec42daa9886c6a526771f2 rdf:first <https://w3id.org/promo/ontology#F_conv> ;
+        rdf:rest _:N1aa256c883c54c699e531bcd9d1330b7 .
+
+    _:Nc426467f9d954e67abf6751d8c8179cc rdf:first _:Nd12ee1b1f5d94c53b54063adf4bc5f85 ;
+        rdf:rest _:Nd93f4bffd4b648129b0672ccf791f49c .
+
     _:Nca9a030a96094885a22f04d6ceb46a9e a promo:Expression ;
         promo:hasArguments _:Nb3c394a2e37244d8a152978f2206c3f6 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     _:Ncf5d245719cb43b3bea5bd5f736aa416 rdf:first <https://w3id.org/promo/ontology#V_23> ;
+        rdf:rest () .
+
+    _:Nd12ee1b1f5d94c53b54063adf4bc5f85 a promo:Expression ;
+        promo:hasArguments _:Nc2ed81ffa9ec42daa9886c6a526771f2 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Nd1b515934c9f4931870c084c357ec9ec rdf:first <https://w3id.org/promo/library#V_54> ;
+        rdf:rest () .
+
+    _:Nd32d49d7e6b84ff5a9945012b2546ed9 rdf:first _:N98160b57137149d9afa058cb9b0b9161 ;
         rdf:rest () .
 
     _:Nd3a7b7cd6ed8458493ebce25907afda9 rdf:first <https://w3id.org/promo/library#V_35> ;
@@ -1411,6 +1486,12 @@
     _:Nd3c7a56b25554e9f97eeb8b328dd21c6 a promo:Expression ;
         promo:hasArguments _:N89d7c13ea5e74619a7376baeeb761377 ;
         promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Nd93f4bffd4b648129b0672ccf791f49c rdf:first <https://w3id.org/promo/ontology#idx_arc_convection> ;
+        rdf:rest () .
+
+    _:Ndb9a4c00f5bf459e84fdf64ba189cc47 rdf:first <https://w3id.org/promo/library#V_54> ;
+        rdf:rest () .
 
     _:Ndcc2126c93b44819834ae03fde803a05 rdf:first <https://w3id.org/promo/ontology#V_23> ;
         rdf:rest () .
@@ -1481,32 +1562,11 @@
     _:na3b773831f234ea3ba42247a574bfaa2b12 rdf:first <https://w3id.org/promo/library#V_45> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b59 .
 
-    _:na3b773831f234ea3ba42247a574bfaa2b124 a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b143 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b125 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b156 ;
-        rdf:rest () .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b126 a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b148 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b127 rdf:first <https://w3id.org/promo/ontology#idx_arc_convection> ;
-        rdf:rest () .
-
     _:na3b773831f234ea3ba42247a574bfaa2b128 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b146 .
 
-    _:na3b773831f234ea3ba42247a574bfaa2b129 a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b160 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
     _:na3b773831f234ea3ba42247a574bfaa2b13 rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b68 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b130 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b162 ;
-        rdf:rest () .
 
     _:na3b773831f234ea3ba42247a574bfaa2b131 rdf:first <https://w3id.org/promo/ontology#V_6> ;
         rdf:rest () .
@@ -1543,12 +1603,6 @@
     _:na3b773831f234ea3ba42247a574bfaa2b142 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:na3b773831f234ea3ba42247a574bfaa2b143 rdf:first <https://w3id.org/promo/library#V_50> ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b144 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b144 rdf:first <https://w3id.org/promo/library#V_54> ;
-        rdf:rest () .
-
     _:na3b773831f234ea3ba42247a574bfaa2b145 rdf:first <https://w3id.org/promo/ontology#V_23> ;
         rdf:rest () .
 
@@ -1558,50 +1612,18 @@
     _:na3b773831f234ea3ba42247a574bfaa2b147 rdf:first <https://w3id.org/promo/ontology#V_22> ;
         rdf:rest () .
 
-    _:na3b773831f234ea3ba42247a574bfaa2b148 rdf:first <https://w3id.org/promo/ontology#F_conv> ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b149 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b149 rdf:first <https://w3id.org/promo/library#V_56> ;
-        rdf:rest () .
-
     _:na3b773831f234ea3ba42247a574bfaa2b150 rdf:first <https://w3id.org/promo/ontology#V_9> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b142 .
 
     _:na3b773831f234ea3ba42247a574bfaa2b153 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:na3b773831f234ea3ba42247a574bfaa2b154 rdf:first <https://w3id.org/promo/ontology#F_conv> ;
-        rdf:rest () .
-
     _:na3b773831f234ea3ba42247a574bfaa2b155 rdf:first <https://w3id.org/promo/ontology#V_10> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b145 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b156 a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b157 ;
-        promo:hasOperation promolg:ReduceProduct .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b157 rdf:first <https://w3id.org/promo/ontology#F_heat> ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b158 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b158 rdf:first <https://w3id.org/promo/ontology#V_9> ;
-        rdf:rest () .
 
     _:na3b773831f234ea3ba42247a574bfaa2b159 a promo:Expression ;
         promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b150 ;
         promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b160 rdf:first <https://w3id.org/promo/library#V_39> ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b161 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b161 rdf:first <https://w3id.org/promo/library#V_54> ;
-        rdf:rest () .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b162 a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b163 ;
-        promo:hasOperation promolg:ReduceProduct .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b163 rdf:first <https://w3id.org/promo/ontology#V_34> ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b154 .
 
     _:na3b773831f234ea3ba42247a574bfaa2b164 a promo:Expression ;
         promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b155 ;
@@ -1610,20 +1632,8 @@
     _:na3b773831f234ea3ba42247a574bfaa2b166 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b164 ;
         rdf:rest () .
 
-    _:na3b773831f234ea3ba42247a574bfaa2b19 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b124 ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b125 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b2 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b51 ;
-        rdf:rest () .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b20 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b126 ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b127 .
-
     _:na3b773831f234ea3ba42247a574bfaa2b21 rdf:first <https://w3id.org/promo/library#V_57> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b128 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b22 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b129 ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b130 .
 
     _:na3b773831f234ea3ba42247a574bfaa2b23 rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b131 .
@@ -1645,16 +1655,6 @@
         promo:hasOperation promolg:Add .
 
     _:na3b773831f234ea3ba42247a574bfaa2b42 rdf:first _:na3b773831f234ea3ba42247a574bfaa2b159 ;
-        rdf:rest () .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b51 a promo:Expression ;
-        promo:hasArguments _:na3b773831f234ea3ba42247a574bfaa2b52 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b52 rdf:first <https://w3id.org/promo/ontology#F_conv> ;
-        rdf:rest _:na3b773831f234ea3ba42247a574bfaa2b53 .
-
-    _:na3b773831f234ea3ba42247a574bfaa2b53 rdf:first <https://w3id.org/promo/ontology#V_34> ;
         rdf:rest () .
 
     _:na3b773831f234ea3ba42247a574bfaa2b59 rdf:first <https://w3id.org/promo/ontology#V_9> ;
