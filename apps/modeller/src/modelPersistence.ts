@@ -3,7 +3,7 @@
 // (ADR-007: the artefact graph is one model document; GET/PUT /api/modeller/model)
 // ---------------------------------------------------------------------------
 
-import type { AppState } from './state/ModelState'
+import type { AppState, RefViewState } from './state/ModelState'
 import type { CompositeRef, Knot, ModelArc, ModelNode, OpenArc, Tree, TreeNode } from './types'
 
 export interface ModelNodeDoc {
@@ -196,11 +196,29 @@ export function deserializeState(doc: ModelDocument): AppState {
     knotStore,
     currentViewNodeId: doc.rootTreeId,
     selectedVisibleNodeId: null,
+    selectedVisibleNodeIds: [],
     selectedModelArcIri: null,
     arcCounter: doc.arcCounter,
     speciesAliases: new Map(Object.entries(doc.speciesAliases ?? {})),
     speciesPin: doc.usesSpecies?.[0] ?? null,
     compositeRefs,
+    viewRefIri: null,
+    refStates: new Map(),
+  }
+}
+
+/** §22: the maps `computeGraphView` needs to render a referenced
+ *  artefact's content inside the host canvas (read-only scope). */
+export function refViewState(doc: ModelDocument): RefViewState {
+  const s = deserializeState(doc)
+  return {
+    tree: s.tree,
+    modelNodes: s.modelNodes,
+    modelArcs: s.modelArcs,
+    layoutStore: s.layoutStore,
+    openArcs: s.openArcs,
+    knotStore: s.knotStore,
+    compositeRefs: s.compositeRefs,
   }
 }
 

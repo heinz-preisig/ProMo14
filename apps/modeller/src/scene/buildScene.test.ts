@@ -37,7 +37,7 @@ function graphView(overrides: Partial<GraphView> = {}): GraphView {
 function build(view: GraphView, overrides: Partial<Parameters<typeof buildScene>[0]> = {}) {
   return buildScene({
     graphView: view,
-    selectedNodeId: null,
+    selectedNodeIds: new Set<string>(),
     selectedArcIri: null,
     draggingOpenArc: null,
     catalogue: placeholderCatalogue,
@@ -57,7 +57,7 @@ describe('buildScene', () => {
     }
 
     const objects = build(graphView({ nodes: [leafA, composite] }), {
-      selectedNodeId: leafA.id,
+      selectedNodeIds: new Set([leafA.id]),
     })
     const nodes = objects.filter((object): object is SceneNode => object.kind === 'node')
 

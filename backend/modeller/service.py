@@ -605,7 +605,18 @@ def extract_submodel(
     moved_comps = [c for c in host.composites if c.treeId in moved]
     moved_node_iris = {
         ch.iri for c in moved_comps for ch in c.children if ch.iri}
+    # UI-authored docs omit ``iri`` on leaf children — the leaf binds
+    # its ModelNode through the ``#N_<treeId>`` fragment instead.
+    # Recover those IRIs; without them the partition moves nothing.
+    leaf_iris: Dict[int, str] = {}
+    for n in host.nodes:
+        frag = n.iri.split("#", 1)[-1]
+        if frag.startswith("N_") and frag[2:].isdigit():
+            leaf_iris[int(frag[2:])] = n.iri
+    moved_node_iris.update(
+        leaf_iris[t] for t in moved if t not in by_id and t in leaf_iris)
     kept_comps = [c for c in host.composites if c.treeId not in moved]
+    all_nodes = list(host.nodes)
 
     def _is_boundary(a: ModelArcDoc) -> bool:
         return ((a.sourceIri in moved_node_iris)
@@ -653,7 +664,7 @@ def extract_submodel(
         treeId=0, label=req.label or "Root", parentTreeId=None,
         children=[ChildDoc(id=remap[t]) for t in roots],
         layout={}, knots={},
-        openArcs=[_sub_open_arc(a, moved_node_iris, host.nodes)
+        openArcs=[_sub_open_arc(a, moved_node_iris, all_nodes)
                   for a in boundary],
     )]
     for c in moved_comps:
@@ -661,7 +672,10 @@ def extract_submodel(
             treeId=remap[c.treeId], label=c.label,
             parentTreeId=(remap[c.parentTreeId]
                           if c.parentTreeId in moved else 0),
-            children=[ChildDoc(id=remap[ch.id], iri=ch.iri)
+            children=[ChildDoc(id=remap[ch.id],
+                               # explicit iri keeps the leaf→ModelNode
+                               # binding intact across the renumber
+                               iri=ch.iri or leaf_iris.get(ch.id))
                       for ch in c.children],
             layout={str(remap[int(k)]): v for k, v in c.layout.items()
                     if int(k) in remap},

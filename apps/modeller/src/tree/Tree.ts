@@ -47,6 +47,28 @@ export class TreeOps {
     return newId
   }
 
+  /** Rename a tree node (composite or leaf view label). */
+  setLabel(id: number, label: string): void {
+    const node = this.tree.nodes.get(id)
+    if (node) node.label = label
+  }
+
+  /** Ungroup: splice the composite's children into its slot in the
+   *  parent's child list and delete the shell node. */
+  ungroup(id: number): void {
+    const node = this.tree.nodes.get(id)
+    if (!node || node.parentId === null) return
+    const parent = this.tree.nodes.get(node.parentId)
+    if (!parent) return
+    const at = parent.children.indexOf(id)
+    for (const cid of node.children) {
+      const child = this.tree.nodes.get(cid)
+      if (child) child.parentId = node.parentId
+    }
+    if (at >= 0) parent.children.splice(at, 1, ...node.children)
+    this.tree.nodes.delete(id)
+  }
+
   /** Get all ancestors of a node (parent first, then grandparent, ... up to root). */
   getAncestors(nodeId: number): number[] {
     const node = this.tree.nodes.get(nodeId)

@@ -1,5 +1,6 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import type { KonvaEventObject } from 'konva/lib/Node'
+import type { Stage as KonvaStage } from 'konva/lib/Stage'
 import type { AppState, Command } from '../state/ModelState'
 import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
@@ -7,7 +8,8 @@ import { resolveConnectionAsync, pickArcType, modelNodeIri, modelArcIri } from '
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
-import { GRAPH_IRI } from '../api'
+import { GRAPH_IRI, loadModelDoc } from '../api'
+import { refViewState } from '../modelPersistence'
 
 /** Root of the transport-system subtree — seeded entity type
  *  (deterministic IRI, minted under the ontology namespace). */
@@ -37,6 +39,9 @@ export interface CanvasEventHandlers {
   groupSelectedNodes: () => void
   handleDelete: () => void
   sceneHandlers: SceneInteractionHandlers
+  /** Active rubber-band rect in scene coordinates (Shift+drag), or
+   *  null — rendered by the canvas layer. */
+  marquee: { x: number; y: number; w: number; h: number } | null
 }
 
 export function useCanvasEvents(
@@ -62,6 +67,60 @@ export function useCanvasEvents(
   const lastClickTime = useRef(0)
   const isPanning = useRef(false)
   const lastPanPos = useRef<{ x: number; y: number } | null>(null)
+
+  // Multi-select: marquee (Shift+drag on empty stage) and multi-drag.
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const isMarquee = useRef(false)
+  const marqueeOrigin = useRef<{ x: number; y: number } | null>(null)
+  /** Members of the selection set at dragStart — multi-drag applies
+   *  the dragged node's delta to every member. */
+  const dragSet = useRef<{
+    originId: string
+    members: { id: string; start: { x: number; y: number }; he: { x: number; y: number } }[]
+  } | null>(null)
+
+  // §22 reference view — inside a referenced artefact's scope the
+  // canvas is read-only: the content belongs to another artefact.
+  // Only navigation (descending composites / nested references)
+  // stays live; every mutating gesture is gated on `inRef`.
+  const inRef = state.viewRefIri !== null
+  const scopeRefs = inRef
+    ? state.refStates.get(state.viewRefIri!)?.compositeRefs
+    : state.compositeRefs
+
+  /** Zoom into a composite — for a referenced composite, into the
+   *  referenced artefact's own tree (rendered read-only).  The ref
+   *  doc is fetched on demand when the load-time prefetch missed it. */
+  const enterComposite = (treeNodeId: number) => {
+    const ref = scopeRefs?.get(treeNodeId)?.refersTo
+    if (!ref) {
+      dispatch({ type: 'setView', viewNodeId: treeNodeId })
+      return
+    }
+    const target = state.refStates.get(ref)
+    if (target) {
+      dispatch({ type: 'setView', viewNodeId: target.tree.rootId, refIri: ref })
+      return
+    }
+    loadModelDoc(ref).then((doc) => {
+      const refs = new Map(state.refStates)
+      refs.set(ref, refViewState(doc))
+      dispatch({ type: 'setRefStates', states: refs })
+      dispatch({ type: 'setView', viewNodeId: doc.rootTreeId, refIri: ref })
+    }).catch(() => {
+      // Unreachable reference — fall back to the local shell zoom.
+      dispatch({ type: 'setView', viewNodeId: treeNodeId })
+    })
+  }
+
+  const pointerToScene = (stage: KonvaStage | null) => {
+    const pos = stage?.getPointerPosition()
+    if (!pos) return null
+    return {
+      x: (pos.x - stageSize.width / 2 - pan.x) / scale,
+      y: (pos.y - stageSize.height / 2 - pan.y) / scale,
+    }
+  }
 
   /** Margins are render zones (ancestors | siblings) — user nodes live
    *  in the centre panel only.  Applies to placement clicks AND drags.
@@ -96,7 +155,11 @@ export function useCanvasEvents(
 
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     if (wasDragged.current) return
+    if (e.evt.button !== 0) return   // Konva fires click for right-button too
+    if (inRef) return
     if (e.target !== e.target.getStage()) return
+    // Modifier clicks belong to multi-select gestures — never insert.
+    if (e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey) return
 
     const now = Date.now()
     if (now - lastClickTime.current < 300) return
@@ -112,6 +175,7 @@ export function useCanvasEvents(
 
   const handleStageRightClick = (e: KonvaEventObject<MouseEvent>) => {
     e.evt.preventDefault()
+    if (inRef) return
     if (state.selectedVisibleNodeId) {
       dispatch({ type: 'selectNode', id: null })
     }
@@ -125,10 +189,34 @@ export function useCanvasEvents(
       e.evt.preventDefault()
       isPanning.current = true
       lastPanPos.current = { x: e.evt.clientX, y: e.evt.clientY }
+      return
+    }
+    // Shift+drag on empty canvas starts the rubber band.
+    if (
+      e.evt.button === 0 && e.evt.shiftKey && !inRef &&
+      e.target === e.target.getStage()
+    ) {
+      const p = pointerToScene(e.target.getStage())
+      if (!p) return
+      isMarquee.current = true
+      marqueeOrigin.current = p
+      setMarquee({ x: p.x, y: p.y, w: 0, h: 0 })
     }
   }
 
   const handleStageMouseMove = (e: KonvaEventObject<MouseEvent>) => {
+    if (isMarquee.current && marqueeOrigin.current) {
+      const p = pointerToScene(e.target.getStage())
+      if (!p) return
+      const o = marqueeOrigin.current
+      setMarquee({
+        x: Math.min(o.x, p.x),
+        y: Math.min(o.y, p.y),
+        w: Math.abs(p.x - o.x),
+        h: Math.abs(p.y - o.y),
+      })
+      return
+    }
     if (!isPanning.current || !lastPanPos.current) return
     const x = e.evt.clientX
     const y = e.evt.clientY
@@ -138,7 +226,32 @@ export function useCanvasEvents(
     lastPanPos.current = { x, y }
   }
 
-  const handleStageMouseUp = () => {
+  const handleStageMouseUp = (e: KonvaEventObject<MouseEvent>) => {
+    if (isMarquee.current) {
+      const m = marquee
+      isMarquee.current = false
+      marqueeOrigin.current = null
+      setMarquee(null)
+      if (m && (m.w > 2 || m.h > 2)) {
+        // Leaf centres inside the rect (same rule as click-select:
+        // only leaves are selectable).
+        const boxed = graphView.nodes
+          .filter((n) =>
+            n.type === 'leaf' &&
+            n.x >= m.x && n.x <= m.x + m.w &&
+            n.y >= m.y && n.y <= m.y + m.h)
+          .map((n) => n.id)
+        const additive = e.evt.ctrlKey || e.evt.metaKey
+        const ids = additive
+          ? [...state.selectedVisibleNodeIds, ...boxed]
+          : boxed
+        dispatch({ type: 'selectNodes', ids })
+        // Swallow the click that follows mouseup — it would insert a node.
+        wasDragged.current = true
+        setTimeout(() => { wasDragged.current = false }, 50)
+      }
+      return
+    }
     isPanning.current = false
     lastPanPos.current = null
   }
@@ -154,19 +267,33 @@ export function useCanvasEvents(
   const onSceneClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true
     if (wasDragged.current) return
+    if (e.evt.button !== 0) return   // right-button is contextmenu, not select/zoom
 
     if (obj.kind === 'node') {
       if (obj.nodeType === 'leaf') {
+        if (inRef) return
+        // Ctrl/Cmd/Shift+click toggles membership — a selection
+        // gesture only, it must not arm the connection source.
+        if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
+          dispatch({ type: 'toggleSelectNode', id: obj.selectionId! })
+          return
+        }
         dispatch({ type: 'selectNode', id: obj.selectionId! })
         if (obj.modelNodeIri && obj.entityType) {
           setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
         }
       } else if (obj.treeNodeId !== undefined) {
-        dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
+        // Ctrl/Shift+click selects the composite (Properties/actions);
+        // a plain click navigates into it.
+        if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
+          if (!inRef) dispatch({ type: 'selectNode', id: obj.selectionId! })
+          return
+        }
+        enterComposite(obj.treeNodeId)
       }
-    } else if (obj.kind === 'arc') {
+    } else if (!inRef && obj.kind === 'arc') {
       dispatch({ type: 'selectArc', iri: obj.arcIri! })
-    } else if (obj.kind === 'knot') {
+    } else if (!inRef && obj.kind === 'knot') {
       dispatch({ type: 'selectArc', iri: obj.arcIri })
     }
   }
@@ -175,6 +302,7 @@ export function useCanvasEvents(
     e.evt.preventDefault()
     e.cancelBubble = true
     if (wasDragged.current) return
+    if (inRef) return
 
     if (obj.kind === 'knot') {
       dispatch({ type: 'removeKnot', arcIri: obj.arcIri, knotIndex: obj.knotIndex })
@@ -231,6 +359,10 @@ export function useCanvasEvents(
         })
       }
       setPendingConnection(null)
+      // Chained connect: the target becomes the armed source — a run
+      // of right-clicks connects node → node → node.
+      dispatch({ type: 'selectNode', id: nodeId })
+      setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
       return
     }
 
@@ -274,9 +406,13 @@ export function useCanvasEvents(
           })
         }
       }
-      dispatch({ type: 'selectNode', id: null })
-      setPendingConnection(null)
-      return
+      if (targetNode?.type === 'leaf') {
+        dispatch({ type: 'selectNode', id: null })
+        setPendingConnection(null)
+        return
+      }
+      // Non-leaf target (composite): fall through — it gets selected
+      // below rather than dissolving the pending gesture on nothing.
     }
 
     // Select this node as connection source
@@ -291,6 +427,8 @@ export function useCanvasEvents(
   const onSceneDoubleClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true
     if (wasDragged.current) return
+    if (e.evt.button !== 0) return
+    if (inRef) return
     if (obj.kind === 'knot') {
       dispatch({ type: 'addKnot', arcIri: obj.arcIri, x: obj.x, y: obj.y })
       return
@@ -303,7 +441,10 @@ export function useCanvasEvents(
       dispatch({ type: 'addKnot', arcIri: obj.arcIri!, x: sceneX, y: sceneY })
       return
     }
-    if (obj.kind === 'node' && obj.treeNodeId !== undefined) {
+    if (obj.kind === 'node' && obj.treeNodeId !== undefined && obj.nodeType !== 'leaf') {
+      // A referenced composite's first click already navigated — a
+      // second setView here would desync the reference scope.
+      if (scopeRefs?.get(obj.treeNodeId)?.refersTo) return
       dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
     }
   }
@@ -320,12 +461,43 @@ export function useCanvasEvents(
     setHoveredObject(null)
   }
 
-  const onSceneDragStart = (_obj: SceneObject, _e: KonvaEventObject<DragEvent>) => {
+  const onSceneDragStart = (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
     wasDragged.current = false
+    dragSet.current = null
+    if (inRef) return
+
+    if (obj.kind !== 'node' || !obj.selectionId) return
+
+    // Dragging an unselected node selects it (standard behaviour).
+    if (!state.selectedVisibleNodeIds.includes(obj.selectionId)) {
+      dispatch({ type: 'selectNode', id: obj.selectionId })
+      return
+    }
+
+    if (state.selectedVisibleNodeIds.length < 2) return
+
+    // Multi-drag: record every member's start so dragMove can apply
+    // the shared delta.  Extent follows each member's entity type
+    // (same source as single-node clamping).
+    const pos = e.target.position()
+    const members = state.selectedVisibleNodeIds
+      .map((id) => {
+        const n = graphView.nodes.find((g) => g.id === id)
+        if (!n || n.type !== 'leaf') return null
+        const he = entityHalfExtent(n.entityType, catalogue)
+        return {
+          id,
+          start: id === obj.id ? { x: pos.x, y: pos.y } : { x: n.x, y: n.y },
+          he,
+        }
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null)
+    if (members.length > 1) dragSet.current = { originId: obj.id, members }
   }
 
   const onSceneDragMove = (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
     wasDragged.current = true
+    if (inRef) return
 
     if (obj.kind === 'node') {
       const pos = e.target.position()
@@ -339,6 +511,22 @@ export function useCanvasEvents(
         y = p.y
       }
       e.target.position({ x, y })
+
+      // Multi-drag: the dragged member's (clamped) delta applies to
+      // the whole selection set in one dispatch.
+      const ds = dragSet.current
+      if (ds && ds.originId === obj.id) {
+        const origin = ds.members.find((m) => m.id === ds.originId)!
+        const dx = x - origin.start.x
+        const dy = y - origin.start.y
+        const moves = ds.members.map((m) => {
+          const p = clampToPanel(m.start.x + dx, m.start.y + dy, m.he.x, m.he.y)
+          return { nodeId: m.id, x: p.x, y: p.y }
+        })
+        dispatch({ type: 'moveNodes', viewNodeId: state.currentViewNodeId, moves })
+        return
+      }
+
       dispatch({
         type: 'moveNode',
         viewNodeId: state.currentViewNodeId,
@@ -368,7 +556,9 @@ export function useCanvasEvents(
   }
 
   const onSceneDragEnd = async (obj: SceneObject, e: KonvaEventObject<DragEvent>) => {
+    dragSet.current = null
     setTimeout(() => { wasDragged.current = false }, 50)
+    if (inRef) return
 
     if (obj.kind === 'openArcHandle') {
       const pos = e.target.position()
@@ -428,15 +618,19 @@ export function useCanvasEvents(
   }
 
   const groupSelectedNodes = () => {
+    if (inRef) return
     const selectedNodes = graphView.nodes.filter(
-      (n) => n.id === state.selectedVisibleNodeId && n.type === 'leaf'
+      (n) => state.selectedVisibleNodeIds.includes(n.id) && n.type === 'leaf'
     )
     if (selectedNodes.length === 0) return
     const treeNodeIds = selectedNodes.map((n) => n.treeNodeId!).filter((id): id is number => id !== undefined)
+    const label = window.prompt('Composite name:', 'Group')
+    if (label === null) return
     dispatch({
       type: 'groupNodes',
       parentViewNodeId: state.currentViewNodeId,
       treeNodeIds,
+      label: label || 'Group',
     })
   }
 
@@ -452,16 +646,18 @@ export function useCanvasEvents(
   }
 
   const handleDelete = () => {
-    if (state.selectedVisibleNodeId) {
-      const node = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
-      if (node?.type === 'leaf' && node.treeNodeId !== undefined) {
-        dispatch({
-          type: 'deleteNode',
-          visibleNodeId: node.id,
-          treeNodeId: node.treeNodeId,
-          modelNodeIri: node.modelNodeIri,
-        })
-      }
+    if (inRef) return
+    if (state.selectedVisibleNodeIds.length) {
+      const nodes = state.selectedVisibleNodeIds
+        .map((id) => graphView.nodes.find((n) => n.id === id))
+        .filter((n): n is NonNullable<typeof n> =>
+          n !== undefined && n.type === 'leaf' && n.treeNodeId !== undefined)
+        .map((n) => ({
+          visibleNodeId: n.id,
+          treeNodeId: n.treeNodeId!,
+          modelNodeIri: n.modelNodeIri,
+        }))
+      if (nodes.length) dispatch({ type: 'deleteNodes', nodes })
     } else if (state.selectedModelArcIri) {
       dispatch({ type: 'deleteArc', iri: state.selectedModelArcIri })
     }
@@ -469,8 +665,11 @@ export function useCanvasEvents(
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (state.viewRefIri !== null) return   // reference view: read-only
       if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDelete()
+      } else if (e.key === 'Escape') {
+        dispatch({ type: 'selectNodes', ids: [] })
       } else if (e.key === 'r' && state.selectedModelArcIri) {
         // §15: 'r' reverses the selected token-flow arc's reference direction
         const arc = state.modelArcs.get(state.selectedModelArcIri)
@@ -505,5 +704,6 @@ export function useCanvasEvents(
     groupSelectedNodes,
     handleDelete,
     sceneHandlers,
+    marquee,
   }
 }

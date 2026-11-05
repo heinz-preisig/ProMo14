@@ -1,0 +1,171 @@
+@prefix promo: <https://w3id.org/promo#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/promo/model-2> {
+    promo:Assignment a rdfs:Class .
+
+    promo:Composite a rdfs:Class .
+
+    promo:Glass a rdfs:Class .
+
+    promo:Instantiation a rdfs:Class .
+
+    promo:Library a rdfs:Class .
+
+    promo:Model a rdfs:Class .
+
+    promo:ModelArc a rdfs:Class .
+
+    promo:ModelNode a rdfs:Class .
+
+    promo:Ontology a rdfs:Class .
+
+    promo:Species a rdfs:Class .
+
+    promo:ValueCell a rdfs:Class ;
+        promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
+
+    promo:ValueFill a rdfs:Class ;
+        promo:doc "A fill rule covering many cells of a variable's value table at once — the '*' selector mechanism for mostly-uniform tables.  The variable links it via promo:valueFill; the fill carries promo:fillPattern (JSON list of element IRIs and '*' segments in indexStructure order) and promo:value.  Resolved to concrete cells at plan() time.  See docs/value-fill.md." .
+
+    promo:Version a rdfs:Class .
+
+    promo:arcCounter a rdf:Property .
+
+    promo:arcType a rdf:Property .
+
+    promo:atIndexElement a rdf:Property ;
+        promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
+
+    promo:children a rdf:Property .
+
+    promo:coordinate a rdf:Property ;
+        promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
+
+    promo:doc a rdf:Property .
+
+    promo:entityType a rdf:Property .
+
+    promo:fillPattern a rdf:Property ;
+        promo:doc "On a promo:ValueFill: JSON list like promo:coordinate but with '*' allowed per segment — '*' matches every element on that axis.  The most specific matching selector wins; equal-specificity overlaps are fill-conflict problems.  See docs/value-fill.md." .
+
+    promo:generatedFrom a rdf:Property .
+
+    promo:hasSubPlan a rdf:Property .
+
+    promo:instantiates a rdf:Property .
+
+    promo:internalID a rdf:Property .
+
+    promo:knots a rdf:Property .
+
+    promo:layout a rdf:Property .
+
+    promo:nextTreeId a rdf:Property .
+
+    promo:occurrencePath a rdf:Property .
+
+    promo:overrides a rdf:Property .
+
+    promo:parent a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
+
+    promo:referenceFrom a rdf:Property .
+
+    promo:referenceTo a rdf:Property .
+
+    promo:rootComposite a rdf:Property .
+
+    promo:seedFloor a rdf:Property .
+
+    promo:source a rdf:Property .
+
+    promo:target a rdf:Property .
+
+    promo:usesAssignment a rdf:Property .
+
+    promo:usesLibrary a rdf:Property .
+
+    promo:usesOntology a rdf:Property .
+
+    promo:usesSpecies a rdf:Property .
+
+    promo:usesValues a rdf:Property .
+
+    promo:valueCell a rdf:Property ;
+        promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
+
+    promo:valueFill a rdf:Property ;
+        promo:doc "Variable → promo:ValueFill: a fill rule covering a region of the variable's value table.  See docs/value-fill.md." .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/model-2> a promo:Model ;
+        rdfs:label "model-2" ;
+        promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
+        promo:usesLibrary <https://w3id.org/promo/library> ;
+        promo:usesOntology <https://w3id.org/promo/ontology> .
+
+    <https://w3id.org/promo/model-2/Arc_1> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_1" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_3> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_1> ;
+        promo:source <https://w3id.org/promo/model-2/Node_3> ;
+        promo:target <https://w3id.org/promo/model-2/Node_1> .
+
+    <https://w3id.org/promo/model-2/Arc_2> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_2" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_1> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_2> ;
+        promo:source <https://w3id.org/promo/model-2/Node_1> ;
+        promo:target <https://w3id.org/promo/model-2/Node_2> .
+
+    <https://w3id.org/promo/model-2/Arc_3> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_3" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_2> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_3> ;
+        promo:source <https://w3id.org/promo/model-2/Node_2> ;
+        promo:target <https://w3id.org/promo/model-2/Node_3> .
+
+    <https://w3id.org/promo/model-2/Composite_4> a promo:Composite ;
+        rdfs:label "Group" ;
+        promo:children "[{\"id\": 1, \"iri\": \"https://w3id.org/promo/model-2/Node_1\"}, {\"id\": 2, \"iri\": \"https://w3id.org/promo/model-2/Node_2\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model-2/Node_3\"}]" ;
+        promo:internalID 4 ;
+        promo:parent <https://w3id.org/promo/model-2/Composite_0> .
+
+    <https://w3id.org/promo/model-2/Model> a promo:Model ;
+        promo:arcCounter 5 ;
+        promo:nextTreeId 4 ;
+        promo:rootComposite <https://w3id.org/promo/model-2/Composite_0> .
+
+    <https://w3id.org/promo/model-2/Composite_0> a promo:Composite ;
+        rdfs:label "Root" ;
+        promo:children "[{\"id\": 4, \"iri\": null}]" ;
+        promo:internalID 0 ;
+        promo:knots "{\"https://w3id.org/promo/model-2/Arc_4\": [{\"x\": -356.0, \"y\": -492.5}]}" ;
+        promo:layout "{\"1\": {\"x\": -699.0, \"y\": -409.5}, \"2\": {\"x\": -185.0, \"y\": -385.5}, \"3\": {\"x\": -430.0, \"y\": -173.5}}" .
+
+    <https://w3id.org/promo/model-2/Node_1> a promo:ModelNode ;
+        rdfs:label "Node 1" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_1" .
+
+    <https://w3id.org/promo/model-2/Node_2> a promo:ModelNode ;
+        rdfs:label "Node 2" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_2" .
+
+    <https://w3id.org/promo/model-2/Node_3> a promo:ModelNode ;
+        rdfs:label "Node 3" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_3" .
+}
+

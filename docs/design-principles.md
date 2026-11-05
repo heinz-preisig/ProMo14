@@ -148,6 +148,29 @@ target harness (python `.sh` wrapper, julia `Project.toml`, matlab
 runtimes.  In-service `POST /initial` remains for verification (t=0
 consistency), not production runs.
 
+## 12. Submodel composition — occurrence vs definition tiers
+
+**Ruled 2026-11-05** (after the "should every group be a graph?"
+discussion): the two tiers stay.
+
+- *Occurrence* = tree node — label, layout, boundary wiring,
+  `overrides`, optional `refersTo`.  Uniform already; occurrence-level
+  identity is unavoidable (two uses of one submodel need distinct
+  positions/wiring).
+- *Definition* lives either in-doc (composite = `treeId`, no IRI —
+  private, unversioned, zero blast radius on edits) or in its own
+  graph (`refersTo` pin — shareable, versioned, edits propagate).
+- **Extract** promotes in-doc → artefact; **Dissolve** demotes —
+  one-way copy.  Referenced definitions render in-place, read-only.
+
+*Not adopted:* every-group-an-artefact — it forces ad-hoc groupings
+through pin/version lifecycle and reintroduces a private tier anyway
+("internal artefacts").  *Adopted direction:* uniform **addressing**,
+not uniform persistence — composites get `{graph}#c_N` identity when a
+consumer needs it (`refersTo` into a sub-part, per-occurrence override
+keying).  Load-bearing gap is occurrence-path namespacing at
+instantiation — below.
+
 ---
 
 ## Open deviations / known gaps
@@ -174,3 +197,8 @@ consistency), not production runs.
 - Cross-artefact consistency review — deferred until all apps are
   operational (impact analysis, publish-boundary SHACL, transactional
   mutation, atomic multi-file persistence, stale `closed` assignments).
+- Occurrence-path namespacing — a referenced submodel used twice has
+  one set of variable IRIs but two physical instances; instantiation
+  must qualify var identity by occurrence path
+  (`host/occ-k/var`).  Prerequisite for multi-occurrence models;
+  orthogonal to where the definition lives (§12).

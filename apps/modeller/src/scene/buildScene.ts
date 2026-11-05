@@ -162,6 +162,7 @@ function buildNodeSceneObject(
   isSelected: boolean,
   highlight: 'valid' | 'invalid' | undefined,
   catalogue: SemanticCatalogue,
+  readOnly: boolean,
 ): SceneNode {
   const isComposite = node.type === 'composite'
   const isLeaf = node.type === 'leaf'
@@ -215,7 +216,7 @@ function buildNodeSceneObject(
     highlight,
     interactions: {
       clickable: true,
-      draggable: isLeaf || isComposite,
+      draggable: !readOnly && (isLeaf || isComposite),
       doubleClickable: node.treeNodeId !== undefined,
       rightClickable: true,
     },
@@ -224,7 +225,7 @@ function buildNodeSceneObject(
 
 export interface BuildSceneOptions {
   graphView: GraphView
-  selectedNodeId: string | null
+  selectedNodeIds: ReadonlySet<string>
   selectedArcIri: string | null
   draggingOpenArc: {
     openArcIri: string
@@ -239,10 +240,13 @@ export interface BuildSceneOptions {
   /** §16: entityTypeIri → token name (mass|energy|…) — the token a
    *  token-flow arc borrows from its incident transport node. */
   tokenByEntityType?: Map<string, string>
+  /** §22 reference view: content belongs to another artefact —
+   *  render shapes non-draggable (clicks still navigate). */
+  readOnly?: boolean
 }
 
 export function buildScene(options: BuildSceneOptions): SceneObject[] {
-  const { graphView, selectedNodeId, selectedArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, tokenByEntityType } = options
+  const { graphView, selectedNodeIds, selectedArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, tokenByEntityType, readOnly } = options
   const objects: SceneObject[] = []
   const nodeMap = new Map<string, VisibleNode>()
 
@@ -371,7 +375,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
         knotIndex: i,
         interactions: {
           clickable: true,
-          draggable: true,
+          draggable: !readOnly,
           doubleClickable: true,
           rightClickable: true,
         },
@@ -382,10 +386,10 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
 
   // --- Nodes ---
   for (const node of graphView.nodes) {
-    const isSelected = node.id === selectedNodeId
+    const isSelected = selectedNodeIds.has(node.id)
     const isHovered = node.id === hoveredNodeId
     const nodeHighlight = isHovered ? hoveredHighlight ?? undefined : undefined
-    objects.push(buildNodeSceneObject(node, isSelected, nodeHighlight, catalogue))
+    objects.push(buildNodeSceneObject(node, isSelected, nodeHighlight, catalogue, readOnly ?? false))
   }
 
   // --- Open arc handles (top layer) ---
@@ -413,7 +417,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
         openY: arc.freeEnd.y,
         interactions: {
           clickable: true,
-          draggable: true,
+          draggable: !readOnly,
           doubleClickable: false,
           rightClickable: false,
         },
@@ -448,7 +452,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
       openY,
       interactions: {
         clickable: true,
-        draggable: true,
+        draggable: !readOnly,
         doubleClickable: false,
         rightClickable: false,
       },

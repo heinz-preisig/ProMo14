@@ -536,11 +536,13 @@ async function forkArtefact(iri) {
 
 // Default IRI dodges existing lines (trailing-slash-insensitive) —
 // promo/ontology/ would near-collide with the core promo/ontology.
+// Suggested IRIs are slash-free: artefact graph IRIs are canonical
+// (backend canonicalizes too — a stored "…/x/" is unreachable as "…/x").
 function TYPE_DEFAULT_IRI(t) {
   const taken = new Set(LINES.map(l => l.iri.replace(/\/+$/, '')));
   let base = `https://w3id.org/promo/${t}`;
   for (let n = 2; taken.has(base); n++) base = `https://w3id.org/promo/${t}-${n}`;
-  return base + '/';
+  return base;
 }
 
 function toggleNewForm() {

@@ -248,6 +248,61 @@ def test_extract_submodel(client):
             URIRef(str(get_store().ONTOLOGY_GRAPH_IRI))) in g
 
 
+def test_extract_submodel_frontend_style_children(client):
+    """UI-authored docs carry no ``iri`` on leaf children — the leaf
+    binds its ModelNode via the ``#N_<treeId>`` fragment instead.  The
+    partition must recover those IRIs or the submodel comes out empty
+    (extract produced an empty artefact for grouped UI nodes)."""
+    doc = {
+        "nodes": [
+            {"iri": f"{MODEL}#N_1", "entityType": f"{ONTO}#etype_capacity", "label": "Reactor"},
+            {"iri": f"{MODEL}#N_3", "entityType": f"{ONTO}#etype_capacity", "label": "Tank"},
+        ],
+        "arcs": [
+            {"iri": f"{MODEL}#Arc_1", "sourceIri": f"{MODEL}#N_1",
+             "targetIri": f"{MODEL}#N_3",
+             "arcType": "https://w3id.org/promo#ArcType/token-flow"},
+        ],
+        "composites": [
+            {"treeId": 0, "label": "Root", "parentTreeId": None,
+             "children": [{"id": 1}, {"id": 2}],
+             "layout": {"1": {"x": 0.0, "y": 0.0}, "2": {"x": 100.0, "y": 50.0}},
+             "knots": {}, "openArcs": []},
+            {"treeId": 2, "label": "Group", "parentTreeId": 0,
+             "children": [{"id": 3}],
+             "layout": {"3": {"x": 5.0, "y": 5.0}}, "knots": {},
+             "openArcs": []},
+        ],
+        "rootTreeId": 0, "nextTreeId": 4, "arcCounter": 2,
+    }
+    assert client.put("/api/modeller/model", json=doc).status_code == 200
+
+    r = client.post(f"/api/modeller/extract-submodel?graph={MODEL}",
+                    json={"iri": "https://example.org/sub",
+                          "treeNodeIds": [2], "label": "Inner"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["movedNodes"] == 1
+    assert body["boundaryArcs"] == 1
+
+    # submodel: the moved leaf arrives; its child entry carries the
+    # explicit iri so the binding survives the treeId renumber; the
+    # boundary terminal keeps the internal node's entity type.
+    sub = client.get(
+        "/api/modeller/model?graph=https://example.org/sub").json()
+    assert {n["iri"] for n in sub["nodes"]} == {f"{MODEL}#N_3"}
+    sub_comp = {c["treeId"]: c for c in sub["composites"]}[1]
+    assert sub_comp["children"] == [{"id": 2, "iri": f"{MODEL}#N_3"}]
+    s_open = {c["treeId"]: c for c in sub["composites"]}[0]["openArcs"][0]
+    assert s_open["externalIri"] == f"{MODEL}#N_3"
+    assert s_open["externalEntityType"] == f"{ONTO}#etype_capacity"
+
+    # host: leaf gone, referenced composite carries the boundary arc
+    host = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    assert {n["iri"] for n in host["nodes"]} == {f"{MODEL}#N_1"}
+    assert len(host["arcs"]) == 1
+
+
 def test_reference_dag_and_cycles(client):
     """§22: /references walks the usesModel DAG and reports
     transitive self-references as reference-cycle loops."""

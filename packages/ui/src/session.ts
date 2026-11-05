@@ -14,14 +14,20 @@ export function sessionParam(name: string): string | undefined {
 /** The artefact this session edits — present in every ProMo app. */
 export const GRAPH_IRI = sessionParam('graph')
 
-/** Append ``?graph=`` plus any extra session params to an API path. */
+/** Append ``?graph=`` plus any extra session params to an API path.
+ *  Params the path already carries (e.g. an explicit ``?graph=<other>``
+ *  on cross-artefact reads) are never duplicated — a duplicated
+ *  ``graph`` silently resolves to the session artefact instead. */
 export function withParams(
   path: string,
   extra: Record<string, string | undefined> = {},
 ): string {
+  const existing = path.includes('?')
+    ? new URLSearchParams(path.slice(path.indexOf('?') + 1))
+    : new URLSearchParams()
   const params = new URLSearchParams()
-  if (GRAPH_IRI) params.set('graph', GRAPH_IRI)
-  for (const [k, v] of Object.entries(extra)) if (v) params.set(k, v)
+  if (GRAPH_IRI && !existing.has('graph')) params.set('graph', GRAPH_IRI)
+  for (const [k, v] of Object.entries(extra)) if (v && !existing.has(k)) params.set(k, v)
   const s = params.toString()
   if (!s) return path
   const sep = path.includes('?') ? '&' : '?'

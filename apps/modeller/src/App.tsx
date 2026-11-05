@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useReducer, useCallback, useRef } from 'react'
-import { Stage, Layer, Line, Group } from 'react-konva'
+import { Stage, Layer, Line, Group, Rect } from 'react-konva'
 import type Konva from 'konva'
 import type { NodeType, ArcType, OpenArc } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
@@ -10,8 +10,9 @@ import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { fetchPortSatisfaction } from './api'
 import type { PortSatisfaction } from './api'
-import { deserializeState, hasContent, serializeState } from './modelPersistence'
-import type { Command } from './state/ModelState'
+import { deserializeState, hasContent, refViewState, serializeState } from './modelPersistence'
+import type { ModelDocument } from './modelPersistence'
+import type { Command, RefViewState } from './state/ModelState'
 import { computeGraphView } from './tree/computeGraphView'
 import type { AppState } from './state/ModelState'
 import { initialState, applyCommand } from './state/ModelState'
@@ -27,6 +28,25 @@ const PALETTE_WIDTH = 140
 function reducer(state: AppState, cmd: Command): AppState {
   // console.log('Command:', cmd)
   return applyCommand(state, cmd)
+}
+
+/** §22: deserialize every artefact the doc references (transitively)
+ *  so referenced composites can render their content in place. */
+async function fetchRefStates(doc: ModelDocument): Promise<Map<string, RefViewState>> {
+  const out = new Map<string, RefViewState>()
+  const queue = [...(doc.usesModel ?? [])]
+  const seen = new Set(queue)
+  while (queue.length) {
+    const iri = queue.shift()!
+    try {
+      const d = await loadModelDoc(iri)
+      out.set(iri, refViewState(d))
+      for (const r of d.usesModel ?? []) {
+        if (!seen.has(r)) { seen.add(r); queue.push(r) }
+      }
+    } catch { /* stale reference — the composite renders as a shell */ }
+  }
+  return out
 }
 
 export default function App() {
@@ -86,6 +106,9 @@ export default function App() {
         if (hasContent(doc)) {
           dispatch({ type: 'loadState', state: deserializeState(doc) })
         }
+        fetchRefStates(doc)
+          .then((m) => { if (!cancelled) dispatch({ type: 'setRefStates', states: m }) })
+          .catch(() => { /* referenced docs optional — comps stay shells */ })
         if (SPECIES_IRI) {
           dispatch({ type: 'setSpeciesPin', iri: SPECIES_IRI })
         }
@@ -150,6 +173,9 @@ export default function App() {
   const reload = useCallback(async () => {
     const doc = await loadModel()
     if (hasContent(doc)) dispatch({ type: 'loadState', state: deserializeState(doc) })
+    fetchRefStates(doc)
+      .then((m) => dispatch({ type: 'setRefStates', states: m }))
+      .catch(() => { /* referenced docs optional */ })
   }, [])
 
   // §22 library pick: model artefacts usable as referenced composites
@@ -180,10 +206,14 @@ export default function App() {
   // §22 insert: materialize the referenced artefact's declared interface
   // (its root composite's open arcs) as this occurrence's terminals.
   const insertReferenced = useCallback(async (line: CatalogueLine) => {
+    if (state.viewRefIri !== null) return   // reference view is read-only
     try {
       const doc = await loadModelDoc(line.iri)
       const root = doc.composites.find((c) => c.treeId === doc.rootTreeId)
       const entityOf = new Map(doc.nodes.map((n) => [n.iri, n.entityType]))
+      const refs = new Map(state.refStates)
+      refs.set(line.iri, refViewState(doc))
+      dispatch({ type: 'setRefStates', states: refs })
       dispatch({
         type: 'insertReferencedComposite',
         id: state.tree.nextId + 1,
@@ -205,7 +235,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to insert referenced composite:', err)
     }
-  }, [state.tree.nextId, state.currentViewNodeId])
+  }, [state.tree.nextId, state.currentViewNodeId, state.viewRefIri, state.refStates])
 
   const NODE_TYPES = useMemo(() => catalogue.getBaseEntities()
     .filter((entity) => behaviourEntityTypes.has(entity.iri))
@@ -277,9 +307,21 @@ export default function App() {
   }, [])
 
   // --- Compute current GraphView on demand ---
+  // §22 reference view: when `viewRefIri` is set, `currentViewNodeId`
+  // indexes the referenced artefact's tree — render its (read-only)
+  // maps instead of the host's.
+  const refScope = state.viewRefIri ? state.refStates.get(state.viewRefIri) : undefined
   const graphView = useMemo(
-    () => computeGraphView(state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height),
-    [state.currentViewNodeId, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height]
+    () => computeGraphView(
+      state.currentViewNodeId,
+      refScope?.tree ?? state.tree,
+      refScope?.modelNodes ?? state.modelNodes,
+      refScope?.modelArcs ?? state.modelArcs,
+      refScope?.layoutStore ?? state.layoutStore,
+      refScope?.openArcs ?? state.openArcs,
+      refScope?.knotStore ?? state.knotStore,
+      stageSize.width, stageSize.height),
+    [state.currentViewNodeId, refScope, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height]
   )
 
   // ADR-008 fix picker: the selected leaf's assignment variables.
@@ -375,18 +417,23 @@ export default function App() {
   const zoneBottom = stageSize.height / 2
 
   // --- Build unified scene object list ---
+  const selectedNodeIds = useMemo(
+    () => new Set(state.selectedVisibleNodeIds),
+    [state.selectedVisibleNodeIds]
+  )
   const sceneObjects = useMemo(
     () => buildScene({
       graphView,
-      selectedNodeId: state.selectedVisibleNodeId,
+      selectedNodeIds,
       selectedArcIri: state.selectedModelArcIri,
       draggingOpenArc,
       hoveredNodeId,
       hoveredHighlight,
       catalogue,
       tokenByEntityType: entityTokens,
+      readOnly: state.viewRefIri !== null,
     }),
-    [graphView, state.selectedVisibleNodeId, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, entityTokens]
+    [graphView, selectedNodeIds, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, entityTokens, state.viewRefIri]
   )
 
   // --- Canvas event handlers (isolated from rendering) ---
@@ -399,6 +446,7 @@ export default function App() {
     handleStageWheel,
     groupSelectedNodes,
     sceneHandlers,
+    marquee,
   } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject, pendingConnection, setPendingConnection, ruleResolver, catalogue)
 
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
@@ -406,17 +454,44 @@ export default function App() {
 
   // §22 extract to submodel (move): the selected composite's subtree
   // moves to a new artefact; the host keeps a referenced composite.
+  // One name is asked — the artefact IRI is derived (slugged) and
+  // pre-checked against the catalogue; the backend 409 is the hard
+  // guard if the catalogue is stale.
   const extractSelected = useCallback(async () => {
     if (selectedVisibleNode?.treeNodeId === undefined) return
     const treeId = selectedVisibleNode.treeNodeId
-    const iri = window.prompt('New submodel artefact IRI:', childIri(GRAPH_IRI!, 'submodel'))
-    if (!iri) return
-    const label = window.prompt('Label:', selectedVisibleNode.label) ?? selectedVisibleNode.label
-    try {
-      await extractSubmodel(iri, [treeId], label)
-      await reload()
-    } catch (err) {
-      console.error('Extract failed:', err)
+    const slugOf = (s: string) =>
+      s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    const taken = new Set(
+      (await fetchCatalogueLines().catch(() => [] as CatalogueLine[]))
+        .map((l) => l.iri))
+    let suggestion = selectedVisibleNode.label
+    let ask = 'Name for the extracted submodel:'
+    while (true) {
+      const name = window.prompt(ask, suggestion)
+      if (name === null) return
+      const label = name || suggestion
+      const slug = slugOf(label)
+      if (!slug) {
+        ask = 'Name produces no usable IRI — pick another:'
+        suggestion = name || suggestion
+        continue
+      }
+      const iri = childIri(GRAPH_IRI!, slug)
+      if (taken.has(iri)) {
+        ask = `"${slug}" already names an artefact — choose another name:`
+        suggestion = name || suggestion
+        continue
+      }
+      try {
+        await extractSubmodel(iri, [treeId], label)
+        await reload()
+        fetchCatalogueLines().then((lines) =>
+          setModelArtefacts(lines.filter((l) => l.type === 'model')))
+      } catch (err) {
+        console.error('Extract failed:', err)
+      }
+      return
     }
   }, [selectedVisibleNode, reload])
 
@@ -433,6 +508,12 @@ export default function App() {
       console.error('Dissolve failed:', err)
     }
   }, [selectedVisibleNode, reload])
+
+  const ungroupSelected = useCallback(() => {
+    const treeId = selectedVisibleNode?.treeNodeId
+    if (treeId === undefined) return
+    dispatch({ type: 'ungroup', treeNodeId: treeId })
+  }, [selectedVisibleNode])
 
   // Derived arc token display: the arc carries no declared token — the
   // licensed token set comes from resolve-connection's matched_tokens
@@ -471,7 +552,50 @@ export default function App() {
         <strong>ProMo14</strong>
         <span style={{ fontSize: 13, color: '#555' }}>Model: untitled</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 13 }}>
-          <span style={{ color: '#555' }}>View: {state.tree.nodes.get(state.currentViewNodeId)?.label ?? 'Root'}</span>
+          <span style={{ color: '#555' }}>
+            {state.viewRefIri ? (
+              <>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    // Back to the host view containing the reference.
+                    const refComp = [...state.compositeRefs]
+                      .find(([, r]) => r.refersTo === state.viewRefIri)?.[0]
+                    const back = refComp !== undefined
+                      ? state.tree.nodes.get(refComp)?.parentId ?? state.tree.rootId
+                      : state.tree.rootId
+                    dispatch({ type: 'setView', viewNodeId: back, refIri: null })
+                  }}
+                  style={{ color: '#58c', cursor: 'pointer', textDecoration: 'none' }}
+                >
+                  ◂ back
+                </a>{' '}
+                {refScope?.tree.nodes.get(state.currentViewNodeId)?.label ?? 'reference'}{' '}
+                <em style={{ color: '#999', fontStyle: 'normal' }}>(referenced — read-only)</em>
+              </>
+            ) : (
+              <>
+                View:{' '}
+                <input
+                  style={{
+                    fontSize: 13,
+                    border: 'none',
+                    borderBottom: '1px dotted #999',
+                    background: 'transparent',
+                    width: 110,
+                  }}
+                  title="Composite name — renames the view you're inside"
+                  value={state.tree.nodes.get(state.currentViewNodeId)?.label ?? ''}
+                  onChange={(e) => dispatch({
+                    type: 'setNodeLabel',
+                    treeNodeId: state.currentViewNodeId,
+                    label: e.target.value,
+                  })}
+                />
+              </>
+            )}
+          </span>
           {speciesDoc && (
             <button style={{ fontSize: 12 }}
                     onClick={() => setAliasDialogOpen(true)}>
@@ -615,7 +739,7 @@ export default function App() {
             <strong style={{ fontSize: 12 }}>Actions</strong>
             <button
               onClick={extractSelected}
-              disabled={selectedVisibleNode?.type !== 'composite'}
+              disabled={selectedVisibleNode?.type !== 'composite' || state.viewRefIri !== null}
               title="Move the selected composite into a new artefact; the host keeps a reference"
               style={{
                 fontSize: 12,
@@ -632,19 +756,41 @@ export default function App() {
             </button>
             <button
               onClick={groupSelectedNodes}
-              disabled={!state.selectedVisibleNodeId}
+              disabled={!state.selectedVisibleNodeIds.length || state.viewRefIri !== null}
+              title="Wrap the selected nodes in a composite (Ctrl+click or Shift+drag to multi-select)"
               style={{
                 fontSize: 12,
                 padding: '6px 8px',
                 width: '100%',
-                cursor: state.selectedVisibleNodeId ? 'pointer' : 'not-allowed',
-                background: state.selectedVisibleNodeId ? '#e8f4fd' : '#eee',
+                cursor: state.selectedVisibleNodeIds.length ? 'pointer' : 'not-allowed',
+                background: state.selectedVisibleNodeIds.length ? '#e8f4fd' : '#eee',
                 border: '1px solid #bbb',
                 borderRadius: 4,
                 marginTop: 4,
               }}
             >
               Group selected
+            </button>
+            <button
+              onClick={ungroupSelected}
+              disabled={
+                selectedVisibleNode?.type !== 'composite'
+                || !!state.compositeRefs.get(selectedVisibleNode?.treeNodeId ?? -1)?.refersTo
+                || state.viewRefIri !== null
+              }
+              title="Explode this composite — children move up one level, the shell is removed (references: use Dissolve in Properties)"
+              style={{
+                fontSize: 12,
+                padding: '6px 8px',
+                width: '100%',
+                cursor: selectedVisibleNode?.type === 'composite' ? 'pointer' : 'not-allowed',
+                background: selectedVisibleNode?.type === 'composite' ? '#e8f4fd' : '#eee',
+                border: '1px solid #bbb',
+                borderRadius: 4,
+                marginTop: 4,
+              }}
+            >
+              Ungroup
             </button>
             <button
               onClick={() => dispatch({ type: 'reset' })}
@@ -712,6 +858,19 @@ export default function App() {
                   listening={false}
                 />
               )}
+              {marquee && (
+                <Rect
+                  x={marquee.x}
+                  y={marquee.y}
+                  width={marquee.w}
+                  height={marquee.h}
+                  fill="rgba(11, 124, 190, 0.08)"
+                  stroke="#0b7cbe"
+                  strokeWidth={1}
+                  dash={[4, 4]}
+                  listening={false}
+                />
+              )}
             </Group>
           </Layer>
         </Stage>
@@ -732,6 +891,20 @@ export default function App() {
           <strong style={{ fontSize: 12 }}>Properties</strong>
           {selectedVisibleNode && (
             <div style={{ fontSize: 11 }}>
+              {selectedVisibleNode.treeNodeId !== undefined && (
+                <div style={{ marginBottom: 4 }}>
+                  Label:{' '}
+                  <input
+                    style={{ width: 78, fontSize: 11 }}
+                    value={selectedVisibleNode.label}
+                    onChange={(e) => dispatch({
+                      type: 'setNodeLabel',
+                      treeNodeId: selectedVisibleNode.treeNodeId!,
+                      label: e.target.value,
+                    })}
+                  />
+                </div>
+              )}
               <div>ID: {selectedVisibleNode.id}</div>
               <div>Type: {selectedVisibleNode.type}</div>
               {selectedVisibleNode.modelNodeIri && (
@@ -802,6 +975,7 @@ export default function App() {
                 ))}
                 <button
                   onClick={dissolveSelected}
+                  disabled={state.viewRefIri !== null}
                   style={{
                     fontSize: 12,
                     width: '100%',
@@ -1002,12 +1176,14 @@ export default function App() {
                     : hoveredObject?.kind === 'openArcHandle'
                       ? 'Drag to reconnect to a nearby node'
                       : hoveredObject?.kind === 'node' && !state.selectedVisibleNodeId
-                        ? 'Click to select — double-click to zoom — right-click to connect'
+                        ? hoveredObject.nodeType === 'leaf'
+                          ? 'Click to select — right-click to connect — drag to move'
+                          : 'Click to open — Ctrl+click or right-click to select'
                         : state.selectedVisibleNodeId
-                          ? 'Right-click a leaf to connect — double-click composite to zoom — Delete to remove'
+                          ? 'Right-click a leaf to connect — click composite to open — Delete to remove'
                           : state.selectedModelArcIri
                             ? 'Delete to remove — drag knots to route — r or right-click to reverse flow direction'
-                            : 'Click canvas to add node — double-click composite to zoom — Delete to remove'}
+                            : 'Click canvas to add node — click composite to open — Delete to remove'}
         </span>
         <span style={{ marginLeft: 'auto', color: '#555' }}>
           {state.modelNodes.size} model nodes, {state.modelArcs.size} arcs (next node: {state.tree.nextId + 1})

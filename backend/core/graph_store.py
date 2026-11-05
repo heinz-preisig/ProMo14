@@ -28,7 +28,7 @@ from rdflib import Dataset, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
 from .config import get_data_dir
-from .iri import equation_iri, vocab_iri
+from .iri import canonical_graph_iri, equation_iri, vocab_iri
 from .persistence import PersistenceMixin
 from .seed import SeedMixin
 from .vocab import (
@@ -269,7 +269,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
             raise ValueError(
                 f"unknown artefact type: {artefact_type} "
                 f"(expected one of {ARTEFACT_TYPES})")
-        iri = URIRef(str(iri))
+        # Canonical form at the write boundary: graph_param/
+        # editable_param strip trailing slashes on every other path,
+        # so a stored ``…/x/`` would be unreachable as ``…/x``.
+        iri = URIRef(canonical_graph_iri(iri))
         g = self.dataset.graph(iri)
         if len(g):
             raise ValueError(f"graph already exists: {iri}")
@@ -278,13 +281,17 @@ class RdfStore(PersistenceMixin, SeedMixin):
         if label:
             g.add((iri, RDFS.label, Literal(label)))
         for pin in uses or []:
-            g.add((iri, PROMO["usesOntology"], URIRef(str(pin))))
+            g.add((iri, PROMO["usesOntology"],
+                   URIRef(canonical_graph_iri(pin))))
         for pin in uses_library or []:
-            g.add((iri, PROMO["usesLibrary"], URIRef(str(pin))))
+            g.add((iri, PROMO["usesLibrary"],
+                   URIRef(canonical_graph_iri(pin))))
         for pin in uses_assignment or []:
-            g.add((iri, PROMO["usesAssignment"], URIRef(str(pin))))
+            g.add((iri, PROMO["usesAssignment"],
+                   URIRef(canonical_graph_iri(pin))))
         for pin in uses_species or []:
-            g.add((iri, PROMO["usesSpecies"], URIRef(str(pin))))
+            g.add((iri, PROMO["usesSpecies"],
+                   URIRef(canonical_graph_iri(pin))))
         self.declare_vocabulary(g)
         return iri
 
@@ -306,8 +313,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
         Raises ``ValueError`` if the source is empty or the target
         exists.
         """
-        source = URIRef(str(source_iri))
-        new = URIRef(str(new_iri))
+        source = URIRef(canonical_graph_iri(source_iri))
+        new = URIRef(canonical_graph_iri(new_iri))
         src = self.dataset.graph(source)
         if not len(src):
             raise ValueError(f"nothing to fork: {source} is empty")

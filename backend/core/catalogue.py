@@ -20,6 +20,7 @@ from rdflib.namespace import RDF, RDFS
 from backend.core.graph_store import (
     ARTEFACT_TYPES, PROMO, SEED_FLOOR, get_store,
 )
+from backend.core.iri import canonical_graph_iri
 
 router = APIRouter()
 
@@ -184,7 +185,7 @@ def update_pins(req: PinsRequest) -> Dict[str, Any]:
     draft line instead.
     """
     store = get_store()
-    gid = URIRef(req.iri)
+    gid = URIRef(canonical_graph_iri(req.iri))
     g = store.dataset.graph(gid)
     if not len(g):
         raise HTTPException(status_code=404,
@@ -202,7 +203,7 @@ def update_pins(req: PinsRequest) -> Dict[str, Any]:
             continue
         g.remove((gid, pred, None))
         for t in targets:
-            g.add((gid, pred, URIRef(t)))
+            g.add((gid, pred, URIRef(canonical_graph_iri(t))))
     store.dirty = True
     return {"iri": req.iri}
 

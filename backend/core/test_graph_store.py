@@ -489,3 +489,48 @@ def test_resolution_scope_cycle_safe(tmp_path):
     gb.add((b, PROMO["usesOntology"], a))
     scope = [str(i) for i in store.resolution_scope(LIB)]
     assert sorted(scope) == sorted([LIB, ONT2])
+
+
+def test_create_artefact_canonicalises_trailing_slash(tmp_path):
+    """Creation writes the canonical slash-free IRI: a stored
+    ``…/x/`` graph is unreachable through graph_param/editable_param
+    (both strip the slash), leaving the artefact orphaned — observed
+    with a hub-created model whose pins silently resolved empty."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = str(store.ONTOLOGY_GRAPH_IRI)
+    iri = store.create_artefact_graph(
+        MODEL + "/", "Model", label="m",
+        uses=[ont + "/"], uses_library=[LIB + "/"])
+
+    assert str(iri) == MODEL
+    g = store.dataset.get_context(URIRef(MODEL))
+    assert len(g)                       # content lives on the canonical graph
+    assert not len(store.dataset.get_context(URIRef(MODEL + "/")))
+    assert str(g.value(URIRef(MODEL), PROMO["usesOntology"])) == ont
+    assert str(g.value(URIRef(MODEL), PROMO["usesLibrary"])) == LIB
+
+    # The pin is honoured by scope resolution — the artefact is not
+    # an empty island.
+    scope = {str(i) for i in store.resolution_scope(MODEL)}
+    assert {MODEL, LIB, ont} <= scope
+
+    # Re-creating the same line under either spelling is one graph.
+    try:
+        store.create_artefact_graph(MODEL + "/", "Model")
+    except ValueError as exc:
+        assert "already exists" in str(exc)
+    else:                                # pragma: no cover
+        raise AssertionError("slash variant created a shadow graph")
+
+
+def test_fork_canonicalises_iris(tmp_path):
+    """fork_graph shares the write boundary: source resolves
+    leniently, the new artefact lands slash-free."""
+    store = RdfStore(tmp_path)
+    store.load()
+    store.create_artefact_graph(LIB, "Library")
+    new = store.fork_graph(LIB + "/", ONT2 + "/", label="fork")
+    assert str(new) == ONT2
+    assert len(store.dataset.get_context(URIRef(ONT2)))
+    assert not len(store.dataset.get_context(URIRef(ONT2 + "/")))

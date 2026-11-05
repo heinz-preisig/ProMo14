@@ -11,7 +11,13 @@ export interface AppState {
   openArcs: Map<number, OpenArc[]> // keyed by composite tree node id
   knotStore: Map<number, Map<string, Knot[]>> // viewNodeId -> arc IRI -> knots (an arc renders differently per GraphView)
   currentViewNodeId: number
+  /** Primary selection — the last-selected node; single-node gestures
+   *  (connection source, details panel) read this.  Equals the tail
+   *  of ``selectedVisibleNodeIds``, or null when the set is empty. */
   selectedVisibleNodeId: string | null
+  /** Multi-select set (ordered, primary last).  Group / delete /
+   *  drag-move operate on the set. */
+  selectedVisibleNodeIds: string[]
   selectedModelArcIri: string | null
   arcCounter: number
   /** §20 model-level species aliasing: Component IRI → local name
@@ -24,7 +30,22 @@ export interface AppState {
   /** §22 referenced composites: composite tree id → refersTo +
    *  override map (content lives in the referenced artefact). */
   compositeRefs: Map<number, CompositeRef>
+  /** §22 reference view — IRI of the referenced artefact whose tree
+   *  `currentViewNodeId` indexes, or null when viewing the host doc.
+   *  Everything drawn from `refStates` is read-only. */
+  viewRefIri: string | null
+  /** §22 referenced artefacts, deserialized for in-place rendering
+   *  (usesModel closure — populated on load). */
+  refStates: Map<string, RefViewState>
 }
+
+/** The per-doc maps `computeGraphView` needs to render a referenced
+ *  artefact's content inside the host canvas (read-only scope). */
+export type RefViewState = Pick<
+  AppState,
+  | 'tree' | 'modelNodes' | 'modelArcs' | 'layoutStore'
+  | 'openArcs' | 'knotStore' | 'compositeRefs'
+>
 
 export const initialState: AppState = {
   modelNodes: new Map(),
@@ -35,25 +56,35 @@ export const initialState: AppState = {
   knotStore: new Map(),
   currentViewNodeId: 0,
   selectedVisibleNodeId: null,
+  selectedVisibleNodeIds: [],
   selectedModelArcIri: null,
   arcCounter: 1,
   speciesAliases: new Map(),
   speciesPin: null,
   compositeRefs: new Map(),
+  viewRefIri: null,
+  refStates: new Map(),
 }
 
 // ─── Commands (discriminated union) ───
 export type Command =
   | { type: 'insertNode'; id: number; iri: string; label: string; entityType: NodeType; parentViewNodeId: number; x: number; y: number }
   | { type: 'deleteNode'; visibleNodeId: string; treeNodeId: number; modelNodeIri?: string }
+  | { type: 'deleteNodes'; nodes: { visibleNodeId: string; treeNodeId: number; modelNodeIri?: string }[] }
   | { type: 'insertArc'; iri: string; sourceIri: string; targetIri: string; arcType: ArcType; referenceFrom?: string; referenceTo?: string }
   | { type: 'deleteArc'; iri: string }
   | { type: 'reverseArcOrientation'; iri: string }
   | { type: 'moveNode'; viewNodeId: number; nodeId: string; x: number; y: number }
-  | { type: 'setView'; viewNodeId: number }
+  | { type: 'moveNodes'; viewNodeId: number; moves: { nodeId: string; x: number; y: number }[] }
+  | { type: 'setView'; viewNodeId: number; refIri?: string | null }
+  | { type: 'setRefStates'; states: Map<string, RefViewState> }
   | { type: 'selectNode'; id: string | null }
+  | { type: 'selectNodes'; ids: string[] }
+  | { type: 'toggleSelectNode'; id: string }
   | { type: 'selectArc'; iri: string | null }
-  | { type: 'groupNodes'; parentViewNodeId: number; treeNodeIds: number[] }
+  | { type: 'groupNodes'; parentViewNodeId: number; treeNodeIds: number[]; label?: string }
+  | { type: 'setNodeLabel'; treeNodeId: number; label: string }
+  | { type: 'ungroup'; treeNodeId: number }
   | { type: 'reconnectOpenArc'; openArcIri: string; newModelNodeIri: string }
   | { type: 'moveKnot'; arcIri: string; knotIndex: number; x: number; y: number }
   | { type: 'addKnot'; arcIri: string; x: number; y: number }
@@ -127,6 +158,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         layoutStore: nextLayouts,
         openArcs: nextOpenArcs,
         selectedVisibleNodeId: String(cmd.id),
+        selectedVisibleNodeIds: [String(cmd.id)],
         selectedModelArcIri: null,
       }
     }
@@ -154,6 +186,35 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         compositeRefs,
         openArcs: nextOpenArcs,
         selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
+        selectedModelArcIri: null,
+      }
+    }
+
+    case 'deleteNodes': {
+      const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
+      const nextTree = new TreeOps(state.tree)
+      const compositeRefs = new Map(state.compositeRefs)
+      const nextOpenArcs = new Map(state.openArcs)
+      const nextLayouts = new Map(state.layoutStore)
+      for (const node of cmd.nodes) {
+        if (node.modelNodeIri) modelGraph.deleteNode(node.modelNodeIri)
+        nextTree.removeNode(node.treeNodeId)
+        compositeRefs.delete(node.treeNodeId)
+        nextOpenArcs.delete(node.treeNodeId)
+        for (const layouts of nextLayouts.values())
+          layouts.delete(node.visibleNodeId)
+      }
+      return {
+        ...state,
+        modelNodes: modelGraph.getNodes(),
+        modelArcs: modelGraph.getArcs(),
+        tree: nextTree.getState(),
+        layoutStore: nextLayouts,
+        compositeRefs,
+        openArcs: nextOpenArcs,
+        selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
         selectedModelArcIri: null,
       }
     }
@@ -168,6 +229,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         modelArcs: modelGraph.getArcs(),
         arcCounter: modelGraph.getArcCounter(),
         selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
         selectedModelArcIri: cmd.iri,
       }
     }
@@ -186,6 +248,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         modelArcs: modelGraph.getArcs(),
         selectedModelArcIri: null,
         selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
       }
     }
 
@@ -197,19 +260,65 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       return { ...state, layoutStore: nextLayouts }
     }
 
+    case 'moveNodes': {
+      const nextLayouts = new Map(state.layoutStore)
+      const viewLayouts = new Map(nextLayouts.get(cmd.viewNodeId) ?? [])
+      for (const m of cmd.moves) viewLayouts.set(m.nodeId, { x: m.x, y: m.y })
+      nextLayouts.set(cmd.viewNodeId, viewLayouts)
+      return { ...state, layoutStore: nextLayouts }
+    }
+
     case 'setView':
       return {
         ...state,
         currentViewNodeId: cmd.viewNodeId,
+        viewRefIri: cmd.refIri !== undefined ? cmd.refIri : state.viewRefIri,
         selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
         selectedModelArcIri: null,
       }
 
+    case 'setRefStates':
+      return { ...state, refStates: cmd.states }
+
     case 'selectNode':
-      return { ...state, selectedVisibleNodeId: cmd.id, selectedModelArcIri: null }
+      return {
+        ...state,
+        selectedVisibleNodeId: cmd.id,
+        selectedVisibleNodeIds: cmd.id ? [cmd.id] : [],
+        selectedModelArcIri: null,
+      }
+
+    case 'selectNodes': {
+      const ids = [...new Set(cmd.ids)]
+      return {
+        ...state,
+        selectedVisibleNodeIds: ids,
+        selectedVisibleNodeId: ids.length ? ids[ids.length - 1] : null,
+        selectedModelArcIri: null,
+      }
+    }
+
+    case 'toggleSelectNode': {
+      const has = state.selectedVisibleNodeIds.includes(cmd.id)
+      const ids = has
+        ? state.selectedVisibleNodeIds.filter((i) => i !== cmd.id)
+        : [...state.selectedVisibleNodeIds, cmd.id]
+      return {
+        ...state,
+        selectedVisibleNodeIds: ids,
+        selectedVisibleNodeId: ids.length ? ids[ids.length - 1] : null,
+        selectedModelArcIri: null,
+      }
+    }
 
     case 'selectArc':
-      return { ...state, selectedModelArcIri: cmd.iri, selectedVisibleNodeId: null }
+      return {
+        ...state,
+        selectedModelArcIri: cmd.iri,
+        selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
+      }
 
     case 'setNodeSpecies': {
       const modelNodes = new Map(state.modelNodes)
@@ -288,17 +397,56 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         openArcs: nextOpenArcs,
         layoutStore: nextLayouts,
         selectedVisibleNodeId: String(cmd.id),
+        selectedVisibleNodeIds: [String(cmd.id)],
         selectedModelArcIri: null,
       }
     }
 
     case 'groupNodes': {
       const nextTree = new TreeOps(state.tree)
-      const compositeId = nextTree.addChild(cmd.parentViewNodeId, 'Group', undefined)
+      const compositeId = nextTree.addChild(cmd.parentViewNodeId, cmd.label ?? 'Group', undefined)
       for (const id of cmd.treeNodeIds) {
         nextTree.moveID(id, compositeId)
       }
-      return { ...state, tree: nextTree.getState(), selectedVisibleNodeId: null }
+      return {
+        ...state,
+        tree: nextTree.getState(),
+        selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
+      }
+    }
+
+    case 'setNodeLabel': {
+      const nextTree = new TreeOps(state.tree)
+      nextTree.setLabel(cmd.treeNodeId, cmd.label)
+      const tree = nextTree.getState()
+      // Leaf labels persist via the ModelNode — keep the copies in sync.
+      const iri = tree.nodes.get(cmd.treeNodeId)?.iri
+      const modelNodes = iri !== undefined && state.modelNodes.has(iri)
+        ? new Map(state.modelNodes).set(iri, { ...state.modelNodes.get(iri)!, label: cmd.label })
+        : state.modelNodes
+      return { ...state, tree, modelNodes }
+    }
+
+    case 'ungroup': {
+      const comp = state.tree.nodes.get(cmd.treeNodeId)
+      // Only an in-doc composite (no leaf iri, not root); referenced
+      // composites go through Dissolve instead.
+      if (!comp || comp.parentId === null || comp.iri !== undefined) return state
+      const nextTree = new TreeOps(state.tree)
+      nextTree.ungroup(cmd.treeNodeId)
+      // Drop every store entry keyed by the vanished composite id.
+      const openArcs = new Map(state.openArcs); openArcs.delete(cmd.treeNodeId)
+      const compositeRefs = new Map(state.compositeRefs); compositeRefs.delete(cmd.treeNodeId)
+      const layoutStore = new Map(state.layoutStore); layoutStore.delete(cmd.treeNodeId)
+      const knotStore = new Map(state.knotStore); knotStore.delete(cmd.treeNodeId)
+      return {
+        ...state,
+        tree: nextTree.getState(),
+        openArcs, compositeRefs, layoutStore, knotStore,
+        selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
+      }
     }
 
     case 'reconnectOpenArc': {
@@ -334,6 +482,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         arcCounter: modelGraph.getArcCounter(),
         openArcs: nextOpenArcs,
         selectedVisibleNodeId: null,
+        selectedVisibleNodeIds: [],
         selectedModelArcIri: openArc.iri,
       }
     }

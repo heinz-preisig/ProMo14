@@ -16,21 +16,34 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from rdflib import URIRef
 
 from backend.core.graph_store import get_store
 from backend.core.iri import canonical_graph_iri
 
 
-def graph_param(graph: Optional[str] = None) -> Optional[str]:
+def _graph_value(request: Request) -> Optional[str]:
+    """The single ``?graph=`` value — a duplicated param must fail
+    loud: scalar binding silently picks the last value, which can
+    resolve reads *and* writes to the wrong artefact."""
+    values = request.query_params.getlist("graph")
+    if len(values) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="multiple ?graph= params — ambiguous graph scope")
+    return values[0] if values else None
+
+
+def graph_param(request: Request) -> Optional[str]:
     """FastAPI dependency: the ``?graph=`` query param (a graph IRI).
     Normalised to the slash-free canonical form — ``…/library/``-era
     session URLs keep resolving after the §26 rename."""
+    graph = _graph_value(request)
     return canonical_graph_iri(graph) if graph else graph
 
 
-def editable_param(graph: Optional[str] = None) -> Optional[str]:
+def editable_param(request: Request) -> Optional[str]:
     """Like ``graph_param`` but rejects frozen version graphs (R5) and
     graphs that were never created — and is *required* on writes.
 
@@ -44,6 +57,7 @@ def editable_param(graph: Optional[str] = None) -> Optional[str]:
     ``usesOntology`` pins are born with it (hub ticket #3).  A properly
     created artefact is never empty — the marker triple is always
     stamped — so ``len(g) == 0`` means the IRI names nothing."""
+    graph = _graph_value(request)
     if graph is None:
         raise HTTPException(
             status_code=400,
