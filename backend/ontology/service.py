@@ -370,22 +370,31 @@ def delete_index(
 def list_tokens(
     graph_iri: Optional[str] = Depends(graph_param),
 ) -> List[TokenRecord]:
-    """List token types defined in the ontology."""
+    """List token types — resolved across the scoped artefact's
+    resolution scope so editors on a library/model graph still see
+    the pinned ontology's token catalogue.  Nearest declaration wins
+    (scope order: self first, then pins breadth-first)."""
     store = get_store()
     graph = resolve_graph(store, graph_iri)
     records = []
-    for s in graph.subjects(RDF.type, PROMO["Token"]):
-        label = graph.value(s, RDFS.label)
-        parent = graph.value(s, PROMO["parent"])
-        kind = graph.value(s, PROMO["tokenKind"])
-        records.append(
-            TokenRecord(
-                iri=str(s),
-                label=str(label) if label else "",
-                parent=str(parent) if parent else None,
-                kind=str(kind) if kind else None,
+    seen = set()
+    for scope_iri in store.resolution_scope(graph.identifier):
+        g = store.dataset.graph(scope_iri)
+        for s in g.subjects(RDF.type, PROMO["Token"]):
+            if str(s) in seen:
+                continue
+            seen.add(str(s))
+            label = g.value(s, RDFS.label)
+            parent = g.value(s, PROMO["parent"])
+            kind = g.value(s, PROMO["tokenKind"])
+            records.append(
+                TokenRecord(
+                    iri=str(s),
+                    label=str(label) if label else "",
+                    parent=str(parent) if parent else None,
+                    kind=str(kind) if kind else None,
+                )
             )
-        )
     return records
 
 

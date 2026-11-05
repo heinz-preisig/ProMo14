@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
-import type { ClassificationAxis, Domain, Index, NetworkTree, Variable } from '../types'
+import type { ClassificationAxis, Domain, Index, NetworkTree, TokenRecord, Variable } from '../types'
+import TokenSection from './TokenSection'
 import AxisClassifications, {
   applicableAxes,
   kindTag,
@@ -24,6 +25,9 @@ export interface PortVariableEditorProps {
   networkTree: NetworkTree
   axes: ClassificationAxis[]
   domains: Domain[]
+  /** promo:Token catalogue for the carriesToken/tokenVector pickers
+   *  — carriesToken is the port-licensing declaration (§14/§24). */
+  tokenCatalogue?: TokenRecord[]
   initialDomain?: string
   initialClassifications?: Record<string, string>
   onDefaultsChange?: (domain: string, classifications: Record<string, string>) => void
@@ -41,6 +45,7 @@ export default function PortVariableEditor({
   networkTree,
   axes,
   domains,
+  tokenCatalogue = [],
   initialDomain = '',
   initialClassifications = {},
   onDefaultsChange,
@@ -52,6 +57,10 @@ export default function PortVariableEditor({
   const [latexSym, setLatexSym] = useState('')
   const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
   const [selectedIndices, setSelectedIndices] = useState<Set<string>>(new Set())
+  // §24 token declarations: carriesToken (the port license itself)
+  // and tokenVector (algebraic signature, exponent map).
+  const [carriesTokens, setCarriesTokens] = useState<Set<string>>(new Set())
+  const [tokenVector, setTokenVector] = useState<Record<string, number>>({})
   const [doc, setDoc] = useState('')
 
   useEffect(() => {
@@ -65,6 +74,8 @@ export default function PortVariableEditor({
       setLatexSym('')
       setUnits([0, 0, 0, 0, 0, 0, 0, 0])
       setSelectedIndices(new Set())
+      setCarriesTokens(new Set())
+      setTokenVector({})
       setDoc('')
     }
   }, [open])
@@ -80,6 +91,24 @@ export default function PortVariableEditor({
       const next = new Set(prev)
       if (next.has(iri)) next.delete(iri)
       else next.add(iri)
+      return next
+    })
+  }
+
+  const toggleToken = (iri: string) => {
+    setCarriesTokens((prev) => {
+      const next = new Set(prev)
+      if (next.has(iri)) next.delete(iri)
+      else next.add(iri)
+      return next
+    })
+  }
+
+  const setTokenExponent = (iri: string, value: string) => {
+    setTokenVector((prev) => {
+      const next = { ...prev }
+      if (value.trim() === '' || Number(value) === 0) delete next[iri]
+      else next[iri] = Number(value)
       return next
     })
   }
@@ -118,6 +147,8 @@ export default function PortVariableEditor({
       internal_id: nextInternalId(variables),
       port_variable: true,
       classifications,
+      tokens: Array.from(carriesTokens),
+      token_vector: Object.keys(tokenVector).length ? { ...tokenVector } : undefined,
       aliases: latexSym.trim() ? { latex: latexSym.trim() } : {},
       doc: doc.trim(),
     }
@@ -318,6 +349,14 @@ export default function PortVariableEditor({
               ))}
             </div>
           </div>
+
+          <TokenSection
+            tokenCatalogue={tokenCatalogue}
+            carriesTokens={carriesTokens}
+            tokenVector={tokenVector}
+            onToggleToken={toggleToken}
+            onSetExponent={setTokenExponent}
+          />
 
           <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
             Documentation

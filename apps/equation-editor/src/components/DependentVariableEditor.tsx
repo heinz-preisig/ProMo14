@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, Variable } from '../types'
+import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from '../types'
+import TokenSection, { normaliseTokenVector } from './TokenSection'
 import AxisClassifications, {
   applicableAxes,
   kindTag,
@@ -39,6 +40,8 @@ export interface DependentVariableEditorProps {
   domains: Domain[]
   /** Equation-class nodes from /context — the picker's options. */
   equationClasses: EquationClass[]
+  /** promo:Token catalogue for the carriesToken/tokenVector pickers. */
+  tokenCatalogue?: TokenRecord[]
   initialDomain: string
   initialClassifications: Record<string, string>
   /** When set, the editor attaches the equation to this existing
@@ -64,6 +67,7 @@ export default function DependentVariableEditor({
   axes,
   domains,
   equationClasses,
+  tokenCatalogue = [],
   initialDomain,
   initialClassifications,
   editing,
@@ -86,6 +90,10 @@ export default function DependentVariableEditor({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
+  // §24 token declarations: carriesToken (network membership, port
+  // licensing) and tokenVector (algebraic signature, exponent map).
+  const [carriesTokens, setCarriesTokens] = useState<Set<string>>(new Set())
+  const [tokenVector, setTokenVector] = useState<Record<string, number>>({})
   const [genTarget, setGenTarget] = useState<CodegenTarget>('python')
   const [genCode, setGenCode] = useState<string | null>(null)
   const [genLoading, setGenLoading] = useState(false)
@@ -106,6 +114,8 @@ export default function DependentVariableEditor({
       setCheckResult(null)
       setError(null)
       setDoc(editing?.doc ?? '')
+      setCarriesTokens(new Set(editing?.tokens ?? []))
+      setTokenVector(editing?.token_vector ?? {})
       // Stored class may be a label or an IRI — match both.
       setEqClass(
         equationClasses.find(
@@ -131,6 +141,44 @@ export default function DependentVariableEditor({
   useEffect(() => {
     setLatexError(validateLatexAlias(latexSym))
   }, [latexSym])
+
+  const toggleToken = (iri: string) => {
+    setCarriesTokens((prev) => {
+      const next = new Set(prev)
+      if (next.has(iri)) next.delete(iri)
+      else next.add(iri)
+      return next
+    })
+  }
+
+  const setTokenExponent = (iri: string, value: string) => {
+    setTokenVector((prev) => {
+      const next = { ...prev }
+      if (value.trim() === '' || Number(value) === 0) delete next[iri]
+      else next[iri] = Number(value)
+      return next
+    })
+  }
+
+  // §24 suggestion: the checked equation's derived signature — the
+  // variable adopts it (algebraic), while carriesToken stays the
+  // user's pick (network membership is definitional, never derived).
+  const tokenSuggestion =
+    checkResult?.ok && checkResult.tokens && Object.keys(checkResult.tokens).length
+      ? { vector: checkResult.tokens, pretty: checkResult.tokens_pretty ?? '' }
+      : null
+
+  const applyTokenSuggestion = () => {
+    if (!tokenSuggestion) return
+    const vec = normaliseTokenVector(tokenSuggestion.vector, tokenCatalogue)
+    setTokenVector(vec)
+    // Unambiguous case — a single +1 entry IS the network membership
+    // (F_conv / n pattern).  Multi-entry vectors stay the user's pick.
+    const entries = Object.entries(vec).filter(([, e]) => e !== 0)
+    if (entries.length === 1 && entries[0][1] === 1) {
+      setCarriesTokens((prev) => new Set([...prev, entries[0][0]]))
+    }
+  }
 
   // Report the current domain/classifications so the app can offer
   // them as defaults next time either variable editor is opened.
@@ -236,11 +284,13 @@ export default function DependentVariableEditor({
       internal_id: editing?.internal_id ?? nextInternalId(variables),
       port_variable: editing?.port_variable ?? false,
       classifications,
+      tokens: Array.from(carriesTokens),
+      token_vector: Object.keys(tokenVector).length ? { ...tokenVector } : undefined,
       aliases,
       doc,
     }
   }, [name, domain, variables, checkResult, latexSym, doc, editing,
-      classifications, structuralLocked])
+      classifications, structuralLocked, carriesTokens, tokenVector])
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
@@ -362,7 +412,11 @@ export default function DependentVariableEditor({
     domain !== (editing.network ?? '') ||
     doc !== (editing.doc ?? '') ||
     latexSym !== (editing.aliases?.latex ?? '') ||
-    JSON.stringify(classifications) !== JSON.stringify(editing.classifications ?? {})
+    JSON.stringify(classifications) !== JSON.stringify(editing.classifications ?? {}) ||
+    JSON.stringify([...carriesTokens].sort()) !==
+      JSON.stringify([...(editing.tokens ?? [])].sort()) ||
+    JSON.stringify(Object.entries(tokenVector).sort()) !==
+      JSON.stringify(Object.entries(editing.token_vector ?? {}).sort())
   )
 
   // A new variable with an empty RHS is equation-less by intent —
@@ -552,6 +606,16 @@ export default function DependentVariableEditor({
                   No classification axes apply in this domain.
                 </span>
               )}
+
+              <TokenSection
+                tokenCatalogue={tokenCatalogue}
+                carriesTokens={carriesTokens}
+                tokenVector={tokenVector}
+                onToggleToken={toggleToken}
+                onSetExponent={setTokenExponent}
+                suggestion={tokenSuggestion}
+                onApplySuggestion={applyTokenSuggestion}
+              />
             </div>
           </div>
         </div>

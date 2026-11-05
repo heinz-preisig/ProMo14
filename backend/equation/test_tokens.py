@@ -114,3 +114,66 @@ def test_checker_sqrt_even_exponents():
     space = _space(x2)
     checked = check(parse("sqrt( x2 )"), space)
     assert checked.tokens == TokenVec.single(T_E)
+
+
+# -- persisted-data consistency (data/*.trig) --------------------------------
+
+def test_data_variable_token_consistency():
+    """§24 declaration rules over the persisted artefacts.
+
+    For every ``promo:Variable`` in ``data/*.trig``:
+    - each ``promo:carriesToken`` must name a declared ``promo:Token``;
+    - each ``carriesToken`` must appear with a nonzero exponent in the
+      variable's ``promo:tokenVector`` (network membership ⊆ algebraic
+      signature — the reverse is NOT required);
+    - a ``promo:portVariable true`` variable must carry at least one
+      token — a port with no token can never be licensed
+      (instantiate/satisfy.py).
+    """
+    import json
+    from pathlib import Path
+
+    from rdflib import Dataset, URIRef
+    from rdflib.namespace import RDF, RDFS
+
+    data_dir = Path(__file__).resolve().parents[2] / "data"
+    ds = Dataset()
+    for f in sorted(data_dir.glob("*.trig")):
+        ds.parse(str(f), format="trig")
+
+    P = lambda n: URIRef("https://w3id.org/promo#" + n)
+    frag = lambda iri: str(iri).split("#")[-1].split("/")[-1]
+    declared = {
+        str(s)
+        for gr in ds.graphs()
+        for s in gr.subjects(RDF.type, P("Token"))
+    }
+
+    violations = []
+    for gr in ds.graphs():
+        for s in gr.subjects(RDF.type, P("Variable")):
+            label = gr.value(s, RDFS.label) or s
+            name = f"{label} ({gr.identifier.split('/')[-1]})"
+            ct = [str(o) for o in gr.objects(s, P("carriesToken"))]
+            tv_lit = gr.value(s, P("tokenVector"))
+            try:
+                tv = json.loads(str(tv_lit)) if tv_lit else None
+            except ValueError:
+                violations.append(f"{name}: tokenVector is not JSON")
+                continue
+            is_port = str(gr.value(s, P("portVariable")) or "").lower() == "true"
+            if is_port and not ct:
+                violations.append(f"{name}: portVariable with no carriesToken")
+            for c in ct:
+                if c not in declared:
+                    violations.append(f"{name}: carriesToken {frag(c)} not a declared Token")
+                if tv is None:
+                    violations.append(
+                        f"{name}: carriesToken {frag(c)} but no tokenVector")
+                elif not any(v != 0 and frag(k) == frag(c) for k, v in tv.items()):
+                    violations.append(
+                        f"{name}: carriesToken {frag(c)} not in tokenVector {tv}")
+            if tv is not None and not ct:
+                violations.append(
+                    f"{name}: tokenVector declared but no carriesToken")
+    assert not violations, "\n".join(sorted(violations))

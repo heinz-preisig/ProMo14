@@ -1135,6 +1135,35 @@ def variable_references(iri: str) -> Dict[str, Any]:
     return {"iri": iri, "used": bool(refs), "references": refs}
 
 
+@router.delete("/equations/{iri:path}")
+def delete_equation(
+    iri: str,
+    graph_iri: Optional[str] = Depends(editable_param),
+) -> Dict[str, Any]:
+    """Delete a standalone equation node in the selected graph — the
+    node plus its rhs expression tree plus any ``promo:hasEquation``
+    ownership links in that graph.
+
+    Needed for detached equation resources (e.g. migrated shadow copies
+    in artefact graphs) that no variable owns and so can never be
+    reached through the variable write path.  Frozen equations 409.
+    """
+    subject = URIRef(iri)
+    _assert_absolute_iri(iri)
+    store = get_store()
+    graph = resolve_graph(store, graph_iri)
+    if (subject, None, None) not in graph:
+        raise HTTPException(status_code=404, detail="Equation not found")
+    if _is_frozen(graph, subject):
+        raise HTTPException(status_code=409, detail={
+            "message": "Equation is frozen (proven) — unfreeze it first",
+            "frozen": True,
+        })
+    _remove_equation(graph, subject)
+    graph.remove((None, PROMO["hasEquation"], subject))
+    return {"deleted": iri}
+
+
 @router.delete("/variables/{iri:path}")
 def delete_variable(
     iri: str,

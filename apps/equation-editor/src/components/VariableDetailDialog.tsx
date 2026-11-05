@@ -2,6 +2,7 @@ import 'katex/dist/katex.min.css'
 import { useEffect, useState } from 'react'
 import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, TokenRecord, Variable } from '../types'
 import { equationClassLabel } from '../variableUtils'
+import TokenSection from './TokenSection'
 import { astToLatex, indexShortLabel, renderLatex, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
 import AxisClassifications, { applicableAxes, kindTag } from '../axisClassifications'
@@ -416,61 +417,13 @@ export default function VariableDetailDialog({
             </div>
           </div>
 
-          {tokenCatalogue.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span>Tokens</span>
-              <div style={{ fontSize: 11, color: '#777' }}>
-                carriesToken = network membership (port licensing);
-                tokenVector = algebraic signature (exponent per token,
-                e.g. energy +1 · mass −1; empty = untracked).
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                  maxHeight: 140,
-                  overflowY: 'auto',
-                  border: '1px solid #ccc',
-                  borderRadius: 4,
-                  padding: 8,
-                }}
-              >
-                {tokenCatalogue.map((t) => (
-                  <div
-                    key={t.iri}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                      <input
-                        type="checkbox"
-                        checked={carriesTokens.has(t.iri)}
-                        onChange={() => toggleToken(t.iri)}
-                      />
-                      <span>
-                        {t.label}{t.kind ? ` (${t.kind})` : ''}
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      title={`tokenVector exponent for ${t.label}`}
-                      placeholder="exp"
-                      value={tokenVector[t.iri]
-                        ?? tokenVector[t.iri.split('#').pop()!]
-                        ?? ''}
-                      onChange={(e) => setTokenExponent(t.iri, e.target.value)}
-                      style={{ width: 52 }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <TokenSection
+            tokenCatalogue={tokenCatalogue}
+            carriesTokens={carriesTokens}
+            tokenVector={tokenVector}
+            onToggleToken={toggleToken}
+            onSetExponent={setTokenExponent}
+          />
           </div>
         </div>
 

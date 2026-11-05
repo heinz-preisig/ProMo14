@@ -67,7 +67,9 @@ export default function App() {
         setDomains(ctx.domains ?? [])
         setEquationClasses(ctx.equation_classes ?? [])
         setPdfCapable(ctx.capabilities?.pdf ?? false)
-        listTokens().then(setTokenCatalogue).catch(() => {})
+        listTokens()
+          .then(setTokenCatalogue)
+          .catch((err) => console.error('Failed to load token catalogue:', err))
       })
       .catch((err) => {
         console.error('Failed to load context:', err)
@@ -377,6 +379,7 @@ export default function App() {
         networkTree={networkTree}
         axes={axes}
         domains={domains}
+        tokenCatalogue={tokenCatalogue}
         initialDomain={lastDomain}
         initialClassifications={lastClassifications}
         onDefaultsChange={(d, c) => {
@@ -408,6 +411,7 @@ export default function App() {
         axes={axes}
         domains={domains}
         equationClasses={equationClasses}
+        tokenCatalogue={tokenCatalogue}
         initialDomain={lastDomain}
         initialClassifications={lastClassifications}
         editing={dependentEditing}

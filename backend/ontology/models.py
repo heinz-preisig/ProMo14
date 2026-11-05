@@ -165,7 +165,7 @@ class TokenRecord(BaseModel):
     iri: str
     label: str
     parent: Optional[str] = None
-    kind: Optional[Literal["conserved", "reference"]] = None
+    kind: Optional[Literal["conserved", "reference", "basis"]] = None
 
 
 # ---------------------------------------------------------------------------
