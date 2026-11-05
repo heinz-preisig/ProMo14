@@ -1212,6 +1212,11 @@
     <https://w3id.org/promo/ontology#eqclass_initialise> a promo:EquationClass ;
         rdfs:label "initialise" .
 
+    <https://w3id.org/promo/ontology#term_function_coefficient> a promo:AxisTerm ;
+        rdfs:label "coefficient" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> ;
+        promo:parent <https://w3id.org/promo/ontology#term_function_parameter> .
+
     <https://w3id.org/promo/ontology#term_function_flow> a promo:AxisTerm ;
         rdfs:label "flow" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
@@ -1356,7 +1361,7 @@
         promo:rhsLatex "\\left( r_{x,N} \\circ r_{y,N} \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:na492e02516b94ef5850016f2b0f7e086b3 ;
+        promo:hasArguments _:N2f1cb96e90eb47f89c681b5bece99338 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -1444,7 +1449,7 @@
         rdfs:label "Axy" ;
         promo:aliases "{\"latex\": \"{A_xy}\", \"global_ID\": \"https://w3id.org/promo/ontology#V_17\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_parameter> ;
+            <https://w3id.org/promo/ontology#term_function_geometry> ;
         promo:doc "contact area in x-y plane" ;
         promo:frozen false ;
         promo:hasEquation <https://w3id.org/promo/ontology#E_3> ;
@@ -1825,6 +1830,11 @@
     <https://w3id.org/promo/ontology#term_extensity_intensive> a promo:AxisTerm ;
         rdfs:label "intensive" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_extensity> .
+
+    <https://w3id.org/promo/ontology#term_function_geometry> a promo:AxisTerm ;
+        rdfs:label "geometry" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> ;
+        promo:parent <https://w3id.org/promo/ontology#term_function_parameter> .
 
     <https://w3id.org/promo/ontology#term_function_secondary_state> a promo:AxisTerm ;
         rdfs:label "secondary-state" ;
@@ -2216,10 +2226,6 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
         promo:parent <https://w3id.org/promo/ontology#sval_time_continuum> .
 
-    <https://w3id.org/promo/ontology#axis_function_physical> a promo:ClassificationAxis ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "function" .
-
     <https://w3id.org/promo/ontology#etype_energy_transport> a promo:EntityType ;
         rdfs:label "Energy Transport" ;
         promo:branch "physical" ;
@@ -2239,14 +2245,14 @@
         promo:parent <https://w3id.org/promo/ontology#token_mass> ;
         promo:tokenKind "conserved" .
 
+    <https://w3id.org/promo/ontology#axis_function_physical> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "function" .
+
     <https://w3id.org/promo/ontology#scale_phase> a promo:ScaleDimension ;
         promo:dimensionKind "content" ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:name "phase" .
-
-    <https://w3id.org/promo/ontology#term_function_parameter> a promo:AxisTerm ;
-        rdfs:label "parameter" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
 
     <https://w3id.org/promo/ontology#token_signal> a promo:Token ;
         rdfs:label "Signal" ;
@@ -2255,6 +2261,10 @@
     <https://w3id.org/promo/ontology#axis_role_information> a promo:ClassificationAxis ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_information> ;
         promo:name "role" .
+
+    <https://w3id.org/promo/ontology#term_function_parameter> a promo:AxisTerm ;
+        rdfs:label "parameter" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
 
     <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
         rdfs:label "Energy" ;
@@ -2326,22 +2336,22 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
+    _:N2f1cb96e90eb47f89c681b5bece99338 rdf:first <https://w3id.org/promo/ontology#V_14> ;
+        rdf:rest _:Nfff9a9f26ced4092a61ed76c98fb826f .
+
+    _:Nfff9a9f26ced4092a61ed76c98fb826f rdf:first <https://w3id.org/promo/ontology#V_15> ;
+        rdf:rest () .
+
     _:na492e02516b94ef5850016f2b0f7e086b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:na492e02516b94ef5850016f2b0f7e086b7 .
 
     _:na492e02516b94ef5850016f2b0f7e086b2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:na492e02516b94ef5850016f2b0f7e086b8 .
 
-    _:na492e02516b94ef5850016f2b0f7e086b3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
-        rdf:rest _:na492e02516b94ef5850016f2b0f7e086b6 .
-
     _:na492e02516b94ef5850016f2b0f7e086b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
     _:na492e02516b94ef5850016f2b0f7e086b5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest () .
-
-    _:na492e02516b94ef5850016f2b0f7e086b6 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest () .
 
     _:na492e02516b94ef5850016f2b0f7e086b7 rdf:first <https://w3id.org/promo/ontology#V_7> ;
