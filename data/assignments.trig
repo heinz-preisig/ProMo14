@@ -97,7 +97,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:nf7ce4f2e8ea94b30aef7410220747222b1 ;
+        promo:hasEquationSequence _:nc30cea43ae0a4629b0352b51784a3d45b1 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_57>,
             <https://w3id.org/promo/ontology#F_conv> ;
         promo:hasOutputVariable <https://w3id.org/promo/library#V_56> ;
@@ -113,18 +113,18 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:nf7ce4f2e8ea94b30aef7410220747222b3 ;
+        promo:hasEquationSequence _:nc30cea43ae0a4629b0352b51784a3d45b3 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/ontology#V_34> ;
         promo:hasPortVariable <https://w3id.org/promo/library#V_56> ;
         promo:hasStateVariable <https://w3id.org/promo/library#V_57> .
 
-    _:nf7ce4f2e8ea94b30aef7410220747222b1 rdf:first <https://w3id.org/promo/library#E_4> ;
-        rdf:rest _:nf7ce4f2e8ea94b30aef7410220747222b4 .
+    _:nc30cea43ae0a4629b0352b51784a3d45b1 rdf:first <https://w3id.org/promo/library#E_4> ;
+        rdf:rest _:nc30cea43ae0a4629b0352b51784a3d45b4 .
 
-    _:nf7ce4f2e8ea94b30aef7410220747222b3 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:nc30cea43ae0a4629b0352b51784a3d45b3 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 
-    _:nf7ce4f2e8ea94b30aef7410220747222b4 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:nc30cea43ae0a4629b0352b51784a3d45b4 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 }
 
