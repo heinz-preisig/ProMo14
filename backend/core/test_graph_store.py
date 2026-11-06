@@ -267,8 +267,9 @@ PVAR = f"{ONTO}#"
 
 def test_seed_incidence_factors(tmp_path):
     """§25: one canonical F_<mech> variable per arc sub-index — fixed
-    [A_k, N] shape, constant+parameter, dimensionless, mechanism token
-    derived from the entity-tree token group."""
+    [A_k, N] shape, constant+parameter, dimensionless.  §4 neutrality:
+    incidence matrices are structural operators, not physical
+    quantities — they carry no token declarations."""
     store = RdfStore(tmp_path)
     store.load()
     ont = store.ontology_graph
@@ -283,13 +284,24 @@ def test_seed_incidence_factors(tmp_path):
         assert str(ont.value(f, RDFS.label)) == f"F_{mech}"
         assert set(ont.objects(f, PROMO["indexStructure"])) == {sub, node}
         assert str(ont.value(f, PROMO["portVariable"])) == "false"
-        toks = {str(t).rsplit("#", 1)[-1]
-                for t in ont.objects(f, PROMO["carriesToken"])}
-        want = "token_mass" if mech in ("conv", "diff", "mass") \
-            else "token_energy"
-        assert toks == {want}, mech
-        assert json.loads(str(ont.value(f, PROMO["tokenVector"]))) == \
-            {want: 1}
+        assert set(ont.objects(f, PROMO["carriesToken"])) == set(), mech
+        assert (f, PROMO["tokenVector"], None) not in ont, mech
+
+
+def test_seed_incidence_factors_strips_legacy_token_decls(tmp_path):
+    """§4 migration: pre-neutrality records carrying token
+    declarations are stripped on re-seed (load)."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    f = URIRef(f"{PVAR}F_conv")
+    ont.add((f, PROMO["carriesToken"],
+             URIRef(f"{ONTO}#token_mass")))
+    ont.add((f, PROMO["tokenVector"],
+             Literal('{"token_mass": 1}')))
+    store._seed_incidence_factors(ont, ONTO)
+    assert set(ont.objects(f, PROMO["carriesToken"])) == set()
+    assert (f, PROMO["tokenVector"], None) not in ont
 
 
 def test_seed_incidence_factors_rehomes_legacy_spelling(tmp_path):

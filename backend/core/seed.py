@@ -543,7 +543,9 @@ class SeedMixin:
         §25: ``F_<mech>`` is the equation layer's symbolic handle on a
         mechanism's slice of the node–arc incidence — fixed
         ``[A_k, N]`` shape, determination ``constant`` + function
-        ``parameter``, dimensionless, carrying the mechanism's token.
+        ``parameter``, dimensionless.  Incidence matrices are
+        structural operators, not physical quantities — they carry
+        **no** token (§4 neutrality ruling, 2026-11-05).
         The record is a pure function of the sub-index, so it is
         derived here rather than authored: every artefact that uses
         this ontology sees literally the same ``F_*`` objects.
@@ -551,19 +553,15 @@ class SeedMixin:
         Idempotent — ``add_variable_dict``'s replace semantics fill
         missing triples and correct stale single-valued ones (the
         port-variable-era ``F_conv`` is normalised in place), while
-        the exact-set pass below drops extra ``indexStructure`` /
-        ``carriesToken`` members.  The token is derived, not
-        table-driven: the selector's ancestor directly under
-        ``transport_system`` names the token group
-        (``mass_transport`` → ``token_mass``), so a mechanism added to
-        the ontology materialises its factor at next load.
+        the exact-set pass below drops extra ``indexStructure``
+        members and strips any token declarations (the
+        pre-neutrality records are cleaned on next load).
         """
         arc_iri = self.mint_iri(base, "idx_arc")
         node_iri = self.mint_iri(base, "idx_node")
         if (arc_iri, RDF.type, PROMO["Index"]) not in g or \
                 (node_iri, RDF.type, PROMO["Index"]) not in g:
             return
-        transport_root = self.mint_iri(base, "etype_transport_system")
         domain = self.mint_iri(base, "domain_physical")
 
         for sub in sorted(g.subjects(PROMO["subIndexOf"], arc_iri)):
@@ -587,26 +585,6 @@ class SeedMixin:
                 for _s, p, o in list(g.triples((legacy, None, None))):
                     g.add((iri, p, o))
                     g.remove((_s, p, o))
-
-            # Token: walk the selector's parent chain; the node just
-            # under transport_system is the token group —
-            # ``X_transport`` → ``token_X``.
-            tokens: List[str] = []
-            token_vector: Dict[str, int] = {}
-            cur, seen = g.value(sub, PROMO["selector"]), set()
-            while isinstance(cur, URIRef) and cur not in seen:
-                seen.add(cur)
-                parent = g.value(cur, PROMO["parent"])
-                if parent == transport_root:
-                    frag = str(cur).rsplit("#", 1)[-1]
-                    group = (frag.removeprefix("etype_")
-                             .removesuffix("_transport"))
-                    tok = self.mint_iri(base, f"token_{group}")
-                    if (tok, RDF.type, PROMO["Token"]) in g:
-                        tokens = [str(tok)]
-                        token_vector = {f"token_{group}": 1}
-                    break
-                cur = parent
 
             # Classifications only if the seeded terms are present.
             classifications = {}
@@ -636,16 +614,17 @@ class SeedMixin:
                 "classifications": classifications,
                 "aliases": {"latex": "F", "global_ID": str(iri)},
                 "doc": f"incidence matrix for the {label}",
-                "tokens": tokens,
-                "token_vector": token_vector,
             })
-            # Exact-set enforcement on the multi-valued shape triples.
+            # Exact-set enforcement on the multi-valued shape triples,
+            # and token neutrality: strip any token declarations
+            # (migrates pre-§4 records on load).
             keep_idx = {sub, node_iri}
-            keep_tok = {URIRef(t) for t in tokens}
             for o in set(g.objects(iri, PROMO["indexStructure"])) - keep_idx:
                 g.remove((iri, PROMO["indexStructure"], o))
-            for o in set(g.objects(iri, PROMO["carriesToken"])) - keep_tok:
+            for o in set(g.objects(iri, PROMO["carriesToken"])):
                 g.remove((iri, PROMO["carriesToken"], o))
+            for _, _, o in g.triples((iri, PROMO["tokenVector"], None)):
+                g.remove((iri, PROMO["tokenVector"], o))
 
     def _seed_capabilities(self, g: Graph, base: str) -> None:
         """Seed entity-type capabilities (§20): which types may inject
