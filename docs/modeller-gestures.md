@@ -54,9 +54,12 @@ leaf selection acts as the implicit source.
 An armed gesture **survives view changes** (zoom, `◂ back`,
 breadcrumb) — §13, old-ProMo beginArc/finishArc parity: the armed
 source is a model IRI, not a view object.  Finishing in another
-branch mints a flat leaf→leaf arc plus an open-arc stub on every
-composite along leaf→LCA on both sides, so the arc renders inside
-each branch view.  **Escape** disarms and clears the selection.
+branch mints a flat leaf→leaf arc — the projection renders it in
+local terms at every level (leaf→sibling inside the branch,
+comp→comp at the parent); no bookkeeping needed.  Only a **foreign
+endpoint** (inside a referenced artefact) records stubs — on the
+crossed composites plus `via` on the arc so it dies with the
+occurrence.  **Escape** disarms and clears the selection.
 
 ## Panels and actions
 

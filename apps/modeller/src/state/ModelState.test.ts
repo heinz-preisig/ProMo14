@@ -435,11 +435,11 @@ describe('applyCommand', () => {
   })
 })
 
-describe('cross-branch arcs — §13 boundary stubs', () => {
+describe('cross-branch arcs — §13', () => {
   // §13 ruling 2026-11-06: connect is branch-independent (old ProMo
-  // beginArc/finishArc); the arc mints leaf↔leaf and every composite
-  // along leaf→LCA on both sides records a stub, else the arc is
-  // invisible inside the branch views.
+  // beginArc/finishArc).  The arc mints flat leaf↔leaf; in-doc
+  // crossings render via the flat-arc projection — only a FOREIGN
+  // endpoint (inside a referenced artefact) needs stub records.
   const leaf = (id: number, iri: string) => ({
     type: 'insertNode' as const, id, iri, label: iri,
     entityType: 'promo:TypeA', parentViewNodeId: 0, x: 0, y: 0,
@@ -460,6 +460,21 @@ describe('cross-branch arcs — §13 boundary stubs', () => {
     s = applyCommand(s, group([2], 'c2'))   // comp 4 holds Node_2
     return s
   }
+  // leaf Node_1 in comp 2; ref shell 9 → 'ref:X'; view inside the
+  // ref; arc Node_1 → foreign leaf F/Node_9.
+  const foreignArc = () => {
+    let s = applyCommand(initialState, leaf(1, 'g/Node_1'))
+    s = applyCommand(s, group([1], 'c1'))
+    s = applyCommand(s, {
+      type: 'insertReferencedComposite', id: 9, label: 'r',
+      parentViewNodeId: 0, x: 0, y: 0, refersTo: 'ref:X', terminals: [],
+    })
+    s = applyCommand(s, { type: 'setView', viewNodeId: 0, refIri: 'ref:X' })
+    return applyCommand(s, {
+      type: 'insertArc', iri: 'g/Arc_1',
+      sourceIri: 'g/Node_1', targetIri: 'F/Node_9', arcType: TF,
+    })
+  }
 
   it('same-view arc writes no stubs', () => {
     const s = arc(applyCommand(
@@ -467,45 +482,25 @@ describe('cross-branch arcs — §13 boundary stubs', () => {
     expect(s.openArcs.size).toBe(0)
   })
 
-  it('arc between two branches stubs both composites', () => {
+  it('arc between two branches writes no stubs — the projection renders it', () => {
     const s = arc(twoBranches())
-    expect(s.openArcs.get(3)).toMatchObject([{
-      iri: 'g/Arc_1', externalIri: 'g/Node_2', arcType: TF,
-      isSource: true, refToExternal: true, externalEntityType: 'promo:TypeA',
-    }])
-    expect(s.openArcs.get(4)).toMatchObject([{
-      iri: 'g/Arc_1', externalIri: 'g/Node_1', arcType: TF,
-      isSource: false, refToExternal: false, externalEntityType: 'promo:TypeA',
-    }])
+    expect(s.modelArcs.has('g/Arc_1')).toBe(true)
+    expect(s.openArcs.size).toBe(0)
   })
 
-  it('arc into a branch stubs only the crossed composite', () => {
+  it('arc into a branch writes no stubs', () => {
     let s = applyCommand(applyCommand(initialState, leaf(1, 'g/Node_1')),
       leaf(2, 'g/Node_2'))
-    s = applyCommand(s, group([1], 'c1'))   // comp 3 holds Node_1
+    s = applyCommand(s, group([1], 'c1'))
     s = applyCommand(s, {
       type: 'insertArc', iri: 'g/Arc_1',
       sourceIri: 'g/Node_2', targetIri: 'g/Node_1', arcType: TF,
     })
-    expect([...s.openArcs.keys()]).toEqual([3])
-    expect(s.openArcs.get(3)).toMatchObject([{
-      iri: 'g/Arc_1', externalIri: 'g/Node_2',
-      isSource: false, refToExternal: false,
-    }])
+    expect(s.openArcs.size).toBe(0)
   })
 
-  it('arc to a foreign leaf stubs the ref occurrence the view was in', () => {
-    let s = applyCommand(initialState, leaf(1, 'g/Node_1'))
-    s = applyCommand(s, group([1], 'c1'))   // comp 2 holds Node_1
-    s = applyCommand(s, {
-      type: 'insertReferencedComposite', id: 9, label: 'r',
-      parentViewNodeId: 0, x: 0, y: 0, refersTo: 'ref:X', terminals: [],
-    })
-    s = applyCommand(s, { type: 'setView', viewNodeId: 0, refIri: 'ref:X' })
-    s = applyCommand(s, {
-      type: 'insertArc', iri: 'g/Arc_1',
-      sourceIri: 'g/Node_1', targetIri: 'F/Node_9', arcType: TF,
-    })
+  it('arc to a foreign leaf stubs the ref occurrence and tags via', () => {
+    const s = foreignArc()
     expect(s.openArcs.get(2)).toMatchObject([{
       iri: 'g/Arc_1', externalIri: 'F/Node_9',
       isSource: true, refToExternal: true,
@@ -514,23 +509,22 @@ describe('cross-branch arcs — §13 boundary stubs', () => {
       iri: 'g/Arc_1', externalIri: 'g/Node_1',
       isSource: false, refToExternal: false,
     }])
+    // `via` — the arc is bound through this occurrence's boundary and
+    // dies with it.
+    expect(s.modelArcs.get('g/Arc_1')?.via).toBe(9)
   })
 
   it('deleteArc drops the stubs the arc created', () => {
-    let s = arc(twoBranches())
-    s = applyCommand(s, { type: 'deleteArc', iri: 'g/Arc_1' })
+    const s = applyCommand(foreignArc(), { type: 'deleteArc', iri: 'g/Arc_1' })
     expect(s.openArcs.size).toBe(0)
   })
 
-  it('deleting a branch drops its stubs on both sides', () => {
-    let s = arc(twoBranches())
-    s = applyCommand(s, {
+  it('deleting the ref shell kills the foreign arc and both stubs', () => {
+    const s = applyCommand(foreignArc(), {
       type: 'deleteNodes',
-      nodes: [{ visibleNodeId: '3', treeNodeId: 3 }],
+      nodes: [{ visibleNodeId: '9', treeNodeId: 9 }],
     })
-    // comp 3 + leaf Node_1 gone; Arc_1 died with the node → comp 4's
-    // stub for it is dropped too.
-    expect(s.openArcs.size).toBe(0)
     expect(s.modelArcs.size).toBe(0)
+    expect(s.openArcs.size).toBe(0)
   })
 })

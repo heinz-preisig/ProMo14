@@ -123,13 +123,17 @@ function purgeOpenArcs(
   return next
 }
 
-/** §13: an arc whose endpoints sit in different branches must carry
- *  an open-arc stub on every composite along leaf→LCA on both
- *  sides — otherwise it renders nowhere inside the branch views.
- *  A foreign endpoint (a leaf inside a referenced artefact) binds at
- *  the ref occurrence the view was in; several occurrences of one
- *  artefact share the refersTo → first match, same caveat as the
- *  back button.  Returns null when no boundary is crossed. */
+/** §13: a cross-branch arc needs no record — the flat-arc
+ *  projection (findVisibleId) renders it at every level in local
+ *  terms: leaf→sibling-composite inside the branch, comp→comp at the
+ *  parent.  The one case the projection cannot reach is a FOREIGN
+ *  endpoint (a leaf inside a referenced artefact has no host tree
+ *  node) — there the crossing is recorded as an open-arc stub on
+ *  every composite along leaf→LCA on both sides, and the arc tags
+ *  the ref shell via `via` so it dies with the occurrence.
+ *  The shell resolves to the ref occurrence the view was in;
+ *  several occurrences of one artefact share the refersTo → first
+ *  match, same caveat as the back button. */
 function boundaryStubs(
   state: AppState,
   arcIri: string,
@@ -137,7 +141,7 @@ function boundaryStubs(
   targetIri: string,
   arcType: string,
   referenceTo?: string,
-): Map<number, OpenArc[]> | null {
+): { openArcs: Map<number, OpenArc[]>; via: number } | null {
   const leafOf = (iri: string): number | null => {
     for (const [id, n] of state.tree.nodes)
       if (n.children.length === 0 && n.iri === iri) return id
@@ -151,14 +155,15 @@ function boundaryStubs(
       if (r.refersTo === state.viewRefIri) return id
     return null
   }
+  const srcLeaf = leafOf(sourceIri)
+  const tgtLeaf = leafOf(targetIri)
+  // Both endpoints in-doc — the projection renders the crossing
+  // everywhere; nothing to record.
+  if (srcLeaf !== null && tgtLeaf !== null) return null
   // Walk start: a host leaf starts at its parent composite; a
   // foreign endpoint starts AT the ref shell — its boundary is crossed.
-  const startOf = (iri: string): number | null => {
-    const leaf = leafOf(iri)
-    return leaf !== null ? parentOf(leaf) : refShellId()
-  }
-  const srcStart = startOf(sourceIri)
-  const tgtStart = startOf(targetIri)
+  const srcStart = srcLeaf !== null ? parentOf(srcLeaf) : refShellId()
+  const tgtStart = tgtLeaf !== null ? parentOf(tgtLeaf) : refShellId()
   if (srcStart === null || tgtStart === null) return null
 
   const srcAnc = new Set<number>()
@@ -195,7 +200,8 @@ function boundaryStubs(
     add(c, targetIri, true)
   for (let c: number | null = tgtStart; c !== null && c !== lca; c = parentOf(c))
     add(c, sourceIri, false)
-  return touched ? openArcs : null
+  const via = refShellId()
+  return touched && via !== null ? { openArcs, via } : null
 }
 
 // ─── Pure reducer ───
@@ -337,18 +343,20 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       // counter.  Callers pass an explicit iri only when carrying a
       // template IRI (open-arc reconnect, stamped copies).
       const iri = cmd.iri ?? modelArcIri(cmd.graphIri!, modelGraph.getArcCounter())
-      modelGraph.insertArc(iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceFrom, cmd.referenceTo)
+      const arc = modelGraph.insertArc(iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceFrom, cmd.referenceTo)
 
-      // §13: a cross-branch arc needs a stub on every composite along
-      // leaf→LCA on both sides, or it is invisible inside the branches.
-      const openArcs = boundaryStubs(
+      // §13: only a FOREIGN endpoint needs a record — stubs on the
+      // crossed composites plus `via` on the arc (dies with the ref
+      // occurrence).  In-doc crossings render via projection alone.
+      const stub = boundaryStubs(
         state, iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceTo)
+      if (stub) arc.via = stub.via
 
       return {
         ...state,
         modelNodes: modelGraph.getNodes(),
         modelArcs: modelGraph.getArcs(),
-        openArcs: openArcs ?? state.openArcs,
+        openArcs: stub?.openArcs ?? state.openArcs,
         arcCounter: modelGraph.getArcCounter(),
         selectedVisibleNodeId: null,
         selectedVisibleNodeIds: [],
