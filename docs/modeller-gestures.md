@@ -1,7 +1,11 @@
 # Modeller gesture map
 
-Canonical list of canvas gestures in `apps/modeller` — keep in sync
-with `canvas/useCanvasEvents.ts` and the status-bar hints in `App.tsx`.
+Canonical list of canvas gestures in `apps/modeller`.  Gestures are
+decided by the **interaction automaton** in `canvas/interaction.ts`
+— a pure `transition(mode, event, ctx) → {next, outputs}` table the
+Konva adapter (`useCanvasEvents.ts`) feeds and executes.  Dead
+gestures emit `swallowed` outputs (console.debug) instead of silent
+returns.  Keep this doc in sync with the table.
 
 ## Canvas (empty stage)
 
@@ -9,8 +13,8 @@ with `canvas/useCanvasEvents.ts` and the status-bar hints in `App.tsx`.
   modifiers suppressed, 300 ms debounce)
 - **Right-click** — clear selection, cancel pending connection
 - **Middle-drag** — pan; **wheel** — zoom
-- **Shift+drag** — marquee select (leaf centres inside the rect only;
-  Ctrl adds to the selection)
+- **Shift+drag** — marquee select (leaf and composite centres inside
+  the rect; Ctrl adds to the selection)
 - **Delete/Backspace** — remove selection
 
 ## Leaf node
@@ -26,8 +30,8 @@ with `canvas/useCanvasEvents.ts` and the status-bar hints in `App.tsx`.
 
 - **Click** — open/navigate in (referenced composite → read-only
   reference view; `◂ back` returns)
-- **Ctrl+click or right-click** — select (Properties, Extract,
-  Ungroup, Dissolve)
+- **Ctrl+click** — toggle in the multi-selection (same rule as leaves)
+- **Right-click** — select (Properties, Extract, Ungroup, Dissolve)
 - **Drag** — move
 - **Double-click** — same as click (navigate)
 
@@ -42,13 +46,20 @@ with `canvas/useCanvasEvents.ts` and the status-bar hints in `App.tsx`.
 
 ## Connect chaining
 
-Left-click arms a source; right-click on a leaf connects it **and
-arms the target** — repeated right-clicks build node → node → node.
+Left-click arms a source (automaton mode `armed`); right-click on a
+leaf connects it **and re-arms the target** — repeated right-clicks
+build node → node → node.  Without an explicit arm, the current
+leaf selection acts as the implicit source.
+
+An armed gesture dies on **any view change** (zoom, `◂ back`,
+breadcrumb) — cross-boundary connects must go through terminals,
+not through a forgotten arm.  **Escape** disarms and clears the
+selection.
 
 ## Panels and actions
 
-- Palette click arms a node type; Submodels click inserts a referenced
-  composite (terminals materialised from the artefact's interface)
+- Palette click arms a node type; Submodels click stamps a copy
+  (Ctrl+click for the referenced composite — see below)
 - Actions: **Extract to submodel** (composite → artefact + `refersTo`),
   **Group** (prompts for a name), **Ungroup** (in-doc comps — children
   move up, shell removed), **Reset all**
@@ -59,5 +70,13 @@ arms the target** — repeated right-clicks build node → node → node.
 ## Reference view (inside a referenced artefact)
 
 Read-only: pan, zoom, and descending into composites/nested references
-stay live; every mutating gesture is suppressed. `◂ back` in the
-header returns to the host view.
+stay live; every mutating gesture emits `swallowed('reference view —
+read-only')`. `◂ back` in the header returns to the host view.
+
+## Palette (Submodels)
+
+- **Click a line** — stamp an editable **copy** (fresh ids + IRIs;
+  ordinary host content, fully editable)
+- **Ctrl+click a line** — insert a **referenced** composite
+  (`refersTo`; read-only inside; terminals materialised from the
+  artefact's declared interface)

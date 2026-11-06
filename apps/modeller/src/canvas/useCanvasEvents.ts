@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { Stage as KonvaStage } from 'konva/lib/Stage'
 import type { AppState, Command } from '../state/ModelState'
@@ -10,6 +10,8 @@ import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
 import { GRAPH_IRI, loadModelDoc } from '../api'
 import { refViewState } from '../modelPersistence'
+import { transition, initialInteraction } from './interaction'
+import type { Mode, Event, Ctx, Output, NodeCtx } from './interaction'
 
 /** Root of the transport-system subtree — seeded entity type
  *  (deterministic IRI, minted under the ontology namespace). */
@@ -42,6 +44,9 @@ export interface CanvasEventHandlers {
   /** Active rubber-band rect in scene coordinates (Shift+drag), or
    *  null — rendered by the canvas layer. */
   marquee: { x: number; y: number; w: number; h: number } | null
+  /** The interaction automaton's current mode — App reads `armed`
+   *  for the connect-gesture preview. */
+  interaction: Mode
 }
 
 export function useCanvasEvents(
@@ -58,26 +63,23 @@ export function useCanvasEvents(
   setDraggingOpenArc: (v: { openArcIri: string; fixedX: number; fixedY: number; currentX: number; currentY: number } | null) => void,
   setHoveredNodeId: (id: string | null) => void,
   setHoveredObject: (obj: SceneObject | null) => void,
-  pendingConnection: { sourceModelIri: string; sourceEntityType: string } | null,
-  setPendingConnection: (v: { sourceModelIri: string; sourceEntityType: string } | null) => void,
   ruleResolver: ConnectionRuleResolver,
   catalogue: SemanticCatalogue,
+  interaction: Mode,
+  setInteraction: (m: Mode) => void,
 ): CanvasEventHandlers {
   const wasDragged = useRef(false)
   const lastClickTime = useRef(0)
   const isPanning = useRef(false)
   const lastPanPos = useRef<{ x: number; y: number } | null>(null)
-
-  // Multi-select: marquee (Shift+drag on empty stage) and multi-drag.
-  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const isMarquee = useRef(false)
-  const marqueeOrigin = useRef<{ x: number; y: number } | null>(null)
   /** Members of the selection set at dragStart — multi-drag applies
    *  the dragged node's delta to every member. */
   const dragSet = useRef<{
     originId: string
     members: { id: string; start: { x: number; y: number }; he: { x: number; y: number } }[]
   } | null>(null)
+
+  const mode = interaction
 
   // §22 reference view — inside a referenced artefact's scope the
   // canvas is read-only: the content belongs to another artefact.
@@ -87,6 +89,93 @@ export function useCanvasEvents(
   const scopeRefs = inRef
     ? state.refStates.get(state.viewRefIri!)?.compositeRefs
     : state.compositeRefs
+
+  // Any navigation kills a mid-flight gesture — an armed connect
+  // must not produce a cross-boundary arc.  setView dispatches from
+  // several places (breadcrumb, back button, enterComposite), so
+  // watch the view inputs rather than each call site.
+  useEffect(() => {
+    setInteraction(initialInteraction)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentViewNodeId, state.viewRefIri])
+
+  const buildCtx = (): Ctx => {
+    const arc = state.selectedModelArcIri
+      ? state.modelArcs.get(state.selectedModelArcIri)
+      : undefined
+    return {
+      inRef,
+      selectedIds: state.selectedVisibleNodeIds,
+      selectedId: state.selectedVisibleNodeId,
+      selectedArcIri: state.selectedModelArcIri,
+      selectedArcCarrier: arc ? (arcCarrier(arc.arcType) ?? null) : null,
+      graphView,
+    }
+  }
+
+  /** Async connect effect — resolves the rule, picks the arc type,
+   *  computes the §15 orientation, dispatches insertArc.  Re-arm on
+   *  the target is already encoded in the automaton's next mode. */
+  const runConnect = async (o: Extract<Output, { kind: 'connect' }>) => {
+    const result = await resolveConnectionAsync(
+      o.source.entityType, o.target.entityType, catalogue, ruleResolver)
+    const arcType = pickArcType(result, activeArcType)
+    if (!arcType) return
+    const arcIri = modelArcIri(GRAPH_IRI!, state.arcCounter)
+    const orientation = defaultOrientation(
+      arcType, o.source.modelIri, o.target.modelIri,
+      isTransportEntity(o.source.entityType, catalogue),
+      isTransportEntity(o.target.entityType, catalogue),
+      transportArcs(o.source.modelIri, o.target.modelIri),
+    )
+    dispatch({
+      type: 'insertArc',
+      iri: arcIri,
+      sourceIri: o.source.modelIri,
+      targetIri: o.target.modelIri,
+      arcType,
+      referenceFrom: orientation?.referenceFrom,
+      referenceTo: orientation?.referenceTo,
+    })
+  }
+
+  /** Run one automaton output — commands dispatch, effects execute. */
+  const runOutput = (o: Output) => {
+    switch (o.kind) {
+      case 'cmd':
+        dispatch(o.cmd)
+        return
+      case 'insertNode':
+        insertNodeAt(o.point.x, o.point.y)
+        return
+      case 'connect':
+        void runConnect(o)
+        return
+      case 'enterComposite':
+        enterComposite(o.treeNodeId)
+        return
+      case 'swallowed':
+        // Dead gestures are no longer silent — surface the reason.
+        console.debug(`gesture swallowed: ${o.reason}`)
+        return
+    }
+  }
+
+  /** Feed a normalized event through the automaton. */
+  const fire = (ev: Event) => {
+    const { next, out } = transition(mode, ev, buildCtx())
+    setInteraction(next)
+    for (const o of out) runOutput(o)
+  }
+
+  const nodeCtx = (obj: Extract<SceneObject, { kind: 'node' }>): NodeCtx => ({
+    kind: obj.nodeType === 'leaf' ? 'leaf'
+      : obj.nodeType === 'composite' ? 'composite' : 'chrome',
+    id: obj.selectionId!,
+    treeNodeId: obj.treeNodeId,
+    modelNodeIri: obj.modelNodeIri,
+    entityType: obj.entityType,
+  })
 
   /** Zoom into a composite — for a referenced composite, into the
    *  referenced artefact's own tree (rendered read-only).  The ref
@@ -153,13 +242,15 @@ export function useCanvasEvents(
     })
   }
 
+  const mods = (e: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => ({
+    ctrl: e.ctrlKey || e.metaKey,
+    shift: e.shiftKey,
+  })
+
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     if (wasDragged.current) return
     if (e.evt.button !== 0) return   // Konva fires click for right-button too
-    if (inRef) return
     if (e.target !== e.target.getStage()) return
-    // Modifier clicks belong to multi-select gestures — never insert.
-    if (e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey) return
 
     const now = Date.now()
     if (now - lastClickTime.current < 300) return
@@ -170,18 +261,12 @@ export function useCanvasEvents(
 
     const sceneX = (pos.x - stageSize.width / 2 - pan.x) / scale
     const sceneY = (pos.y - stageSize.height / 2 - pan.y) / scale
-    insertNodeAt(sceneX, sceneY)
+    fire({ kind: 'stageClick', point: { x: sceneX, y: sceneY }, mods: mods(e.evt) })
   }
 
   const handleStageRightClick = (e: KonvaEventObject<MouseEvent>) => {
     e.evt.preventDefault()
-    if (inRef) return
-    if (state.selectedVisibleNodeId) {
-      dispatch({ type: 'selectNode', id: null })
-    }
-    if (pendingConnection) {
-      setPendingConnection(null)
-    }
+    fire({ kind: 'stageRightClick' })
   }
 
   const handleStageMouseDown = (e: KonvaEventObject<MouseEvent>) => {
@@ -193,28 +278,20 @@ export function useCanvasEvents(
     }
     // Shift+drag on empty canvas starts the rubber band.
     if (
-      e.evt.button === 0 && e.evt.shiftKey && !inRef &&
+      e.evt.button === 0 && e.evt.shiftKey &&
       e.target === e.target.getStage()
     ) {
       const p = pointerToScene(e.target.getStage())
       if (!p) return
-      isMarquee.current = true
-      marqueeOrigin.current = p
-      setMarquee({ x: p.x, y: p.y, w: 0, h: 0 })
+      fire({ kind: 'marqueeStart', point: p })
     }
   }
 
   const handleStageMouseMove = (e: KonvaEventObject<MouseEvent>) => {
-    if (isMarquee.current && marqueeOrigin.current) {
+    if (mode.name === 'marquee') {
       const p = pointerToScene(e.target.getStage())
       if (!p) return
-      const o = marqueeOrigin.current
-      setMarquee({
-        x: Math.min(o.x, p.x),
-        y: Math.min(o.y, p.y),
-        w: Math.abs(p.x - o.x),
-        h: Math.abs(p.y - o.y),
-      })
+      fire({ kind: 'marqueeMove', point: p })
       return
     }
     if (!isPanning.current || !lastPanPos.current) return
@@ -227,30 +304,12 @@ export function useCanvasEvents(
   }
 
   const handleStageMouseUp = (e: KonvaEventObject<MouseEvent>) => {
-    if (isMarquee.current) {
-      const m = marquee
-      isMarquee.current = false
-      marqueeOrigin.current = null
-      setMarquee(null)
-      if (m && (m.w > 2 || m.h > 2)) {
-        // Centres inside the rect — leaves AND composites are
-        // selectable (composites became selectable for delete in
-        // 9c58b15; the marquee never caught up).
-        const boxed = graphView.nodes
-          .filter((n) =>
-            (n.type === 'leaf' || n.type === 'composite') &&
-            n.x >= m.x && n.x <= m.x + m.w &&
-            n.y >= m.y && n.y <= m.y + m.h)
-          .map((n) => n.id)
-        const additive = e.evt.ctrlKey || e.evt.metaKey
-        const ids = additive
-          ? [...state.selectedVisibleNodeIds, ...boxed]
-          : boxed
-        dispatch({ type: 'selectNodes', ids })
-        // Swallow the click that follows mouseup — it would insert a node.
-        wasDragged.current = true
-        setTimeout(() => { wasDragged.current = false }, 50)
-      }
+    if (mode.name === 'marquee') {
+      const p = pointerToScene(e.target.getStage())
+      fire({ kind: 'marqueeEnd', point: p ?? { x: 0, y: 0 }, mods: mods(e.evt) })
+      // Swallow the click that follows mouseup — it would insert a node.
+      wasDragged.current = true
+      setTimeout(() => { wasDragged.current = false }, 50)
       return
     }
     isPanning.current = false
@@ -271,167 +330,42 @@ export function useCanvasEvents(
     if (e.evt.button !== 0) return   // right-button is contextmenu, not select/zoom
 
     if (obj.kind === 'node') {
-      if (obj.nodeType === 'leaf') {
-        if (inRef) return
-        // Ctrl/Cmd/Shift+click toggles membership — a selection
-        // gesture only, it must not arm the connection source.
-        if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
-          dispatch({ type: 'toggleSelectNode', id: obj.selectionId! })
-          return
-        }
-        dispatch({ type: 'selectNode', id: obj.selectionId! })
-        if (obj.modelNodeIri && obj.entityType) {
-          setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
-        }
-      } else if (obj.treeNodeId !== undefined) {
-        // Ctrl/Shift+click toggles the composite's selection
-        // membership (same rule as leaves); a plain click navigates.
-        if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
-          if (!inRef) dispatch({ type: 'toggleSelectNode', id: obj.selectionId! })
-          return
-        }
-        enterComposite(obj.treeNodeId)
-      }
-    } else if (!inRef && obj.kind === 'arc') {
-      dispatch({ type: 'selectArc', iri: obj.arcIri! })
-    } else if (!inRef && obj.kind === 'knot') {
-      dispatch({ type: 'selectArc', iri: obj.arcIri })
+      fire({ kind: 'nodeClick', node: nodeCtx(obj), mods: mods(e.evt) })
+    } else if (obj.kind === 'arc') {
+      fire({ kind: 'arcClick', iri: obj.arcIri! })
+    } else if (obj.kind === 'knot' && obj.arcIri !== undefined) {
+      fire({ kind: 'knotClick', arcIri: obj.arcIri })
     }
   }
 
-  const onSceneRightClick = async (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
+  const onSceneRightClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
     e.evt.preventDefault()
     e.cancelBubble = true
     if (wasDragged.current) return
-    if (inRef) return
 
     if (obj.kind === 'knot') {
-      dispatch({ type: 'removeKnot', arcIri: obj.arcIri, knotIndex: obj.knotIndex })
+      if (obj.arcIri !== undefined && obj.knotIndex !== undefined) {
+        fire({ kind: 'knotRightClick', arcIri: obj.arcIri, knotIndex: obj.knotIndex })
+      }
       return
     }
-
-    // §15: right-click on a token-flow arc reverses its reference
-    // direction (layout untouched).
     if (obj.kind === 'arc' && obj.arcIri) {
       const modelArc = state.modelArcs.get(obj.arcIri)
-      if (modelArc && arcCarrier(modelArc.arcType) === 'token-flow') {
-        dispatch({ type: 'reverseArcOrientation', iri: obj.arcIri })
-      }
+      fire({ kind: 'arcRightClick', arcIri: obj.arcIri, carrier: modelArc ? (arcCarrier(modelArc.arcType) ?? null) : null })
       return
     }
-
     if (obj.kind !== 'node') return
-
-    const nodeId = obj.selectionId!
-
-    // If we have a pending connection source, try to connect to this node
-    if (pendingConnection && obj.nodeType === 'leaf' && obj.modelNodeIri && obj.entityType) {
-      // Don't connect to self
-      if (obj.modelNodeIri === pendingConnection.sourceModelIri) {
-        setPendingConnection(null)
-        dispatch({ type: 'selectNode', id: null })
-        return
-      }
-      const result = await resolveConnectionAsync(
-        pendingConnection.sourceEntityType,
-        obj.entityType,
-        catalogue,
-        ruleResolver,
-      )
-      const arcType = pickArcType(result, activeArcType)
-      if (arcType) {
-        const arcIri = modelArcIri(GRAPH_IRI!, state.arcCounter)
-        const orientation = defaultOrientation(
-          arcType,
-          pendingConnection.sourceModelIri,
-          obj.modelNodeIri,
-          isTransportEntity(pendingConnection.sourceEntityType, catalogue),
-          isTransportEntity(obj.entityType, catalogue),
-          transportArcs(pendingConnection.sourceModelIri, obj.modelNodeIri),
-        )
-        dispatch({
-          type: 'insertArc',
-          iri: arcIri,
-          sourceIri: pendingConnection.sourceModelIri,
-          targetIri: obj.modelNodeIri,
-          arcType,
-          referenceFrom: orientation?.referenceFrom,
-          referenceTo: orientation?.referenceTo,
-        })
-      }
-      setPendingConnection(null)
-      // Chained connect: the target becomes the armed source — a run
-      // of right-clicks connects node → node → node.
-      dispatch({ type: 'selectNode', id: nodeId })
-      setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
-      return
-    }
-
-    // Same-view connection (source visible in this view)
-    if (state.selectedVisibleNodeId && state.selectedVisibleNodeId !== nodeId) {
-      const sourceNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
-      const targetNode = graphView.nodes.find((n) => n.id === nodeId)
-      if (
-        sourceNode?.type === 'leaf' &&
-        targetNode?.type === 'leaf' &&
-        sourceNode.modelNodeIri &&
-        targetNode.modelNodeIri &&
-        sourceNode.entityType &&
-        targetNode.entityType
-      ) {
-        const result = await resolveConnectionAsync(
-          sourceNode.entityType,
-          targetNode.entityType,
-          catalogue,
-          ruleResolver,
-        )
-        const arcType = pickArcType(result, activeArcType)
-        if (arcType) {
-          const arcIri = modelArcIri(GRAPH_IRI!, state.arcCounter)
-          const orientation = defaultOrientation(
-            arcType,
-            sourceNode.modelNodeIri,
-            targetNode.modelNodeIri,
-            isTransportEntity(sourceNode.entityType, catalogue),
-            isTransportEntity(targetNode.entityType, catalogue),
-            transportArcs(sourceNode.modelNodeIri, targetNode.modelNodeIri),
-          )
-          dispatch({
-            type: 'insertArc',
-            iri: arcIri,
-            sourceIri: sourceNode.modelNodeIri,
-            targetIri: targetNode.modelNodeIri,
-            arcType,
-            referenceFrom: orientation?.referenceFrom,
-            referenceTo: orientation?.referenceTo,
-          })
-        }
-      }
-      if (targetNode?.type === 'leaf') {
-        dispatch({ type: 'selectNode', id: null })
-        setPendingConnection(null)
-        return
-      }
-      // Non-leaf target (composite): fall through — it gets selected
-      // below rather than dissolving the pending gesture on nothing.
-    }
-
-    // Select this node as connection source
-    if (obj.nodeType === 'leaf' && obj.modelNodeIri && obj.entityType) {
-      dispatch({ type: 'selectNode', id: nodeId })
-      setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
-    } else {
-      dispatch({ type: 'selectNode', id: nodeId })
-    }
+    fire({ kind: 'nodeRightClick', node: nodeCtx(obj) })
   }
 
   const onSceneDoubleClick = (obj: SceneObject, e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true
     if (wasDragged.current) return
     if (e.evt.button !== 0) return
-    if (inRef) return
     if (obj.kind === 'knot') {
-      dispatch({ type: 'addKnot', arcIri: obj.arcIri, x: obj.x, y: obj.y })
+      if (obj.arcIri !== undefined) {
+        fire({ kind: 'knotDoubleClick', arcIri: obj.arcIri, point: { x: obj.x, y: obj.y } })
+      }
       return
     }
     if (obj.kind === 'arc') {
@@ -439,14 +373,12 @@ export function useCanvasEvents(
       if (!pos) return
       const sceneX = (pos.x - stageSize.width / 2 - pan.x) / scale
       const sceneY = (pos.y - stageSize.height / 2 - pan.y) / scale
-      dispatch({ type: 'addKnot', arcIri: obj.arcIri!, x: sceneX, y: sceneY })
+      fire({ kind: 'arcDoubleClick', arcIri: obj.arcIri!, point: { x: sceneX, y: sceneY } })
       return
     }
-    if (obj.kind === 'node' && obj.treeNodeId !== undefined && obj.nodeType !== 'leaf') {
-      // A referenced composite's first click already navigated — a
-      // second setView here would desync the reference scope.
-      if (scopeRefs?.get(obj.treeNodeId)?.refersTo) return
-      dispatch({ type: 'setView', viewNodeId: obj.treeNodeId })
+    if (obj.kind === 'node' && obj.treeNodeId !== undefined) {
+      const isRef = !!scopeRefs?.get(obj.treeNodeId)?.refersTo
+      fire({ kind: 'nodeDoubleClick', node: nodeCtx(obj), isRef })
     }
   }
 
@@ -469,11 +401,11 @@ export function useCanvasEvents(
 
     if (obj.kind !== 'node' || !obj.selectionId) return
 
-    // Dragging an unselected node selects it (standard behaviour).
-    if (!state.selectedVisibleNodeIds.includes(obj.selectionId)) {
-      dispatch({ type: 'selectNode', id: obj.selectionId })
-      return
-    }
+    // Dragging an unselected node selects it (standard behaviour) —
+    // that first drag selects, it does not start a multi-drag.
+    const wasSelected = state.selectedVisibleNodeIds.includes(obj.selectionId)
+    fire({ kind: 'dragStartNode', node: nodeCtx(obj) })
+    if (!wasSelected) return
 
     if (state.selectedVisibleNodeIds.length < 2) return
 
@@ -648,42 +580,22 @@ export function useCanvasEvents(
   }
 
   const handleDelete = () => {
-    if (inRef) return
-    if (state.selectedVisibleNodeIds.length) {
-      const nodes = state.selectedVisibleNodeIds
-        .map((id) => graphView.nodes.find((n) => n.id === id))
-        .filter((n): n is NonNullable<typeof n> =>
-          n !== undefined && n.treeNodeId !== undefined
-          && (n.type === 'leaf' || n.type === 'composite'))
-        .map((n) => ({
-          visibleNodeId: n.id,
-          treeNodeId: n.treeNodeId!,
-          modelNodeIri: n.modelNodeIri,
-        }))
-      if (nodes.length) dispatch({ type: 'deleteNodes', nodes })
-    } else if (state.selectedModelArcIri) {
-      dispatch({ type: 'deleteArc', iri: state.selectedModelArcIri })
-    }
+    fire({ kind: 'keyDelete' })
   }
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (state.viewRefIri !== null) return   // reference view: read-only
       if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDelete()
       } else if (e.key === 'Escape') {
-        dispatch({ type: 'selectNodes', ids: [] })
-      } else if (e.key === 'r' && state.selectedModelArcIri) {
-        // §15: 'r' reverses the selected token-flow arc's reference direction
-        const arc = state.modelArcs.get(state.selectedModelArcIri)
-        if (arc && arcCarrier(arc.arcType) === 'token-flow') {
-          dispatch({ type: 'reverseArcOrientation', iri: arc.iri })
-        }
+        fire({ kind: 'keyEscape' })
+      } else if (e.key === 'r') {
+        fire({ kind: 'keyReverse' })
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleDelete, state.selectedModelArcIri, state.modelArcs])
+  })   // rebinds each render — closure must see the current mode/state
 
   const sceneHandlers: SceneInteractionHandlers = {
     onClick: onSceneClick,
@@ -707,6 +619,7 @@ export function useCanvasEvents(
     groupSelectedNodes,
     handleDelete,
     sceneHandlers,
-    marquee,
+    marquee: mode.name === 'marquee' ? mode.rect : null,
+    interaction: mode,
   }
 }

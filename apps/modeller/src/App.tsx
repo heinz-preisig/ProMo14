@@ -17,6 +17,8 @@ import { computeGraphView } from './tree/computeGraphView'
 import type { AppState } from './state/ModelState'
 import { initialState, applyCommand } from './state/ModelState'
 import { useCanvasEvents } from './canvas/useCanvasEvents'
+import { initialInteraction } from './canvas/interaction'
+import type { Mode } from './canvas/interaction'
 import { buildScene } from './scene/buildScene'
 import { SceneRenderer } from './scene/SceneRenderer'
 import type { SceneObject } from './scene/types'
@@ -313,11 +315,13 @@ export default function App() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [hoveredObject, setHoveredObject] = useState<SceneObject | null>(null)
 
-  // --- Pending connection source (persists across view changes) ---
-  const [pendingConnection, setPendingConnection] = useState<{
-    sourceModelIri: string
-    sourceEntityType: string
-  } | null>(null)
+  // --- Interaction automaton: the canvas gesture mode lives here.
+  //  `armed` = connect gesture awaiting its target — the old
+  //  pendingConnection, now a mode the transition table owns.
+  const [interaction, setInteraction] = useState<Mode>(initialInteraction)
+  const pendingConnection = interaction.name === 'armed'
+    ? { sourceModelIri: interaction.source.modelIri, sourceEntityType: interaction.source.entityType }
+    : null
 
   // --- Connection rule resolver: remote (ontology backend) with the
   // placeholder allow-all as fallback while the backend is unreachable.
@@ -484,7 +488,7 @@ export default function App() {
     groupSelectedNodes,
     sceneHandlers,
     marquee,
-  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject, pendingConnection, setPendingConnection, ruleResolver, catalogue)
+  } = useCanvasEvents(state, graphView, stageSize, activeNodeType, activeArcType, dispatch, pan, setPan, scale, setScale, setDraggingOpenArc, setHoveredNodeId, setHoveredObject, ruleResolver, catalogue, interaction, setInteraction)
 
   const selectedVisibleNode = graphView.nodes.find((n) => n.id === state.selectedVisibleNodeId)
   const selectedArc = graphView.arcs.find((a) => a.modelArcIri === state.selectedModelArcIri)
