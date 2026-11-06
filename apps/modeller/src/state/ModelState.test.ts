@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { initialState, applyCommand } from './ModelState'
 import { defaultOrientation } from '../model/ModelGraph'
 import { deserializeState } from '../modelPersistence'
+import { computeGraphView } from '../tree/computeGraphView'
 import type { ModelDocument } from '../modelPersistence'
 import type { ModelArc } from '../types'
 
@@ -288,6 +289,22 @@ describe('applyCommand', () => {
       expect(state.modelNodes.size).toBe(6)
       expect([...state.modelNodes.keys()].every((iri) => iri.startsWith('host/Node_'))).toBe(true)
       expect(state.modelArcs.size).toBe(2)
+    })
+
+    it('copied children render as selectable view nodes inside the group', () => {
+      let state = stamped()
+      // zoom into the stamped 'Sub' composite (new id 4)
+      state = applyCommand(state, { type: 'setView', viewNodeId: 4 })
+      const view = computeGraphView(4, state.tree, state.modelNodes,
+        state.modelArcs, state.layoutStore, state.openArcs,
+        state.knotStore, 800, 600)
+      const leaf = view.nodes.find((n) => n.id === '5')
+      expect(leaf).toMatchObject({
+        type: 'leaf', treeNodeId: 5, modelNodeIri: 'host/Node_5',
+      })
+      // selection mechanics on that id
+      state = applyCommand(state, { type: 'selectNode', id: leaf!.id })
+      expect(state.selectedVisibleNodeIds).toEqual(['5'])
     })
   })
 

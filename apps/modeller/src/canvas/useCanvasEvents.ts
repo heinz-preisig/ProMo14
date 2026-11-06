@@ -233,11 +233,12 @@ export function useCanvasEvents(
       marqueeOrigin.current = null
       setMarquee(null)
       if (m && (m.w > 2 || m.h > 2)) {
-        // Leaf centres inside the rect (same rule as click-select:
-        // only leaves are selectable).
+        // Centres inside the rect — leaves AND composites are
+        // selectable (composites became selectable for delete in
+        // 9c58b15; the marquee never caught up).
         const boxed = graphView.nodes
           .filter((n) =>
-            n.type === 'leaf' &&
+            (n.type === 'leaf' || n.type === 'composite') &&
             n.x >= m.x && n.x <= m.x + m.w &&
             n.y >= m.y && n.y <= m.y + m.h)
           .map((n) => n.id)
@@ -283,10 +284,10 @@ export function useCanvasEvents(
           setPendingConnection({ sourceModelIri: obj.modelNodeIri, sourceEntityType: obj.entityType })
         }
       } else if (obj.treeNodeId !== undefined) {
-        // Ctrl/Shift+click selects the composite (Properties/actions);
-        // a plain click navigates into it.
+        // Ctrl/Shift+click toggles the composite's selection
+        // membership (same rule as leaves); a plain click navigates.
         if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
-          if (!inRef) dispatch({ type: 'selectNode', id: obj.selectionId! })
+          if (!inRef) dispatch({ type: 'toggleSelectNode', id: obj.selectionId! })
           return
         }
         enterComposite(obj.treeNodeId)
