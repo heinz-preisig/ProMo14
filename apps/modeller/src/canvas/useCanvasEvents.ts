@@ -10,7 +10,7 @@ import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
 import { GRAPH_IRI, loadModelDoc } from '../api'
 import { refViewState } from '../modelPersistence'
-import { transition, initialInteraction } from './interaction'
+import { transition, initialInteraction, editableTarget } from './interaction'
 import type { Mode, Event, Ctx, Output, NodeCtx } from './interaction'
 
 /** Root of the transport-system subtree — seeded entity type
@@ -586,6 +586,9 @@ export function useCanvasEvents(
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // Keystrokes aimed at form controls (rename fields, dialogs)
+      // are not canvas gestures — Backspace there must not delete.
+      if (editableTarget(e.target)) return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDelete()
       } else if (e.key === 'Escape') {

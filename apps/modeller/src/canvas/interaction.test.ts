@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { transition, initialInteraction } from './interaction'
+import { transition, initialInteraction, editableTarget } from './interaction'
 import type { Mode, Ctx, Output } from './interaction'
 import type { GraphView } from '../types'
 
@@ -106,5 +106,26 @@ describe('interaction automaton', () => {
     expect(cmds(end.out)).toEqual(['selectNodes'])
     const sel = end.out[0] as { cmd: { ids: string[] } }
     expect(sel.cmd.ids).toEqual(['1', '4'])   // 9 is outside the box
+  })
+})
+
+describe('editableTarget — canvas hotkeys stay out of form controls', () => {
+  // GUI regression 2026-11-06: Backspace in the rename input
+  // deleted the selected composite because the window-level
+  // keydown listener had no focus guard.
+  const asTarget = (o: object) => o as unknown as EventTarget
+
+  it('true for every editable control', () => {
+    for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT'])
+      expect(editableTarget(asTarget({ tagName }))).toBe(true)
+    expect(editableTarget(
+      asTarget({ tagName: 'DIV', isContentEditable: true }))).toBe(true)
+  })
+
+  it('false for the canvas stage and null', () => {
+    expect(editableTarget(
+      asTarget({ tagName: 'DIV', isContentEditable: false }))).toBe(false)
+    expect(editableTarget(asTarget({ tagName: 'CANVAS' }))).toBe(false)
+    expect(editableTarget(null)).toBe(false)
   })
 })

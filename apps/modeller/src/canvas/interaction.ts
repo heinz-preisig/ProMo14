@@ -323,3 +323,19 @@ export function transition(
       return { ...idle, out: [] }
   }
 }
+
+/**
+ * Hotkeys belong to the canvas — a keystroke aimed at a form
+ * control (rename fields, dialog inputs) must not reach the
+ * automaton.  The window listener bails on editable targets;
+ * without this, Backspace in the rename box deletes the selected
+ * subtree and 'r' fires keyReverse mid-typing.
+ */
+export function editableTarget(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null
+  return !!el && (
+    el.tagName === 'INPUT' ||
+    el.tagName === 'TEXTAREA' ||
+    el.tagName === 'SELECT' ||
+    el.isContentEditable === true)
+}
