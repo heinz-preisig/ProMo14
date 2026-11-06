@@ -954,12 +954,17 @@ export default function App() {
               <div>y: {selectedVisibleNode.y.toFixed(1)}</div>
             </div>
           )}
-          {selectedVisibleNode?.modelNodeIri && fixVars.length > 0 && (() => {
+          {selectedVisibleNode?.modelNodeIri && (() => {
             const selNode = state.modelNodes.get(selectedVisibleNode.modelNodeIri!)
             const fixed = new Set(selNode?.fixes ?? [])
             return (
               <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
                 <strong style={{ fontSize: 12 }}>Fix (bound at this node)</strong>
+                {fixVars.length === 0 && (
+                  <div style={{ color: '#999', fontSize: 10 }}>
+                    no closed assignment for this entity type — or no assignment artefact pinned
+                  </div>
+                )}
                 {fixVars.map((v) => (
                   <label key={v.var} style={{ display: 'block', cursor: 'pointer' }}>
                     <input
