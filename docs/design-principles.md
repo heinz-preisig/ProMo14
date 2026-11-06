@@ -69,6 +69,11 @@ tokens; frames, coefficients, constants, and geometry stay neutral.**
   transferred token via the driving effort — the coefficient's own
   signature is redundant.
 
+*Encoded:* `seed.py _seed_incidence_factors` materialises `F_*`
+records token-free and strips legacy declarations at load (floor
+migration — file-level strips alone get resurrected);
+`test_graph_store` asserts neutrality.
+
 ## 5. Mass granularity is a model-objective choice
 
 `token_mass` and `token_component_mass` are **linearly dependent**:
@@ -202,3 +207,10 @@ instantiation — below.
   must qualify var identity by occurrence path
   (`host/occ-k/var`).  Prerequisite for multi-occurrence models;
   orthogonal to where the definition lives (§12).
+- `promo:Mechanism` vocabulary (§32 stage 2) — `drives`/`carries`
+  signatures pairing vars to mechanisms on shared multi-mechanism
+  boundaries; the `port-domain-ambiguous` path waits on it.
+- Seed-derived vs ruled drift — floor migrations can silently
+  re-implement superseded semantics (found 2026-11-06: F_* token
+  decls resurrected post-strip).  Review audits the seed layer
+  against the rulings, not just data files.

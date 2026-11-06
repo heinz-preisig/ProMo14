@@ -35,3 +35,9 @@ enforcement lives in the ontology and the test suite.
 - Minimal upstream fixes over downstream workarounds; root cause first.
 - Regression test for every semantic rule that's been ruled.
 - Commit messages: conventional (`feat(scope): …`).
+
+## Design review
+
+Run `.devin/workflows/design-review.md` on a regular cadence (~weekly
+or every ~10 semantic commits): audits the repo against
+`design-principles.md` and keeps the principles doc refined.
