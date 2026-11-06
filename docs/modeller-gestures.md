@@ -51,10 +51,12 @@ leaf connects it **and re-arms the target** — repeated right-clicks
 build node → node → node.  Without an explicit arm, the current
 leaf selection acts as the implicit source.
 
-An armed gesture dies on **any view change** (zoom, `◂ back`,
-breadcrumb) — cross-boundary connects must go through terminals,
-not through a forgotten arm.  **Escape** disarms and clears the
-selection.
+An armed gesture **survives view changes** (zoom, `◂ back`,
+breadcrumb) — §13, old-ProMo beginArc/finishArc parity: the armed
+source is a model IRI, not a view object.  Finishing in another
+branch mints a flat leaf→leaf arc plus an open-arc stub on every
+composite along leaf→LCA on both sides, so the arc renders inside
+each branch view.  **Escape** disarms and clears the selection.
 
 ## Panels and actions
 
@@ -71,7 +73,11 @@ selection.
 
 Read-only: pan, zoom, and descending into composites/nested references
 stay live; every mutating gesture emits `swallowed('reference view —
-read-only')`. `◂ back` in the header returns to the host view.
+read-only')` — with one exception: an **armed connect completes** on
+a leaf here, minting a host-owned arc to the foreign endpoint (the
+ref is untouched; the host stub lands on the ref shell).  No chained
+re-arm from a foreign leaf.  `◂ back` in the header returns to the
+host view.
 
 ## Palette (Submodels)
 
