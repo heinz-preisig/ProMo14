@@ -220,6 +220,8 @@ def test_extract_submodel(client):
     by_id = {c["treeId"]: c for c in host["composites"]}
     assert by_id[comp_id]["refersTo"] == "https://example.org/sub"
     assert by_id[comp_id]["parentTreeId"] == 0
+    # occurrence keeps its own name — "Inner" is the artefact's name
+    assert by_id[comp_id]["label"] == "Group"
     open_arc = by_id[comp_id]["openArcs"][0]
     assert open_arc["iri"] == f"{MODEL}Arc_1"
     assert open_arc["externalIri"] == f"{MODEL}Node_1"

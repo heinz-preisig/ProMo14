@@ -721,7 +721,11 @@ def extract_submodel(
 
     kept_comps.append(CompositeDoc(
         treeId=new_comp_id,
-        label=req.label or "Submodel",
+        # Occurrence keeps its own name — req.label names the
+        # ARTEFACT.  Multi-root selections have no single
+        # occurrence name, so they fall back to req.label.
+        label=(by_id[roots[0]].label if len(roots) == 1 else req.label)
+              or "Submodel",
         parentTreeId=parent_id,
         children=[], layout={}, knots={},
         openArcs=host_open,
