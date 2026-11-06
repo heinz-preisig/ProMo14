@@ -1066,15 +1066,20 @@ export default function App() {
           )}
           {/* §13/§14 port demands this connection would feed (advisory) */}
           {portSat && [portSat.source, portSat.target].some(
-              (s) => s.ports.length > 0) && (
+              (s) => s.ports.length > 0 || !s.has_assignment) && (
             <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 8 }}>
               <strong style={{ fontSize: 12 }}>Ports</strong>
               {[portSat.source, portSat.target].map((side) =>
-                side.ports.length === 0 ? null : (
+                (side.ports.length === 0 && side.has_assignment) ? null : (
                   <div key={side.entity_type} style={{ marginTop: 2 }}>
                     <span style={{ color: '#666' }}>
                       {side.entity_type.split(/[/#]/).pop()}
                     </span>
+                    {!side.has_assignment && (
+                      <div style={{ color: '#888', paddingLeft: 6 }}>
+                        no assignment
+                      </div>
+                    )}
                     {side.ports.map((p) => {
                       const frag = (iri: string) =>
                         iri.split(/[/#]/).pop() ?? iri
