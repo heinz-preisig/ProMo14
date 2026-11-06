@@ -237,6 +237,29 @@ export default function App() {
     }
   }, [state.tree.nextId, state.currentViewNodeId, state.viewRefIri, state.refStates])
 
+  // Stamp semantics (repeated structures): the artefact is a template —
+  // its subtree is deep-copied inline with fresh tree ids and fresh
+  // {graph}/Node_{id} leaf IRIs.  No refersTo, no interface: copies
+  // connect with ordinary arcs and are fully editable/deletable.
+  const insertCopy = useCallback(async (line: CatalogueLine) => {
+    if (state.viewRefIri !== null) return   // reference view is read-only
+    try {
+      const doc = await loadModelDoc(line.iri)
+      dispatch({
+        type: 'insertStamped',
+        id: state.tree.nextId + 1,
+        label: line.label,
+        parentViewNodeId: state.currentViewNodeId,
+        x: 0,
+        y: 0,
+        stamped: deserializeState(doc),
+        graphIri: GRAPH_IRI!,
+      })
+    } catch (err) {
+      console.error('Failed to stamp copy:', err)
+    }
+  }, [state.tree.nextId, state.currentViewNodeId, state.viewRefIri])
+
   const NODE_TYPES = useMemo(() => catalogue.getBaseEntities()
     .filter((entity) => behaviourEntityTypes.has(entity.iri))
     .map((entity) => {
@@ -695,14 +718,14 @@ export default function App() {
 
           <div style={{ marginTop: 8, borderTop: '1px solid #ccc', paddingTop: 8 }}>
             <strong style={{ fontSize: 12 }}>Submodels</strong>
-            <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Click to insert a referenced composite</div>
+            <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>Click to stamp a copy — Ctrl+click for a live reference</div>
             {modelArtefacts.map((l) => {
               const iface = ifaceSummary.get(l.iri)
               const frag = (iri: string) => iri.split(/[/#]/).pop() ?? iri
               return (
                 <button
                   key={l.iri}
-                  onClick={() => insertReferenced(l)}
+                  onClick={(e) => e.ctrlKey ? insertReferenced(l) : insertCopy(l)}
                   onMouseEnter={() => loadInterface(l.iri)}
                   title={`${l.iri}${l.referencedBy.length ? ` — referenced by ${l.referencedBy.length}` : ''}`}
                   style={{

@@ -1,4 +1,5 @@
 import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc, Knot, CompositeRef } from '../types'
+import { modelNodeIri, modelArcIri } from '@promo/semantic'
 import { createTree, TreeOps } from '../tree/Tree'
 import { arcCarrier, ModelGraphOps } from '../model/ModelGraph'
 
@@ -98,6 +99,7 @@ export type Command =
   | { type: 'toggleNodeFix'; iri: string; varIri: string }
   | { type: 'setCompositeRef'; treeNodeId: number; ref: CompositeRef | null }
   | { type: 'insertReferencedComposite'; id: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[] }
+  | { type: 'insertStamped'; id: number; label: string; parentViewNodeId: number; x: number; y: number; stamped: AppState; graphIri: string }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -452,6 +454,111 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         compositeRefs,
         openArcs: nextOpenArcs,
         layoutStore: nextLayouts,
+        selectedVisibleNodeId: String(cmd.id),
+        selectedVisibleNodeIds: [String(cmd.id)],
+        selectedModelArcIri: null,
+      }
+    }
+
+    case 'insertStamped': {
+      // Stamp semantics: deep-copy the artefact's subtree into the
+      // host — fresh tree ids and fresh {graph}/Node_{id} leaf IRIs
+      // per insert.  The copy is ordinary host content: connectable
+      // by plain arcs, deletable, editable.  The artefact becomes a
+      // template, not a live reference — no refersTo, no interface.
+      const stamped = cmd.stamped
+      const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
+      const nextTree = new TreeOps(state.tree)
+      const compositeRefs = new Map(state.compositeRefs)
+      const nextOpenArcs = new Map(state.openArcs)
+      const nextLayouts = new Map(state.layoutStore)
+      const nextKnots = new Map(state.knotStore)
+      const speciesAliases = new Map(state.speciesAliases)
+
+      nextTree.addChild(cmd.parentViewNodeId, cmd.label, undefined, cmd.id)
+      const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
+      viewLayouts.set(String(cmd.id), { x: cmd.x, y: cmd.y })
+      nextLayouts.set(cmd.parentViewNodeId, viewLayouts)
+
+      // Pass 1 — BFS: allocate fresh tree ids for the stamped subtree.
+      const idMap = new Map<number, number>()
+      const order: Array<{ oldId: number; newId: number; parent: number }> = []
+      const queue: Array<{ oldId: number; parent: number }> =
+        (stamped.tree.nodes.get(stamped.tree.rootId)?.children ?? [])
+          .map((oldId) => ({ oldId, parent: cmd.id }))
+      let alloc = cmd.id
+      while (queue.length) {
+        const { oldId, parent } = queue.shift()!
+        const newId = ++alloc
+        idMap.set(oldId, newId)
+        order.push({ oldId, newId, parent })
+        for (const ch of stamped.tree.nodes.get(oldId)?.children ?? [])
+          queue.push({ oldId: ch, parent: newId })
+      }
+
+      // Pass 2 — rebuild the subtree; fresh leaf IRIs keyed to new ids.
+      const iriMap = new Map<string, string>()
+      for (const { oldId, newId, parent } of order) {
+        const old = stamped.tree.nodes.get(oldId)!
+        const freshIri = old.iri ? modelNodeIri(cmd.graphIri, newId) : undefined
+        if (old.iri) iriMap.set(old.iri, freshIri!)
+        nextTree.addChild(parent, old.label, freshIri, newId)
+        const mn = old.iri ? stamped.modelNodes.get(old.iri) : undefined
+        if (mn && freshIri) {
+          const node = modelGraph.insertNode(freshIri, mn.entityType, mn.label)
+          node.speciesAllocation = mn.speciesAllocation
+          node.reactions = mn.reactions
+          node.fixes = mn.fixes
+        }
+      }
+
+      // Pass 3 — internal arcs, remapped endpoints, fresh arc IRIs.
+      const arcIriMap = new Map<string, string>()
+      for (const arc of stamped.modelArcs.values()) {
+        const source = iriMap.get(arc.sourceIri)
+        const target = iriMap.get(arc.targetIri)
+        if (!source || !target) continue
+        const freshArc = modelArcIri(cmd.graphIri, modelGraph.getArcCounter())
+        const a = modelGraph.insertArc(
+          freshArc, source, target, arc.arcType, arc.referenceFrom, arc.referenceTo)
+        a.permeable = arc.permeable
+        arcIriMap.set(arc.iri, freshArc)
+      }
+
+      // Pass 4 — per-composite bookkeeping follows the id remap.
+      for (const [oldId, newId] of idMap) {
+        const ref = stamped.compositeRefs.get(oldId)
+        if (ref) compositeRefs.set(newId, {
+          refersTo: ref.refersTo,
+          overrides: { ...ref.overrides },
+          dissolvedFrom: ref.dissolvedFrom,
+        })
+        const oa = stamped.openArcs.get(oldId)
+        if (oa) nextOpenArcs.set(newId, oa.map((a) => ({
+          ...a, externalIri: iriMap.get(a.externalIri) ?? a.externalIri,
+        })))
+        const lay = stamped.layoutStore.get(oldId)
+        if (lay) nextLayouts.set(newId, new Map(
+          [...lay].map(([vid, p]) => [String(idMap.get(Number(vid)) ?? vid), p])))
+        const knots = stamped.knotStore.get(oldId)
+        if (knots) nextKnots.set(newId, new Map(
+          [...knots].map(([airi, ks]) => [arcIriMap.get(airi) ?? airi, ks])))
+      }
+      for (const [k, v] of stamped.speciesAliases)
+        if (!speciesAliases.has(k)) speciesAliases.set(k, v)
+
+      return {
+        ...state,
+        modelNodes: modelGraph.getNodes(),
+        modelArcs: modelGraph.getArcs(),
+        tree: nextTree.getState(),
+        layoutStore: nextLayouts,
+        openArcs: nextOpenArcs,
+        knotStore: nextKnots,
+        compositeRefs,
+        speciesAliases,
+        speciesPin: state.speciesPin ?? stamped.speciesPin,
+        arcCounter: modelGraph.getArcCounter(),
         selectedVisibleNodeId: String(cmd.id),
         selectedVisibleNodeIds: [String(cmd.id)],
         selectedModelArcIri: null,
