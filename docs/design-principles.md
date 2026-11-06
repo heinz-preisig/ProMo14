@@ -176,6 +176,28 @@ consumer needs it (`refersTo` into a sub-part, per-occurrence override
 keying).  Load-bearing gap is occurrence-path namespacing at
 instantiation — below.
 
+## 13. Arcs bind only leaf entities — open arcs preserve the invariant
+
+**Ruled 2026-11-06** (the openArc mechanism is a basic principle that
+"got forgotten over time"; it is construction, not bookkeeping):
+
+- The model is a **flat graph of basic entities**: `ModelArc` endpoints
+  are always *leaf* node IRIs — never a composite, never the view.
+- The tree is an **overlaid hierarchy** for making large models
+  manageable — a view organisation, not a parallel node layer.
+- An **open arc** arises when a leaf-bound arc's far endpoint falls
+  outside the current view's scope (zoom into a composite where an
+  inside leaf is connected outward): the end "is not defined" *in that
+  view*, so the arc renders open as a boundary stub/terminal.
+- Completing a stub binds the open end to a **leaf inside** — the arc
+  is re-rooted to a real leaf↔leaf connection, never to the composite.
+  The mechanism is what lets the overlaid hierarchy exist without ever
+  violating the flat-graph invariant.
+
+*Encoded:* `ModelArc.sourceIri/targetIri` = leaf IRIs;
+`CompositeDoc.openArcs` carries the boundary terminals;
+`reconnectOpenArc` resolves a stub to an inside leaf.
+
 ---
 
 ## Open deviations / known gaps
