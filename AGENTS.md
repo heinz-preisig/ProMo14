@@ -25,8 +25,8 @@ enforcement lives in the ontology and the test suite.
   carries literal numbers only.  Computed values → `initialise`-class
   equations.
 - After any frontend source edit, rebuild the dist before the user
-  refreshes: `source ~/.nvm/nvm.sh && npm run build -w @promo/<app>`
-  (hub serves `apps/*/dist`, not Vite sources).
+  refreshes: `npm run build -w @promo/<app>` (source nvm first on
+  machines that have it; hub serves `apps/*/dist`, not Vite sources).
 - Writes need `?graph=` on `editable_param` endpoints; reads take
   lenient `graph_param` and resolve across the artefact's scope.
 
