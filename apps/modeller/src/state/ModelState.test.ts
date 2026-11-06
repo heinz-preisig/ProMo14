@@ -291,6 +291,35 @@ describe('applyCommand', () => {
       expect(state.modelArcs.size).toBe(2)
     })
 
+    it('mints ids/IRIs inside the reducer — interleaved dispatches cannot collide', () => {
+      // Two palette inserts dispatched from the SAME captured state
+      // (the async-interleave case): the reducer must still allocate
+      // distinct wrapper ids.
+      let state = initialState
+      const stampedDoc = deserializeState(stampDoc())
+      const first = applyCommand(state, {
+        type: 'insertStamped', label: 'a', parentViewNodeId: 0, x: 0, y: 0,
+        stamped: stampedDoc, graphIri: 'host',
+      })
+      const second = applyCommand(first, {
+        type: 'insertStamped', label: 'b', parentViewNodeId: 0, x: 0, y: 0,
+        stamped: stampedDoc, graphIri: 'host',
+      })
+      expect(second.tree.rootId).toBeDefined()
+      expect(second.tree.nodes.size).toBe(initialState.tree.nodes.size + 10)   // 5 per stamp
+
+      // Same for arcs: two connects dispatching from the same snapshot
+      // mint distinct arc IRIs.
+      state = applyCommand(state, { type: 'insertNode', id: 1, iri: 'g/N1', label: 'A', entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0 })
+      state = applyCommand(state, { type: 'insertNode', id: 2, iri: 'g/N2', label: 'B', entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0 })
+      const snap = state   // shared capture, as the adapter closes over
+      const a = applyCommand(snap, { type: 'insertArc', graphIri: 'g', sourceIri: 'g/N1', targetIri: 'g/N2', arcType: TF })
+      const b = applyCommand(a, { type: 'insertArc', graphIri: 'g', sourceIri: 'g/N1', targetIri: 'g/N2', arcType: TF })
+      const iris = [...b.modelArcs.keys()]
+      expect(iris.length).toBe(2)
+      expect(new Set(iris).size).toBe(2)
+    })
+
     it('copied children render as selectable view nodes inside the group', () => {
       let state = stamped()
       // zoom into the stamped 'Sub' composite (new id 4)

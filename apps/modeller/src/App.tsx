@@ -218,7 +218,6 @@ export default function App() {
       dispatch({ type: 'setRefStates', states: refs })
       dispatch({
         type: 'insertReferencedComposite',
-        id: state.tree.nextId + 1,
         label: line.label,
         parentViewNodeId: state.currentViewNodeId,
         x: 0,
@@ -263,7 +262,6 @@ export default function App() {
       }
       dispatch({
         type: 'insertStamped',
-        id: state.tree.nextId + 1,
         label: line.label,
         parentViewNodeId: state.currentViewNodeId,
         x: 0,

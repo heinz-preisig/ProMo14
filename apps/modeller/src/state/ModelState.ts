@@ -72,7 +72,7 @@ export type Command =
   | { type: 'insertNode'; id: number; iri: string; label: string; entityType: NodeType; parentViewNodeId: number; x: number; y: number }
   | { type: 'deleteNode'; visibleNodeId: string; treeNodeId: number; modelNodeIri?: string }
   | { type: 'deleteNodes'; nodes: { visibleNodeId: string; treeNodeId: number; modelNodeIri?: string }[] }
-  | { type: 'insertArc'; iri: string; sourceIri: string; targetIri: string; arcType: ArcType; referenceFrom?: string; referenceTo?: string }
+  | { type: 'insertArc'; iri?: string; graphIri?: string; sourceIri: string; targetIri: string; arcType: ArcType; referenceFrom?: string; referenceTo?: string }
   | { type: 'deleteArc'; iri: string }
   | { type: 'reverseArcOrientation'; iri: string }
   | { type: 'moveNode'; viewNodeId: number; nodeId: string; x: number; y: number }
@@ -98,8 +98,8 @@ export type Command =
   | { type: 'setSpeciesPin'; iri: string | null }
   | { type: 'toggleNodeFix'; iri: string; varIri: string }
   | { type: 'setCompositeRef'; treeNodeId: number; ref: CompositeRef | null }
-  | { type: 'insertReferencedComposite'; id: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[] }
-  | { type: 'insertStamped'; id: number; label: string; parentViewNodeId: number; x: number; y: number; stamped: AppState; graphIri: string }
+  | { type: 'insertReferencedComposite'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[] }
+  | { type: 'insertStamped'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; stamped: AppState; graphIri: string }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -240,7 +240,12 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
 
     case 'insertArc': {
       const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
-      modelGraph.insertArc(cmd.iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceFrom, cmd.referenceTo)
+      // The IRI is minted here, not at dispatch time — async connect
+      // resolutions can interleave and must not share a captured
+      // counter.  Callers pass an explicit iri only when carrying a
+      // template IRI (open-arc reconnect, stamped copies).
+      const iri = cmd.iri ?? modelArcIri(cmd.graphIri!, modelGraph.getArcCounter())
+      modelGraph.insertArc(iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceFrom, cmd.referenceTo)
 
       return {
         ...state,
@@ -249,7 +254,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         arcCounter: modelGraph.getArcCounter(),
         selectedVisibleNodeId: null,
         selectedVisibleNodeIds: [],
-        selectedModelArcIri: cmd.iri,
+        selectedModelArcIri: iri,
       }
     }
 
@@ -423,18 +428,22 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       // arcs, copied verbatim — externalIri is the submodel-internal
       // endpoint, which never resolves in this tree → renders as a
       // terminal stub) becomes its connectable terminals.
+      // The id is allocated HERE — the artefact doc fetch is async
+      // and a second palette insert could interleave on a stale
+      // nextId captured at click time.
+      const id = cmd.id ?? state.tree.nextId + 1
       const nextTree = new TreeOps(state.tree)
-      nextTree.addChild(cmd.parentViewNodeId, cmd.label, undefined, cmd.id)
+      nextTree.addChild(cmd.parentViewNodeId, cmd.label, undefined, id)
 
       const compositeRefs = new Map(state.compositeRefs)
-      compositeRefs.set(cmd.id, { refersTo: cmd.refersTo, overrides: {} })
+      compositeRefs.set(id, { refersTo: cmd.refersTo, overrides: {} })
 
       const nextOpenArcs = new Map(state.openArcs)
-      if (cmd.terminals.length) nextOpenArcs.set(cmd.id, cmd.terminals)
+      if (cmd.terminals.length) nextOpenArcs.set(id, cmd.terminals)
 
       const nextLayouts = new Map(state.layoutStore)
       const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
-      viewLayouts.set(String(cmd.id), { x: cmd.x, y: cmd.y })
+      viewLayouts.set(String(id), { x: cmd.x, y: cmd.y })
       nextLayouts.set(cmd.parentViewNodeId, viewLayouts)
 
       return {
@@ -443,8 +452,8 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         compositeRefs,
         openArcs: nextOpenArcs,
         layoutStore: nextLayouts,
-        selectedVisibleNodeId: String(cmd.id),
-        selectedVisibleNodeIds: [String(cmd.id)],
+        selectedVisibleNodeId: String(id),
+        selectedVisibleNodeIds: [String(id)],
         selectedModelArcIri: null,
       }
     }
@@ -464,9 +473,13 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const nextKnots = new Map(state.knotStore)
       const speciesAliases = new Map(state.speciesAliases)
 
-      nextTree.addChild(cmd.parentViewNodeId, cmd.label, undefined, cmd.id)
+      // Same async-interleave rule as insertReferencedComposite —
+      // the wrapper id is allocated on the fresh state, not the
+      // click-time capture.
+      const id = cmd.id ?? state.tree.nextId + 1
+      nextTree.addChild(cmd.parentViewNodeId, cmd.label, undefined, id)
       const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
-      viewLayouts.set(String(cmd.id), { x: cmd.x, y: cmd.y })
+      viewLayouts.set(String(id), { x: cmd.x, y: cmd.y })
       nextLayouts.set(cmd.parentViewNodeId, viewLayouts)
 
       // Pass 1 — BFS: allocate fresh tree ids for the stamped subtree.
@@ -474,8 +487,8 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const order: Array<{ oldId: number; newId: number; parent: number }> = []
       const queue: Array<{ oldId: number; parent: number }> =
         (stamped.tree.nodes.get(stamped.tree.rootId)?.children ?? [])
-          .map((oldId) => ({ oldId, parent: cmd.id }))
-      let alloc = cmd.id
+          .map((oldId) => ({ oldId, parent: id }))
+      let alloc = id
       while (queue.length) {
         const { oldId, parent } = queue.shift()!
         const newId = ++alloc
@@ -538,10 +551,10 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       // The stamped root's own view bookkeeping maps onto the wrapper —
       // without it the copy's children lose their template positions.
       const rootLay = stamped.layoutStore.get(stamped.tree.rootId)
-      if (rootLay) nextLayouts.set(cmd.id, new Map(
+      if (rootLay) nextLayouts.set(id, new Map(
         [...rootLay].map(([vid, p]) => [String(idMap.get(Number(vid)) ?? vid), p])))
       const rootKnots = stamped.knotStore.get(stamped.tree.rootId)
-      if (rootKnots) nextKnots.set(cmd.id, new Map(
+      if (rootKnots) nextKnots.set(id, new Map(
         [...rootKnots].map(([airi, ks]) => [arcIriMap.get(airi) ?? airi, ks])))
       for (const [k, v] of stamped.speciesAliases)
         if (!speciesAliases.has(k)) speciesAliases.set(k, v)
@@ -558,8 +571,8 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         speciesAliases,
         speciesPin: state.speciesPin ?? stamped.speciesPin,
         arcCounter: modelGraph.getArcCounter(),
-        selectedVisibleNodeId: String(cmd.id),
-        selectedVisibleNodeIds: [String(cmd.id)],
+        selectedVisibleNodeId: String(id),
+        selectedVisibleNodeIds: [String(id)],
         selectedModelArcIri: null,
       }
     }

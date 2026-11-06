@@ -4,7 +4,7 @@ import type { Stage as KonvaStage } from 'konva/lib/Stage'
 import type { AppState, Command } from '../state/ModelState'
 import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
-import { resolveConnectionAsync, pickArcType, modelNodeIri, modelArcIri } from '@promo/semantic'
+import { resolveConnectionAsync, pickArcType, modelNodeIri } from '@promo/semantic'
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
@@ -121,16 +121,17 @@ export function useCanvasEvents(
       o.source.entityType, o.target.entityType, catalogue, ruleResolver)
     const arcType = pickArcType(result, activeArcType)
     if (!arcType) return
-    const arcIri = modelArcIri(GRAPH_IRI!, state.arcCounter)
     const orientation = defaultOrientation(
       arcType, o.source.modelIri, o.target.modelIri,
       isTransportEntity(o.source.entityType, catalogue),
       isTransportEntity(o.target.entityType, catalogue),
       transportArcs(o.source.modelIri, o.target.modelIri),
     )
+    // No iri — the reducer mints on its fresh arcCounter, so two
+    // interleaved resolves cannot collide.
     dispatch({
       type: 'insertArc',
-      iri: arcIri,
+      graphIri: GRAPH_IRI!,
       sourceIri: o.source.modelIri,
       targetIri: o.target.modelIri,
       arcType,
