@@ -85,7 +85,9 @@ export type Command =
   | { type: 'groupNodes'; parentViewNodeId: number; treeNodeIds: number[]; label?: string }
   | { type: 'setNodeLabel'; treeNodeId: number; label: string }
   | { type: 'ungroup'; treeNodeId: number }
-  | { type: 'reconnectOpenArc'; openArcIri: string; newModelNodeIri: string }
+  | { type: 'reconnectOpenArc'; openArcIri: string; newModelNodeIri: string; arcType?: string }
+  | { type: 'exposeTerminal'; iri: string; compositeId: number; modelNodeIri: string; entityType: string }
+  | { type: 'unexposeTerminal'; compositeId: number; openArcIri: string }
   | { type: 'moveKnot'; arcIri: string; knotIndex: number; x: number; y: number }
   | { type: 'addKnot'; arcIri: string; x: number; y: number }
   | { type: 'removeKnot'; arcIri: string; knotIndex: number }
@@ -232,6 +234,34 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         selectedVisibleNodeIds: [],
         selectedModelArcIri: cmd.iri,
       }
+    }
+
+    case 'exposeTerminal': {
+      // §22 authored interface: declaring a leaf as a terminal appends
+      // an open-arc record on the leaf's owning composite.  arcType
+      // and direction stay undecided — reconnectOpenArc resolves them
+      // at bind time.  Idempotent per node.
+      const nextOpenArcs = new Map(state.openArcs)
+      const list = nextOpenArcs.get(cmd.compositeId) ?? []
+      if (list.some((a) => a.externalIri === cmd.modelNodeIri)) return state
+      nextOpenArcs.set(cmd.compositeId, [...list, {
+        iri: cmd.iri,
+        externalIri: cmd.modelNodeIri,
+        arcType: '',
+        isSource: false,
+        externalEntityType: cmd.entityType,
+      }])
+      return { ...state, openArcs: nextOpenArcs, arcCounter: state.arcCounter + 1 }
+    }
+
+    case 'unexposeTerminal': {
+      const list = state.openArcs.get(cmd.compositeId) ?? []
+      const kept = list.filter((a) => a.iri !== cmd.openArcIri)
+      if (kept.length === list.length) return state
+      const nextOpenArcs = new Map(state.openArcs)
+      if (kept.length) nextOpenArcs.set(cmd.compositeId, kept)
+      else nextOpenArcs.delete(cmd.compositeId)
+      return { ...state, openArcs: nextOpenArcs }
     }
 
     case 'reverseArcOrientation': {
@@ -468,7 +498,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const referenceTo = openArc.refToExternal === undefined
         ? undefined
         : openArc.refToExternal ? openArc.externalIri : cmd.newModelNodeIri
-      modelGraph.insertArc(openArc.iri, sourceIri, targetIri, openArc.arcType as ArcType, referenceFrom, referenceTo)
+      modelGraph.insertArc(openArc.iri, sourceIri, targetIri, (cmd.arcType || openArc.arcType) as ArcType, referenceFrom, referenceTo)
 
       const nextOpenArcs = new Map(state.openArcs)
       const remaining = openForView.filter((a) => a.iri !== cmd.openArcIri)

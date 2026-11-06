@@ -603,6 +603,7 @@ export function useCanvasEvents(
                 type: 'reconnectOpenArc',
                 openArcIri: obj.openArcIri,
                 newModelNodeIri: targetNode.modelNodeIri,
+                arcType,
               })
             }
             break

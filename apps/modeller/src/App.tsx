@@ -3,7 +3,7 @@ import { Stage, Layer, Line, Group, Rect } from 'react-konva'
 import type Konva from 'konva'
 import type { NodeType, ArcType, OpenArc } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
-import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue, childIri } from '@promo/semantic'
+import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue, childIri, modelArcIri } from '@promo/semantic'
 import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityTokens, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
 import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
@@ -938,6 +938,61 @@ export default function App() {
                     <span style={{ color: '#999' }}> · {v.role}</span>
                   </label>
                 ))}
+              </div>
+            )
+          })()}
+          {selectedVisibleNode?.type === 'leaf' &&
+            !!selectedVisibleNode.modelNodeIri && (() => {
+            const sel = state.modelNodes.get(selectedVisibleNode.modelNodeIri!)
+            if (!sel || selectedVisibleNode.treeNodeId === undefined) return null
+            const parentId = state.tree.nodes
+              .get(selectedVisibleNode.treeNodeId)?.parentId
+            if (parentId === null || parentId === undefined) return null
+            const exposed = (state.openArcs.get(parentId) ?? [])
+              .find((a) => a.externalIri === sel.iri)
+            return (
+              <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
+                <strong style={{ fontSize: 12 }}>Terminal</strong>
+                {exposed ? (
+                  <button
+                    onClick={() => dispatch({
+                      type: 'unexposeTerminal',
+                      compositeId: parentId,
+                      openArcIri: exposed.iri,
+                    })}
+                    style={{
+                      fontSize: 12, width: '100%', marginTop: 4,
+                      padding: '4px 6px', cursor: 'pointer',
+                      background: '#fff3e0', border: '1px solid #e0a050',
+                      borderRadius: 4,
+                    }}
+                  >
+                    Remove terminal
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => dispatch({
+                      type: 'exposeTerminal',
+                      iri: modelArcIri(GRAPH_IRI!, state.arcCounter),
+                      compositeId: parentId,
+                      modelNodeIri: sel.iri,
+                      entityType: sel.entityType,
+                    })}
+                    style={{
+                      fontSize: 12, width: '100%', marginTop: 4,
+                      padding: '4px 6px', cursor: 'pointer',
+                      background: '#fff', border: '1px solid #bbb',
+                      borderRadius: 4,
+                    }}
+                  >
+                    Expose as terminal
+                  </button>
+                )}
+                <div style={{ color: '#888', marginTop: 2 }}>
+                  {exposed
+                    ? 'on the interface — binds at occurrences'
+                    : 'puts this node on the current view’s interface'}
+                </div>
               </div>
             )
           })()}
