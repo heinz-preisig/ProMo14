@@ -199,13 +199,39 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const compositeRefs = new Map(state.compositeRefs)
       const nextOpenArcs = new Map(state.openArcs)
       const nextLayouts = new Map(state.layoutStore)
+      // Subtree cascade: a composite victim takes its descendants —
+      // leaf model nodes, per-composite ref/terminal/layout state.
+      const victimTreeIds = new Set<number>()
       for (const node of cmd.nodes) {
-        if (node.modelNodeIri) modelGraph.deleteNode(node.modelNodeIri)
-        nextTree.removeNode(node.treeNodeId)
-        compositeRefs.delete(node.treeNodeId)
-        nextOpenArcs.delete(node.treeNodeId)
+        victimTreeIds.add(node.treeNodeId)
+        for (const id of nextTree.getDescendants(node.treeNodeId))
+          victimTreeIds.add(id)
         for (const layouts of nextLayouts.values())
           layouts.delete(node.visibleNodeId)
+      }
+      // Fewest descendants first → parents empty before removal.
+      const depth = new Map(
+        [...victimTreeIds].map((id) => [id, nextTree.getDescendants(id).length]))
+      const ordered = [...victimTreeIds]
+        .sort((a, b) => depth.get(a)! - depth.get(b)!)
+      const deadModelIris = new Set<string>()
+      for (const id of ordered) {
+        const iri = state.tree.nodes.get(id)?.iri
+        if (iri && state.modelNodes.has(iri)) {
+          modelGraph.deleteNode(iri)
+          deadModelIris.add(iri)
+        }
+        nextTree.removeNode(id)
+        compositeRefs.delete(id)
+        nextOpenArcs.delete(id)
+        nextLayouts.delete(id)
+      }
+      // Terminals declaring a deleted leaf would dangle — drop them.
+      for (const [cid, list] of nextOpenArcs) {
+        const kept = list.filter((a) => !deadModelIris.has(a.externalIri))
+        if (kept.length !== list.length)
+          if (kept.length) nextOpenArcs.set(cid, kept)
+          else nextOpenArcs.delete(cid)
       }
       return {
         ...state,

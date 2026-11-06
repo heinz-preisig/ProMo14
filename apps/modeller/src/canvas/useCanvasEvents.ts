@@ -652,7 +652,8 @@ export function useCanvasEvents(
       const nodes = state.selectedVisibleNodeIds
         .map((id) => graphView.nodes.find((n) => n.id === id))
         .filter((n): n is NonNullable<typeof n> =>
-          n !== undefined && n.type === 'leaf' && n.treeNodeId !== undefined)
+          n !== undefined && n.treeNodeId !== undefined
+          && (n.type === 'leaf' || n.type === 'composite'))
         .map((n) => ({
           visibleNodeId: n.id,
           treeNodeId: n.treeNodeId!,
