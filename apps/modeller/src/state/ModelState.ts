@@ -110,6 +110,94 @@ function findCompositeForOpenArc(openArcs: Map<number, OpenArc[]>, iri: string):
   return undefined
 }
 
+/** Drop open-arc entries failing `keep`; emptied lists go with them. */
+function purgeOpenArcs(
+  openArcs: Map<number, OpenArc[]>,
+  keep: (a: OpenArc) => boolean,
+): Map<number, OpenArc[]> {
+  const next = new Map<number, OpenArc[]>()
+  for (const [cid, list] of openArcs) {
+    const kept = list.filter(keep)
+    if (kept.length) next.set(cid, kept)
+  }
+  return next
+}
+
+/** §13: an arc whose endpoints sit in different branches must carry
+ *  an open-arc stub on every composite along leaf→LCA on both
+ *  sides — otherwise it renders nowhere inside the branch views.
+ *  A foreign endpoint (a leaf inside a referenced artefact) binds at
+ *  the ref occurrence the view was in; several occurrences of one
+ *  artefact share the refersTo → first match, same caveat as the
+ *  back button.  Returns null when no boundary is crossed. */
+function boundaryStubs(
+  state: AppState,
+  arcIri: string,
+  sourceIri: string,
+  targetIri: string,
+  arcType: string,
+  referenceTo?: string,
+): Map<number, OpenArc[]> | null {
+  const leafOf = (iri: string): number | null => {
+    for (const [id, n] of state.tree.nodes)
+      if (n.children.length === 0 && n.iri === iri) return id
+    return null
+  }
+  const parentOf = (id: number | null): number | null =>
+    id === null ? null : state.tree.nodes.get(id)?.parentId ?? null
+  const refShellId = (): number | null => {
+    if (!state.viewRefIri) return null
+    for (const [id, r] of state.compositeRefs)
+      if (r.refersTo === state.viewRefIri) return id
+    return null
+  }
+  // Walk start: a host leaf starts at its parent composite; a
+  // foreign endpoint starts AT the ref shell — its boundary is crossed.
+  const startOf = (iri: string): number | null => {
+    const leaf = leafOf(iri)
+    return leaf !== null ? parentOf(leaf) : refShellId()
+  }
+  const srcStart = startOf(sourceIri)
+  const tgtStart = startOf(targetIri)
+  if (srcStart === null || tgtStart === null) return null
+
+  const srcAnc = new Set<number>()
+  for (let c: number | null = srcStart; c !== null; c = parentOf(c)) srcAnc.add(c)
+  let lca: number | null = null
+  for (let c: number | null = tgtStart; c !== null; c = parentOf(c))
+    if (srcAnc.has(c)) { lca = c; break }
+  if (lca === null) return null
+
+  const entityTypeOf = (iri: string) =>
+    state.modelNodes.get(iri)?.entityType
+    ?? (state.viewRefIri
+        ? state.refStates.get(state.viewRefIri)?.modelNodes.get(iri)?.entityType
+        : undefined)
+  // refToExternal — does the reference direction point at the
+  // external node (same convention as extract's host stubs).
+  const refTo = referenceTo ?? targetIri
+  const openArcs = new Map(state.openArcs)
+  let touched = false
+  const add = (comp: number, external: string, insideIsSource: boolean) => {
+    const list = openArcs.get(comp) ?? []
+    if (list.some((a) => a.iri === arcIri)) return
+    openArcs.set(comp, [...list, {
+      iri: arcIri,
+      externalIri: external,
+      arcType,
+      isSource: insideIsSource,
+      refToExternal: refTo === external,
+      externalEntityType: entityTypeOf(external),
+    }])
+    touched = true
+  }
+  for (let c: number | null = srcStart; c !== null && c !== lca; c = parentOf(c))
+    add(c, targetIri, true)
+  for (let c: number | null = tgtStart; c !== null && c !== lca; c = parentOf(c))
+    add(c, sourceIri, false)
+  return touched ? openArcs : null
+}
+
 // ─── Pure reducer ───
 export function applyCommand(state: AppState, cmd: Command): AppState {
   switch (cmd.type) {
@@ -212,18 +300,22 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         nextOpenArcs.delete(id)
         nextLayouts.delete(id)
       }
-      // Terminals declaring a deleted leaf would dangle — drop them.
-      for (const [cid, list] of nextOpenArcs) {
-        const kept = list.filter((a) => !deadModelIris.has(a.externalIri))
-        if (kept.length !== list.length)
-          if (kept.length) nextOpenArcs.set(cid, kept)
-          else nextOpenArcs.delete(cid)
-      }
       // Arcs bound through a removed composite's terminals die with it —
       // otherwise they keep foreign endpoints as ghosts.
       for (const arc of modelGraph.getArcs().values())
         if (arc.via !== undefined && victimTreeIds.has(arc.via))
           modelGraph.deleteArc(arc.iri)
+      // Stubs declaring a deleted leaf or a dead arc would dangle —
+      // drop them (cross-branch stubs record the arc's own iri).
+      const deadArcIris = new Set(
+        [...state.modelArcs.keys()].filter((a) => !modelGraph.getArcs().has(a)))
+      for (const [cid, list] of nextOpenArcs) {
+        const kept = list.filter((a) =>
+          !deadModelIris.has(a.externalIri) && !deadArcIris.has(a.iri))
+        if (kept.length !== list.length)
+          if (kept.length) nextOpenArcs.set(cid, kept)
+          else nextOpenArcs.delete(cid)
+      }
       return {
         ...state,
         modelNodes: modelGraph.getNodes(),
@@ -247,10 +339,16 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const iri = cmd.iri ?? modelArcIri(cmd.graphIri!, modelGraph.getArcCounter())
       modelGraph.insertArc(iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceFrom, cmd.referenceTo)
 
+      // §13: a cross-branch arc needs a stub on every composite along
+      // leaf→LCA on both sides, or it is invisible inside the branches.
+      const openArcs = boundaryStubs(
+        state, iri, cmd.sourceIri, cmd.targetIri, cmd.arcType, cmd.referenceTo)
+
       return {
         ...state,
         modelNodes: modelGraph.getNodes(),
         modelArcs: modelGraph.getArcs(),
+        openArcs: openArcs ?? state.openArcs,
         arcCounter: modelGraph.getArcCounter(),
         selectedVisibleNodeId: null,
         selectedVisibleNodeIds: [],
@@ -298,6 +396,8 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       return {
         ...state,
         modelArcs: modelGraph.getArcs(),
+        // Boundary stubs declaring the dead arc would dangle — drop.
+        openArcs: purgeOpenArcs(state.openArcs, (a) => a.iri !== cmd.iri),
         selectedModelArcIri: null,
         selectedVisibleNodeId: null,
         selectedVisibleNodeIds: [],

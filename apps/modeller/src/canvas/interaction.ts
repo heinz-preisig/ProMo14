@@ -145,14 +145,34 @@ export function transition(
       return { ...idle, out: [cmd({ type: 'selectNode', id: null })] }
 
     case 'nodeRightClick': {
-      if (ctx.inRef) return ro()
       const n = ev.node
+      // §13 (2026-11-06): armed completion writes a HOST arc — legal
+      // inside a referenced view (the ref stays untouched; the
+      // foreign endpoint is a boundary crossing like extract's).
+      // Every other gesture in ref view stays read-only.
+      const refCompletion = ctx.inRef && mode.name === 'armed'
+        && n.kind === 'leaf' && !!n.modelNodeIri && !!n.entityType
+      if (ctx.inRef && !refCompletion) return ro()
 
       if (mode.name === 'armed') {
         if (n.kind === 'leaf' && n.modelNodeIri && n.entityType) {
           if (n.modelNodeIri === mode.source.modelIri) {
             // Right-click on the armed source: cancel the gesture.
             return { ...idle, out: [cmd({ type: 'selectNode', id: null })] }
+          }
+          if (ctx.inRef) {
+            // No chained re-arm from a foreign leaf — the next hop
+            // could bind two artefact-internal nodes, which the host
+            // must not own.  Finish and idle instead.
+            return {
+              ...idle,
+              out: [{
+                kind: 'connect',
+                source: mode.source,
+                target: { modelIri: n.modelNodeIri, entityType: n.entityType },
+                chained: false,
+              }],
+            }
           }
           // Connect and re-arm on the target — chained connect.
           return {
@@ -318,9 +338,13 @@ export function transition(
       return { next: mode, out: [swallow('r without a selected token-flow arc')] }
 
     case 'viewChanged':
-      // Navigation kills any mid-flight gesture — an armed connect
-      // must not survive into another view (cross-boundary arcs).
-      return { ...idle, out: [] }
+      // §13 (2026-11-06): an armed connect is branch-independent —
+      // old ProMo's beginArc/finishArc.  The armed source is a model
+      // IRI, not a view object, so it survives navigation; every
+      // other mid-flight gesture still dies with the view.
+      return mode.name === 'armed'
+        ? { next: mode, out: [] }
+        : { ...idle, out: [] }
   }
 }
 

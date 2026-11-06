@@ -72,11 +72,6 @@ describe('interaction automaton', () => {
     expect(conn).toMatchObject({ source: { modelIri: 'g/Node_1' }, target: { modelIri: 'g/Node_5' }, chained: false })
   })
 
-  it('viewChanged kills an armed gesture — no cross-boundary arcs', () => {
-    const r = transition(armed(), { kind: 'viewChanged' }, ctx())
-    expect(r.next).toEqual({ name: 'idle' })
-  })
-
   it('Escape disarms and clears selection', () => {
     const r = transition(armed(), { kind: 'keyEscape' }, ctx())
     expect(cmds(r.out)).toEqual(['selectNodes'])
@@ -127,5 +122,42 @@ describe('editableTarget — canvas hotkeys stay out of form controls', () => {
       asTarget({ tagName: 'DIV', isContentEditable: false }))).toBe(false)
     expect(editableTarget(asTarget({ tagName: 'CANVAS' }))).toBe(false)
     expect(editableTarget(null)).toBe(false)
+  })
+})
+
+describe('cross-branch connect — §13 begin/finishArc is branch-independent', () => {
+  it('armed survives viewChanged', () => {
+    const r = transition(armed(), { kind: 'viewChanged' }, ctx())
+    expect(r.next).toEqual(armed())
+  })
+
+  it('other mid-flight gestures still die on viewChanged', () => {
+    const m = transition(initialInteraction,
+      { kind: 'marqueeStart', point: { x: 0, y: 0 } }, ctx())
+    const r = transition(m.next, { kind: 'viewChanged' }, ctx())
+    expect(r.next.name).toBe('idle')
+  })
+
+  it('armed completes on a leaf inside ref view — host arc, no re-arm', () => {
+    const target = { kind: 'leaf' as const, id: 'f', treeNodeId: 9, modelNodeIri: 'F/Node_1', entityType: 'et:B' }
+    const r = transition(armed(), { kind: 'nodeRightClick', node: target }, ctx({ inRef: true }))
+    expect(r.next.name).toBe('idle')
+    expect(r.out).toEqual([{
+      kind: 'connect',
+      source: { modelIri: 'g/Node_1', entityType: 'et:A' },
+      target: { modelIri: 'F/Node_1', entityType: 'et:B' },
+      chained: false,
+    }])
+  })
+
+  it('armed + non-leaf target in ref view stays read-only', () => {
+    const r = transition(armed(), { kind: 'nodeRightClick', node: comp('r1') }, ctx({ inRef: true }))
+    expect(kinds(r.out)).toEqual(['swallowed'])
+  })
+
+  it('non-armed gestures in ref view stay read-only', () => {
+    const r = transition(initialInteraction,
+      { kind: 'nodeRightClick', node: leaf('f', 'F/Node_1') }, ctx({ inRef: true }))
+    expect(kinds(r.out)).toEqual(['swallowed'])
   })
 })

@@ -10,7 +10,7 @@ import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
 import { GRAPH_IRI, loadModelDoc } from '../api'
 import { refViewState } from '../modelPersistence'
-import { transition, initialInteraction, editableTarget } from './interaction'
+import { transition, editableTarget } from './interaction'
 import type { Mode, Event, Ctx, Output, NodeCtx } from './interaction'
 
 /** Root of the transport-system subtree — seeded entity type
@@ -90,12 +90,13 @@ export function useCanvasEvents(
     ? state.refStates.get(state.viewRefIri!)?.compositeRefs
     : state.compositeRefs
 
-  // Any navigation kills a mid-flight gesture — an armed connect
-  // must not produce a cross-boundary arc.  setView dispatches from
-  // several places (breadcrumb, back button, enterComposite), so
-  // watch the view inputs rather than each call site.
+  // §13 (2026-11-06): an armed connect is branch-independent — the
+  // automaton decides what survives a view change (armed stays;
+  // marquee etc. die).  setView dispatches from several places
+  // (breadcrumb, back button, enterComposite), so watch the view
+  // inputs rather than each call site.
   useEffect(() => {
-    setInteraction(initialInteraction)
+    setInteraction(transition(interaction, { kind: 'viewChanged' }, buildCtx()).next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentViewNodeId, state.viewRefIri])
 
