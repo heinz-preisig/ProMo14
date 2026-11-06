@@ -41,6 +41,10 @@ export interface ModelArc {
   /** §20 permeability (mass/species transport): the Component IRIs that
    *  pass — absent = all pass; a strict subset = semipermeable wall. */
   permeable?: string[]
+  /** Bound through this composite's openArc (terminal→leaf gesture).
+   *  Lets a delete cascade drop arcs bound to a removed occurrence —
+   *  the minimal occurrence attribution for arcs. */
+  via?: number
 }
 
 // ===========================================================================

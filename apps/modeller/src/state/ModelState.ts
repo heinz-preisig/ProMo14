@@ -167,33 +167,17 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       }
     }
 
-    case 'deleteNode': {
-      const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
-      if (cmd.modelNodeIri) {
-        modelGraph.deleteNode(cmd.modelNodeIri)
-      }
-
-      const nextTree = new TreeOps(state.tree)
-      nextTree.removeNode(cmd.treeNodeId)
-
-      // §22: a referenced composite may leave ref/terminal state behind
-      const compositeRefs = new Map(state.compositeRefs)
-      compositeRefs.delete(cmd.treeNodeId)
-      const nextOpenArcs = new Map(state.openArcs)
-      nextOpenArcs.delete(cmd.treeNodeId)
-
-      return {
-        ...state,
-        modelNodes: modelGraph.getNodes(),
-        modelArcs: modelGraph.getArcs(),
-        tree: nextTree.getState(),
-        compositeRefs,
-        openArcs: nextOpenArcs,
-        selectedVisibleNodeId: null,
-        selectedVisibleNodeIds: [],
-        selectedModelArcIri: null,
-      }
-    }
+    case 'deleteNode':
+      // Singular alias for the deleteNodes cascade — keeps composite
+      // subtree semantics in one place.
+      return applyCommand(state, {
+        type: 'deleteNodes',
+        nodes: [{
+          visibleNodeId: cmd.visibleNodeId,
+          treeNodeId: cmd.treeNodeId,
+          modelNodeIri: cmd.modelNodeIri,
+        }],
+      })
 
     case 'deleteNodes': {
       const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
@@ -235,6 +219,11 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
           if (kept.length) nextOpenArcs.set(cid, kept)
           else nextOpenArcs.delete(cid)
       }
+      // Arcs bound through a removed composite's terminals die with it —
+      // otherwise they keep foreign endpoints as ghosts.
+      for (const arc of modelGraph.getArcs().values())
+        if (arc.via !== undefined && victimTreeIds.has(arc.via))
+          modelGraph.deleteArc(arc.iri)
       return {
         ...state,
         modelNodes: modelGraph.getNodes(),
@@ -641,7 +630,10 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const referenceTo = openArc.refToExternal === undefined
         ? undefined
         : openArc.refToExternal ? openArc.externalIri : cmd.newModelNodeIri
-      modelGraph.insertArc(openArc.iri, sourceIri, targetIri, (cmd.arcType || openArc.arcType) as ArcType, referenceFrom, referenceTo)
+      const boundArc = modelGraph.insertArc(
+        openArc.iri, sourceIri, targetIri,
+        (cmd.arcType || openArc.arcType) as ArcType, referenceFrom, referenceTo)
+      boundArc.via = compositeId
 
       const nextOpenArcs = new Map(state.openArcs)
       const remaining = openForView.filter((a) => a.iri !== cmd.openArcIri)

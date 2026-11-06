@@ -331,6 +331,36 @@ describe('applyCommand', () => {
       })
       expect(state.openArcs.get(0)).toBeUndefined()
     })
+
+    it('deleting a bound occurrence drops arcs bound via its terminals', () => {
+      let state = applyCommand(initialState, {
+        type: 'insertNode', id: 1, iri: 'g/Node_1', label: 'A',
+        entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0,
+      })
+      state = applyCommand(state, {
+        type: 'insertReferencedComposite', id: 2, label: 'ref',
+        parentViewNodeId: 0, x: 0, y: 0, refersTo: 'tpl',
+        terminals: [{
+          iri: 'tpl/oa1', externalIri: 'tpl/Node_9', arcType: '',
+          isSource: false, externalEntityType: 'et:A',
+        }],
+      })
+      state = applyCommand(state, {
+        type: 'reconnectOpenArc', openArcIri: 'tpl/oa1',
+        newModelNodeIri: 'g/Node_1', arcType: TF,
+      })
+      const bound = state.modelArcs.get('tpl/oa1')
+      expect(bound?.via).toBe(2)
+      expect(bound?.sourceIri).toBe('tpl/Node_9')
+
+      state = applyCommand(state, {
+        type: 'deleteNodes',
+        nodes: [{ visibleNodeId: '2', treeNodeId: 2 }],
+      })
+      expect(state.modelArcs.get('tpl/oa1')).toBeUndefined()
+      // the host leaf's end of the binding dies with the occurrence
+      expect(state.modelNodes.has('g/Node_1')).toBe(true)
+    })
   })
 
   describe('exposeTerminal / unexposeTerminal', () => {

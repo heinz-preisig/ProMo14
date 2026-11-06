@@ -22,6 +22,10 @@ export interface ModelArcDoc {
   sourceIri: string
   targetIri: string
   arcType: string
+  /** Composite tree id whose openArc bound this arc (delete cascade).
+   *  Not yet persisted by the backend — survives frontend serialize
+   *  only. */
+  via?: number
   /** §15 reference direction (token-flow arcs); absent = draw order. */
   referenceFrom?: string
   referenceTo?: string
@@ -78,6 +82,7 @@ export function serializeState(state: AppState): ModelDocument {
   }))
 
   const arcs: ModelArcDoc[] = [...state.modelArcs.values()].map((a) => ({
+    via: a.via,
     iri: a.iri,
     sourceIri: a.sourceIri,
     targetIri: a.targetIri,

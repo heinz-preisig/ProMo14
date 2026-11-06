@@ -113,7 +113,7 @@ describe('buildScene', () => {
           sourceId: leafA.id,
           targetId: leafB.id,
           arcType: 'connection',
-          modelArcType: 'promo:ArcType2',
+          modelArcType: 'https://w3id.org/promo#ArcType2',
           knots: [{ x: 50, y: 30 }],
         }],
       }),
