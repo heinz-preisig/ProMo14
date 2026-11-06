@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { initialState, applyCommand } from './ModelState'
 import { defaultOrientation } from '../model/ModelGraph'
+import { deserializeState } from '../modelPersistence'
+import type { ModelDocument } from '../modelPersistence'
 import type { ModelArc } from '../types'
 
 const TF = 'promo:ArcType/token-flow'
@@ -202,6 +204,157 @@ describe('applyCommand', () => {
       const arc = state.modelArcs.get('promo:Arc/Arc_1')!
       expect(arc.referenceFrom).toBe('promo:Model/Node_2')
       expect(arc.referenceTo).toBe('promo:Model/Node_3')
+    })
+  })
+
+  describe('insertStamped (copy-and-integrate)', () => {
+    const stampDoc = (): ModelDocument => ({
+      rootTreeId: 1, nextTreeId: 5, arcCounter: 1,
+      nodes: [
+        { iri: 'tpl/Node_2', entityType: 'et:A', label: 'A' },
+        { iri: 'tpl/Node_3', entityType: 'et:B', label: 'B' },
+        { iri: 'tpl/Node_5', entityType: 'et:C', label: 'C' },
+      ],
+      arcs: [{
+        iri: 'tpl/Arc_1', sourceIri: 'tpl/Node_2', targetIri: 'tpl/Node_3',
+        arcType: TF, referenceFrom: 'tpl/Node_2', referenceTo: 'tpl/Node_3',
+      }],
+      composites: [
+        {
+          treeId: 1, label: 'root', parentTreeId: null,
+          children: [
+            { id: 2, iri: 'tpl/Node_2' },
+            { id: 3, iri: 'tpl/Node_3' },
+            { id: 4 },
+          ],
+          layout: { '2': { x: 10, y: 20 }, '3': { x: 30, y: 40 }, '4': { x: 50, y: 60 } },
+          knots: {}, openArcs: [],
+        },
+        {
+          treeId: 4, label: 'Sub', parentTreeId: 1,
+          children: [{ id: 5, iri: 'tpl/Node_5' }],
+          layout: { '5': { x: 1, y: 2 } }, knots: {},
+          openArcs: [{
+            iri: 'tpl/oa1', externalIri: 'tpl/Node_5', arcType: '',
+            isSource: false, externalEntityType: 'et:C',
+          }],
+        },
+      ],
+    })
+
+    const stamped = () => applyCommand(initialState, {
+      type: 'insertStamped', id: 1, label: 'tpl',
+      parentViewNodeId: 0, x: 0, y: 0,
+      stamped: deserializeState(stampDoc()), graphIri: 'host',
+    })
+
+    it('copies the subtree with fresh ids and host-minted IRIs', () => {
+      const state = stamped()
+      // wrapper composite under root
+      expect(state.tree.nodes.get(1)?.parentId).toBe(0)
+      expect(state.tree.nodes.get(1)?.label).toBe('tpl')
+      // stamped children remapped: leaves 2,3 and composite 4 (with leaf 5)
+      expect(state.tree.nodes.get(2)?.iri).toBe('host/Node_2')
+      expect(state.tree.nodes.get(4)?.children).toEqual([5])
+      expect(state.tree.nodes.get(5)?.iri).toBe('host/Node_5')
+      // model nodes minted in the host namespace — no template IRIs
+      expect(state.modelNodes.size).toBe(3)
+      expect([...state.modelNodes.keys()].every((iri) => iri.startsWith('host/Node_'))).toBe(true)
+      expect(state.selectedVisibleNodeIds).toEqual(['1'])
+    })
+
+    it('remaps arc endpoints, openArc terminals, and view layouts', () => {
+      const state = stamped()
+      expect(state.modelArcs.size).toBe(1)
+      const arc = [...state.modelArcs.values()][0]
+      expect(arc.iri).toMatch(/^host\/Arc_/)
+      expect(arc.sourceIri).toBe('host/Node_2')
+      expect(arc.targetIri).toBe('host/Node_3')
+      expect(arc.referenceFrom).toBe('host/Node_2')
+      // nested composite's terminal points at the COPIED leaf
+      expect(state.openArcs.get(4)?.[0].externalIri).toBe('host/Node_5')
+      // stamped root layout lands on the wrapper; Sub's on id 4
+      expect(state.layoutStore.get(1)?.get('2')).toEqual({ x: 10, y: 20 })
+      expect(state.layoutStore.get(4)?.get('5')).toEqual({ x: 1, y: 2 })
+    })
+
+    it('stamps twice with disjoint ids/IRIs', () => {
+      let state = stamped()
+      state = applyCommand(state, {
+        type: 'insertStamped', id: state.tree.nextId + 1, label: 'tpl',
+        parentViewNodeId: 0, x: 0, y: 0,
+        stamped: deserializeState(stampDoc()), graphIri: 'host',
+      })
+      expect(state.modelNodes.size).toBe(6)
+      expect([...state.modelNodes.keys()].every((iri) => iri.startsWith('host/Node_'))).toBe(true)
+      expect(state.modelArcs.size).toBe(2)
+    })
+  })
+
+  describe('deleteNodes cascade', () => {
+    it('deleting a composite removes its whole subtree', () => {
+      let state = initialState
+      for (const [id, iri] of [[1, 'g/Node_1'], [2, 'g/Node_2']] as const)
+        state = applyCommand(state, {
+          type: 'insertNode', id, iri, label: `N${id}`,
+          entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0,
+        })
+      state = applyCommand(state, {
+        type: 'groupNodes', parentViewNodeId: 0, treeNodeIds: [1, 2],
+      })
+      const compositeId = state.tree.nextId
+      expect(state.tree.nodes.get(compositeId)?.children).toEqual([1, 2])
+
+      state = applyCommand(state, {
+        type: 'deleteNodes',
+        nodes: [{ visibleNodeId: String(compositeId), treeNodeId: compositeId }],
+      })
+      expect(state.modelNodes.size).toBe(0)
+      expect(state.tree.nodes.has(compositeId)).toBe(false)
+      expect(state.tree.nodes.has(1)).toBe(false)
+      expect(state.tree.nodes.get(0)?.children).toEqual([])
+    })
+
+    it('deleting a leaf drops terminals declared on it', () => {
+      let state = applyCommand(initialState, {
+        type: 'insertNode', id: 1, iri: 'g/Node_1', label: 'A',
+        entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0,
+      })
+      state = applyCommand(state, {
+        type: 'exposeTerminal', iri: 'g/oa1', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+      })
+      expect(state.openArcs.get(0)?.length).toBe(1)
+      state = applyCommand(state, {
+        type: 'deleteNodes',
+        nodes: [{ visibleNodeId: '1', treeNodeId: 1, modelNodeIri: 'g/Node_1' }],
+      })
+      expect(state.openArcs.get(0)).toBeUndefined()
+    })
+  })
+
+  describe('exposeTerminal / unexposeTerminal', () => {
+    it('declares and removes an open arc on the parent composite', () => {
+      let state = applyCommand(initialState, {
+        type: 'exposeTerminal', iri: 'g/oa1', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+      })
+      const oa = state.openArcs.get(0)!
+      expect(oa).toHaveLength(1)
+      expect(oa[0]).toMatchObject({
+        iri: 'g/oa1', externalIri: 'g/Node_1',
+        arcType: '', externalEntityType: 'et:A',
+      })
+      // repeat is a no-op
+      state = applyCommand(state, {
+        type: 'exposeTerminal', iri: 'g/oa2', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+      })
+      expect(state.openArcs.get(0)).toHaveLength(1)
+      state = applyCommand(state, {
+        type: 'unexposeTerminal', compositeId: 0, openArcIri: 'g/oa1',
+      })
+      expect(state.openArcs.get(0)).toBeUndefined()
     })
   })
 })

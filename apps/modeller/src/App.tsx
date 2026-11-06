@@ -245,6 +245,20 @@ export default function App() {
     if (state.viewRefIri !== null) return   // reference view is read-only
     try {
       const doc = await loadModelDoc(line.iri)
+      const stamped = deserializeState(doc)
+      // A refersTo inside the stamped subtree stays a live reference —
+      // preload its read-only view state or it renders empty.
+      const missing = [...stamped.compositeRefs.values()]
+        .map((r) => r.refersTo)
+        .filter((iri) => iri && !state.refStates.has(iri))
+      if (missing.length) {
+        const refs = new Map(state.refStates)
+        for (const iri of missing) {
+          try { refs.set(iri, refViewState(await loadModelDoc(iri))) }
+          catch { /* unresolved reference — composite renders empty */ }
+        }
+        dispatch({ type: 'setRefStates', states: refs })
+      }
       dispatch({
         type: 'insertStamped',
         id: state.tree.nextId + 1,
@@ -252,7 +266,7 @@ export default function App() {
         parentViewNodeId: state.currentViewNodeId,
         x: 0,
         y: 0,
-        stamped: deserializeState(doc),
+        stamped,
         graphIri: GRAPH_IRI!,
       })
     } catch (err) {

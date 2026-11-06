@@ -6,8 +6,11 @@
  *  ``apiFetch`` so the backend can scope writes to the artefact.
  */
 
-/** One URL query param, read once, or ``undefined`` when absent. */
+/** One URL query param, read once, or ``undefined`` when absent.
+ *  ``undefined`` outside a browser (vitest, node) — session-scoped
+ *  apps are always launched in a window. */
 export function sessionParam(name: string): string | undefined {
+  if (typeof window === 'undefined') return undefined
   return new URLSearchParams(window.location.search).get(name) ?? undefined
 }
 

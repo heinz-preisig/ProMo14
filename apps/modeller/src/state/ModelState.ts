@@ -520,7 +520,9 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         if (!source || !target) continue
         const freshArc = modelArcIri(cmd.graphIri, modelGraph.getArcCounter())
         const a = modelGraph.insertArc(
-          freshArc, source, target, arc.arcType, arc.referenceFrom, arc.referenceTo)
+          freshArc, source, target, arc.arcType,
+          arc.referenceFrom ? iriMap.get(arc.referenceFrom) ?? arc.referenceFrom : undefined,
+          arc.referenceTo ? iriMap.get(arc.referenceTo) ?? arc.referenceTo : undefined)
         a.permeable = arc.permeable
         arcIriMap.set(arc.iri, freshArc)
       }
@@ -544,6 +546,14 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
         if (knots) nextKnots.set(newId, new Map(
           [...knots].map(([airi, ks]) => [arcIriMap.get(airi) ?? airi, ks])))
       }
+      // The stamped root's own view bookkeeping maps onto the wrapper —
+      // without it the copy's children lose their template positions.
+      const rootLay = stamped.layoutStore.get(stamped.tree.rootId)
+      if (rootLay) nextLayouts.set(cmd.id, new Map(
+        [...rootLay].map(([vid, p]) => [String(idMap.get(Number(vid)) ?? vid), p])))
+      const rootKnots = stamped.knotStore.get(stamped.tree.rootId)
+      if (rootKnots) nextKnots.set(cmd.id, new Map(
+        [...rootKnots].map(([airi, ks]) => [arcIriMap.get(airi) ?? airi, ks])))
       for (const [k, v] of stamped.speciesAliases)
         if (!speciesAliases.has(k)) speciesAliases.set(k, v)
 
