@@ -3235,3 +3235,116 @@ coupled m+e     drives:{chem-pot, T}  carries:{mass, energy}
 - Verified on test_01: `p_mech * F_conv` contracts over `A_conv`,
   gathers concatenate peer values in contact order, all three
   dialects emit; E_4/E_11 repointed, V_59 deleted.
+
+## 33. Submodel reuse — two insertion modes and the phantom port (2026-11-08)
+
+Continuation of the 11-06 copy-vs-reference discussion.  The user's
+clarification — *reuse requires open connections* — dissolved the
+either/or: the two modes serve different intents and **coexist**.
+
+### Two insertion modes — ruled
+
+- **Copy insert** — paste-and-integrate.  Stamped content becomes
+  ordinary host content: flat graph, no occurrence semantics, no
+  read-only island, re-resolved under host pins.  Mechanically it is
+  *insert + dissolve*; `dissolvedFrom` is the provenance record and
+  dies if the composite is later ungrouped — the honest semantics of
+  "stop tracking this".  Copied open arcs persist as ordinary host
+  open arcs — never auto-deleted; they may even become the *host's*
+  own interface if it is later saved as a part.  The interface
+  survives as wiring documentation, not a gate: **every leaf is a
+  legal connection surface** — the copy's interface is emergent.
+- **Referenced insert** — sealed contract use.  The declared ports
+  are the *only* legal connection surface (strictness below).
+
+Division of labour: **copy = private, editable reuse; reference =
+curated, versioned, untouchable reuse** — maps onto principle 12's
+in-doc vs own-graph tiers.  The Friday proposal's refresh machinery
+(`copiedFrom` + refresh gesture) is demoted: `dissolvedFrom` already
+provides the provenance anchor; refuse-to-clobber/merge stays
+deferred until a real update workflow demands it.
+
+### The interface — ports as complete contracts
+
+A submodel's interface is its open arcs, each a **complete
+contract**: what flows (token or information), which way (§15
+reference direction for physical; in/out inherent for signals), arc
+kind, and what peer it expects.  Token is never stored on the
+terminal (arcs declare none — principle 3); it derives from the
+inside entity's type.  `externalEntityType` demoted from gate to
+auto-filled hint of intent; admissibility is the ontology rules run
+between the two real entity types at connect time.
+
+A reusable submodel is **complete**: it carries its own context —
+tokens/species scheme, pins, possibly value defaults — so it means
+something on its own, before any host places it.
+
+### Phantom ports — how interfaces are authored
+
+Two origins of a port:
+
+- **Severed** — extraction cuts a live arc; the contract is
+  inherited from the cut arc and the dropped peer's type.  Primary
+  path, exists today.
+- **Authored** — declared on purpose for standalone or imported
+  models, and for the cuts extraction forgot.
+
+*Ruled:* authored ports are declared via a **phantom peer**.  Pick
+the inside leaf, name the imagined partner ("a capacity sits here");
+the connection rules derive the contract — arc kind, token,
+physical-vs-informational.  Nothing is hand-written, so nothing goes
+stale.  The one underivable bit is the direction convention: a
+default plus a flip gesture.
+
+**The phantom does double duty**: it is also the default boundary
+condition — "expects a capacity" instantiates a minimal capacity to
+close the circuit when the part is tested alone.
+
+### Strict boundary — ruled
+
+Only declared ports are connectable on a referenced occurrence —
+**including observational arcs**: reading an internal variable is
+crossing the boundary like any other wire, so observable parts
+declare signal ports.  Consequences, accepted:
+
+- A missing port is a hard stop: the fix is an artefact edit (open
+  the submodel → phantom-declare → host picks it up).  Someone
+  else's artefact = fork + re-point, or ask the author.
+- Undeclared leaves of a referenced composite are not connect
+  targets; `resolve-connection` enforces.
+- **Escape hatch: dissolve.**  It converts the occurrence to a copy;
+  every internal becomes reachable at the price of severed
+  provenance.  Strict is only livable because port-declaration is
+  cheap and escape exists — remove either and it is intolerable.
+
+### Standalone instantiation — ruled
+
+A complete, interfaced submodel instantiates **standalone**: its
+ports are exposed as boundary conditions, the phantom peers as the
+default closures.  Parts are testable before placement.
+
+### What this settles from 11-06
+
+- **Q1 (per-occurrence pin variation)** — lives in the referenced
+  path; the override map remains its mechanism.  Copies don't need
+  it — adaptation is just editing.
+- **Q2 (automatic propagation)** — the referenced path keeps
+  pin-gated propagation.  Copies don't propagate; that was the
+  point.
+- **Q3 (black-box boundary)** — answered: the referenced insert
+  *is* the black-box case.  `refersTo` stays — not as the sole reuse
+  story, but as the contract-bound tier.
+- §22 stands reframed: *refer* is one of two modes.  The machinery
+  (occurrence expansion, sub-plans, override coverage) stays live
+  for exactly this tier.
+
+### Open
+
+- **Port multiplicity** — a terminal gathering several host peers
+  (cf. the shared boundary var, §29/§32) needs declared cardinality.
+- **Enforcement surface** — undeclared leaves must render/behave as
+  non-targets in the connect gesture, not merely fail late.
+- **Phantom closures** — instantiating the imagined peer as a
+  minimal default entity is new machinery at instantiation time.
+- **Copies of interfaces** — whether copied-in open arcs keep their
+  expected-peer hints or land as bare stubs.

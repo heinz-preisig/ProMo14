@@ -166,7 +166,15 @@ discussion): the two tiers stay.
   private, unversioned, zero blast radius on edits) or in its own
   graph (`refersTo` pin — shareable, versioned, edits propagate).
 - **Extract** promotes in-doc → artefact; **Dissolve** demotes —
-  one-way copy.  Referenced definitions render in-place, read-only.
+  one-way copy.
+- **Two uses of an artefact-level definition** (amended 2026-11-08,
+  §33): *referenced* — sealed, renders in-place read-only, only
+  declared ports connectable (strict boundary; dissolve is the
+  escape hatch) — or *copied* — insert+dissolve: pasted content
+  becomes ordinary host content, every leaf a legal connection
+  surface, provenance = `dissolvedFrom` and dies if the composite
+  is ungrouped.  Copy = private editable reuse; reference =
+  curated, versioned, contract-bound reuse.
 
 *Not adopted:* every-group-an-artefact — it forces ad-hoc groupings
 through pin/version lifecycle and reintroduces a private tier anyway
@@ -193,6 +201,15 @@ instantiation — below.
   is re-rooted to a real leaf↔leaf connection, never to the composite.
   The mechanism is what lets the overlaid hierarchy exist without ever
   violating the flat-graph invariant.
+
+- At **artefact scope** an open end is not an incomplete arc but a
+  **declared port** — the artefact's interface (amended 2026-11-08,
+  §33): a complete contract of what flows, direction, and expected
+  peer.  Two origins: *severed* by extraction (contract inherited
+  from the cut arc) or *authored* by declaring the imagined peer
+  (phantom) — the connection rules derive the contract, the
+  direction convention stays a flippable choice.  Open ends persist
+  indefinitely; nothing is auto-deleted or forced to complete.
 
 *Encoded:* `ModelArc.sourceIri/targetIri` = leaf IRIs;
 `CompositeDoc.openArcs` carries the boundary terminals;
@@ -236,3 +253,6 @@ instantiation — below.
   re-implement superseded semantics (found 2026-11-06: F_* token
   decls resurrected post-strip).  Review audits the seed layer
   against the rulings, not just data files.
+- §33 machinery — authored/phantom ports, strict referenced
+  boundary (undeclared leaves non-targets), standalone
+  instantiation with phantom closures: ruled, unimplemented.
