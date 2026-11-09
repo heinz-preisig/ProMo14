@@ -347,6 +347,45 @@ describe('applyCommand', () => {
       state = applyCommand(state, { type: 'selectNode', id: leaf!.id })
       expect(state.selectedVisibleNodeIds).toEqual(['5'])
     })
+
+    it('two stamps of the same artefact keep both terminal bindings', () => {
+      // Regression: copied open arcs used to carry the template's arc
+      // IRI verbatim — a second stamp collided, and reconnectOpenArc
+      // overwrote the first bound ModelArc under the same name.
+      const stampedDoc = deserializeState(stampDoc())
+      let state = applyCommand(initialState, {
+        type: 'insertStamped', label: 'a', parentViewNodeId: 0,
+        x: 0, y: 0, stamped: stampedDoc, graphIri: 'host',
+      })
+      state = applyCommand(state, {
+        type: 'insertStamped', label: 'b', parentViewNodeId: 0,
+        x: 0, y: 0, stamped: stampedDoc, graphIri: 'host',
+      })
+      state = applyCommand(state, {
+        type: 'insertNode', id: 40, iri: 'host/N_a', label: 'A',
+        entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0,
+      })
+      state = applyCommand(state, {
+        type: 'insertNode', id: 41, iri: 'host/N_b', label: 'B',
+        entityType: 'et:A', parentViewNodeId: 0, x: 0, y: 0,
+      })
+      const openIris = [...state.openArcs.values()]
+        .flat().map((a) => a.iri)
+      expect(openIris.length).toBe(2)
+      expect(new Set(openIris).size).toBe(2)
+
+      const [first, second] = openIris
+      state = applyCommand(state, {
+        type: 'reconnectOpenArc', openArcIri: first,
+        newModelNodeIri: 'host/N_a', arcType: TF,
+      })
+      state = applyCommand(state, {
+        type: 'reconnectOpenArc', openArcIri: second,
+        newModelNodeIri: 'host/N_b', arcType: TF,
+      })
+      expect(state.modelArcs.get(first)?.targetIri).toBe('host/N_a')
+      expect(state.modelArcs.get(second)?.targetIri).toBe('host/N_b')
+    })
   })
 
   describe('deleteNodes cascade', () => {
@@ -397,17 +436,17 @@ describe('applyCommand', () => {
       })
       state = applyCommand(state, {
         type: 'insertReferencedComposite', id: 2, label: 'ref',
-        parentViewNodeId: 0, x: 0, y: 0, refersTo: 'tpl',
+        parentViewNodeId: 0, x: 0, y: 0, refersTo: 'tpl', graphIri: 'g',
         terminals: [{
           iri: 'tpl/oa1', externalIri: 'tpl/Node_9', arcType: '',
           isSource: false, externalEntityType: 'et:A',
         }],
       })
       state = applyCommand(state, {
-        type: 'reconnectOpenArc', openArcIri: 'tpl/oa1',
+        type: 'reconnectOpenArc', openArcIri: 'g/Composite_2/tpl/oa1',
         newModelNodeIri: 'g/Node_1', arcType: TF,
       })
-      const bound = state.modelArcs.get('tpl/oa1')
+      const bound = state.modelArcs.get('g/Composite_2/tpl/oa1')
       expect(bound?.via).toBe(2)
       expect(bound?.sourceIri).toBe('tpl/Node_9')
 
@@ -415,7 +454,7 @@ describe('applyCommand', () => {
         type: 'deleteNodes',
         nodes: [{ visibleNodeId: '2', treeNodeId: 2 }],
       })
-      expect(state.modelArcs.get('tpl/oa1')).toBeUndefined()
+      expect(state.modelArcs.get('g/Composite_2/tpl/oa1')).toBeUndefined()
       // the host leaf's end of the binding dies with the occurrence
       expect(state.modelNodes.has('g/Node_1')).toBe(true)
     })
@@ -535,6 +574,7 @@ describe('cross-branch arcs — §13', () => {
     s = applyCommand(s, {
       type: 'insertReferencedComposite', id: 9, label: 'r',
       parentViewNodeId: 0, x: 0, y: 0, refersTo: 'ref:X', terminals: [],
+      graphIri: 'g',
     })
     s = applyCommand(s, { type: 'setView', viewNodeId: 0, refIri: 'ref:X' })
     return applyCommand(s, {

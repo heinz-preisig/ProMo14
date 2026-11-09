@@ -134,6 +134,13 @@ export class ModelGraphOps {
     return modelArcIri(GRAPH_IRI!, this.arcCounter)
   }
 
+  /** Mint a fresh arc IRI without inserting an arc — for open-arc
+   *  records that must name an arc that does not exist yet
+   *  (reconnect binds under the same IRI).  Advances the counter. */
+  mintArcIri(graphIri: string): string {
+    return modelArcIri(graphIri, this.arcCounter++)
+  }
+
   /** Get all arcs connected to a given node IRI. */
   getConnectedArcs(iri: string): ModelArc[] {
     const result: ModelArc[] = []

@@ -223,6 +223,7 @@ export default function App() {
         x: 0,
         y: 0,
         refersTo: line.iri,
+        graphIri: GRAPH_IRI!,
         terminals: (root?.openArcs ?? []).map((o) => ({
           iri: o.iri,
           externalIri: o.externalIri,

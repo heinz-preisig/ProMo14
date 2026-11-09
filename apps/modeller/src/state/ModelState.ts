@@ -1,5 +1,5 @@
 import type { Tree, ModelNode, ModelArc, NodeType, ArcType, OpenArc, Knot, CompositeRef } from '../types'
-import { modelNodeIri, modelArcIri } from '@promo/semantic'
+import { modelNodeIri, modelArcIri, childIri } from '@promo/semantic'
 import { createTree, TreeOps } from '../tree/Tree'
 import { arcCarrier, ModelGraphOps } from '../model/ModelGraph'
 
@@ -99,7 +99,7 @@ export type Command =
   | { type: 'setSpeciesPin'; iri: string | null }
   | { type: 'toggleNodeFix'; iri: string; varIri: string }
   | { type: 'setCompositeRef'; treeNodeId: number; ref: CompositeRef | null }
-  | { type: 'insertReferencedComposite'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[] }
+  | { type: 'insertReferencedComposite'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[]; graphIri: string }
   | { type: 'insertStamped'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; stamped: AppState; graphIri: string; sourceIri?: string }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
@@ -570,8 +570,15 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const compositeRefs = new Map(state.compositeRefs)
       compositeRefs.set(id, { refersTo: cmd.refersTo, overrides: {} })
 
+      // Occurrence-scoped terminal IRIs ({comp}/{template arc}) —
+      // the artefact's own arc IRIs would collide across two
+      // occurrences of the same artefact, and reconnectOpenArc
+      // binds the ModelArc under this name.
+      const compIri = childIri(cmd.graphIri, `Composite_${id}`)
       const nextOpenArcs = new Map(state.openArcs)
-      if (cmd.terminals.length) nextOpenArcs.set(id, cmd.terminals)
+      if (cmd.terminals.length) nextOpenArcs.set(id, cmd.terminals.map((t) => ({
+        ...t, iri: `${compIri}/${t.iri}`,
+      })))
 
       const nextLayouts = new Map(state.layoutStore)
       const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
@@ -678,8 +685,13 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
           dissolvedFrom: ref.dissolvedFrom,
         })
         const oa = stamped.openArcs.get(oldId)
+        // Every copied open arc needs a fresh host IRI — the
+        // template's own would collide on a second stamp, and
+        // reconnectOpenArc binds the ModelArc under this name.
         if (oa) nextOpenArcs.set(newId, oa.map((a) => ({
-          ...a, externalIri: iriMap.get(a.externalIri) ?? a.externalIri,
+          ...a,
+          iri: arcIriMap.get(a.iri) ?? modelGraph.mintArcIri(cmd.graphIri),
+          externalIri: iriMap.get(a.externalIri) ?? a.externalIri,
         })))
         const lay = stamped.layoutStore.get(oldId)
         if (lay) nextLayouts.set(newId, new Map(
