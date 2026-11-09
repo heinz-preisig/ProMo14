@@ -6,7 +6,6 @@ import type { ClassificationAxis, Domain, EquationClass, EquationRecord, Index, 
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor from './components/DependentVariableEditor'
-import PortVariableEditor from './components/PortVariableEditor'
 import VariableDetailDialog from './components/VariableDetailDialog'
 import VariablePalette from './components/VariablePalette'
 import VariableTable from './components/VariableTable'
@@ -21,7 +20,6 @@ export default function App() {
   const [tokenCatalogue, setTokenCatalogue] = useState<TokenRecord[]>([])
   const [expressionNetwork, setExpressionNetwork] = useState('root')
 
-  const [portOpen, setPortOpen] = useState(false)
   const [dependentOpen, setDependentOpen] = useState(false)
   // Set when the equation editor attaches to an existing variable
   // ("Add equation…" in the detail dialog) instead of minting a new one.
@@ -114,13 +112,6 @@ export default function App() {
   // Variable-only save from the equation editor (e.g. a LaTeX-symbol
   // edit while attaching an equation) — no new equation appended.
   const saveOnlyVariable = useCallback((v: Variable) => {
-    saveEditedVariable(v).catch((err) => {
-      console.error('Failed to save variable:', err)
-      setSaveErr(`Failed to save variable: ${err}`)
-    })
-  }, [saveEditedVariable])
-
-  const addPortVariable = useCallback((v: Variable) => {
     saveEditedVariable(v).catch((err) => {
       console.error('Failed to save variable:', err)
       setSaveErr(`Failed to save variable: ${err}`)
@@ -287,9 +278,6 @@ export default function App() {
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignSelf: 'stretch' }}>
-            <button type="button" onClick={() => setPortOpen(true)}>
-              New port variable…
-            </button>
             <button
               type="button"
               onClick={() => {
@@ -298,7 +286,7 @@ export default function App() {
                 setDependentOpen(true)
               }}
             >
-              New dependent variable…
+              New variable…
             </button>
           </div>
           <VariablePalette
@@ -370,24 +358,6 @@ export default function App() {
           onClose={() => setSelectedVariable(null)}
         />
       )}
-
-      <PortVariableEditor
-        open={portOpen}
-        onClose={() => setPortOpen(false)}
-        variables={variables}
-        indices={indices}
-        networkTree={networkTree}
-        axes={axes}
-        domains={domains}
-        tokenCatalogue={tokenCatalogue}
-        initialDomain={lastDomain}
-        initialClassifications={lastClassifications}
-        onDefaultsChange={(d, c) => {
-          setLastDomain(d)
-          setLastClassifications(c)
-        }}
-        onAccept={addPortVariable}
-      />
 
       <DeleteVariableDialog
         open={!!deleteTarget}

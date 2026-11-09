@@ -25,6 +25,33 @@ export function normaliseTokenVector(
   return out
 }
 
+/** Catalogue flattened roots-first, children indented under their
+ *  ``promo:parent`` — the ancestry IS the comparability rule, so the
+ *  picker shows it rather than an unordered list. */
+function orderedTokens(
+  catalogue: TokenRecord[],
+): { token: TokenRecord; depth: number }[] {
+  const byIri = new Map(catalogue.map((t) => [t.iri, t]))
+  const byParent = new Map<string, TokenRecord[]>()
+  for (const t of catalogue) {
+    // A parent outside the catalogue (shouldn't happen) renders as root.
+    const p = t.parent && byIri.has(t.parent) ? t.parent : ''
+    byParent.set(p, [...(byParent.get(p) ?? []), t])
+  }
+  const out: { token: TokenRecord; depth: number }[] = []
+  const seen = new Set<string>()
+  const walk = (parent: string, depth: number) => {
+    for (const t of byParent.get(parent) ?? []) {
+      if (seen.has(t.iri)) continue // cycle guard
+      seen.add(t.iri)
+      out.push({ token: t, depth })
+      walk(t.iri, depth + 1)
+    }
+  }
+  walk('', 0)
+  return out
+}
+
 export interface TokenSuggestion {
   /** §24 signature derived from the checked equation. */
   vector: Record<string, number>
@@ -103,16 +130,26 @@ export default function TokenSection({
           opacity: disabled ? 0.55 : 1,
         }}
       >
-        {tokenCatalogue.map((t) => (
+        {orderedTokens(tokenCatalogue).map(({ token: t, depth }) => (
           <div
             key={t.iri}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
+              paddingLeft: depth * 16,
             }}
           >
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}
+              title={
+                t.parent
+                  ? `kind of ${
+                      tokenCatalogue.find((p) => p.iri === t.parent)?.label ?? t.parent
+                    } — comparable by ancestry`
+                  : t.iri
+              }
+            >
               <input
                 type="checkbox"
                 checked={carriesTokens.has(t.iri)}
@@ -120,6 +157,7 @@ export default function TokenSection({
                 onChange={() => onToggleToken(t.iri)}
               />
               <span>
+                {depth > 0 && <span style={{ color: '#999' }}>↳ </span>}
                 {t.label}{t.kind ? ` (${t.kind})` : ''}
               </span>
             </label>

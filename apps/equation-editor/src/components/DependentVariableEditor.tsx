@@ -20,11 +20,13 @@ import {
   isValidVariableName,
   VARIABLE_NAME_HINT,
 } from '../validation'
-import { suggestLatexAlias, validateLatexAlias } from '../latex'
+import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
 
 /** Bound-value kinds allowed on the LHS of ``Instantiate(proto)`` — an
  *  instance is a bound-value slot, not a computed quantity (§24). */
 const BOUND_KINDS = ['constant', 'parameter']
+
+const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current', 'light', 'nil']
 
 /** Class the backend auto-assigns to ``Instantiate(proto)`` RHS — not a
  *  picker option; shown (disabled) when the RHS is an Instantiate. */
@@ -90,6 +92,13 @@ export default function DependentVariableEditor({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
+  // §34: port-ness is a declaration on the variable, not a separate
+  // kind — a dependent variable may also be connectable.
+  const [isPort, setIsPort] = useState(false)
+  // Manual signature — used only when no equation derives one
+  // (declared vars: terminals, parameters, constants).
+  const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
+  const [selectedIndices, setSelectedIndices] = useState<Set<string>>(new Set())
   // §24 token declarations: carriesToken (network membership, port
   // licensing) and tokenVector (algebraic signature, exponent map).
   const [carriesTokens, setCarriesTokens] = useState<Set<string>>(new Set())
@@ -116,6 +125,9 @@ export default function DependentVariableEditor({
       setDoc(editing?.doc ?? '')
       setCarriesTokens(new Set(editing?.tokens ?? []))
       setTokenVector(editing?.token_vector ?? {})
+      setIsPort(editing?.port_variable ?? false)
+      setUnits([...(editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0])])
+      setSelectedIndices(new Set(editing?.index_structures ?? []))
       // Stored class may be a label or an IRI — match both.
       setEqClass(
         equationClasses.find(
@@ -144,6 +156,15 @@ export default function DependentVariableEditor({
 
   const toggleToken = (iri: string) => {
     setCarriesTokens((prev) => {
+      const next = new Set(prev)
+      if (next.has(iri)) next.delete(iri)
+      else next.add(iri)
+      return next
+    })
+  }
+
+  const toggleIndex = (iri: string) => {
+    setSelectedIndices((prev) => {
       const next = new Set(prev)
       if (next.has(iri)) next.delete(iri)
       else next.add(iri)
@@ -275,14 +296,20 @@ export default function DependentVariableEditor({
       // and applying them trips the §18 mutability guard.  An UNUSED
       // (or new) variable still adopts the checker signature — the
       // first equation defines it.
+      // Signature priority: stored (locked) > checker > manual pick
+      // when no RHS is given — the declared-variable path.
       units: structuralLocked
         ? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0]
-        : checkResult?.units ?? editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0],
+        : checkResult?.units
+          ?? (text.trim() ? editing?.units : undefined)
+          ?? units,
       index_structures: structuralLocked
         ? editing?.index_structures ?? []
-        : checkResult?.indices ?? editing?.index_structures ?? [],
+        : checkResult?.indices
+          ?? (text.trim() ? editing?.index_structures : undefined)
+          ?? Array.from(selectedIndices),
       internal_id: editing?.internal_id ?? nextInternalId(variables),
-      port_variable: editing?.port_variable ?? false,
+      port_variable: isPort,
       classifications,
       tokens: Array.from(carriesTokens),
       token_vector: Object.keys(tokenVector).length ? { ...tokenVector } : undefined,
@@ -290,7 +317,8 @@ export default function DependentVariableEditor({
       doc,
     }
   }, [name, domain, variables, checkResult, latexSym, doc, editing,
-      classifications, structuralLocked, carriesTokens, tokenVector])
+      classifications, structuralLocked, carriesTokens, tokenVector, isPort,
+      units, selectedIndices, text])
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
@@ -413,6 +441,10 @@ export default function DependentVariableEditor({
     doc !== (editing.doc ?? '') ||
     latexSym !== (editing.aliases?.latex ?? '') ||
     JSON.stringify(classifications) !== JSON.stringify(editing.classifications ?? {}) ||
+    isPort !== (editing.port_variable ?? false) ||
+    JSON.stringify(units) !== JSON.stringify(editing.units ?? [0, 0, 0, 0, 0, 0, 0, 0]) ||
+    JSON.stringify(Array.from(selectedIndices)) !==
+      JSON.stringify(editing.index_structures ?? []) ||
     JSON.stringify([...carriesTokens].sort()) !==
       JSON.stringify([...(editing.tokens ?? [])].sort()) ||
     JSON.stringify(Object.entries(tokenVector).sort()) !==
@@ -478,7 +510,7 @@ export default function DependentVariableEditor({
                 ? `Edit equation ${editingEquation.id} — ${editing?.label ?? ''}`
                 : editing
                   ? `Add equation — ${editing.label}`
-                  : 'New dependent variable'}
+                  : 'New variable'}
             </h3>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
               {acceptBlockReason && (
@@ -605,6 +637,88 @@ export default function DependentVariableEditor({
                 <span style={{ fontSize: 12, color: '#8d6e00' }}>
                   No classification axes apply in this domain.
                 </span>
+              )}
+
+              <label
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+                title={
+                  'Connectable across an entity boundary — supplied to a ' +
+                  'peer through a contact arc (§34: preference, not gate; ' +
+                  'a port variable may still own equations)'
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={isPort}
+                  disabled={structuralLocked}
+                  onChange={(e) => setIsPort(e.target.checked)}
+                />
+                Port (connectable)
+              </label>
+
+              {/* Declared-variable signature — no RHS means no checker
+                  derivation, so units/indices are picked manually. */}
+              {!structuralLocked && !text.trim() && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12 }}>Units (SI vector)</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                      {UNIT_LABELS.map((label, i) => (
+                        <label
+                          key={label}
+                          style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+                        >
+                          <span style={{ fontSize: 10, color: '#666' }}>{label}</span>
+                          <input
+                            type="number"
+                            step="1"
+                            value={units[i]}
+                            onChange={(e) => {
+                              const next = [...units]
+                              next[i] = Number(e.target.value)
+                              setUnits(next)
+                            }}
+                            style={{ width: '100%' }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12 }}>Index structures</span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        maxHeight: 140,
+                        overflowY: 'auto',
+                        border: '1px solid #ccc',
+                        borderRadius: 4,
+                        padding: 8,
+                      }}
+                    >
+                      {indices.map((i) => (
+                        <label
+                          key={i.iri}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIndices.has(i.iri)}
+                            onChange={() => toggleIndex(i.iri)}
+                          />
+                          <span
+                            title={`${i.iri}${i.aliases?.internal_code ? ' / ' + i.aliases.internal_code : ''}`}
+                          >
+                            {indexShortLabel(i)} ({i.label})
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               <TokenSection

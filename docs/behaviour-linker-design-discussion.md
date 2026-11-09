@@ -3408,3 +3408,128 @@ gesture, never a cascade.
   flatten-this-level action that dispatches by composite kind, with
   a confirm affordance only on the dissolve path (one-way, severs
   the link); ungroup stays instant and redoable.
+
+## 34. Two senses of "port" — variable interface vs assignment endpoint (2026-11-09)
+
+Surfaced while authoring the first control block (`y := p∘e`): the
+user pushed back on a suggestion to flag `y` as port — "y is a
+function of existing variables, so it is not a port variable".
+That exposed a terminology collision the implementation had been
+carrying silently.
+
+### The two senses — clarified
+
+- **Variable-level `promo:portVariable`** — connectable-interface
+  marker: "this variable may be supplied to a peer across a contact
+  arc".  The functional-block I/O sense: `u`, `y` of
+  `ẋ = f(x,u); y = g(x,u)`.  Preference, not gate (§14 R3): the flag
+  exports an otherwise-hidden state and disambiguates among
+  comparable supply candidates; unflagged defined vars still bind.
+  Port vars may own defining equations (`fmc` = `E_4`): port-ness is
+  boundary reach, not determined-ness.
+- **Assignment-level `promo:hasPortVariable`** — demand endpoint:
+  where the lower-triangular var/expr search terminates ("one needs
+  to start somewhere").  The graph-root sense (§21).
+
+They compose: `y` is `out` on the controller's assignment (produced
+root) and `port` on the plant's (demand); the variable flag licenses
+it as a connectable surface.  "Is `y` a port?" — yes on the variable
+record, no on the controller's assignment.
+
+### The terminal question — resolved in discussion
+
+User's question: a variable class "defined like ports, but
+connectable later — requestable to be instantiated, like a setpoint
+(either instantiated or driven by another control block)".
+
+No new class — the three layers already decompose it:
+
+- `portVariable` = *connectable* capability (variable declaration).
+- Endpoint mark = *per-occurrence resolution* (assignment: `port`
+  when wired, `instantiated` when pinned).
+- §33 phantom closure = the unconnected case: an unwired terminal
+  instantiates via the imagined peer's boundary condition.
+
+Cascade control is the composed case: outer `out y` → inner
+`port s`.  "Terminal that can be requested to be instantiated" IS
+`portVariable` + endpoint-per-occurrence.
+
+### What it actually exposed
+
+- **Unconnected-resolution policy** — physical contact ports resolve
+  open to an *environment boundary*; info terminals (setpoint,
+  manual input) resolve to a *value pin*.  Both via phantom closure,
+  different phantom types.  Where the *default* lives — variable
+  hint vs occurrence fix marking — is open.
+- **Optional terminals** — the endpoint taxonomy has no "may be
+  wired": `port` implies *will be* wired.  If
+  instantiate-if-unwired should be a declared property rather than
+  emergent, it is a small attribute question on the endpoint mark —
+  not a new variable class.  Adjacent to §33's port-multiplicity
+  open item.
+- **Defects found same day** — stale doc wording fixed
+  (`ontology-data-model.md` now records both senses); the two
+  creation dialogs merged into one variable editor (done same day):
+  "Port (connectable)" is a checkbox, the port editor's manual
+  units/indices pickers appear when no RHS is given (declared
+  variables), and a single "New variable…" button opens it —
+  `PortVariableEditor.tsx` deleted.  §18 still locks the flag while
+  *referenced* — exempting it (same argument as the token-ADD
+  exemption) is a policy question left open.  Possible predicate
+  rename (`promo:connectable`) parked: cheap via migration, only if
+  the fuzz keeps biting.
+
+### Two connection semantics under one flag (user, same day)
+
+- **Signal arcs — inherently directed terminals.**  In/out is baked
+  into the arc kind (§15); the endpoint roles are already typed at
+  the assignment level (`port` = demand, `out` = produced).  Every
+  signal endpoint of a block is therefore a *potential* terminal —
+  in flat models the emergent surface is the full I/O set.  The
+  flag's remaining job: declare the curated interface (referenced
+  tier), license state export to a sensor, disambiguate comparable
+  supply candidates.
+- **Physical token-flow arcs — shared coupling points.**  `p_mech`
+  is not pushed down a directed wire; it is *one* variable bound at
+  several contacts (bound-index by incident arcs, §32) — effort
+  continuity + flow balance, the bond-graph port.  The flag marks
+  the shared var as exportable across its contacts.
+
+The naming fuzz is partly this: "port" means *terminal* (signal,
+unidirectional) and *coupling point* (physical, shared).  The flag
+uniformly declares "may be supplied/connected", but what supply
+means differs by arc kind.
+
+### First control block — review of the authored variables (same day)
+
+Walking the stored P-controller (`e := s − o`, `y := p ∘ e`):
+
+- **`u` (V_63) is dead weight** — `port` + `info_role input`, but no
+  equation references it.  Leftover from the `ẋ=f(x,u)` template; the
+  algebraic block's actual inputs are `obs` and `s`.  Delete or wait
+  for dynamics.
+- **`obs` (V_66)** — correctly declared all along (`port` +
+  `Observation` + extensive/flow); only its doc string lied
+  ("token-free observation" — fixed via API).  The §18 lock rightly
+  refused a redundant `Signal` add on top of `Observation`:
+  `Observation` already descends from `Signal`.  First live
+  demonstration that the lock steers authors away from bookkeeping
+  without semantics.
+- **`pGain` (V_59)** — `carriesToken signal` + `extensive/flow`
+  contradicts §4 neutrality for coefficients; `portVariable` is
+  legitimate (tunable terminal).
+- **No control assignment yet** — `s`, `obs` (demand `port`s),
+  `pGain` (`instantiated`), `y` (`out`) exist only at variable level;
+  endpoint roles still unrecorded.
+- **Token picker now shows the ancestry** — the `carriesToken` list
+  in `TokenSection` renders `promo:parent` as an indented tree
+  (`Observation`/`Manipulation` under `Signal`) so the comparability
+  rule is visible at the point of choice ("the user cannot know").
+
+### Documentation gap (user)
+
+"This type of question will be posed by the user — it is not
+trivial to see how one defines the various variables and functional
+blocks."  The control-block authoring recipe — which flag, which
+endpoint, which network, which tokens for `u`/`x`/`y`/`s` — needs a
+user-facing worked example.  Open.

@@ -1,9 +1,8 @@
 @prefix promo: <https://w3id.org/promo#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://w3id.org/promo/model-2/tripot1> {
+<https://w3id.org/promo/model-3> {
     promo:Assignment a rdfs:Class .
 
     promo:Glass a rdfs:Class .
@@ -69,65 +68,11 @@
 
     promo:versionOf a rdf:Property .
 
-    <https://w3id.org/promo/model-2/Arc_1> a promo:ModelArc ;
-        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
-        promo:internalID "Arc_1" ;
-        promo:referenceFrom <https://w3id.org/promo/model-2/Node_1> ;
-        promo:referenceTo <https://w3id.org/promo/model-2/Node_2> ;
-        promo:source <https://w3id.org/promo/model-2/Node_1> ;
-        promo:target <https://w3id.org/promo/model-2/Node_2> .
-
-    <https://w3id.org/promo/model-2/Arc_2> a promo:ModelArc ;
-        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
-        promo:internalID "Arc_2" ;
-        promo:referenceFrom <https://w3id.org/promo/model-2/Node_2> ;
-        promo:referenceTo <https://w3id.org/promo/model-2/Node_3> ;
-        promo:source <https://w3id.org/promo/model-2/Node_2> ;
-        promo:target <https://w3id.org/promo/model-2/Node_3> .
-
-    <https://w3id.org/promo/model-2/Arc_3> a promo:ModelArc ;
-        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
-        promo:internalID "Arc_3" ;
-        promo:referenceFrom <https://w3id.org/promo/model-2/Node_3> ;
-        promo:referenceTo <https://w3id.org/promo/model-2/Node_1> ;
-        promo:source <https://w3id.org/promo/model-2/Node_3> ;
-        promo:target <https://w3id.org/promo/model-2/Node_1> .
-
-    <https://w3id.org/promo/model-2/tripot1> a promo:Model ;
-        rdfs:label "tripot1" ;
+    <https://w3id.org/promo/model-3> a promo:Model ;
+        rdfs:label "model1" ;
         promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
         promo:usesLibrary <https://w3id.org/promo/library> ;
-        promo:usesOntology <https://w3id.org/promo/ontology> .
-
-    <https://w3id.org/promo/model-2/tripot1/Composite_1> a promo:Composite ;
-        rdfs:label "tripot" ;
-        promo:children "[{\"id\": 2, \"iri\": \"https://w3id.org/promo/model-2/Node_1\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model-2/Node_2\"}, {\"id\": 4, \"iri\": \"https://w3id.org/promo/model-2/Node_3\"}]" ;
-        promo:internalID 1 ;
-        promo:parent <https://w3id.org/promo/model-2/tripot1/Composite_0> .
-
-    <https://w3id.org/promo/model-2/tripot1/Model> a promo:Model ;
-        promo:arcCounter 4 ;
-        promo:nextTreeId 5 ;
-        promo:rootComposite <https://w3id.org/promo/model-2/tripot1/Composite_0> .
-
-    <https://w3id.org/promo/model-2/tripot1/Composite_0> a promo:Composite ;
-        rdfs:label "tripot1" ;
-        promo:children "[{\"id\": 1, \"iri\": null}]" ;
-        promo:internalID 0 .
-
-    <https://w3id.org/promo/model-2/Node_1> a promo:ModelNode ;
-        rdfs:label "Node 1" ;
-        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
-        promo:internalID "Node_1" .
-
-    <https://w3id.org/promo/model-2/Node_2> a promo:ModelNode ;
-        rdfs:label "Node 2" ;
-        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
-        promo:internalID "Node_2" .
-
-    <https://w3id.org/promo/model-2/Node_3> a promo:ModelNode ;
-        rdfs:label "Node 3" ;
-        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
-        promo:internalID "Node_3" .
+        promo:usesOntology <https://w3id.org/promo/ontology> ;
+        promo:usesSpecies <https://w3id.org/promo/species> .
 }
 

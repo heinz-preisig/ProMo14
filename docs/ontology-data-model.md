@@ -102,10 +102,18 @@ parse time (label → IRI resolution).
   (`state`, `constant`, `flow`, …) survives only as a *derived* display
   (`Variable.type` via `compile_space.kind_tag`), never stored.  In the
   old JSON this field was called `type`.
-- `port_variable` — `true` for the fundamental quantities and constants
-  that **are the foundation** of the var/expr graph.  Port variables are
-  declared with a name, units, and index structure, but have **no defining
-  RHS expression**.
+- `port_variable` — connectable-interface marker on the **variable**
+  (§14 R3, §32): `true` declares the variable may be supplied to a peer
+  entity through a contact arc — the functional-block I/O sense
+  (`u`, `y` of `ẋ = f(x,u); y = g(x,u)`).  It is a *preference*, not a
+  gate — unflagged defined variables remain supply candidates; the flag
+  exports an otherwise-hidden state variable and disambiguates among
+  several comparable candidates.  Port variables may own defining
+  equations (e.g. `fmc` = `E_4`): port-ness is boundary reach, not
+  determined-ness.  Distinct from the **assignment-level** endpoint
+  `hasPortVariable` — the demand root where the triangular var/expr
+  search terminates.  The same variable can be `out` on its producer
+  assignment and `port` on a consumer's.
 - `imported` — *ontology-editor metadata*: marks a variable brought in from
   another ontology (e.g. a base physical ontology imported into a
   domain-specific one).  **Not consumed by the equation editor** — kept on

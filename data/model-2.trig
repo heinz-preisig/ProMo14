@@ -6,8 +6,6 @@
 <https://w3id.org/promo/model-2> {
     promo:Assignment a rdfs:Class .
 
-    promo:Composite a rdfs:Class .
-
     promo:Glass a rdfs:Class .
 
     promo:Instantiation a rdfs:Class .
@@ -15,10 +13,6 @@
     promo:Library a rdfs:Class .
 
     promo:Model a rdfs:Class .
-
-    promo:ModelArc a rdfs:Class .
-
-    promo:ModelNode a rdfs:Class .
 
     promo:Ontology a rdfs:Class .
 
@@ -32,21 +26,11 @@
 
     promo:Version a rdfs:Class .
 
-    promo:arcCounter a rdf:Property .
-
-    promo:arcType a rdf:Property .
-
     promo:atIndexElement a rdf:Property ;
         promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
 
-    promo:children a rdf:Property .
-
     promo:coordinate a rdf:Property ;
         promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
-
-    promo:doc a rdf:Property .
-
-    promo:entityType a rdf:Property .
 
     promo:fillPattern a rdf:Property ;
         promo:doc "On a promo:ValueFill: JSON list like promo:coordinate but with '*' allowed per segment — '*' matches every element on that axis.  The most specific matching selector wins; equal-specificity overlaps are fill-conflict problems.  See docs/value-fill.md." .
@@ -57,31 +41,13 @@
 
     promo:instantiates a rdf:Property .
 
-    promo:internalID a rdf:Property .
-
-    promo:layout a rdf:Property .
-
-    promo:nextTreeId a rdf:Property .
-
     promo:occurrencePath a rdf:Property .
 
     promo:overrides a rdf:Property .
 
-    promo:parent a rdf:Property .
-
     promo:publishedOn a rdf:Property .
 
-    promo:referenceFrom a rdf:Property .
-
-    promo:referenceTo a rdf:Property .
-
-    promo:rootComposite a rdf:Property .
-
     promo:seedFloor a rdf:Property .
-
-    promo:source a rdf:Property .
-
-    promo:target a rdf:Property .
 
     promo:usesAssignment a rdf:Property .
 
@@ -104,27 +70,73 @@
     promo:versionOf a rdf:Property .
 
     <https://w3id.org/promo/model-2> a promo:Model ;
-        rdfs:label "model2" ;
+        rdfs:label "tripod2" ;
         promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
         promo:usesLibrary <https://w3id.org/promo/library> ;
-        promo:usesModel <https://w3id.org/promo/model-2/tripot1> ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
 
-    <https://w3id.org/promo/model-2/Composite_4> a promo:Composite ;
-        rdfs:label "tripot" ;
-        promo:internalID 4 ;
-        promo:parent <https://w3id.org/promo/model-2/Composite_0> ;
-        promo:refersTo <https://w3id.org/promo/model-2/tripot1> .
+    <https://w3id.org/promo/model-2/Arc_1> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_1" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_3> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_2> ;
+        promo:source <https://w3id.org/promo/model-2/Node_3> ;
+        promo:target <https://w3id.org/promo/model-2/Node_2> .
+
+    <https://w3id.org/promo/model-2/Arc_10> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_10" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_1> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_6> ;
+        promo:source <https://w3id.org/promo/model-2/Node_1> ;
+        promo:target <https://w3id.org/promo/model-2/Node_6> .
+
+    <https://w3id.org/promo/model-2/Arc_2> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_2" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_2> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_1> ;
+        promo:source <https://w3id.org/promo/model-2/Node_2> ;
+        promo:target <https://w3id.org/promo/model-2/Node_1> .
+
+    <https://w3id.org/promo/model-2/Arc_3> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_3" ;
+        promo:referenceFrom <https://w3id.org/promo/model-2/Node_1> ;
+        promo:referenceTo <https://w3id.org/promo/model-2/Node_3> ;
+        promo:source <https://w3id.org/promo/model-2/Node_1> ;
+        promo:target <https://w3id.org/promo/model-2/Node_3> .
 
     <https://w3id.org/promo/model-2/Model> a promo:Model ;
-        promo:arcCounter 4 ;
-        promo:nextTreeId 5 ;
+        promo:arcCounter 11 ;
+        promo:nextTreeId 6 ;
         promo:rootComposite <https://w3id.org/promo/model-2/Composite_0> .
 
     <https://w3id.org/promo/model-2/Composite_0> a promo:Composite ;
         rdfs:label "Root" ;
-        promo:children "[{\"id\": 4, \"iri\": null}]" ;
+        promo:children "[{\"id\": 1, \"iri\": \"https://w3id.org/promo/model-2/Node_1\"}, {\"id\": 2, \"iri\": \"https://w3id.org/promo/model-2/Node_2\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model-2/Node_3\"}, {\"id\": 6, \"iri\": \"https://w3id.org/promo/model-2/Node_6\"}]" ;
         promo:internalID 0 ;
-        promo:layout "{\"4\": {\"x\": -28.0625, \"y\": -426.25}}" .
+        promo:layout "{\"1\": {\"x\": -29.75, \"y\": -340.5}, \"2\": {\"x\": -124.75, \"y\": -233.5}, \"3\": {\"x\": 82.25, \"y\": -237.5}, \"6\": {\"x\": -30.5, \"y\": -558.5}}" ;
+        promo:openArcs "[{\"iri\": \"https://w3id.org/promo/model-2/Arc_9\", \"externalIri\": \"https://w3id.org/promo/model-2/Node_6\", \"arcType\": \"https://w3id.org/promo#ArcType/reference\", \"isSource\": false, \"refToExternal\": null, \"externalEntityType\": \"https://w3id.org/promo/ontology#etype_convection_transport\", \"phantomEntityType\": \"https://w3id.org/promo/ontology#etype_convection_transport\"}]" .
+
+    <https://w3id.org/promo/model-2/Node_6> a promo:ModelNode ;
+        rdfs:label "Node 6" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
+        promo:internalID "Node_6" .
+
+    <https://w3id.org/promo/model-2/Node_2> a promo:ModelNode ;
+        rdfs:label "Node 2" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_2" .
+
+    <https://w3id.org/promo/model-2/Node_3> a promo:ModelNode ;
+        rdfs:label "Node 3" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_3" .
+
+    <https://w3id.org/promo/model-2/Node_1> a promo:ModelNode ;
+        rdfs:label "Node 1" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped> ;
+        promo:internalID "Node_1" .
 }
 
