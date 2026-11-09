@@ -295,6 +295,10 @@ export default function App() {
   // §33 phantom pick: entity type the user imagines on a terminal's
   // missing end; the connection rules derive the contract's arc kind.
   const [phantomPeer, setPhantomPeer] = useState('')
+  /** §33: when the rule set licenses several contract kinds for the
+   *  pair (access/reference + physical-same/token-flow), the user
+   *  picks; falls back to the first licensed kind. */
+  const [arcPick, setArcPick] = useState<string | null>(null)
 
   // Keep the active palette selection valid when the catalogue swaps.
   useEffect(() => {
@@ -595,7 +599,7 @@ export default function App() {
         }}
       >
         <strong>ProMo14</strong>
-        <span style={{ fontSize: 15, color: '#333' }}>
+?        <span style={{ fontSize: 15, color: '#333' }}>
           Model: <strong>{localName(GRAPH_IRI!)}</strong>
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 13 }}>
@@ -1013,6 +1017,8 @@ export default function App() {
               : []
             const peerEntity = NODE_TYPES.find((t) => t.id === phantomPeer)
             const canDeclare = !!peerEntity && peerKinds.length > 0
+            const chosenKind = arcPick && peerKinds.includes(arcPick)
+              ? arcPick : peerKinds[0]
             return (
               <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
                 <strong style={{ fontSize: 12 }}>Terminals</strong>
@@ -1065,7 +1071,7 @@ export default function App() {
                       modelNodeIri: sel.iri,
                       entityType: sel.entityType,
                       phantomEntityType: phantomPeer || undefined,
-                      arcType: peerKinds[0],
+                      arcType: chosenKind,
                     })
                   }}
                   disabled={!canDeclare}
@@ -1085,7 +1091,22 @@ export default function App() {
                       ? 'no connection licensed for that pair'
                       : peerKinds.length === 0
                         ? 'resolving the rule set…'
-                        : `contract: ${short(peerKinds[0])}`}
+                        : peerKinds.length > 1
+                          ? (
+                            <label>
+                              contract:{' '}
+                              <select
+                                value={chosenKind}
+                                onChange={(e) => setArcPick(e.target.value)}
+                                style={{ fontSize: 11 }}
+                              >
+                                {peerKinds.map((k) => (
+                                  <option key={k} value={k}>{short(k)}</option>
+                                ))}
+                              </select>
+                            </label>
+                          )
+                          : `contract: ${short(chosenKind)}`}
                 </div>
               </div>
             )
