@@ -292,6 +292,9 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                             <>
                               <span dangerouslySetInnerHTML={{ __html: symbolHtml(v) }} />{' '}
                               <span style={{ color: '#888', fontWeight: 400 }}>{v.label}</span>
+                              {v.internal_id && (
+                                <span style={{ color: '#ccc', fontSize: 10, fontWeight: 400 }}> {v.internal_id}</span>
+                              )}
                               {v.value != null && v.value !== '' && (
                                 <span style={{ color: '#888', fontWeight: 400 }}> = {v.value}</span>
                               )}
@@ -383,7 +386,11 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                           <td
                             colSpan={7}
                             style={{ padding: '3px 8px', borderBottom: '1px solid #f0f0f0' }}
+                            title={eq.iri || eqId}
                           >
+                            <span style={{ fontSize: 10, color: '#bbb', marginRight: 6, fontFamily: 'monospace' }}>
+                              {eq.internal_id ?? eqId}
+                            </span>
                             {eq.rhs_latex ? (
                               <span
                                 style={{ overflowX: 'auto', display: 'inline-block', maxWidth: '100%', verticalAlign: 'middle' }}
