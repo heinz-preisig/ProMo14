@@ -3,7 +3,7 @@ import { Stage, Layer, Line, Group, Rect } from 'react-konva'
 import type Konva from 'konva'
 import type { NodeType, ArcType, OpenArc } from './types'
 import type { Iri, NodeGraphicalDefinition, ArcGraphicalDefinition, SemanticCatalogue } from '@promo/semantic'
-import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue, childIri, modelArcIri } from '@promo/semantic'
+import { placeholderCatalogue, placeholderRuleResolver, resolveConnection, RemoteRuleResolver, RemoteCatalogue, childIri, modelArcIri, localName } from '@promo/semantic'
 import { GRAPH_IRI, SPECIES_IRI, catalogueFetchers, dissolveComposite, extractSubmodel, fetchBehaviourEntityTypes, fetchCatalogueLines, fetchEntityCapabilities, fetchEntityTokens, fetchEntityVariables, fetchSpecies, fetchSpeciesDistribution, loadModel, loadModelDoc, saveModel, saveOntology } from './api'
 import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocument } from './api'
 import { SpeciesPanel } from './SpeciesPanel'
@@ -595,7 +595,9 @@ export default function App() {
         }}
       >
         <strong>ProMo14</strong>
-        <span style={{ fontSize: 13, color: '#555' }}>Model: untitled</span>
+        <span style={{ fontSize: 13, color: '#555' }}>
+          Model: {localName(GRAPH_IRI!)}
+        </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 13 }}>
           <span style={{ color: '#555' }}>
             {state.viewRefIri ? (
