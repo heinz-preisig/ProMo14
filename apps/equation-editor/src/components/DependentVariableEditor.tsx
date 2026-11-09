@@ -713,7 +713,7 @@ export default function DependentVariableEditor({
               lhs={name.trim() || undefined}
             />
 
-            <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} />
+            <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} variables={variables} />
 
             {checkResult?.ok && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

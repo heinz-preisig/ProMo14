@@ -1,11 +1,12 @@
 import { indexShortLabel } from '../latex'
-import type { CheckResponse, Index } from '../types'
+import type { CheckResponse, Index, Variable } from '../types'
 
 export interface ResultPanelProps {
   result: CheckResponse | null
   loading: boolean
   indices?: Index[]
   label?: string
+  variables?: Variable[]
 }
 
 function formatIndex(iri: string, indices: Index[] = []) {
@@ -15,12 +16,14 @@ function formatIndex(iri: string, indices: Index[] = []) {
 }
 
 // Incidence entries are IRIs (".../ontology#Mm", "net!x", "...#x") — display the
-// bare name after the last separator.
-function formatIncidence(iri: string): string {
-  return iri.split(/[:#!]/).pop() ?? iri
+// internal ID with the human label when the variable is known: "V_62 (setPoint)".
+function formatIncidence(iri: string, variables: Variable[] = []): string {
+  const local = iri.split(/[:#!]/).pop() ?? iri
+  const v = variables.find((x) => x.iri === iri)
+  return v && v.label && v.label !== local ? `${local} (${v.label})` : local
 }
 
-export default function ResultPanel({ result, loading, indices = [], label }: ResultPanelProps) {
+export default function ResultPanel({ result, loading, indices = [], label, variables = [] }: ResultPanelProps) {
   if (loading) return <div style={{ color: '#666', fontSize: 13 }}>Checking…</div>
   if (!result) return <div style={{ color: '#888', fontSize: 13 }}>No check result yet.</div>
 
@@ -80,7 +83,7 @@ export default function ResultPanel({ result, loading, indices = [], label }: Re
         </div>
         <div>
           <strong>Incidence:</strong>{' '}
-          {result.incidence ? result.incidence.map(formatIncidence).join(', ') : '[]'}
+          {result.incidence ? result.incidence.map((i) => formatIncidence(i, variables)).join(', ') : '[]'}
         </div>
         {(label ?? result.label) && (
           <div>
