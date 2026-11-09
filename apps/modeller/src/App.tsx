@@ -595,8 +595,8 @@ export default function App() {
         }}
       >
         <strong>ProMo14</strong>
-        <span style={{ fontSize: 13, color: '#555' }}>
-          Model: {localName(GRAPH_IRI!)}
+        <span style={{ fontSize: 15, color: '#333' }}>
+          Model: <strong>{localName(GRAPH_IRI!)}</strong>
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 13 }}>
           <span style={{ color: '#555' }}>
