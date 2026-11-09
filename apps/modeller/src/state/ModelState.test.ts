@@ -484,6 +484,24 @@ describe('applyCommand', () => {
       expect(state.openArcs.get(0)).toBeUndefined()
     })
 
+    it('a terminal on the root composite renders as a stub off the leaf', () => {
+      // §33: the root view has no composite self-node — the artefact's
+      // own interface must still draw, dangling off the anchor leaf.
+      let state = applyCommand(initialState, {
+        type: 'insertNode', id: 1, iri: 'g/Node_1', label: 'T',
+        entityType: 'et:T', parentViewNodeId: 0, x: 0, y: 0,
+      })
+      state = applyCommand(state, {
+        type: 'exposeTerminal', iri: 'g/oa1', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:T', arcType: TF,
+      })
+      const view = computeGraphView(0, state.tree, state.modelNodes,
+        state.modelArcs, state.layoutStore, state.openArcs,
+        state.knotStore, 800, 600)
+      const stub = view.openArcs.find((a) => a.modelArcIri === 'g/oa1')
+      expect(stub).toMatchObject({ terminal: true, openEndId: '1' })
+    })
+
     it('one leaf hosts several terminals — dedup is per contract', () => {
       // §33: a valve-style leaf needs two token-flow ports plus a
       // signal port — the imagined peer distinguishes the contracts.

@@ -155,7 +155,41 @@ export function computeGraphView(
   // --- Open arcs: dangling ends attached wherever the owning composite is visible ---
   for (const [compositeId, openArcList] of openArcs) {
     const compositeVisibleId = findVisibleId(compositeId, viewNodeId, tree)
-    if (!compositeVisibleId || !nodeMap.has(compositeVisibleId)) continue
+    if (!compositeVisibleId || !nodeMap.has(compositeVisibleId)) {
+      // §33: a terminal declared on the view's own composite has no
+      // composite node to hang off — at root the artefact's interface
+      // would be invisible.  Dangle the stub off the anchor leaf; the
+      // imagined peer has no node in this view.
+      if (compositeId !== viewNodeId) continue
+      for (const openArc of openArcList) {
+        const anchorLeafId = findLeafForModelNode(openArc.externalIri, tree)
+        if (anchorLeafId === null) continue
+        const anchorVisibleId = findVisibleId(anchorLeafId, viewNodeId, tree)
+        if (!anchorVisibleId || !nodeMap.has(anchorVisibleId)) continue
+        const anchor = nodeMap.get(anchorVisibleId)!
+        const idx = openArcsOut.filter(
+          (a) => a.terminal && a.openEndId === anchorVisibleId).length
+        const angle = -Math.PI / 2 + (idx - (openArcList.length - 1) / 2) * 0.55
+        const stubLen = 60
+        openArcsOut.push({
+          modelArcIri: openArc.iri,
+          sourceId: anchorVisibleId,
+          targetId: anchorVisibleId,
+          arcType: 'open',
+          modelArcType: openArc.arcType,
+          knots: [],
+          openEndId: anchorVisibleId,
+          openEndTreeNodeId: compositeId,
+          terminal: true,
+          freeEnd: {
+            x: anchor.x + Math.cos(angle) * stubLen,
+            y: anchor.y + Math.sin(angle) * stubLen,
+          },
+          referenceReversed: !(openArc.refToExternal ?? openArc.isSource),
+        })
+      }
+      continue
+    }
     for (const openArc of openArcList) {
       const externalLeafId = findLeafForModelNode(openArc.externalIri, tree)
       if (externalLeafId === null) {
