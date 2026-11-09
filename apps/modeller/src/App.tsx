@@ -231,6 +231,7 @@ export default function App() {
           refToExternal: o.refToExternal,
           externalEntityType: o.externalEntityType
             ?? entityOf.get(o.externalIri),
+          phantomEntityType: o.phantomEntityType,
         })),
       })
     } catch (err) {
@@ -240,8 +241,8 @@ export default function App() {
 
   // Stamp semantics (repeated structures): the artefact is a template —
   // its subtree is deep-copied inline with fresh tree ids and fresh
-  // {graph}/Node_{id} leaf IRIs.  No refersTo, no interface: copies
-  // connect with ordinary arcs and are fully editable/deletable.
+  // {graph}/Node_{id} leaf IRIs.  §33 copy insert: no refersTo; open
+  // arcs persist as host open arcs; dissolvedFrom keeps provenance.
   const insertCopy = useCallback(async (line: CatalogueLine) => {
     if (state.viewRefIri !== null) return   // reference view is read-only
     try {
@@ -268,6 +269,7 @@ export default function App() {
         y: 0,
         stamped,
         graphIri: GRAPH_IRI!,
+        sourceIri: line.iri,
       })
     } catch (err) {
       console.error('Failed to stamp copy:', err)
@@ -289,6 +291,9 @@ export default function App() {
   // --- Palette state (UI only, not part of model) ---
   const [activeNodeType, setActiveNodeType] = useState<NodeType>('https://w3id.org/promo#TypeA')
   const [activeArcType, setActiveArcType] = useState<ArcType>('https://w3id.org/promo#ArcType1')
+  // §33 phantom pick: entity type the user imagines on a terminal's
+  // missing end; the connection rules derive the contract's arc kind.
+  const [phantomPeer, setPhantomPeer] = useState('')
 
   // Keep the active palette selection valid when the catalogue swaps.
   useEffect(() => {
@@ -992,50 +997,92 @@ export default function App() {
             const parentId = state.tree.nodes
               .get(selectedVisibleNode.treeNodeId)?.parentId
             if (parentId === null || parentId === undefined) return null
-            const exposed = (state.openArcs.get(parentId) ?? [])
-              .find((a) => a.externalIri === sel.iri)
+            const terminals = (state.openArcs.get(parentId) ?? [])
+              .filter((a) => a.externalIri === sel.iri)
+            const short = (iri?: string) => iri?.split(/[/#]/).pop() ?? '—'
+            // §33 phantom declare: naming the imagined peer lets the
+            // connection rules derive the contract's arc kind.
+            const peerRes = phantomPeer
+              ? resolveConnection(sel.entityType, phantomPeer, catalogue, ruleResolver)
+              : null
+            const peerKinds = peerRes?.status !== 'forbidden'
+              ? (peerRes?.connections ?? []).map((c) => c.arcTypeIri)
+              : []
+            const peerEntity = NODE_TYPES.find((t) => t.id === phantomPeer)
+            const canDeclare = !!peerEntity && peerKinds.length > 0
             return (
               <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
-                <strong style={{ fontSize: 12 }}>Terminal</strong>
-                {exposed ? (
-                  <button
-                    onClick={() => dispatch({
-                      type: 'unexposeTerminal',
-                      compositeId: parentId,
-                      openArcIri: exposed.iri,
-                    })}
-                    style={{
-                      fontSize: 12, width: '100%', marginTop: 4,
-                      padding: '4px 6px', cursor: 'pointer',
-                      background: '#fff3e0', border: '1px solid #e0a050',
-                      borderRadius: 4,
-                    }}
-                  >
-                    Remove terminal
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => dispatch({
+                <strong style={{ fontSize: 12 }}>Terminals</strong>
+                {terminals.map((t) => (
+                  <div key={t.iri} style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    marginTop: 4, fontSize: 11,
+                  }}>
+                    <span style={{ flex: 1 }}>
+                      {short(t.phantomEntityType)} · {short(t.arcType)}
+                      {t.refToExternal !== undefined &&
+                        (t.refToExternal ? ' · →out' : ' · →in')}
+                    </span>
+                    <button
+                      title='flip reference direction'
+                      onClick={() => dispatch({
+                        type: 'flipTerminalDirection',
+                        compositeId: parentId,
+                        openArcIri: t.iri,
+                      })}
+                      style={{ fontSize: 11, cursor: 'pointer' }}
+                    >⇄</button>
+                    <button
+                      title='remove terminal'
+                      onClick={() => dispatch({
+                        type: 'unexposeTerminal',
+                        compositeId: parentId,
+                        openArcIri: t.iri,
+                      })}
+                      style={{ fontSize: 11, cursor: 'pointer' }}
+                    >✕</button>
+                  </div>
+                ))}
+                <select
+                  value={phantomPeer}
+                  onChange={(e) => setPhantomPeer(e.target.value)}
+                  style={{ width: '100%', marginTop: 4, fontSize: 11 }}
+                >
+                  <option value=''>imagine a peer…</option>
+                  {NODE_TYPES.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    dispatch({
                       type: 'exposeTerminal',
                       iri: modelArcIri(GRAPH_IRI!, state.arcCounter),
                       compositeId: parentId,
                       modelNodeIri: sel.iri,
                       entityType: sel.entityType,
-                    })}
-                    style={{
-                      fontSize: 12, width: '100%', marginTop: 4,
-                      padding: '4px 6px', cursor: 'pointer',
-                      background: '#fff', border: '1px solid #bbb',
-                      borderRadius: 4,
-                    }}
-                  >
-                    Expose as terminal
-                  </button>
-                )}
+                      phantomEntityType: phantomPeer || undefined,
+                      arcType: peerKinds[0],
+                    })
+                  }}
+                  disabled={!canDeclare}
+                  style={{
+                    fontSize: 12, width: '100%', marginTop: 4,
+                    padding: '4px 6px', cursor: canDeclare ? 'pointer' : 'default',
+                    background: '#fff', border: '1px solid #bbb',
+                    borderRadius: 4,
+                  }}
+                >
+                  Declare terminal
+                </button>
                 <div style={{ color: '#888', marginTop: 2 }}>
-                  {exposed
-                    ? 'on the interface — binds at occurrences'
-                    : 'puts this node on the current view’s interface'}
+                  {phantomPeer === ''
+                    ? 'pick the imagined peer — the rules derive the contract'
+                    : peerRes?.status === 'forbidden'
+                      ? 'no connection licensed for that pair'
+                      : peerKinds.length === 0
+                        ? 'resolving the rule set…'
+                        : `contract: ${short(peerKinds[0])}`}
                 </div>
               </div>
             )

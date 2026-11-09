@@ -152,6 +152,10 @@ export interface OpenArc {
    *  interface; used for host-side resolve-connection adjudication
    *  when the node itself lives in another artefact. */
   externalEntityType?: string
+  /** §33 phantom peer: the entity type imagined on the missing end.
+   *  Severed arcs inherit it from the dropped endpoint; authored
+   *  terminals get it from the declare gesture. */
+  phantomEntityType?: string
 }
 
 // ===========================================================================

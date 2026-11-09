@@ -306,6 +306,23 @@ class IcNeedOut(BaseModel):
     status: str = "needed"               # needed | supplied
 
 
+class BoundaryPortOut(BaseModel):
+    """§33 standalone boundary port: one open arc declared on the
+    artefact's root composite and how the instantiation closed it.
+
+    ``phantom-closed`` — the imagined peer materialized as an
+    instantiation-scoped node (overlay only, the artefact is never
+    written); ``bound`` — the arc's far endpoint already resolved to
+    a real node; ``unclosed`` — no declared peer (an informational
+    boundary state, not an error)."""
+
+    arc: str
+    anchor: str                            # surviving inside endpoint
+    peer_entity_type: Optional[str] = None
+    status: str                            # phantom-closed|bound|unclosed
+    peer_node: Optional[str] = None        # materialized phantom IRI
+
+
 class InstantiationReportOut(BaseModel):
     """The assembled model equation-set report (§19)."""
 
@@ -314,6 +331,7 @@ class InstantiationReportOut(BaseModel):
     indices: Dict[str, List[str]] = Field(default_factory=dict)
     entity_types: List[EntityInstantiationOut] = Field(default_factory=list)
     ports: List[PortBindingOut] = Field(default_factory=list)
+    boundary: List[BoundaryPortOut] = Field(default_factory=list)
     incidence: IncidenceReportOut
     schedule: ScheduleOut = Field(default_factory=ScheduleOut)
     problems: List[ProblemOut] = Field(default_factory=list)
@@ -330,6 +348,88 @@ def _json_value(graph, s, pred, default):
         return json.loads(str(raw))
     except (ValueError, TypeError):
         return default
+
+
+def _phantom_overlay(model_graph,
+                     nodes: Dict[str, NodeInfo],
+                     arcs: Dict[str, ArcInfo],
+                     assignments: List[AssignmentInfo],
+                     variables: Dict[str, VarInfo],
+                     equations: Dict[str, EqInfo],
+                     labels: Dict[str, str]) -> List[BoundaryPortOut]:
+    """§33 standalone boundary: phantom-close the artefact's declared
+    open arcs — the root composite's interface.
+
+    Severed arcs already carry their dangling endpoint in the
+    artefact: the phantom materializes AT that IRI and the arc binds
+    untouched.  Authored terminals (no ModelArc yet) mint both the
+    peer node and the arc, mirroring ``reconnectOpenArc``'s isSource
+    / refToExternal semantics.  The peer's boundary vars — its
+    ``port_variable`` exports plus its consumed port demands — are
+    auto-fixed so they surface as fill-in boundary conditions.
+    Overlay only: nothing is written to the artefact graph."""
+    boundary: List[BoundaryPortOut] = []
+    model = next(model_graph.subjects(RDF.type, PROMO["Model"]), None)
+    root = (model_graph.value(model, PROMO["rootComposite"])
+            if model is not None else None)
+    if root is None:
+        return boundary
+    for o in _json_value(model_graph, root, PROMO["openArcs"], []):
+        anchor = o.get("externalIri") or ""
+        pet = o.get("phantomEntityType")
+        arc_iri = o.get("iri") or ""
+        if not pet:
+            boundary.append(BoundaryPortOut(
+                arc=arc_iri, anchor=anchor, status="unclosed"))
+            continue
+        arc = arcs.get(arc_iri)
+        if arc is not None:
+            # Severed port: the phantom fills the dangling endpoint.
+            if arc.source == anchor:
+                dangling = arc.target
+            elif arc.target == anchor:
+                dangling = arc.source
+            else:
+                dangling = None
+            if dangling is None or dangling in nodes:
+                boundary.append(BoundaryPortOut(
+                    arc=arc_iri, anchor=anchor,
+                    peer_entity_type=pet, status="bound",
+                    peer_node=dangling))
+                continue
+            peer = dangling
+        else:
+            # Authored port: mint the peer node and the arc itself.
+            peer = f"{arc_iri}/peer"
+            is_source = bool(o.get("isSource"))
+            ref_to_ext = o.get("refToExternal")
+            arcs[arc_iri] = ArcInfo(
+                iri=arc_iri,
+                source=peer if is_source else anchor,
+                target=anchor if is_source else peer,
+                carrier=arc_carrier(o.get("arcType") or None),
+                reference_from=(peer if ref_to_ext else anchor)
+                if ref_to_ext is not None else None,
+                reference_to=(anchor if ref_to_ext else peer)
+                if ref_to_ext is not None else None)
+        # Boundary-condition provider: every port-relevant var of the
+        # imagined peer — its exports (port_variable-flagged LHS
+        # vars) and its consumed port demands — becomes fill-in.
+        fixes: List[str] = []
+        asg = next((a for a in assignments if a.entity_type == pet),
+                   None)
+        if asg is not None:
+            fixes += [equations[e].lhs for e in asg.sequence
+                      if e in equations
+                      and variables.get(equations[e].lhs) is not None
+                      and variables[equations[e].lhs].port_variable]
+            fixes += [p for p in asg.ports if p not in fixes]
+        nodes[peer] = NodeInfo(iri=peer, entity_type=pet, fixes=fixes)
+        labels[peer] = f"phantom {_frag(pet)}"
+        boundary.append(BoundaryPortOut(
+            arc=arc_iri, anchor=anchor, peer_entity_type=pet,
+            status="phantom-closed", peer_node=peer))
+    return boundary
 
 
 def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
@@ -1030,14 +1130,21 @@ def model_instantiation(
     library, assignment_graph = _model_dependencies(model_graph, vars)
     nodes, arcs, sub_indices, parents, temporal_types, labels, occurrences = _collect(
         store, model_graph)
-    memberships = resolve(nodes, arcs, sub_indices, parents)
-    inc = build(nodes, arcs, memberships, sub_indices)
 
     variables, equations, indices, var_labels, canonicals = \
         _vars_collect(store, library)
     labels.update(var_labels)
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, assignment_graph, labels)
+
+    # §33 standalone boundary: phantom-close the artefact's declared
+    # open arcs — the imagined peers materialize in this view only.
+    boundary = _phantom_overlay(
+        model_graph, nodes, arcs, assignments, variables, equations,
+        labels)
+
+    memberships = resolve(nodes, arcs, sub_indices, parents)
+    inc = build(nodes, arcs, memberships, sub_indices)
 
     # §20 species distribution → bind the species index.  The
     # ?species= param overrides the artefact's usesSpecies pin.
@@ -1141,6 +1248,7 @@ def model_instantiation(
             element=p.element,
             candidates=[list(c) for c in p.candidates])
             for p in report.ports],
+        boundary=boundary,
         incidence=_incidence_out(inc, labels),
         schedule=ScheduleOut(
             levels=[[SchedBlockOut(
@@ -1182,14 +1290,21 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     library, assignment_graph = _model_dependencies(model_graph, vars)
     nodes, arcs, sub_indices, parents, temporal_types, labels, occurrences = _collect(
         store, model_graph)
-    memberships = resolve(nodes, arcs, sub_indices, parents)
-    inc = build(nodes, arcs, memberships, sub_indices)
 
     variables, equations, indices, var_labels, canonicals = \
         _vars_collect(store, library)
     labels.update(var_labels)
     token_parents, token_kinds = _token_taxonomy(store, model_graph)
     assignments = _assignments_collect(store, assignment_graph, labels)
+
+    # §33 standalone boundary (see model_instantiation): the phantom
+    # overlay must precede resolve/build or the closed arcs miss the
+    # incidence pass.
+    _phantom_overlay(model_graph, nodes, arcs, assignments,
+                     variables, equations, labels)
+
+    memberships = resolve(nodes, arcs, sub_indices, parents)
+    inc = build(nodes, arcs, memberships, sub_indices)
 
     # §20 species distribution → bind the species index.  The
     # ?species= param overrides the artefact's usesSpecies pin.

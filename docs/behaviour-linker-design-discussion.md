@@ -3317,11 +3317,28 @@ declare signal ports.  Consequences, accepted:
   provenance.  Strict is only livable because port-declaration is
   cheap and escape exists — remove either and it is intolerable.
 
-### Standalone instantiation — ruled
+### Standalone instantiation — ruled (provisional, evaluate on use)
 
 A complete, interfaced submodel instantiates **standalone**: its
 ports are exposed as boundary conditions, the phantom peers as the
 default closures.  Parts are testable before placement.
+
+*Status 2026-11-09:* the procedure is new — v1 picks the minimal
+honest semantics and keeps track for evaluation:
+
+- **Overlay, not content** — phantom peers materialize only in an
+  instantiation-scoped view; the artefact itself never gains
+  phantom entities or arcs.
+- **Phantoms as boundary-condition providers** — the imagined
+  peer's port variables become fill-in inputs on the instantiation,
+  not a computing entity with its own equations.
+- **Undeclared terminals** — open arcs without a named peer report
+  as unclosed boundary, not errors.
+
+*Evaluate on use:* whether input-provision suffices or the phantom
+must compute; the DOF story at open boundaries; whether authored
+terminals need declared default values beyond the peer's port
+vars.
 
 ### What this settles from 11-06
 
@@ -3338,13 +3355,56 @@ default closures.  Parts are testable before placement.
   (occurrence expansion, sub-plans, override coverage) stays live
   for exactly this tier.
 
+### Depth — dissolve and ungroup are single-level (ruled)
+
+Both operations remove only the **top** layer:
+
+- **Dissolve** severs exactly one `refersTo` — the occurrence's own.
+  Inner referenced composites inside the pasted content copy through
+  with their `refersTo`/`overrides`/`dissolvedFrom` intact: they
+  stay live references under the host (already the implemented
+  behaviour — `service.py` dissolve copies them verbatim).
+- **Ungroup** splices one composite's children into the parent's
+  child list — inner composites stay composites (structurally
+  single-level by construction).  It applies only to in-doc
+  composites; referenced composites go through dissolve (the
+  gesture is already gated so).
+
+A paste-dissolve-ungroup sequence therefore yields a **mixed**
+host: integrated top level + still-live inner references — which is
+the desired semantics: links die only by explicit act, one per
+occurrence.  Flattening deeper is always a repeated deliberate
+gesture, never a cascade.
+
 ### Open
 
 - **Port multiplicity** — a terminal gathering several host peers
   (cf. the shared boundary var, §29/§32) needs declared cardinality.
-- **Enforcement surface** — undeclared leaves must render/behave as
-  non-targets in the connect gesture, not merely fail late.
+  Dual case, ruled: one leaf anchors *several* terminals of
+  different kinds — a valve/pump = two token-flow ports (capacity
+  peers) + one signal port (controller peer), each its own phantom.
+  The phantom set can be suggested by the entity type's
+  capabilities (actuation implies a signal port); `exposeTerminal`'s
+  one-terminal-per-leaf cap must relax to per-(leaf, contract)
+  — done 2026-11-09 (dedup key = leaf+phantom+kind+direction).
+  Gathering-terminal cardinality stays open.
+- **Enforcement surface** — verified structural (2026-11-09): a
+  referenced composite's internals are never host-view connect
+  targets — `computeGraphView` builds the host view from host maps
+  only, and the ref's interior lives in a separate read-only view
+  (`viewRefIri`) where `inRef` gates every mutating gesture.
+  Terminals are the only exposed surface, and `reconnectOpenArc`
+  requires the host end in `modelNodes`.  What remains is polish:
+  terminal stubs should be the *only* visible connection
+  affordance on a referenced box.
 - **Phantom closures** — instantiating the imagined peer as a
   minimal default entity is new machinery at instantiation time.
-- **Copies of interfaces** — whether copied-in open arcs keep their
-  expected-peer hints or land as bare stubs.
+- **Copies of interfaces** — answered in implementation
+  (2026-11-09): stamped copies keep their open arcs *with* hints
+  (`externalEntityType`/`phantomEntityType` ride the remap
+  verbatim); the interface lands as wiring documentation.
+- **One flatten gesture** — dissolve and ungroup *feel* the same to
+  the user while differing underneath: present a single
+  flatten-this-level action that dispatches by composite kind, with
+  a confirm affordance only on the dissolve path (one-way, severs
+  the link); ungroup stays instant and redoable.

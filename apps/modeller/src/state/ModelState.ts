@@ -87,8 +87,9 @@ export type Command =
   | { type: 'setNodeLabel'; treeNodeId: number; label: string }
   | { type: 'ungroup'; treeNodeId: number }
   | { type: 'reconnectOpenArc'; openArcIri: string; newModelNodeIri: string; arcType?: string }
-  | { type: 'exposeTerminal'; iri: string; compositeId: number; modelNodeIri: string; entityType: string }
+  | { type: 'exposeTerminal'; iri: string; compositeId: number; modelNodeIri: string; entityType: string; phantomEntityType?: string; arcType?: string }
   | { type: 'unexposeTerminal'; compositeId: number; openArcIri: string }
+  | { type: 'flipTerminalDirection'; compositeId: number; openArcIri: string }
   | { type: 'moveKnot'; arcIri: string; knotIndex: number; x: number; y: number }
   | { type: 'addKnot'; arcIri: string; x: number; y: number }
   | { type: 'removeKnot'; arcIri: string; knotIndex: number }
@@ -99,7 +100,7 @@ export type Command =
   | { type: 'toggleNodeFix'; iri: string; varIri: string }
   | { type: 'setCompositeRef'; treeNodeId: number; ref: CompositeRef | null }
   | { type: 'insertReferencedComposite'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; refersTo: string; terminals: OpenArc[] }
-  | { type: 'insertStamped'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; stamped: AppState; graphIri: string }
+  | { type: 'insertStamped'; id?: number; label: string; parentViewNodeId: number; x: number; y: number; stamped: AppState; graphIri: string; sourceIri?: string }
   | { type: 'reset' }
   | { type: 'loadState'; state: AppState }
 
@@ -365,20 +366,29 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
     }
 
     case 'exposeTerminal': {
-      // §22 authored interface: declaring a leaf as a terminal appends
-      // an open-arc record on the leaf's owning composite.  arcType
-      // and direction stay undecided — reconnectOpenArc resolves them
-      // at bind time.  Idempotent per node.
-      const nextOpenArcs = new Map(state.openArcs)
-      const list = nextOpenArcs.get(cmd.compositeId) ?? []
-      if (list.some((a) => a.externalIri === cmd.modelNodeIri)) return state
-      nextOpenArcs.set(cmd.compositeId, [...list, {
+      // §22/§33 authored interface: declaring a leaf as a terminal
+      // appends an open-arc record on the leaf's owning composite.
+      // The phantom peer (§33) names the imagined partner and the
+      // caller derives the contract kind (arcType) from the pair's
+      // connection rules; direction stays a flippable convention
+      // (flipTerminalDirection), and reconnectOpenArc resolves what
+      // remains undecided at bind time.  Idempotent per identical
+      // contract — a leaf may host several terminals of different
+      // kinds (§33: valve = two token-flow ports + one signal port).
+      const candidate: OpenArc = {
         iri: cmd.iri,
         externalIri: cmd.modelNodeIri,
-        arcType: '',
+        arcType: cmd.arcType ?? '',
         isSource: false,
         externalEntityType: cmd.entityType,
-      }])
+        phantomEntityType: cmd.phantomEntityType,
+      }
+      const key = (a: OpenArc) =>
+        `${a.externalIri}|${a.phantomEntityType ?? ''}|${a.arcType}|${a.refToExternal ?? ''}`
+      const nextOpenArcs = new Map(state.openArcs)
+      const list = nextOpenArcs.get(cmd.compositeId) ?? []
+      if (list.some((a) => key(a) === key(candidate))) return state
+      nextOpenArcs.set(cmd.compositeId, [...list, candidate])
       return { ...state, openArcs: nextOpenArcs, arcCounter: state.arcCounter + 1 }
     }
 
@@ -389,6 +399,20 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const nextOpenArcs = new Map(state.openArcs)
       if (kept.length) nextOpenArcs.set(cmd.compositeId, kept)
       else nextOpenArcs.delete(cmd.compositeId)
+      return { ...state, openArcs: nextOpenArcs }
+    }
+
+    case 'flipTerminalDirection': {
+      // §33: the reference direction is the one underivable bit of an
+      // authored contract — a flippable convention (§15: any
+      // assignment valid, existence is the only requirement).
+      const list = state.openArcs.get(cmd.compositeId)
+      if (!list?.some((a) => a.iri === cmd.openArcIri)) return state
+      const nextOpenArcs = new Map(state.openArcs)
+      nextOpenArcs.set(cmd.compositeId, list.map((a) =>
+        a.iri === cmd.openArcIri
+          ? { ...a, refToExternal: a.refToExternal === true ? false : true }
+          : a))
       return { ...state, openArcs: nextOpenArcs }
     }
 
@@ -570,8 +594,10 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       // Stamp semantics: deep-copy the artefact's subtree into the
       // host — fresh tree ids and fresh {graph}/Node_{id} leaf IRIs
       // per insert.  The copy is ordinary host content: connectable
-      // by plain arcs, deletable, editable.  The artefact becomes a
-      // template, not a live reference — no refersTo, no interface.
+      // by plain arcs, deletable, editable.  Its open arcs persist
+      // as host open arcs (§33: they may even become the host's own
+      // interface later); dissolvedFrom records provenance on the
+      // wrapper composite and dies if it is ungrouped.
       const stamped = cmd.stamped
       const modelGraph = new ModelGraphOps(state.modelNodes, state.modelArcs, state.arcCounter)
       const nextTree = new TreeOps(state.tree)
@@ -589,6 +615,12 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       const viewLayouts = new Map(nextLayouts.get(cmd.parentViewNodeId) ?? [])
       viewLayouts.set(String(id), { x: cmd.x, y: cmd.y })
       nextLayouts.set(cmd.parentViewNodeId, viewLayouts)
+      // §33 provenance: the wrapper remembers its template — a
+      // reference-free CompositeRef (refersTo: '') so ungrouping the
+      // copy drops the record with the group.
+      if (cmd.sourceIri) {
+        compositeRefs.set(id, { refersTo: '', overrides: {}, dissolvedFrom: cmd.sourceIri })
+      }
 
       // Pass 1 — BFS: allocate fresh tree ids for the stamped subtree.
       const idMap = new Map<number, number>()

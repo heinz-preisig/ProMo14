@@ -110,6 +110,10 @@ class OpenArcDoc(BaseModel):
     # §22: the external node's entity type — the terminal's declared
     # interface for host-side resolve-connection adjudication.
     externalEntityType: Optional[str] = None
+    # §33 phantom peer: the entity type imagined on the missing end.
+    # Severed arcs inherit it from the dropped endpoint; authored
+    # terminals get it from the declare gesture.
+    phantomEntityType: Optional[str] = None
 
 
 class CompositeDoc(BaseModel):
@@ -695,7 +699,9 @@ def extract_submodel(
     parents = {by_id[r].parentTreeId for r in roots}
     parent_id = parents.pop() if len(parents) == 1 else host.rootTreeId
 
-    entity_of = {n.iri: n.entityType for n in host.nodes}
+    # all_nodes covers the moved endpoints too — the phantom peer on
+    # the host side is the node that just left for the submodel.
+    entity_of = {n.iri: n.entityType for n in all_nodes}
     host_open = [OpenArcDoc(
         iri=a.iri,
         externalIri=(a.sourceIri if a.targetIri in moved_node_iris
@@ -706,6 +712,9 @@ def extract_submodel(
                        if a.referenceTo else None),
         externalEntityType=entity_of.get(
             a.sourceIri if a.targetIri in moved_node_iris
+            else a.targetIri),
+        phantomEntityType=entity_of.get(
+            a.sourceIri if a.sourceIri in moved_node_iris
             else a.targetIri),
     ) for a in boundary]
 
@@ -747,13 +756,15 @@ def _sub_open_arc(a: ModelArcDoc, inside: set,
     declared interface also carries the internal node's entity type
     so a host-side connect gesture can run resolve-connection."""
     internal = a.sourceIri if a.sourceIri in inside else a.targetIri
+    external = a.targetIri if a.sourceIri in inside else a.sourceIri
     entity_of = {n.iri: n.entityType for n in node_docs}
     return OpenArcDoc(
         iri=a.iri, externalIri=internal, arcType=a.arcType,
         isSource=a.sourceIri not in inside,
         refToExternal=((a.referenceTo in inside)
                        if a.referenceTo else None),
-        externalEntityType=entity_of.get(internal))
+        externalEntityType=entity_of.get(internal),
+        phantomEntityType=entity_of.get(external))
 
 
 def _centroid(parent: CompositeDoc, moved: set) -> Dict[str, float]:

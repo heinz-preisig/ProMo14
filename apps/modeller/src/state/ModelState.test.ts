@@ -247,6 +247,7 @@ describe('applyCommand', () => {
       type: 'insertStamped', id: 1, label: 'tpl',
       parentViewNodeId: 0, x: 0, y: 0,
       stamped: deserializeState(stampDoc()), graphIri: 'host',
+      sourceIri: 'tpl',
     })
 
     it('copies the subtree with fresh ids and host-minted IRIs', () => {
@@ -262,6 +263,17 @@ describe('applyCommand', () => {
       expect(state.modelNodes.size).toBe(3)
       expect([...state.modelNodes.keys()].every((iri) => iri.startsWith('host/Node_'))).toBe(true)
       expect(state.selectedVisibleNodeIds).toEqual(['1'])
+    })
+
+    it('records template provenance on the wrapper — dies on ungroup', () => {
+      let state = stamped()
+      expect(state.compositeRefs.get(1)).toEqual({
+        refersTo: '', overrides: {}, dissolvedFrom: 'tpl',
+      })
+      // §33: provenance dies with the group — ungrouping the wrapper
+      // drops the CompositeRef entry with it.
+      state = applyCommand(state, { type: 'ungroup', treeNodeId: 1 })
+      expect(state.compositeRefs.has(1)).toBe(false)
     })
 
     it('remaps arc endpoints, openArc terminals, and view layouts', () => {
@@ -431,6 +443,61 @@ describe('applyCommand', () => {
         type: 'unexposeTerminal', compositeId: 0, openArcIri: 'g/oa1',
       })
       expect(state.openArcs.get(0)).toBeUndefined()
+    })
+
+    it('one leaf hosts several terminals — dedup is per contract', () => {
+      // §33: a valve-style leaf needs two token-flow ports plus a
+      // signal port — the imagined peer distinguishes the contracts.
+      let state = applyCommand(initialState, {
+        type: 'exposeTerminal', iri: 'g/oa1', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+        phantomEntityType: 'et:cap', arcType: TF,
+      })
+      state = applyCommand(state, {
+        type: 'exposeTerminal', iri: 'g/oa2', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+        phantomEntityType: 'et:ctl', arcType: 'sig',
+      })
+      expect(state.openArcs.get(0)).toHaveLength(2)
+      // an identical re-declare is a no-op; a flipped direction
+      // makes the contract distinct
+      state = applyCommand(state, {
+        type: 'exposeTerminal', iri: 'g/oa3', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+        phantomEntityType: 'et:cap', arcType: TF,
+      })
+      expect(state.openArcs.get(0)).toHaveLength(2)
+      state = applyCommand(state, {
+        type: 'flipTerminalDirection', compositeId: 0, openArcIri: 'g/oa1',
+      })
+      state = applyCommand(state, {
+        type: 'exposeTerminal', iri: 'g/oa3', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+        phantomEntityType: 'et:cap', arcType: TF,
+      })
+      expect(state.openArcs.get(0)).toHaveLength(3)
+    })
+
+    it('flipTerminalDirection toggles refToExternal (undefined → out)', () => {
+      let state = applyCommand(initialState, {
+        type: 'exposeTerminal', iri: 'g/oa1', compositeId: 0,
+        modelNodeIri: 'g/Node_1', entityType: 'et:A',
+        phantomEntityType: 'et:cap', arcType: TF,
+      })
+      expect(state.openArcs.get(0)![0].refToExternal).toBeUndefined()
+      state = applyCommand(state, {
+        type: 'flipTerminalDirection', compositeId: 0, openArcIri: 'g/oa1',
+      })
+      expect(state.openArcs.get(0)![0].refToExternal).toBe(true)
+      state = applyCommand(state, {
+        type: 'flipTerminalDirection', compositeId: 0, openArcIri: 'g/oa1',
+      })
+      expect(state.openArcs.get(0)![0].refToExternal).toBe(false)
+      // unknown iri is a no-op
+      const same = applyCommand(state, {
+        type: 'flipTerminalDirection', compositeId: 0, openArcIri: 'g/nope',
+      })
+      expect(same).toBe(state)
     })
   })
 })
