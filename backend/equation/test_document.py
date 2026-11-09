@@ -91,8 +91,17 @@ def _ctx():
         index_structures=[ah_idx.iri, N],
         aliases={"latex": r"{{\tilde{n}_{conv}}}"},
     )
+    # Ontology-style id without the V_ prefix — ``_num`` returns it
+    # whole, and a bare ``F_conv`` in the first column is a text-mode
+    # underscore (Missing $ inserted) — the regression this fixture
+    # guards against.
+    fconv = Variable(
+        iri="http://promo.example/var/F_conv", internal_id="F_conv",
+        label="F_conv", network="thermo", type="constant", units=Units(),
+        index_structures=[N], aliases={"latex": r"{F}_{A\_conv,N}"},
+    )
     return _Ctx(
-        {v.iri: v for v in [rho, M, J, rz, flow, grouped_flow]},
+        {v.iri: v for v in [rho, M, J, rz, flow, grouped_flow, fconv]},
         {i.iri: i for i in [n_idx, ah_idx]},
     )
 
@@ -158,6 +167,16 @@ def test_variable_row_lists_equation_links():
     tex = build_document(_ctx())
     assert r'\hyperlink{"e:1"}' in tex
     assert r'\hyperlink{"e:2"}' in tex
+
+
+def test_non_v_prefixed_id_escaped_in_num_column():
+    """``F_conv``'s id has no ``V_`` prefix — ``_num`` returns it whole
+    and the first-column cell is text mode, so the display must be
+    ``F\\_conv`` while the hypertarget name stays raw."""
+    tex = build_document(_ctx())
+    assert r'\hypertarget{"v:F_conv"}' in tex
+    # First cell of the row: escaped id followed by the target/symbol.
+    assert "F\\_conv\n" in tex
 
 
 @pytest.mark.skipif(shutil.which("pdflatex") is None,
