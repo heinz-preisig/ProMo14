@@ -315,8 +315,10 @@ export default function DependentVariableEditor({
       tokens: Array.from(carriesTokens),
       // §24 signature is algebraic = derivable — it adopts like
       // units/indices; carriesToken stays the user's pick.
-      token_vector: structuralLocked
-        ? editing?.token_vector
+      token_vector: structuralLocked && editing?.token_vector
+        // Locked pins only an existing signature — declaring one on a
+        // var that has none is additive, exempt from the lock (§24).
+        ? editing.token_vector
         : checkResult?.ok && checkResult.tokens
             && Object.keys(checkResult.tokens).length
           ? normaliseTokenVector(checkResult.tokens, tokenCatalogue)
