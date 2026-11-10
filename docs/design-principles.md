@@ -228,6 +228,40 @@ keying).  Occurrence-path namespacing at instantiation landed
 
 ---
 
+## 14. Token flows are transport-mediated — capacities never connect directly
+
+User-ruled (2026-11-10): **every token flow between two capacities
+requires a transport system between them — including flows to and
+from the environment.**  A direct capacity↔capacity arc is
+unphysical, whatever the capacities' sizes.
+
+- **Capacities** store extensive quantities.  `temporalType`
+  distinguishes finite `dynamic` (lumped, point) from infinite
+  `constant` — the environment is the *infinite capacity*: it
+  provides and consumes extensive quantities at constant effort.
+  That effort is what drives the physical process — the boundary
+  condition lives on the environment, not on the arc.
+- **Transport systems** generate the flow from the efforts at their
+  ends — the constitutive relation lives there, never on the arc.
+  Two physics grades:
+  - *true physical transport* — `spatialType: distributed`,
+    `temporalType: dynamic`: has capacity of its own (material in
+    transit stores);
+  - *engineering simplification* — `temporalType: event-dynamic`:
+    capacity-free, a time-scale assumption collapsing the
+    transport's dynamics.
+- **Licensing consequence:** the domain+token rules
+  (`physical↔physical` + `sharedToken`) are too permissive — they
+  license capacity↔capacity arcs directly.  Enforcement needs
+  role-level adjudication (capacity / true-transport /
+  event-dynamic-transport).  The signatures already exist on each
+  entity type (`temporalType`, `spatialType`); whether the ontology
+  declares the role explicitly (grouping supertype / role
+  predicate) or code derives it from the signature is the open
+  machinery point.
+
+---
+
 ## Open deviations / known gaps
 
 - `E_29` sibling sub-index contraction (`idx_arc_convection` vs
@@ -275,6 +309,12 @@ keying).  Occurrence-path namespacing at instantiation landed
   re-implement superseded semantics (found 2026-11-06: F_* token
   decls resurrected post-strip).  Review audits the seed layer
   against the rulings, not just data files.
+- Mediated-flow licensing (§14) — ruled 2026-11-10, unenforced:
+  `resolve_connection` adjudicates domain+token only, so
+  capacity↔capacity arcs are still licensed.  Needs role-level
+  adjudication — either rules extended with endpoint role
+  constraints, or roles declared on etypes (signature-derived vs
+  explicit grouping supertype is open).
 - §33 machinery — authored/phantom ports: landed (`14d6aff`);
   strict referenced boundary: **enforced 2026-11-10** — the
   connect gesture's automaton swallows an armed completion at any
