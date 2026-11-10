@@ -95,6 +95,37 @@ export default function TokenSection({
   onApplySuggestion,
 }: TokenSectionProps) {
   if (tokenCatalogue.length === 0) return null
+
+  const byIri = new Map(tokenCatalogue.map((t) => [t.iri, t]))
+
+  // Membership candidates = tokens present in the signature
+  // (checker-derived ∪ manual).  No signature → unconstrained.
+  const signatureVector: Record<string, number> = {
+    ...(suggestion ? normaliseTokenVector(suggestion.vector, tokenCatalogue) : {}),
+    ...normaliseTokenVector(tokenVector, tokenCatalogue),
+  }
+  const candidates = new Set(
+    Object.entries(signatureVector)
+      .filter(([iri, e]) => e !== 0 && byIri.has(iri))
+      .map(([iri]) => iri),
+  )
+
+  // Ancestry resolves same-family pairs: a token that is a strict
+  // ancestor of another candidate is the less specific pick
+  // (component_mass beats mass — comparability runs descendant→root).
+  const ancestors = (iri: string): Set<string> => {
+    const out = new Set<string>()
+    let cur = byIri.get(iri)
+    while (cur?.parent && byIri.has(cur.parent)) {
+      out.add(cur.parent)
+      cur = byIri.get(cur.parent)
+    }
+    return out
+  }
+  const specific = [...candidates].filter(
+    (x) => ![...candidates].some((z) => z !== x && ancestors(z).has(x)),
+  )
+  const suggestedMember = specific.length === 1 ? specific[0] : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span>Tokens</span>
@@ -135,6 +166,32 @@ export default function TokenSection({
           )}
         </div>
       )}
+      {suggestedMember != null && !carriesTokens.has(suggestedMember) && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 12,
+            color: '#33691e',
+          }}
+        >
+          <span>
+            Suggested membership:{' '}
+            <strong>{byIri.get(suggestedMember)?.label}</strong>
+            {candidates.size > 1
+              ? ' — most specific token in the signature'
+              : ''}
+          </span>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onToggleToken(suggestedMember)}
+          >
+            Apply
+          </button>
+        </div>
+      )}
       <div
         style={{
           display: 'flex',
@@ -171,7 +228,11 @@ export default function TokenSection({
               <input
                 type="checkbox"
                 checked={carriesTokens.has(t.iri)}
-                disabled={disabled}
+                disabled={
+                  disabled ||
+                  (candidates.size > 0 && !candidates.has(t.iri) &&
+                    !carriesTokens.has(t.iri))
+                }
                 onChange={() => onToggleToken(t.iri)}
               />
               <span>

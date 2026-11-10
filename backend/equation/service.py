@@ -1310,9 +1310,22 @@ def _guard_token_consistency(record: VariableRecord) -> None:
             status_code=400,
             detail=f"'{record.label}' declares tokenVector "
                    "without carriesToken")
+    frag = lambda k: k.split("#")[-1].split("/")[-1]
     if record.tokens and not record.token_vector:
-        frag = lambda k: k.split("#")[-1].split("/")[-1]
         record.token_vector = {frag(t): 1 for t in record.tokens}
+    # §3 containment: a carried token must appear with nonzero exponent
+    # in the signature — the wrong-but-declared network case (e.g.
+    # ticking ``mass`` on a component-mass density) otherwise passes
+    # silently and mis-licenses ports.
+    if record.tokens and record.token_vector:
+        entries = {frag(k) for k, v in record.token_vector.items() if v}
+        missing = [t for t in record.tokens if frag(t) not in entries]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{record.label}': carriesToken(s) "
+                       f"{[frag(m) for m in missing]} have no nonzero "
+                       "exponent in tokenVector")
 
 
 def _assert_absolute_iri(iri: str) -> None:
