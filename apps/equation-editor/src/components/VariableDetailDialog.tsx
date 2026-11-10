@@ -5,7 +5,7 @@ import { equationClassLabel } from '../variableUtils'
 import TokenSection from './TokenSection'
 import { astToLatex, indexShortLabel, renderLatex, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
-import AxisClassifications, { applicableAxes, kindTag } from '../axisClassifications'
+import AxisClassifications, { applicableAxes, kindTag, tokenPolicy } from '../axisClassifications'
 import NetworkTreeSelect from './NetworkTreeSelect'
 
 const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current', 'light', 'nil']
@@ -423,6 +423,7 @@ export default function VariableDetailDialog({
             tokenVector={tokenVector}
             onToggleToken={toggleToken}
             onSetExponent={setTokenExponent}
+            policy={tokenPolicy(axes, classifications)}
           />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import type { TokenRecord } from '../types'
+import type { TokenPolicy } from '../axisClassifications'
 
 /** Surface fragment of a token IRI (``…#token_energy`` →
  *  ``token_energy``) — ``promo:tokenVector`` keys are stored
@@ -69,6 +70,10 @@ export interface TokenSectionProps {
   onToggleToken: (iri: string) => void
   onSetExponent: (iri: string, value: string) => void
   disabled?: boolean
+  /** §24 neutrality-ruling projection — callers derive it via
+   *  ``tokenPolicy(axes, classifications)``; ``null`` = unclassified,
+   *  no hint shown. */
+  policy?: TokenPolicy | null
   /** Checker-derived signature from the defining equation — shown
    *  with an Apply button when present. */
   suggestion?: TokenSuggestion | null
@@ -85,6 +90,7 @@ export default function TokenSection({
   onToggleToken,
   onSetExponent,
   disabled = false,
+  policy = null,
   suggestion = null,
   onApplySuggestion,
 }: TokenSectionProps) {
@@ -97,6 +103,18 @@ export default function TokenSection({
         tokenVector = algebraic signature (exponent per token,
         e.g. energy +1 · mass −1; empty = untracked).
       </div>
+      {policy?.bearing && carriesTokens.size === 0 && (
+        <div style={{ fontSize: 11, color: '#8d6e00' }}>
+          A {policy.kind} carries a token — pick the{' '}
+          {policy.family ?? 'token'} network(s) it rides.
+        </div>
+      )}
+      {policy != null && !policy.bearing && policy.kind !== '' && (
+        <div style={{ fontSize: 11, color: '#999' }}>
+          {policy.kind} is token-neutral — no network membership
+          expected.
+        </div>
+      )}
       {suggestion && (
         <div
           style={{

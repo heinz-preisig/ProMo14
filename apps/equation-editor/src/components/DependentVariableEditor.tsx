@@ -7,6 +7,7 @@ import AxisClassifications, {
   kindTag,
   FIELD_LABEL_STYLE,
   findTermIri,
+  tokenPolicy,
 } from '../axisClassifications'
 import { nextEquationId, nextInternalId } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
@@ -727,6 +728,7 @@ export default function DependentVariableEditor({
                 tokenVector={tokenVector}
                 onToggleToken={toggleToken}
                 onSetExponent={setTokenExponent}
+                policy={tokenPolicy(axes, classifications)}
                 suggestion={tokenSuggestion}
                 onApplySuggestion={applyTokenSuggestion}
               />
