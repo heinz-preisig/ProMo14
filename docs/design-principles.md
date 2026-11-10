@@ -266,6 +266,19 @@ unphysical, whatever the capacities' sizes.
 
 ## Open deviations / known gaps
 
+- Transport **interface arity** — opened 2026-11-10, under
+  discussion.  Topology is per-instance by construction: *N* token
+  arcs on one transport node = *N* boundaries (e.g. a cooling fin
+  coupled to several solids and the air).  The canvas refuses only
+  same-pair same-carrier duplicates — never counts ports.  What
+  remains unruled: whether a mechanism's *assigned constitutive
+  form* declares bounded arity (a pairwise through-law needs exactly
+  two ends) vs open arity (a distributed law scales with incidences)
+  — i.e. the declaration lives on the behaviour assignment, not the
+  etype.  `port-coverage` already flags the shape mismatch
+  numerically (3 peers → 9 bound slots) but cannot name the
+  semantic reason; port-satisfaction could consume a declared
+  arity for gesture-time "node full" dimming.
 - `E_29` sibling sub-index contraction (`idx_arc_convection` vs
   `idx_arc_mass`) — checker machinery gap; the current model avoids it
   (uses same-index `F_conv . fmc`).  Options recorded in the
