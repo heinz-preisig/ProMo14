@@ -313,13 +313,21 @@ export default function DependentVariableEditor({
       port_variable: isPort,
       classifications,
       tokens: Array.from(carriesTokens),
-      token_vector: Object.keys(tokenVector).length ? { ...tokenVector } : undefined,
+      // §24 signature is algebraic = derivable — it adopts like
+      // units/indices; carriesToken stays the user's pick.
+      token_vector: structuralLocked
+        ? editing?.token_vector
+        : checkResult?.ok && checkResult.tokens
+            && Object.keys(checkResult.tokens).length
+          ? normaliseTokenVector(checkResult.tokens, tokenCatalogue)
+          : (text.trim() ? editing?.token_vector : undefined)
+            ?? (Object.keys(tokenVector).length ? { ...tokenVector } : undefined),
       aliases,
       doc,
     }
   }, [name, domain, variables, checkResult, latexSym, doc, editing,
       classifications, structuralLocked, carriesTokens, tokenVector, isPort,
-      units, selectedIndices, text])
+      units, selectedIndices, text, tokenCatalogue])
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
