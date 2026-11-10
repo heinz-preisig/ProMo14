@@ -92,6 +92,50 @@ describe('RemoteRuleResolver', () => {
     expect(f).toHaveBeenCalledTimes(1)
   })
 
+  it('caches per etype pair — same domains, different etypes resolve independently', async () => {
+    // §14: lumped↔env and lumped↔transport share domain_physical|
+    // domain_physical but license different rules.  A domain-only key
+    // would return the first resolution for every physical pair.
+    const base = {
+      sourceDomainTypeIris: ['promo:domain_physical'],
+      targetDomainTypeIris: ['promo:domain_physical'],
+      sourceTokenTypeIris: [],
+      targetTokenTypeIris: [],
+      domainRelation: 'internal' as const,
+    }
+    const qEnv: ConnectionRuleQuery = {
+      ...base,
+      sourceEntityTypeIris: ['promo:et_lumped'],
+      targetEntityTypeIris: ['promo:et_env'],
+    }
+    const qConv: ConnectionRuleQuery = {
+      ...base,
+      sourceEntityTypeIris: ['promo:et_lumped'],
+      targetEntityTypeIris: ['promo:et_conv'],
+    }
+    const accessOnly = {
+      rules: [{ iri: 'promo:rule_access', rule_type: 'access', carrier: 'reference' }],
+    }
+    const f = vi.fn().mockImplementation((url: string) => {
+      const body = url.includes('target_etype=promo%3Aet_env')
+        ? accessOnly : RULES_BODY
+      return Promise.resolve({
+        ok: true, status: 200, json: () => Promise.resolve(body),
+      } as Response)
+    })
+    vi.stubGlobal('fetch', f)
+    const r = new RemoteRuleResolver()
+    const envRes = await r.resolveAsync(qEnv)
+    const convRes = await r.resolveAsync(qConv)
+    expect(f).toHaveBeenCalledTimes(2)
+    expect(envRes.status === 'allowed' && envRes.connections.map((c) => c.arcTypeIri))
+      .toEqual(['https://w3id.org/promo#ArcType/reference'])
+    expect(convRes.status === 'allowed' && convRes.connections.length).toBe(2)
+    // Re-resolve — still cached under their own keys, no third fetch.
+    await r.resolveAsync(qEnv)
+    expect(f).toHaveBeenCalledTimes(2)
+  })
+
   it('uses the fallback resolver on fetch error and does not cache it', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
     const r = new RemoteRuleResolver({ fallback: placeholderRuleResolver })

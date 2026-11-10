@@ -76,10 +76,18 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
     }
   }
 
+  /** Cache key: domain pair + etype pair — same domains can license
+   *  different rules per etype pair (requiresMechanism means
+   *  lumped↔env and lumped↔transport resolve differently despite
+   *  sharing domain_physical|domain_physical). */
+  private keyFor(pair: { source: Iri; target: Iri; sourceEtype?: Iri; targetEtype?: Iri }): string {
+    return `${pair.source}|${pair.target}|${pair.sourceEtype ?? ''}|${pair.targetEtype ?? ''}`
+  }
+
   resolve(query: ConnectionRuleQuery): ConnectionRuleResult {
     const pair = this.endpointPair(query)
     if (!pair) return { status: 'forbidden', reason: 'no endpoint IRIs in query' }
-    const key = `${pair.source}|${pair.target}`
+    const key = this.keyFor(pair)
     const hit = this.cache.get(key)
     if (hit) return hit
     void this.fetchRules(pair, key, query)
@@ -89,7 +97,7 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
   async resolveAsync(query: ConnectionRuleQuery): Promise<ConnectionRuleResult> {
     const pair = this.endpointPair(query)
     if (!pair) return { status: 'forbidden', reason: 'no endpoint IRIs in query' }
-    const key = `${pair.source}|${pair.target}`
+    const key = this.keyFor(pair)
     const hit = this.cache.get(key)
     if (hit) return hit
     return this.fetchRules(pair, key, query)
