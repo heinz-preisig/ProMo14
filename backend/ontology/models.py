@@ -226,6 +226,11 @@ class ConnectionRuleRecord(BaseModel):
     direction: Optional[Literal["bidirectional", "unidirectional"]] = None
     carrier: Optional[Literal["token-flow", "reference"]] = None
     scope: Optional[Literal["same", "cross", "any"]] = None
+    #: §14 mediated flow — at least one endpoint *entity type* must
+    #: descend from a token-bearing mechanism grouping (a transport).
+    #: Enforcement needs the caller's etypes (`source_etype`/`target_etype`
+    #: on resolve-connection); without them the check is skipped.
+    requires_mechanism: bool = False
     description: str = ""
     #: Synthesised ``promo#ArcType/<carrier>`` — server-side on reads;
     #: clients never synthesise arc-type IRIs themselves (§26).

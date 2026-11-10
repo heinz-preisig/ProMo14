@@ -885,6 +885,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
         shared_tokens: Optional[List[Union[str, URIRef]]] = None,
         carrier: Optional[str] = None,
         scope: Optional[str] = None,
+        requires_mechanism: bool = False,
         description: str = "",
     ) -> URIRef:
         """Add a connection rule definition to the graph."""
@@ -896,6 +897,8 @@ class RdfStore(PersistenceMixin, SeedMixin):
             self._set_literal(graph, iri, PROMO["carrier"], carrier)
         if scope is not None:
             self._set_literal(graph, iri, PROMO["scope"], scope)
+        self._set_literal(graph, iri, PROMO["requiresMechanism"],
+                          requires_mechanism)
         if source_domain is not None:
             if isinstance(source_domain, str):
                 source_domain = URIRef(source_domain)

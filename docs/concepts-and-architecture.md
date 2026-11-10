@@ -331,12 +331,12 @@ re-tokens the arc without touching topology. Consequences:
   compute it (incident transport node → sub-index → token). The
   Modeller displays it: `matchedTokens` on the connect gesture and the
   selected-arc panel (landed 2026-10-17).
-- **Capacity↔capacity arcs are unphysical** — ruled 2026-11-10
-  (design-principles §14): every token flow between two capacities is
-  transport-mediated, including flows to and from the environment.
-  What looked like a token-derivation gap was actually an
-  admissibility gap — the domain+token rules license them today, and
-  enforcement needs role-level adjudication (amended 2026-11-10).
+- **Capacity↔capacity arcs are unphysical** — ruled and enforced
+  2026-11-10 (design-principles §14): every token flow between two
+  capacities is transport-mediated, including flows to and from the
+  environment.  `physical-same` carries `promo:requiresMechanism` —
+  `resolve-connection` skips it unless an endpoint entity type
+  reaches a token-bearing mechanism grouping (amended 2026-11-10).
 
 ### 4.2 Port resolution at boundaries
 
@@ -556,6 +556,6 @@ designed:
   `AllowedConnection` (backend `matched_tokens`), shown in the
   connect-gesture arc-type list and the selected-arc panel.
   Capacity↔capacity is no longer a derivation question — §14 (ruled
-  2026-11-10) declares such arcs unphysical; mediated-flow enforcement
-  is the open machinery point, not an arc token assertion (amended
-  2026-11-10).
+  2026-11-10) declares such arcs unphysical, and enforcement landed
+  the same day via `promo:requiresMechanism` on `physical-same`
+  (amended 2026-11-10).

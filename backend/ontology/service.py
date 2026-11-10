@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from rdflib import URIRef
 from rdflib.namespace import RDF, RDFS
 
+from backend.core.capabilities import mechanism_token_in
 from backend.core.deps import editable_param, graph_param, resolve_graph
 from backend.core.graph_store import (
     PROMO, PROMOLG, QUDT, SEED_FLOOR, get_store,
@@ -818,6 +819,7 @@ def create_connection_rule(
         direction=record.direction,
         carrier=record.carrier,
         scope=record.scope,
+        requires_mechanism=record.requires_mechanism,
         source_domain=record.source_domain,
         target_domain=record.target_domain,
         shared_tokens=record.shared_tokens or [],
@@ -898,6 +900,8 @@ def _rule_match_orientation(rule: ConnectionRuleRecord,
 def resolve_connection(
     source: str,
     target: str,
+    source_etype: Optional[str] = None,
+    target_etype: Optional[str] = None,
     graph_iri: Optional[str] = Depends(graph_param),
 ) -> Dict[str, Any]:
     """Return connection rules applicable to a source→target domain pair.
@@ -934,6 +938,15 @@ def resolve_connection(
         if scope == "same" and src_branch != tgt_branch:
             continue
         if scope == "cross" and src_branch == tgt_branch:
+            continue
+        # §14 mediated flow: a requiresMechanism rule applies only when
+        # at least one endpoint *entity type* descends from a token-
+        # bearing mechanism grouping (a transport).  Capacity↔capacity
+        # token-flow is unphysical — nothing mediates the exchange.
+        # Skipped silently when the caller doesn't supply etypes.
+        if (rule.requires_mechanism and source_etype and target_etype
+                and not (mechanism_token_in(ctx.graph, source_etype)
+                         or mechanism_token_in(ctx.graph, target_etype))):
             continue
         # Token licensing: effective tokens of either endpoint that take
         # part in a comparable pair licensed by a comparable rule token.
@@ -1284,6 +1297,7 @@ def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
         target = graph.value(s, PROMO["targetDomain"])
         tokens = [str(t) for t in graph.objects(s, PROMO["sharedTokens"])]
         doc = graph.value(s, PROMO["doc"])
+        req_mech = graph.value(s, PROMO["requiresMechanism"])
         records.append(
             ConnectionRuleRecord(
                 iri=str(s),
@@ -1294,6 +1308,8 @@ def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
                 direction=str(direction) if direction else None,
                 carrier=str(carrier) if carrier else None,
                 scope=str(scope) if scope else None,
+                requires_mechanism=(
+                    bool(req_mech.toPython()) if req_mech is not None else False),
                 description=str(doc) if doc else "",
                 # §26: the server owns ArcType/<carrier> synthesis —
                 # clients consume, never construct, this IRI.

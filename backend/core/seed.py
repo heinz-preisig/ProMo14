@@ -383,6 +383,7 @@ class SeedMixin:
         self._seed_incidence_factors(g, base)
         self._seed_equation_classes(g, base)
         self._seed_capabilities(g, base)
+        self._seed_rule_mechanism_flags(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
@@ -449,19 +450,31 @@ class SeedMixin:
             self.mint_iri(base, "sval_time_macro_event_dynamic"),
             self.mint_iri(base, "sval_length_microscopic_distributed"),
         ]
-        # (frag, label, parent_frag, bind_scales) — parents first.
+        # (frag, label, parent_frag, bind_scales, token_frag) — parents
+        # first.  The groupings bear promo:token = the family they move
+        # (mechanism_token() walks leaves up to it); leaves inherit via
+        # promo:parent, so their token stays unset.
         tree = [
-            ("mass_transport", "Mass Transport", "transport_system", False),
-            ("energy_transport", "Energy Transport", "transport_system", False),
-            ("diffusion_transport", "Diffusion Transport", "mass_transport", True),
-            ("convection_transport", "Convection Transport", "mass_transport", True),
-            ("heat_transport", "Heat Transport", "energy_transport", True),
-            ("radiation_transport", "Radiation Transport", "energy_transport", True),
-            ("work_transport", "Work Transport", "energy_transport", True),
+            ("mass_transport", "Mass Transport", "transport_system", False,
+             "mass"),
+            ("energy_transport", "Energy Transport", "transport_system", False,
+             "energy"),
+            ("diffusion_transport", "Diffusion Transport", "mass_transport", True,
+             None),
+            ("convection_transport", "Convection Transport", "mass_transport", True,
+             None),
+            ("heat_transport", "Heat Transport", "energy_transport", True,
+             None),
+            ("radiation_transport", "Radiation Transport", "energy_transport", True,
+             None),
+            ("work_transport", "Work Transport", "energy_transport", True,
+             None),
         ]
-        for frag, label, parent_frag, bind_scales in tree:
+        for frag, label, parent_frag, bind_scales, token_frag in tree:
             iri = self.mint_iri(base, f"etype_{frag}")
             parent_iri = self.mint_iri(base, f"etype_{parent_frag}")
+            token_iri = (self.mint_iri(base, f"token_{token_frag}")
+                         if token_frag else None)
             if (iri, RDF.type, PROMO["EntityType"]) in g:
                 # Migration: reparent seeds that predate the token
                 # grouping (they sit directly under transport_system).
@@ -470,6 +483,8 @@ class SeedMixin:
                 cur = g.value(iri, PROMO["parent"])
                 if cur is None or cur == root:
                     g.set((iri, PROMO["parent"], parent_iri))
+                if token_iri is not None:
+                    g.set((iri, PROMO["token"], token_iri))
                 if bind_scales:
                     # Regime migration: drop the molecular time binding
                     # (predates the regime layer) and ensure the
@@ -489,6 +504,7 @@ class SeedMixin:
                 scale_values=[sv for sv in scales
                               if bind_scales and (sv, None, None) in g],
                 parent=parent_iri,
+                token=token_iri,
             )
 
     def _seed_arc_sub_indices(self, g: Graph, base: str) -> None:
@@ -671,6 +687,19 @@ class SeedMixin:
                 continue
             for cf in cap_frags:
                 g.add((et, PROMO["capability"], cap_iris[cf]))
+
+    def _seed_rule_mechanism_flags(self, g: Graph, base: str) -> None:
+        """Flag ``physical-same`` as ``promo:requiresMechanism`` (§14
+        mediated flow — token flows between capacities need a transport
+        mechanism at one endpoint; capacity↔capacity is unphysical).
+
+        Idempotent via ``set()`` — also called from ``load()`` as a
+        migration for stores that predate the flag.
+        """
+        rule = self.mint_iri(base, "rule_physical-same")
+        if (rule, RDF.type, PROMO["ConnectionRule"]) not in g:
+            return
+        g.set((rule, PROMO["requiresMechanism"], Literal(True)))
 
     def _seed_scale_regimes(self, g: Graph, base: str) -> None:
         """Group scale levels under regime values (particulate|continuum).

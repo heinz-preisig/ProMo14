@@ -641,8 +641,9 @@ def _seed_port_vars():
 
 def test_port_satisfaction_endpoint(client):
     """Connect-time adjudication: the lumped side's mass port is fed
-    by the environment's instantiated p_env through a token-flow arc;
-    a signal carrier licenses nothing."""
+    by the transport's instantiated p_env through a token-flow arc;
+    a signal carrier licenses nothing.  (Pair is capacity↔transport —
+    capacity↔capacity token-flow is unphysical per §14.)"""
     _seed_port_vars()
     assert client.put("/api/behaviour/assignment", json={
         "entity_type": ET_LUMPED,
@@ -651,13 +652,13 @@ def test_port_satisfaction_endpoint(client):
         "ports": [f"{ONTO}#var_p"],
     }).status_code == 200
     assert client.put("/api/behaviour/assignment", json={
-        "entity_type": ET_ENV,
+        "entity_type": ET_CONV,
         "sequence": [],
         "instantiated": [f"{ONTO}#var_p_env"],
     }).status_code == 200
 
     r = client.get("/api/modeller/port-satisfaction", params={
-        "graph": MODEL, "source": ET_LUMPED, "target": ET_ENV})
+        "graph": MODEL, "source": ET_LUMPED, "target": ET_CONV})
     assert r.status_code == 200
     body = r.json()
     assert TOK_MASS in body["matched_tokens"]
@@ -671,7 +672,7 @@ def test_port_satisfaction_endpoint(client):
 
     # Carrier filter: a reference arc carries signal, not mass.
     r = client.get("/api/modeller/port-satisfaction", params={
-        "graph": MODEL, "source": ET_LUMPED, "target": ET_ENV,
+        "graph": MODEL, "source": ET_LUMPED, "target": ET_CONV,
         "arc_type": "https://w3id.org/promo#ArcType/reference"})
     p = next(p for p in r.json()["source"]["ports"]
              if p["var"] == f"{ONTO}#var_p")

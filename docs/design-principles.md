@@ -250,15 +250,17 @@ unphysical, whatever the capacities' sizes.
   - *engineering simplification* — `temporalType: event-dynamic`:
     capacity-free, a time-scale assumption collapsing the
     transport's dynamics.
-- **Licensing consequence:** the domain+token rules
-  (`physical↔physical` + `sharedToken`) are too permissive — they
-  license capacity↔capacity arcs directly.  Enforcement needs
-  role-level adjudication (capacity / true-transport /
-  event-dynamic-transport).  The signatures already exist on each
-  entity type (`temporalType`, `spatialType`); whether the ontology
-  declares the role explicitly (grouping supertype / role
-  predicate) or code derives it from the signature is the open
-  machinery point.
+- **Licensing consequence (enforced 2026-11-10):** the domain+token
+  rules (`physical↔physical` + `sharedToken`) alone were too
+  permissive — they licensed capacity↔capacity arcs.  `physical-same`
+  now carries `promo:requiresMechanism`: `resolve-connection` skips
+  the rule unless at least one endpoint *entity type* reaches a
+  token-bearing mechanism grouping (`mechanism_token` walk over
+  `promo:parent` → `promo:token` on `mass_transport`/
+  `energy_transport`).  Callers pass `source_etype`/`target_etype`
+  alongside the domain pair; without them the check is skipped
+  (read-compat).  Role is declared in the ontology — the grouping
+  supertype — not derived from scale signatures.
 
 ---
 

@@ -663,6 +663,59 @@ def test_resolve_empty_shared_tokens_never_applies(client):
     assert dead_iri not in {r["iri"] for r in rules}
 
 
+# §14 mediated flow — promo:requiresMechanism on physical-same
+# ---------------------------------------------------------------------------
+
+def _etype_iri(client, label: str) -> str:
+    r = client.get("/api/ontology/entity-types")
+    return next(et["iri"] for et in r.json() if et["label"] == label)
+
+
+def _resolve_etypes(client, source, target, s_et, t_et):
+    r = client.get("/api/ontology/resolve-connection", params={
+        "source": source, "target": target,
+        "source_etype": s_et, "target_etype": t_et})
+    assert r.status_code == 200
+    return r.json()["rules"]
+
+
+def test_requires_mechanism_blocks_capacity_pair(client):
+    """capacity↔capacity token-flow is unphysical: physical-same must
+    not apply between two non-mechanism etypes even though their
+    domains license it."""
+    phys = _domain_iri(client, "physical")
+    lumped = _etype_iri(client, "Lumped")
+    env = _etype_iri(client, "Environment")
+    rules = _resolve_etypes(client, phys, phys, lumped, env)
+    assert "physical-same" not in {r["rule_type"] for r in rules}
+    # Sanity: domain-only resolution (no etypes) is unchanged — the
+    # check is skipped when callers don't supply entity types.
+    assert "physical-same" in {r["rule_type"]
+                             for r in _resolve(client, phys, phys)}
+
+
+def test_requires_mechanism_allows_transport_endpoint(client):
+    """A token-bearing mechanism at either endpoint satisfies the
+    rule — capacity↔transport is the legal flow topology."""
+    phys = _domain_iri(client, "physical")
+    lumped = _etype_iri(client, "Lumped")
+    conv = _etype_iri(client, "Convection Transport")
+    rules = _resolve_etypes(client, phys, phys, lumped, conv)
+    assert "physical-same" in {r["rule_type"] for r in rules}
+    # Swapped orientation likewise (bidirectional + either endpoint).
+    rules = _resolve_etypes(client, phys, phys, conv, lumped)
+    assert "physical-same" in {r["rule_type"] for r in rules}
+
+
+def test_requires_mechanism_allows_env_transport(client):
+    """environment↔transport is the sanctioned boundary coupling."""
+    phys = _domain_iri(client, "physical")
+    env = _etype_iri(client, "Environment")
+    conv = _etype_iri(client, "Convection Transport")
+    rules = _resolve_etypes(client, phys, phys, env, conv)
+    assert "physical-same" in {r["rule_type"] for r in rules}
+
+
 def test_resolve_unrelated_token_not_licensed(client):
     """A rule token on a disjoint token tree licenses nothing."""
     phys = _domain_iri(client, "physical")

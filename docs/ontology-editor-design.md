@@ -169,9 +169,12 @@ Depend on domains + tokens.  Come last.
   never apply); amended 2026-11-10 to the seeded five.
 - Continuity is token-specific: an arc carries continuity only for
   tokens shared by both connected nodes.
-- Open machinery point (ruled 2026-11-10, §14): rules adjudicate
-  domain+token only, so capacity↔capacity arcs are still licensed;
-  enforcement needs endpoint-role constraints.
+- Endpoint-role enforcement landed 2026-11-10 (§14): `physical-same`
+  carries `promo:requiresMechanism` — at least one endpoint *entity
+  type* must descend from a token-bearing mechanism grouping
+  (`mechanism_token` walk).  `GET /resolve-connection` takes
+  `source_etype`/`target_etype` for the check; capacity↔capacity
+  token-flow is unlicensed (only `access` remains).
 
 ## Abstract graphical symbols (level-1 graphics)
 

@@ -60,12 +60,20 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
 
   constructor(private opts: RemoteRuleResolverOptions = {}) {}
 
-  /** The (source, target) domain pair the backend resolves for a query. */
-  private endpointPair(query: ConnectionRuleQuery): { source: Iri; target: Iri } | null {
+  /** The (source, target) domain pair the backend resolves for a query,
+   *  plus the entity-type IRIs §14 requiresMechanism rules check. */
+  private endpointPair(query: ConnectionRuleQuery): {
+    source: Iri; target: Iri; sourceEtype?: Iri; targetEtype?: Iri
+  } | null {
     const source = query.sourceDomainTypeIris[0] ?? query.sourceEntityTypeIris[0]
     const target = query.targetDomainTypeIris[0] ?? query.targetEntityTypeIris[0]
     if (!source || !target) return null
-    return { source, target }
+    return {
+      source,
+      target,
+      sourceEtype: query.sourceEntityTypeIris[0],
+      targetEtype: query.targetEntityTypeIris[0],
+    }
   }
 
   resolve(query: ConnectionRuleQuery): ConnectionRuleResult {
@@ -74,7 +82,7 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
     const key = `${pair.source}|${pair.target}`
     const hit = this.cache.get(key)
     if (hit) return hit
-    void this.fetchRules(pair.source, pair.target, key, query)
+    void this.fetchRules(pair, key, query)
     return { status: 'allowed', connections: [] }
   }
 
@@ -84,7 +92,7 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
     const key = `${pair.source}|${pair.target}`
     const hit = this.cache.get(key)
     if (hit) return hit
-    return this.fetchRules(pair.source, pair.target, key, query)
+    return this.fetchRules(pair, key, query)
   }
 
   /** Drop all cached answers (e.g. after the ontology changes). */
@@ -93,15 +101,19 @@ export class RemoteRuleResolver implements AsyncConnectionRuleResolver {
   }
 
   private fetchRules(
-    source: Iri,
-    target: Iri,
+    pair: { source: Iri; target: Iri; sourceEtype?: Iri; targetEtype?: Iri },
     key: string,
     query: ConnectionRuleQuery,
   ): Promise<ConnectionRuleResult> {
     const inFlight = this.pending.get(key)
     if (inFlight) return inFlight
 
-    const params = new URLSearchParams({ source, target })
+    const params = new URLSearchParams({
+      source: pair.source,
+      target: pair.target,
+    })
+    if (pair.sourceEtype) params.set('source_etype', pair.sourceEtype)
+    if (pair.targetEtype) params.set('target_etype', pair.targetEtype)
     if (this.opts.graphIri) params.set('graph', this.opts.graphIri)
     const url = `${this.opts.baseUrl ?? ''}/api/ontology/resolve-connection?${params}`
 

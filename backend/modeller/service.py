@@ -293,6 +293,7 @@ def port_satisfaction_endpoint(
     if src_dom and tgt_dom:
         res = resolve_connection(
             src_dom, tgt_dom,
+            source_etype=source, target_etype=target,
             graph_iri=str(model_graph.identifier))
         rules = res["rules"]
         if carrier:
