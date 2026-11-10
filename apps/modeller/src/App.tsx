@@ -958,6 +958,10 @@ export default function App() {
               )}
               <div>ID: {selectedVisibleNode.id}</div>
               <div>Type: {selectedVisibleNode.type}</div>
+              {selectedVisibleNode.entityType && (
+                <div>Entity: {catalogue.getBaseEntity(selectedVisibleNode.entityType)?.label
+                  ?? selectedVisibleNode.entityType}</div>
+              )}
               {selectedVisibleNode.modelNodeIri && (
                 <div>IRI: {selectedVisibleNode.modelNodeIri}</div>
               )}
