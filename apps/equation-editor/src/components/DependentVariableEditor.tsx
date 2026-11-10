@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkExpression, generateExpression, parseExpression } from '../api'
 import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from '../types'
-import TokenSection, { normaliseTokenVector } from './TokenSection'
+import TokenSection, { normaliseTokenVector, specificMember } from './TokenSection'
 import AxisClassifications, {
   applicableAxes,
   kindTag,
@@ -183,23 +183,34 @@ export default function DependentVariableEditor({
   }
 
   // §24 suggestion: the checked equation's derived signature — the
-  // variable adopts it (algebraic), while carriesToken stays the
-  // user's pick (network membership is definitional, never derived).
+  // variable adopts it (algebraic).  carriesToken stays the user's
+  // pick except when the signature forces it: a unique most-specific
+  // token resolves membership unambiguously and is auto-set below.
   const tokenSuggestion =
     checkResult?.ok && checkResult.tokens && Object.keys(checkResult.tokens).length
       ? { vector: checkResult.tokens, pretty: checkResult.tokens_pretty ?? '' }
       : null
 
+  // Forced membership: when the checked signature has a unique
+  // most-specific token (ancestry drops strict ancestors), network
+  // membership isn't a choice — it's that token.  Auto-set it once per
+  // distinct survivor; a later manual uncheck doesn't retrigger.
+  const suggestionMember = tokenSuggestion
+    ? specificMember(tokenSuggestion.vector, tokenCatalogue)
+    : null
+  useEffect(() => {
+    if (suggestionMember) {
+      setCarriesTokens((prev) =>
+        prev.has(suggestionMember)
+          ? prev
+          : new Set([...prev, suggestionMember]),
+      )
+    }
+  }, [suggestionMember])
+
   const applyTokenSuggestion = () => {
     if (!tokenSuggestion) return
-    const vec = normaliseTokenVector(tokenSuggestion.vector, tokenCatalogue)
-    setTokenVector(vec)
-    // Unambiguous case — a single +1 entry IS the network membership
-    // (F_conv / n pattern).  Multi-entry vectors stay the user's pick.
-    const entries = Object.entries(vec).filter(([, e]) => e !== 0)
-    if (entries.length === 1 && entries[0][1] === 1) {
-      setCarriesTokens((prev) => new Set([...prev, entries[0][0]]))
-    }
+    setTokenVector(normaliseTokenVector(tokenSuggestion.vector, tokenCatalogue))
   }
 
   // Report the current domain/classifications so the app can offer

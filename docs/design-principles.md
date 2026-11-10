@@ -75,6 +75,22 @@ records token-free and strips legacy declarations at load (floor
 migration — file-level strips alone get resurrected);
 `test_graph_store` asserts neutrality.
 
+*Leaf semantics (ruled 2026-11-10):* an absent `tokenVector` is
+**untracked** — it poisons every product it touches so missing
+declarations stay loud.  Two cases read as **verified-empty**
+instead (neutral by definition, no declaration needed):
+
+- a bound `promo:value` — a literal number carries no token
+  (`half`/`one`/`zero` hold no classifications, so the kind
+  projection can't see them);
+- bound-value kinds `constant`/`parameter` — the same `BOUND_KINDS`
+  projection the `Instantiate` gate uses.
+
+An explicit `tokenVector` declaration always wins (a token-bearing
+parameter like a heat capacity declares it).  `{}` is a third,
+explicit state — *verified-neutral by declaration* — and persists
+through `add_variable` (2026-11-10 fix: `if tv:` used to drop it).
+
 ## 5. Mass granularity is a model-objective choice
 
 `token_mass` and `token_component_mass` are **linearly dependent**:

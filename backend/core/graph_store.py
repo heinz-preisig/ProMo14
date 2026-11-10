@@ -567,8 +567,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
             graph.add((iri, PROMO["carriesToken"], URIRef(token)))
 
         # Algebraic token signature (§24): JSON sparse exponent map.
+        # ``{}`` is meaningful — a verified-empty signature (token-
+        # neutral by declaration) vs absent = untracked.
         tv = var.get("token_vector")
-        if tv:
+        if tv is not None:
             graph.set((iri, PROMO["tokenVector"], _as_literal(tv)))
 
         # Aliases use replace semantics: the direct predicates are cleared

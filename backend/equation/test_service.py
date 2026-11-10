@@ -166,3 +166,49 @@ def test_check_token_matching_declared_no_warning(client):
     body = r.json()
     assert body["ok"] is True
     assert body["warnings"] == []
+
+
+def test_check_token_neutral_operands_derive_signature(client):
+    """§4 leaf neutrality: ``promo:value``-bound and bound-kind operands
+    are verified-empty, not untracked — the cfV pattern
+    ``half·(F − d·|F|)·c`` derives the tracked operand's signature."""
+    r = client.post("/api/equation/check", json={
+        "text": "( ( half . ( F - ( d . abs( F ) ) ) ) * c )",
+        "lhs": "cfV",
+        "variables": [
+            _var("V_half", label="half", type="constant", value="0.5"),
+            _var("V_F", label="F", type="constant",
+                 index_structures=[f"{BASE}#I_1"]),
+            _var("V_d", label="d", type="parameter"),
+            _var("V_c", label="c",
+                 index_structures=[f"{BASE}#I_1"],
+                 token_vector={"token_component_mass": -1}),
+            _var("V_cfV", label="cfV",
+                 index_structures=[f"{BASE}#I_1"]),
+        ],
+        "indices": [{"iri": f"{BASE}#I_1", "label": "S",
+                     "network": "root"}],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["tokens"] == {"token_component_mass": -1}
+
+
+def test_check_unclassified_operand_stays_untracked(client):
+    """A bearing-kind variable without a declared signature keeps the
+    product untracked — missing declarations stay loud (absorb rule)."""
+    r = client.post("/api/equation/check", json={
+        "text": "( f . c )",
+        "lhs": "x",
+        "variables": [
+            _var("V_f", label="f"),  # type="state", no token_vector
+            _var("V_c", label="c",
+                 token_vector={"token_component_mass": -1}),
+            _var("V_x", label="x"),
+        ],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["tokens"] is None

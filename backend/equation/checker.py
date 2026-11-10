@@ -49,9 +49,28 @@ from .units import Units
 
 
 def _leaf_tokens(var) -> Optional[TokenVec]:
-    """Algebraic signature of a variable leaf; ``None`` = untracked."""
+    """Algebraic signature of a variable leaf; ``None`` = untracked.
+
+    §4 neutrality ruling at the leaf, two verified-empty cases:
+
+    - a bound ``promo:value`` — a literal number carries no token by
+      definition (universal constants ``half``/``one``/``zero``; they
+      hold no classifications, so the kind projection can't see them);
+    - bound-value kinds ``constant``/``parameter`` (the same
+      ``BOUND_KINDS`` projection the Instantiate gate uses) are
+      token-neutral *by kind*.
+
+    An explicit declaration still wins (a token-bearing parameter like
+    a heat capacity declares it).  Bearing kinds stay untracked — a
+    missing signature there is an authoring gap, and untracked
+    absorbing keeps it loud."""
     tv = getattr(var, "token_vector", None)
-    return TokenVec.from_dict(tv) if tv is not None else None
+    if tv is not None:
+        return TokenVec.from_dict(tv)
+    if getattr(var, "value", None) is not None or \
+            getattr(var, "type", "") in BOUND_KINDS:
+        return TokenVec()
+    return None
 
 # Kept for readability: the LHS gate tests ``BOUND_KINDS`` (§24) — the
 # derived kind tags ``constant``/``parameter`` produced by ``kind_tag``.

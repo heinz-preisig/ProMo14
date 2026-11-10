@@ -53,6 +53,35 @@ function orderedTokens(
   return out
 }
 
+/** The single most-specific token in a signature — candidates are the
+ *  nonzero entries; ``promo:parent`` ancestry drops strict ancestors
+ *  (component_mass beats mass — comparability runs descendant→root, so
+ *  the specific pick strictly dominates).  ``null`` = no candidates or
+ *  a cross-family ambiguity, which stays the user's choice. */
+export function specificMember(
+  vector: Record<string, number>,
+  catalogue: TokenRecord[],
+): string | null {
+  const byIri = new Map(catalogue.map((t) => [t.iri, t]))
+  const norm = normaliseTokenVector(vector, catalogue)
+  const candidates = Object.entries(norm)
+    .filter(([iri, e]) => e !== 0 && byIri.has(iri))
+    .map(([iri]) => iri)
+  const ancestors = (iri: string): Set<string> => {
+    const out = new Set<string>()
+    let cur = byIri.get(iri)
+    while (cur?.parent && byIri.has(cur.parent)) {
+      out.add(cur.parent)
+      cur = byIri.get(cur.parent)
+    }
+    return out
+  }
+  const specific = candidates.filter(
+    (x) => !candidates.some((z) => z !== x && ancestors(z).has(x)),
+  )
+  return specific.length === 1 ? specific[0] : null
+}
+
 export interface TokenSuggestion {
   /** §24 signature derived from the checked equation. */
   vector: Record<string, number>
@@ -109,23 +138,7 @@ export default function TokenSection({
       .filter(([iri, e]) => e !== 0 && byIri.has(iri))
       .map(([iri]) => iri),
   )
-
-  // Ancestry resolves same-family pairs: a token that is a strict
-  // ancestor of another candidate is the less specific pick
-  // (component_mass beats mass — comparability runs descendant→root).
-  const ancestors = (iri: string): Set<string> => {
-    const out = new Set<string>()
-    let cur = byIri.get(iri)
-    while (cur?.parent && byIri.has(cur.parent)) {
-      out.add(cur.parent)
-      cur = byIri.get(cur.parent)
-    }
-    return out
-  }
-  const specific = [...candidates].filter(
-    (x) => ![...candidates].some((z) => z !== x && ancestors(z).has(x)),
-  )
-  const suggestedMember = specific.length === 1 ? specific[0] : null
+  const suggestedMember = specificMember(signatureVector, tokenCatalogue)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span>Tokens</span>
@@ -140,7 +153,8 @@ export default function TokenSection({
           {policy.family ?? 'token'} network(s) it rides.
         </div>
       )}
-      {policy != null && !policy.bearing && policy.kind !== '' && (
+      {policy != null && !policy.bearing && policy.kind !== '' &&
+        candidates.size === 0 && (
         <div style={{ fontSize: 11, color: '#999' }}>
           {policy.kind} is token-neutral — no network membership
           expected.
