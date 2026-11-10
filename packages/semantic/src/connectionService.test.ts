@@ -61,8 +61,10 @@ describe('pickArcType', () => {
     expect(pickArcType(allowedResult, 'promo:ArcType2')).toBe('promo:ArcType2')
   })
 
-  it('returns the first allowed arc type when preferred is not in the list', () => {
-    expect(pickArcType(allowedResult, 'promo:ArcType99')).toBe('promo:ArcType1')
+  it('refuses when the preferred arc type is not licensed', () => {
+    // An explicit selection is a constraint — substituting another
+    // carrier silently re-carries the user's arc (§14 regression).
+    expect(pickArcType(allowedResult, 'promo:ArcType99')).toBeNull()
   })
 
   it('returns null when allowed but connections list is empty', () => {

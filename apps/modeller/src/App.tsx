@@ -1345,7 +1345,9 @@ export default function App() {
           {hoveredHighlight === 'valid'
             ? `Valid target — right-click to connect (${validConnections.length} arc type${validConnections.length > 1 ? 's' : ''})`
             : hoveredHighlight === 'invalid'
-              ? 'Invalid target — connection not allowed'
+              ? validConnections.length > 0
+                ? `Selected arc type not licensed — ${validConnections.length} other${validConnections.length > 1 ? 's' : ''} allowed`
+                : 'Invalid target — connection not allowed'
               : pendingConnection && !state.selectedVisibleNodeId
                 ? `Source selected (${pendingConnection.sourceModelIri}) — navigate to target view, right-click a leaf to connect`
                 : hoveredObject?.kind === 'knot'

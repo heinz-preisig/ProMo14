@@ -76,5 +76,8 @@ export function pickArcType(
   const preferred = result.connections.find((c) => c.arcTypeIri === preferredArcType)
   if (preferred) return preferred.arcTypeIri
 
-  return result.connections[0].arcTypeIri
+  // The selected arc type is a constraint, not a hint: an unlicensed
+  // pick refuses rather than silently substituting another carrier
+  // (e.g. token-flow → reference on a capacity↔capacity pair, §14).
+  return null
 }
