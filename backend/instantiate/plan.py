@@ -57,6 +57,8 @@ class StateSlot:
     indices: Dict[str, List[str]] = field(default_factory=dict)
     offset: int = 0
     size: int = 0
+    #: §22 owning occurrence path (``""`` = host).
+    occurrence: str = ""
     #: How x0 is supplied at t=0: ``cells`` (literal pin),
     #: ``initialise`` (an init equation determines it — solver
     #: unknown) or ``par`` (caller-supplied ``par["ic0_<name>"]``).
@@ -78,6 +80,8 @@ class Gather:
     map: List[int] = field(default_factory=list)        # peer pos.
     scalar: bool = False                # no bound indices → select
     indices: Dict[str, List[str]] = field(default_factory=dict)
+    #: §22 owning occurrence path (``""`` = host).
+    occurrence: str = ""
 
 
 @dataclass
@@ -91,6 +95,8 @@ class MatrixLit:
     cols: List[str] = field(default_factory=list)
     entries: List[Tuple[int, int, int]] = field(default_factory=list)
     indices: Dict[str, List[str]] = field(default_factory=dict)
+    #: §22 owning occurrence path (``""`` = host).
+    occurrence: str = ""
 
 
 @dataclass
@@ -103,6 +109,8 @@ class ParamSlot:
     name: str = ""                      # emitted identifier
     value: Optional[str] = None
     indices: Dict[str, List[str]] = field(default_factory=dict)
+    #: §22 owning occurrence path (``""`` = host).
+    occurrence: str = ""
     #: §20 ν channel: the var's stored value cells expanded over the
     #: bound element sets, flat in C (row-major) order; ``None``
     #: entries are missing cells (emitters render them as NaN).
@@ -122,6 +130,8 @@ class OutputSlot:
     entity_type: str
     name: str = ""                        # emitted identifier
     indices: Dict[str, List[str]] = field(default_factory=dict)
+    #: §22 owning occurrence path (``""`` = host).
+    occurrence: str = ""
 
 
 @dataclass
@@ -169,14 +179,16 @@ class CodePlan:
     inputs: List[ParamSlot] = field(default_factory=list)
     outputs: List[OutputSlot] = field(default_factory=list)
     levels: List[List[PlanBlock]] = field(default_factory=list)
-    loops: List[List[Tuple[str, str]]] = field(default_factory=list)
+    #: SCC members as (occurrence, entity_type, equation) triples.
+    loops: List[List[Tuple[str, str, str]]] = field(default_factory=list)
     #: t=0 layer: the ``initialise``-class equation blocks (one
     #: residual each inside the emitted ``initial`` solve).
     initials: List[PlanBlock] = field(default_factory=list)
     constraints: List[PlanBlock] = field(default_factory=list)
-    #: entity_type → var IRI → emitted identifier (the renderer's
-    #: name override — per-type instance names, not bare ids).
-    names: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    #: occurrence → entity_type → var IRI → emitted identifier (the
+    #: renderer's name override — per-instance names, not bare ids).
+    names: Dict[str, Dict[str, Dict[str, str]]] = field(
+        default_factory=dict)
     #: §22 referenced-composite occurrences in this plan, ordered
     #: host-first.  Each entry: ``{path, comp, refersTo,
     #: overrides}`` — the keys emitters group blocks by when
@@ -184,52 +196,39 @@ class CodePlan:
     occurrences: List[Dict[str, Any]] = field(default_factory=list)
 
 
-def _occ_of(instance: str, occurrences: List[Dict[str, Any]]) -> str:
-    """The occurrence path owning an instance IRI — the longest
-    `occ.path` prefix of the instance's node part (`comp/inner@type`)."""
-    node = instance.split("@")[0]
-    best = ""
-    for occ in occurrences:
-        p = occ.get("path", "")
-        if p and node.startswith(p) and len(p) > len(best):
-            best = p
-    return best
+def name_map(cp: "CodePlan", occurrence: str,
+             entity_type: str) -> Dict[str, str]:
+    """A block's emitted-name map — ``names[occurrence][etype][var]``.
 
-
-def _occ_of_elements(elements: List[str],
-                     occurrences: List[Dict[str, Any]]) -> str:
-    """The occurrence path owning a block's bound element set — the
-    path that prefixes *every* element IRI.  Blocks vectorise over
-    the merged element set, so a binding that spans the boundary
-    (e.g. a capacity type used both inside and outside the
-    submodel) stays host-owned; only wholly-occurrence blocks carry
-    the path."""
-    if not elements:
-        return ""
-    for p in sorted((o.get("path", "") for o in occurrences),
-                    key=len, reverse=True):
-        if p and all(el.startswith(p) for el in elements):
-            return p
-    return ""
+    §22 Option A: the same var IRI has a distinct emitted name per
+    occurrence, so the renderer must look names up in the block's
+    own (occurrence, entity type) context.
+    """
+    return cp.names.get(occurrence, {}).get(entity_type, {})
 
 
 def plan(report: Instantiation, sched: Schedule,
          incidence: IncidenceReport,
          equations: Dict[str, EqInfo],
          indices: Dict[str, IndexInfo],
-         values: Optional[Dict[str, Dict[str, Any]]] = None,
+         values: Optional[Dict[Tuple[str, str], Dict[str, Any]]] = None,
          canonicals: Optional[Dict[str, Any]] = None,
          occurrences: Optional[List[Dict[str, Any]]] = None,
          variables: Optional[Dict[str, VarInfo]] = None
          ) -> CodePlan:
     """Lower an instantiation report + schedule into a CodePlan.
 
-    ``values`` maps a variable IRI to its stored value-cell table
-    (``{coordinate_key: scalar}`` — the §20 ν channel); parameter and
-    input slots carrying a table emit as literals instead of runtime
-    ``par`` lookups.  ``canonicals`` (eq IRI → canonical Expression)
-    flags ``SolveRoot`` bodies on plan blocks — their lhs needs an
-    initial guess in the emitted ``initial`` solve."""
+    ``values`` maps ``(occurrence_path, var_iri)`` to a stored
+    value-cell table (``{coordinate_key: scalar}`` — the §20 ν
+    channel); parameter and input slots carrying a table emit as
+    literals instead of runtime ``par`` lookups.  An occurrence's
+    own cells key coordinates by the *submodel's* element IRIs —
+    ``_value_table`` retries each lookup with the occurrence prefix
+    stripped so the submodel's defaults apply while the host's
+    occurrence-qualified cells take precedence.  ``canonicals``
+    (eq IRI → canonical Expression) flags ``SolveRoot`` bodies on
+    plan blocks — their lhs needs an initial guess in the emitted
+    ``initial`` solve."""
     from backend.equation.canonical import ic_targets
 
     out = CodePlan()
@@ -246,30 +245,45 @@ def plan(report: Instantiation, sched: Schedule,
     subsets = {inc.index: set(inc.arcs)
                for inc in incidence.sub_indices}
 
-    bindings: Dict[Tuple[str, str], VarBinding] = {}
+    bindings: Dict[Tuple[str, str, str], VarBinding] = {}
     for e in report.entity_types:
         for v in e.variables:
-            bindings[(e.entity_type, v.var)] = v
+            bindings[(e.occurrence, e.entity_type, v.var)] = v
 
-    node_type = {n: e.entity_type for e in report.entity_types
-                 for n in e.nodes}
+    node_inst = {n: (e.occurrence, e.entity_type)
+                 for e in report.entity_types for n in e.nodes}
 
-    # Emitted identifiers: the internal_id, suffixed with the entity
-    # type's fragment when several types share the variable (a port
-    # var and its peer are the same IRI — without the suffix their
-    # instances collide).
+    # Occurrence tag for emitted identifiers — the composite local
+    # names along the path (``Composite_1/…/Composite_7`` →
+    # ``Composite_1_Composite_7``), so names stay short and readable.
+    def occ_tag(path: str) -> str:
+        if not path:
+            return ""
+        chain = sorted(
+            (o for o in out.occurrences
+             if o.get("path") and path.startswith(o["path"])),
+            key=lambda o: len(o["path"]))
+        return "_".join(
+            o["comp"].rsplit("/", 1)[-1] for o in chain if o.get("comp"))
+
+    # Emitted identifiers: occurrence tag + internal_id, suffixed
+    # with the entity type's fragment when several types share the
+    # variable in one occurrence (a port var and its peer are the
+    # same IRI — without the suffix their instances collide).
     counts = Counter(v.instance.split("@")[0] for v in bindings.values())
 
     def emit_name(vb: VarBinding) -> str:
         base, _, frag = vb.instance.partition("@")
-        n = re.sub(r"\W", "_", base)
+        stem = base.rsplit("/", 1)[-1]
+        tag = occ_tag(vb.occurrence)
+        n = re.sub(r"\W", "_", (tag + "_" if tag else "") + stem)
         if counts[base] > 1:
             n += "_" + re.sub(r"\W", "_", frag).removeprefix("etype_")
         return n
 
-    names: Dict[str, Dict[str, str]] = {}
-    for (et, var), vb in bindings.items():
-        names.setdefault(et, {})[var] = emit_name(vb)
+    names: Dict[str, Dict[str, Dict[str, str]]] = {}
+    for (o, et, var), vb in bindings.items():
+        names.setdefault(o, {}).setdefault(et, {})[var] = emit_name(vb)
     out.names = names
 
     # -- states -------------------------------------------------------------
@@ -277,7 +291,8 @@ def plan(report: Instantiation, sched: Schedule,
     for e in report.entity_types:
         if not e.state_variable:
             continue
-        vb = bindings.get((e.entity_type, e.state_variable))
+        vb = bindings.get((e.occurrence, e.entity_type,
+                           e.state_variable))
         if vb is None:
             continue
         size = 1
@@ -294,9 +309,10 @@ def plan(report: Instantiation, sched: Schedule,
         out.states.append(StateSlot(
             var=vb.var, instance=vb.instance,
             entity_type=e.entity_type, indices=vb.indices,
-            name=names[e.entity_type][vb.var],
+            name=names[e.occurrence][e.entity_type][vb.var],
             offset=offset, size=size,
-            ic_source=ic_source, ic_values=ic_values))
+            ic_source=ic_source, ic_values=ic_values,
+            occurrence=e.occurrence))
         offset += size
 
     # -- matrices (incidence bindings, restricted to bound elements) --------
@@ -320,9 +336,10 @@ def plan(report: Instantiation, sched: Schedule,
                         for r, c, s in inc.entries)
                        if n in rmap and a in cmap]
             out.matrices.append(MatrixLit(
-                instance=v.instance, name=names[e.entity_type][v.var],
+                instance=v.instance,
+                name=names[v.occurrence][e.entity_type][v.var],
                 rows=rows, cols=cols, entries=entries,
-                indices=v.indices))
+                indices=v.indices, occurrence=v.occurrence))
 
     # -- params / inputs ------------------------------------------------------
     for e in report.entity_types:
@@ -339,7 +356,8 @@ def plan(report: Instantiation, sched: Schedule,
                     values=_filled_table(
                         v, _value_table(v, values or {}, report.problems,
                                         subsets), report.problems),
-                    name=names[e.entity_type][v.var]))
+                    name=names[v.occurrence][e.entity_type][v.var],
+                    occurrence=v.occurrence))
             elif v.binding in ("input", "fixed"):
                 out.inputs.append(ParamSlot(
                     var=v.var, instance=v.instance, kind="input",
@@ -347,19 +365,20 @@ def plan(report: Instantiation, sched: Schedule,
                     values=_filled_table(
                         v, _value_table(v, values or {}, report.problems,
                                         subsets), report.problems),
-                    name=names[e.entity_type][v.var]))
+                    name=names[v.occurrence][e.entity_type][v.var],
+                    occurrence=v.occurrence))
 
     # -- gathers (bound ports → peer element positions) ----------------------
-    # Port vars are type-level: group a var's contacts across all of
-    # the type's nodes into one gather over its bound elements.
-    by_type: Dict[Tuple[str, str], list] = {}
+    # Port vars are instance-level: group a var's contacts across all
+    # of the instance's nodes into one gather over its bound elements.
+    by_type: Dict[Tuple[str, str, str], list] = {}
     for p in report.ports:
         if p.status == "bound" and p.peer_node and p.peer_var:
-            et = node_type.get(p.node)
-            if et:
-                by_type.setdefault((et, p.var), []).append(p)
-    for (et, var), pbs in sorted(by_type.items()):
-        vb = bindings.get((et, var))
+            key = node_inst.get(p.node)
+            if key:
+                by_type.setdefault((key[0], key[1], p.var), []).append(p)
+    for (occ, et, var), pbs in sorted(by_type.items()):
+        vb = bindings.get((occ, et, var))
         if vb is None:
             continue
         # One gather piece per run of contacts sharing a peer — a
@@ -379,31 +398,34 @@ def plan(report: Instantiation, sched: Schedule,
         def _flush() -> None:
             if not run:
                 return
-            peer_type, peer_vb = run_peer
+            (peer_occ, peer_type), peer_vb = run_peer
             pos = {el: i for i, el in
                    enumerate(_all_elements(peer_vb))}
             out.gathers.append(Gather(
                 var=var, instance=vb.instance,
                 peer_instance=peer_vb.instance,
-                name=names[et][var],
-                peer_name=names.get(peer_type or "", {}).get(
+                name=names[occ][et][var],
+                peer_name=names.get(peer_occ, {}).get(
+                    peer_type, {}).get(
                     run[0].peer_var or "", peer_vb.instance),
                 elements=[b.arc if arc_elements else (b.element or "")
                           for b in run],
                 map=[pos.get(b.element or "", -1) for b in run],
-                scalar=not vb.indices, indices=vb.indices))
+                scalar=not vb.indices, indices=vb.indices,
+                occurrence=occ))
             run.clear()
 
         for b in contacts:
-            peer_type = node_type.get(b.peer_node or "")
-            peer_vb = bindings.get(
-                (peer_type or "", b.peer_var or ""))
+            peer_key = node_inst.get(b.peer_node or "")
+            peer_vb = (bindings.get((peer_key[0], peer_key[1],
+                                     b.peer_var or ""))
+                       if peer_key else None)
             if peer_vb is None:
                 continue
             if (run_peer is not None
                     and run_peer[1].instance != peer_vb.instance):
                 _flush()
-            run_peer = (peer_type, peer_vb)
+            run_peer = (peer_key, peer_vb)
             run.append(b)
         _flush()
 
@@ -438,42 +460,44 @@ def plan(report: Instantiation, sched: Schedule,
     # -- outputs (§21 observation sinks) -------------------------------------
     for e in report.entity_types:
         for v_iri in e.outputs:
-            vb = bindings.get((e.entity_type, v_iri))
+            vb = bindings.get((e.occurrence, e.entity_type, v_iri))
             if vb is None:
                 continue
             out.outputs.append(OutputSlot(
                 var=v_iri, instance=vb.instance,
                 entity_type=e.entity_type, indices=vb.indices,
-                name=names[e.entity_type][v_iri]))
+                name=names[e.occurrence][e.entity_type][v_iri],
+                occurrence=e.occurrence))
 
     # -- blocks in schedule order ---------------------------------------------
     # Every entity type's bound element extent per index IRI —
     # ``render_rhs`` uses it to tell a sanctioned positional
     # residual (same flat size, different index set) from a rhs the
     #: lhs genuinely can't hold.
-    et_bound: Dict[str, Dict[str, List[str]]] = {}
-    for (et, _v), vb in bindings.items():
-        m = et_bound.setdefault(et, {})
+    et_bound: Dict[Tuple[str, str], Dict[str, List[str]]] = {}
+    for (o, et, _v), vb in bindings.items():
+        m = et_bound.setdefault((o, et), {})
         for iri, els in (vb.indices or {}).items():
             m.setdefault(iri, els or [])
     # §32 bound-typing: vars whose BOUND index set differs from the
     # declared ``index_structures`` — the emit-time check must see
     # the bound form (a node-declared port var on an event-dynamic
     # entity types by its contact arcs).
-    et_var_bound: Dict[str, Dict[str, List[str]]] = {}
-    for (et, v_iri), vb in bindings.items():
+    et_var_bound: Dict[Tuple[str, str], Dict[str, List[str]]] = {}
+    for (o, et, v_iri), vb in bindings.items():
         var = (variables or {}).get(v_iri)
         bound_keys = [k for k, els in (vb.indices or {}).items()
                       if els is not None]
         if (var is not None
                 and set(bound_keys) != set(var.index_structures)):
-            et_var_bound.setdefault(et, {})[v_iri] = bound_keys
-    prescribed = {(e.entity_type, q.equation) for e in report.entity_types
+            et_var_bound.setdefault((o, et), {})[v_iri] = bound_keys
+    prescribed = {(e.occurrence, e.entity_type, q.equation)
+                  for e in report.entity_types
                   for q in e.equations if q.constraint}
     for lvl in sched.levels:
         out_lvl: List[PlanBlock] = []
         for b in lvl:
-            vb = bindings.get((b.entity_type, b.lhs))
+            vb = bindings.get((b.occurrence, b.entity_type, b.lhs))
             eq = equations.get(b.equation)
             canon = canonicals.get(b.equation)
             needs_guess = canon is not None and any(
@@ -483,46 +507,50 @@ def plan(report: Instantiation, sched: Schedule,
                 equation=b.equation,
                 lhs=b.lhs,
                 lhs_instance=vb.instance if vb else b.lhs,
-                lhs_name=(names.get(b.entity_type, {}).get(b.lhs)
+                lhs_name=(names.get(b.occurrence, {}).get(
+                          b.entity_type, {}).get(b.lhs)
                           or (vb.instance if vb else b.lhs)),
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else [],
                 rhs=eq.rhs if eq else "",
                 loop=b.loop,
-                bound=et_bound.get(b.entity_type, {}),
-                var_bound=et_var_bound.get(b.entity_type, {}),
+                bound=et_bound.get((b.occurrence, b.entity_type), {}),
+                var_bound=et_var_bound.get(
+                    (b.occurrence, b.entity_type), {}),
                 guess=needs_guess,
-                occurrence=_occ_of_elements(
-                    [el for els in vb.indices.values() for el in els]
-                    if vb else [],
-                    out.occurrences)))
-        out.constraints.extend(b for b in out_lvl
-                               if (b.entity_type, b.equation) in prescribed)
-        out.levels.append([b for b in out_lvl
-                           if (b.entity_type, b.equation) not in prescribed])
+                # §22 Option A: ownership is the instantiation's, not
+                # element-inferred — a bound boundary arc (host-IRI)
+                # stays inside the occurrence's extent.
+                occurrence=b.occurrence))
+        out.constraints.extend(
+            b for b in out_lvl
+            if (b.occurrence, b.entity_type, b.equation) in prescribed)
+        out.levels.append(
+            [b for b in out_lvl
+             if (b.occurrence, b.entity_type, b.equation)
+             not in prescribed])
     out.loops = sched.loops
 
     # -- t0 layer: initialise-class equation blocks -------------------------
     for e in report.entity_types:
         for q in e.initial_equations:
-            vb = bindings.get((e.entity_type, q.lhs))
+            vb = bindings.get((e.occurrence, e.entity_type, q.lhs))
             eq = equations.get(q.equation)
             out.initials.append(PlanBlock(
                 entity_type=e.entity_type,
                 equation=q.equation,
                 lhs=q.lhs,
                 lhs_instance=vb.instance if vb else q.lhs,
-                lhs_name=(names.get(e.entity_type, {}).get(q.lhs)
+                lhs_name=(names.get(e.occurrence, {}).get(
+                          e.entity_type, {}).get(q.lhs)
                           or (vb.instance if vb else q.lhs)),
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else list(q.inputs),
                 rhs=eq.rhs if eq else "",
-                bound=et_bound.get(e.entity_type, {}),
-                var_bound=et_var_bound.get(e.entity_type, {}),
-                occurrence=_occ_of_elements(
-                    [el for els in vb.indices.values() for el in els]
-                    if vb else [],
-                    out.occurrences)))
+                bound=et_bound.get((e.occurrence, e.entity_type), {}),
+                var_bound=et_var_bound.get(
+                    (e.occurrence, e.entity_type), {}),
+                occurrence=e.occurrence))
     return out
 
 
@@ -547,7 +575,7 @@ def _filled_table(v: VarBinding, table: Optional[List[Any]],
 
 
 def _value_table(v: VarBinding,
-                 values: Dict[str, Dict[str, Any]],
+                 values: Dict[Tuple[str, str], Dict[str, Any]],
                  problems: Optional[List[Problem]] = None,
                  subsets: Optional[Dict[str, set]] = None,
                  ) -> Optional[List[Any]]:
@@ -557,9 +585,15 @@ def _value_table(v: VarBinding,
     ``None`` when the var carries no table or one of its indices is
     unbound (symbolic extent).
 
-    The coordinate key joins element IRIs in ``indexStructure`` order
-    — the same order ``v.indices`` is built in — so the product of
-    the bound element sets enumerates every cell exactly once.
+    ``values`` is keyed ``(occurrence, var)`` — each occurrence
+    binding consults its own table.  The coordinate key joins
+    element IRIs in ``indexStructure`` order — the same order
+    ``v.indices`` is built in — so the product of the bound element
+    sets enumerates every cell exactly once.  An occurrence's bound
+    elements carry its path prefix; a lookup that misses retries
+    with the prefix stripped, so cells authored inside the submodel
+    (unqualified element IRIs) apply while host pins written
+    against qualified coordinates win by exact match.
 
     Keys containing a ``*`` segment are fill rules (docs/value-fill.md):
     a cell takes the exact key first, else the most specific matching
@@ -569,7 +603,11 @@ def _value_table(v: VarBinding,
 
     Per-axis match weight: concrete element 2, sub-index 1, ``*`` 0 —
     a pattern's score is the axis sum."""
-    cells = values.get(v.var)
+    cells = (values.get((v.occurrence, v.var))
+             # var-keyed tables tolerated — direct callers without
+             # occurrence context (never authoritative in service
+             # assembly, which always keys per occurrence).
+             or values.get(v.var))
     if not cells:
         return None
     axes: List[List[str]] = []
@@ -626,7 +664,26 @@ def _value_table(v: VarBinding,
                 first_conflict = key
         return best[0][1] if best else None
 
-    out = [_resolve(coord) for coord in product(*axes)]
+    # §22: an occurrence's bound elements are path-qualified; cells
+    # authored inside the submodel key unqualified coordinates, so a
+    # miss retries with the occurrence prefix stripped from every
+    # segment.  Exact/fill matching runs against whichever form the
+    # table actually carries.
+    occ = v.occurrence
+
+    def _resolve_any(coord: Tuple[str, ...]) -> Any:
+        if not occ:
+            return _resolve(coord)
+        out = _resolve(coord)
+        if out is not None:
+            return out
+        stripped = tuple(
+            s[len(occ):] if s.startswith(occ) else s for s in coord)
+        if stripped == coord:
+            return None
+        return _resolve(stripped)
+
+    out = [_resolve_any(coord) for coord in product(*axes)]
     if problems is not None:
         if n_bad:
             problems.append(Problem(
@@ -669,22 +726,20 @@ def sub_plan_slice(cp: CodePlan, path: str) -> CodePlan:
     excluded.  Loops survive only when every member sits inside the
     slice (a boundary-crossing coupling loop belongs to the host).
     The nested-occurrence registry carries over so deeper slices
-    nest naturally.
+    nest naturally.  Ownership is the explicit ``occurrence``
+    field each slot and block carries (§22 Option A).
     """
     sub = CodePlan()
     sub.occurrences = [dict(o) for o in cp.occurrences
                        if o.get("path", "").startswith(path + "/")]
 
-    def owns(instance: str) -> bool:
-        return _occ_of(instance, cp.occurrences) == path
-
-    sub.states = [s for s in cp.states if owns(s.instance)]
-    sub.params = [p for p in cp.params if owns(p.instance)]
-    sub.inputs = [p for p in cp.inputs if owns(p.instance)]
-    sub.gathers = [g for g in cp.gathers if owns(g.instance)]
-    sub.matrices = [m for m in cp.matrices if owns(m.instance)]
-    sub.outputs = [o for o in cp.outputs if owns(o.instance)]
-    members = {(b.entity_type, b.equation)
+    sub.states = [s for s in cp.states if s.occurrence == path]
+    sub.params = [p for p in cp.params if p.occurrence == path]
+    sub.inputs = [p for p in cp.inputs if p.occurrence == path]
+    sub.gathers = [g for g in cp.gathers if g.occurrence == path]
+    sub.matrices = [m for m in cp.matrices if m.occurrence == path]
+    sub.outputs = [o for o in cp.outputs if o.occurrence == path]
+    members = {(b.occurrence, b.entity_type, b.equation)
                for lvl in cp.levels for b in lvl
                if b.occurrence == path}
     sub.levels = [lvl for lvl in
@@ -692,8 +747,10 @@ def sub_plan_slice(cp: CodePlan, path: str) -> CodePlan:
                    for lvl in cp.levels) if lvl]
     sub.initials = [b for b in cp.initials if b.occurrence == path]
     sub.loops = [scc for scc in cp.loops if set(scc) <= members]
-    sub.constraints = [b for b in cp.constraints if b.occurrence == path]
-    sub.names = {et: dict(m) for et, m in cp.names.items()}
+    sub.constraints = [b for b in cp.constraints
+                       if b.occurrence == path]
+    sub.names = {o: {et: dict(m) for et, m in mm.items()}
+                 for o, mm in cp.names.items()}
     return sub
 
 
@@ -725,6 +782,16 @@ def code_plan_from_dict(d: Dict[str, Any]) -> CodePlan:
                 for scc in d.get("loops", [])]
     cp.initials = [_mk(PlanBlock, b) for b in d.get("initials", [])]
     cp.constraints = [_mk(PlanBlock, b) for b in d.get("constraints", [])]
-    cp.names = {et: dict(m) for et, m in d.get("names", {}).items()}
+    raw_names = d.get("names", {})
+    if raw_names and all(
+            isinstance(m, dict)
+            and all(isinstance(n, str) for n in m.values())
+            for m in raw_names.values()):
+        # legacy 2-level {et: {var: name}} — pre-Option-A persisted
+        # plans; host occurrence only.
+        cp.names = {"": {et: dict(m) for et, m in raw_names.items()}}
+    else:
+        cp.names = {o: {et: dict(m) for et, m in mm.items()}
+                    for o, mm in raw_names.items()}
     cp.occurrences = list(d.get("occurrences", []))
     return cp

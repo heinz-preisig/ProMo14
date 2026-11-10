@@ -33,8 +33,10 @@ from typing import Dict, List, Set, Tuple
 
 from .builder import Instantiation
 
-#: A DAG node: (entity type IRI, equation IRI).
-_Node = Tuple[str, str]
+#: A DAG node: (occurrence path, entity type IRI, equation IRI) —
+#: §22 Option A instantiates per use site, so two occurrences of one
+#: submodel are two independent blocks.
+_Node = Tuple[str, str, str]
 
 
 @dataclass
@@ -45,6 +47,7 @@ class SchedBlock:
     equation: str
     lhs: str
     loop: int = -1                    # loop id, or -1 if acyclic
+    occurrence: str = ""              # §22 owning occurrence path
 
 
 @dataclass
@@ -57,19 +60,20 @@ class Schedule:
 
 def schedule(report: Instantiation) -> Schedule:
     """Derive the evaluation order from an instantiation report."""
-    node_type: Dict[str, str] = {
-        n: e.entity_type for e in report.entity_types for n in e.nodes}
+    node_inst: Dict[str, Tuple[str, str]] = {
+        n: (e.occurrence, e.entity_type)
+        for e in report.entity_types for n in e.nodes}
 
-    # (type, var) → defining equation; the state var is excluded —
-    # its value is the integrator's, not the balance equation's.
-    defines: Dict[Tuple[str, str], str] = {}
+    # (occ, type, var) → defining equation; the state var is excluded
+    # — its value is the integrator's, not the balance equation's.
+    defines: Dict[Tuple[str, str, str], str] = {}
     lhs_of: Dict[_Node, str] = {}
     for e in report.entity_types:
         for q in e.equations:
-            node = (e.entity_type, q.equation)
+            node = (e.occurrence, e.entity_type, q.equation)
             lhs_of[node] = q.lhs
             if q.lhs != e.state_variable and not q.constraint:
-                defines[(e.entity_type, q.lhs)] = q.equation
+                defines[(e.occurrence, e.entity_type, q.lhs)] = q.equation
 
     # Bound ports: (node, port var) → (peer node, peer var).
     port_peer: Dict[Tuple[str, str], Tuple[str, str]] = {}
@@ -81,24 +85,28 @@ def schedule(report: Instantiation) -> Schedule:
     succ: Dict[_Node, Set[_Node]] = {n: set() for n in lhs_of}
     for e in report.entity_types:
         for q in e.equations:
-            consumer = (e.entity_type, q.equation)
+            consumer = (e.occurrence, e.entity_type, q.equation)
             for v in q.inputs:
-                dep_eq = defines.get((e.entity_type, v))
+                dep_eq = defines.get((e.occurrence, e.entity_type, v))
                 if dep_eq is not None:
                     if dep_eq != q.equation:
-                        succ[(e.entity_type, dep_eq)].add(consumer)
+                        succ[(e.occurrence, e.entity_type,
+                              dep_eq)].add(consumer)
                     continue
-                # Cross-type via bound ports on any node of this type.
+                # Cross-occurrence only via bound ports — an
+                # occurrence's other inputs resolve occurrence-local.
                 for n in e.nodes:
                     peer = port_peer.get((n, v))
                     if peer is None:
                         continue
-                    peer_type = node_type.get(peer[0])
-                    if peer_type is None:
+                    peer_inst = node_inst.get(peer[0])
+                    if peer_inst is None:
                         continue
-                    dep_eq = defines.get((peer_type, peer[1]))
+                    dep_eq = defines.get(
+                        (peer_inst[0], peer_inst[1], peer[1]))
                     if dep_eq is not None:
-                        succ[(peer_type, dep_eq)].add(consumer)
+                        succ[(peer_inst[0], peer_inst[1],
+                              dep_eq)].add(consumer)
                     break   # same var, same peer var — one edge suffices
 
     loops = _sccs(succ)
@@ -133,9 +141,11 @@ def schedule(report: Instantiation) -> Schedule:
     out = Schedule()
     for lvl in sorted(by_level):
         out.levels.append([
-            SchedBlock(entity_type=t, equation=q, lhs=lhs_of[(t, q)],
-                       loop=loop_id.get((t, q), -1))
-            for t, q in sorted(by_level[lvl])])
+            SchedBlock(entity_type=t, equation=q,
+                       lhs=lhs_of[(o, t, q)],
+                       loop=loop_id.get((o, t, q), -1),
+                       occurrence=o)
+            for o, t, q in sorted(by_level[lvl])])
     out.loops = [sorted(scc) for scc in loops]
     return out
 

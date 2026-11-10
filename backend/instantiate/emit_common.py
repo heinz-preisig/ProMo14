@@ -22,7 +22,7 @@ from backend.equation.errors import VarError
 from backend.equation.parser import parse
 from backend.equation.syntax import Var
 
-from .plan import CodePlan, PlanBlock, StateSlot
+from .plan import CodePlan, PlanBlock, StateSlot, name_map
 from .scheduler import _sccs
 
 
@@ -254,7 +254,7 @@ def t0_layout(cp: CodePlan) -> T0Layout:
     runtime residual per block); ``steady_state`` drops the pin/init
     residuals and appends ``der = 0`` instead — again one per state."""
     spec = T0Layout()
-    state_lhs = {(s.entity_type, s.var): s for s in cp.states}
+    state_lhs = {(s.occurrence, s.entity_type, s.var): s for s in cp.states}
     pinned = {p.name or inst_name(p.instance)
               for p in cp.params + cp.inputs}
     pinned |= {g.name or inst_name(g.instance) for g in cp.gathers}
@@ -268,7 +268,7 @@ def t0_layout(cp: CodePlan) -> T0Layout:
             spec.pins.append(st)
     for lvl in cp.levels:
         for b in lvl:
-            if not b.rhs or (b.entity_type, b.lhs) in state_lhs:
+            if not b.rhs or (b.occurrence, b.entity_type, b.lhs) in state_lhs:
                 continue
             nm = b.lhs_name or inst_name(b.lhs_instance)
             if nm in pinned or nm in seen:
@@ -290,7 +290,7 @@ def t0_layout(cp: CodePlan) -> T0Layout:
             if not b.rhs:
                 continue
             nm = b.lhs_name or inst_name(b.lhs_instance)
-            st = state_lhs.get((b.entity_type, b.lhs))
+            st = state_lhs.get((b.occurrence, b.entity_type, b.lhs))
             if st is not None:
                 term = "d%s" % (st.name or inst_name(st.instance))
             elif nm in pinned:
@@ -592,7 +592,7 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             continue                      # inlined by the renderer
         body.append(d.param(p, space))
 
-    state_lhs = {(s.entity_type, s.var): s for s in cp.states}
+    state_lhs = {(s.occurrence, s.entity_type, s.var): s for s in cp.states}
     emitted_gathers = set()
 
     # §22 call-style markers: contiguous block runs labelled by the
@@ -620,7 +620,7 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
 
     def _name_of(b: PlanBlock, var: str) -> str:
         return (var_name.get(var)
-                or cp.names.get(b.entity_type, {}).get(var)
+                or name_map(cp, b.occurrence, b.entity_type).get(var)
                 or inst_name(var))
 
     def _mark(path: str) -> None:
@@ -648,7 +648,7 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
         occ_fns.append(d.comment + " " + occ_label.get(occ, occ))
         occ_fns.extend(d.occ_fn_open(fn, ext, defined))
         for b in members:
-            rhs = d.render_rhs(b, space, cp.names.get(b.entity_type, {}))
+            rhs = d.render_rhs(b, space, name_map(cp, b.occurrence, b.entity_type))
             occ_fns.extend(d.assign(b, rhs))
         occ_fns.extend(d.occ_fn_close(defined))
         occ_fns.append("")
@@ -684,7 +684,7 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
             # lift into a helper function; state/loop blocks stay
             # inline (dy writes and global solves are not cones).
             if (extractable and b.occurrence
-                    and (b.entity_type, b.lhs) not in state_lhs):
+                    and (b.occurrence, b.entity_type, b.lhs) not in state_lhs):
                 groups.setdefault(b.occurrence, []).append(b)
             else:
                 inlines.append(b)
@@ -702,8 +702,8 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
                 if occ_paths:
                     _mark(b.occurrence)
                 rhs = d.render_rhs(b, space,
-                                   cp.names.get(b.entity_type, {}))
-                st = state_lhs.get((b.entity_type, b.lhs))
+                                   name_map(cp, b.occurrence, b.entity_type))
+                st = state_lhs.get((b.occurrence, b.entity_type, b.lhs))
                 if st is not None:
                     spawns.append(d.task_spawn(tid, rhs))
                     fetches.append((tid, [], st))
@@ -726,8 +726,8 @@ def emit_plan(cp: CodePlan, space: CompileSpace, d: Dialect) -> str:
                 if occ_paths:
                     _mark(b.occurrence)
                 rhs = d.render_rhs(b, space,
-                                   cp.names.get(b.entity_type, {}))
-                st = state_lhs.get((b.entity_type, b.lhs))
+                                   name_map(cp, b.occurrence, b.entity_type))
+                st = state_lhs.get((b.occurrence, b.entity_type, b.lhs))
                 if st is not None:
                     body.extend(d.state_assign(st, b, rhs, space))
                 else:

@@ -181,8 +181,8 @@ through pin/version lifecycle and reintroduces a private tier anyway
 ("internal artefacts").  *Adopted direction:* uniform **addressing**,
 not uniform persistence — composites get `{graph}#c_N` identity when a
 consumer needs it (`refersTo` into a sub-part, per-occurrence override
-keying).  Load-bearing gap is occurrence-path namespacing at
-instantiation — below.
+keying).  Occurrence-path namespacing at instantiation landed
+2026-11-10 — §22 Option A below.
 
 ## 13. Arcs bind only leaf entities — open arcs preserve the invariant
 
@@ -241,11 +241,21 @@ instantiation — below.
 - Cross-artefact consistency review — deferred until all apps are
   operational (impact analysis, publish-boundary SHACL, transactional
   mutation, atomic multi-file persistence, stale `closed` assignments).
-- Occurrence-path namespacing — a referenced submodel used twice has
-  one set of variable IRIs but two physical instances; instantiation
-  must qualify var identity by occurrence path
-  (`host/occ-k/var`).  Prerequisite for multi-occurrence models;
-  orthogonal to where the definition lives (§12).
+- Occurrence-path namespacing — **landed 2026-11-10** (§22 Option A:
+  the use site is the unit of instantiation).  Each
+  (occurrence, entity type) pair instantiates independently: nodes
+  partition by longest occurrence-path prefix, inner arcs qualify
+  like nodes (`{occ}/{inner}`), var instances carry the path
+  (`{occ}/{internal_id}@{et}`), the schedule DAG runs on
+  `(occ, et, eq)` nodes, plan slots/blocks carry explicit
+  `occurrence` ownership (a bound boundary arc doesn't disqualify),
+  emitted names get a comp-local-name tag (`Composite_1_V_5`), and
+  value cells resolve qualified-first then prefix-stripped
+  (submodel defaults apply, host pins win).  Sub-plans persist
+  populated per occurrence.  *Remaining:* shared-`var_class`
+  constants still duplicate per occurrence (dedup later); a
+  spurious shared loop can tag an occurrence whose own DAG is
+  acyclic (aggregated port edges are conservative).
 - `promo:Mechanism` vocabulary (§32 stage 2) — `drives`/`carries`
   signatures pairing vars to mechanisms on shared multi-mechanism
   boundaries; the `port-domain-ambiguous` path waits on it.

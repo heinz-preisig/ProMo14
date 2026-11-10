@@ -65,7 +65,7 @@ from .emit_common import (
     tear_loop,
     t0_layout,
 )
-from .plan import CodePlan, PlanBlock
+from .plan import CodePlan, PlanBlock, name_map
 
 
 class _Matlab(Dialect):
@@ -326,12 +326,12 @@ class _Matlab(Dialect):
             off += sz
         for b in sweep:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("    %s = %s;" % (nm, rhs))
         for i, (b, nm) in enumerate(zip(tears, names)):
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("    _r%d = (%s) - %s;" % (i, rhs, nm))
         out.append("    r = [%s];"
                    % "; ".join("_r%d.value" % i
@@ -350,7 +350,7 @@ class _Matlab(Dialect):
         # bind eliminated vars at the solved tear values
         for b in sweep:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("  %s = %s;" % (nm, rhs))
 
@@ -410,14 +410,14 @@ class _Matlab(Dialect):
         rlines: List[str] = []
         for i, (b, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             rhs = self._hoist(rhs, dep, hoists)
             rlines.append("    _r%d = (%s) - %s;" % (i, rhs, term))
         elines: List[str] = []
         ne = 0
         for b, term in spec.initials:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             rhs = self._hoist(rhs, dep, hoists)
             elines.append("      _e%d = (%s) - %s;  %% initialise"
                           % (ne, rhs, term))
@@ -496,7 +496,7 @@ class _Matlab(Dialect):
         rlines: List[str] = []
         for i, (block, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(block, space,
-                                  cp.names.get(block.entity_type, {}))
+                                  name_map(cp, block.occurrence, block.entity_type))
             rhs = self._hoist(rhs, dep, hoists)
             rlines.append("    promo_r%d = (%s) - %s;" % (i, rhs, term))
         rlines.append("    r = [%s];" % "; ".join(

@@ -54,7 +54,7 @@ from .emit_common import (
     t0_layout,
     tear_loop,
 )
-from .plan import CodePlan
+from .plan import CodePlan, name_map
 
 
 class _Julia(Dialect):
@@ -213,13 +213,13 @@ class _Julia(Dialect):
             off += sz
         for b in sweep:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("        %s = %s" % (nm, rhs))
         off = 0
         for b, nm, sz in zip(tears, names, sizes):
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("        r[%d:%d] = (%s) .- %s"
                        % (off + 1, off + sz, rhs, nm))
             off += sz
@@ -235,7 +235,7 @@ class _Julia(Dialect):
         # bind eliminated vars at the solved tear values
         for b in sweep:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("    %s = %s" % (nm, rhs))
 
@@ -300,7 +300,7 @@ class _Julia(Dialect):
                                  else self.gather_multi(pieces, space)))
         for i, (block, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(block, space,
-                                  cp.names.get(block.entity_type, {}))
+                                  name_map(cp, block.occurrence, block.entity_type))
             out.append("        _r%d = vec((%s) .- %s)" % (i, rhs, term))
         out.append("        return vcat(%s)" % ", ".join(
             "_r%d" % i for i in range(len(spec.residuals))))
@@ -441,7 +441,7 @@ class _Julia(Dialect):
             out.append("        x0 = %s  # root! guess" % nm)
         for i, (b, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("        _r%d = vec((%s) .- %s)" % (i, rhs, term))
         out.append("        _rs = Any[%s]" % ", ".join(
             "_r%d" % i for i in range(len(spec.residuals))))
@@ -452,7 +452,7 @@ class _Julia(Dialect):
         ne = 0
         for b, term in spec.initials:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("            _e%d = vec((%s) .- %s)  # initialise"
                        % (ne, rhs, term))
             ne += 1

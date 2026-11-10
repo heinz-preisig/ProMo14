@@ -140,6 +140,10 @@ class VarBinding:
     indices: Dict[str, Optional[List[str]]] = field(default_factory=dict)
     matrix: Optional[str] = None        # incidence: arc index IRI
     value: Optional[str] = None         # constant: pre-bound value
+    #: §22 Option A — the occurrence path this binding lives in
+    #: (``""`` = host artefact).  Two occurrences of one submodel
+    #: yield two bindings of the same var IRI.
+    occurrence: str = ""
 
 
 @dataclass
@@ -154,10 +158,17 @@ class EqBinding:
 
 @dataclass
 class EntityInstantiation:
-    """The instantiated equation set for one entity type."""
+    """The instantiated equation set for one entity type *in one
+    occurrence* — the use site is the unit of instantiation (§22
+    Option A): two occurrences of one submodel yield two
+    ``EntityInstantiation``s of the same entity type with disjoint
+    node sets and variable instances."""
 
     entity_type: str
     nodes: List[str] = field(default_factory=list)
+    #: §22 occurrence path owning this instance — ``""`` = the host
+    #: artefact's own content, else ``{graph}/Composite_k/…``.
+    occurrence: str = ""
     has_assignment: bool = False
     closed: bool = False
     state_variable: Optional[str] = None
@@ -292,6 +303,7 @@ def build(nodes: Dict[str, NodeInfo],
           reaction_index: Optional[str] = None,
           temporal_types: Optional[Dict[str, str]] = None,
           parents: Optional[Dict[str, str]] = None,
+          occurrence_paths: Optional[List[str]] = None,
           ) -> Instantiation:
     """Assemble the instantiated equation set for a model.
 
@@ -312,6 +324,11 @@ def build(nodes: Dict[str, NodeInfo],
     of *active* reactions (reactants present at the fixpoint) over the
     type's nodes; reactions are node-hosted, so the extent is always
     the node set.
+    ``occurrence_paths`` — the §22 referenced-composite path prefixes;
+    each node belongs to the longest path prefixing its IRI (``""``
+    = host).  Entity types split per occurrence: bindings, fix marks
+    and bound element sets stay occurrence-local, so two uses of one
+    submodel are two physical instances.
     """
     report = Instantiation()
     problems = report.problems
@@ -349,8 +366,20 @@ def build(nodes: Dict[str, NodeInfo],
     for si in sorted(sub_indices.values(), key=lambda s: s.iri):
         report.indices[si.iri] = members.get(si.iri, [])
 
-    # -- group nodes by entity type ------------------------------------------
-    type_nodes: Dict[str, List[str]] = {}
+    # -- group nodes by (entity type, occurrence) ---------------------------
+    # §22 Option A: a node's owning occurrence is the longest path
+    # prefixing its IRI; the host's own nodes own "".  Each
+    # (occurrence, entity type) pair instantiates independently.
+    occ_paths = sorted((p for p in (occurrence_paths or []) if p),
+                       key=len, reverse=True)
+
+    def node_occurrence(n: str) -> str:
+        for p in occ_paths:
+            if n.startswith(p):
+                return p
+        return ""
+
+    type_nodes: Dict[Tuple[str, str], List[str]] = {}
     for n in node_set:
         et = nodes[n].entity_type
         if not et:
@@ -359,7 +388,7 @@ def build(nodes: Dict[str, NodeInfo],
                 message=f"model node {_frag(n)} has no entity type",
                 node=n))
             continue
-        type_nodes.setdefault(et, []).append(n)
+        type_nodes.setdefault((node_occurrence(n), et), []).append(n)
 
     def arc_elements(idx_iri: str, type_node_set: Set[str],
                      ) -> Optional[List[str]]:
@@ -463,11 +492,12 @@ def build(nodes: Dict[str, NodeInfo],
             pool |= species.reactions.get(n, set())
         return sorted(pool) if pool else None
 
-    # -- per entity type ------------------------------------------------------
-    for et in sorted(type_nodes):
-        t_nodes = sorted(type_nodes[et])
+    # -- per (occurrence, entity type) ------------------------------------------
+    for occ, et in sorted(type_nodes):
+        t_nodes = sorted(type_nodes[(occ, et)])
         t_set = set(t_nodes)
-        inst = EntityInstantiation(entity_type=et, nodes=t_nodes)
+        inst = EntityInstantiation(entity_type=et, nodes=t_nodes,
+                                   occurrence=occ)
         report.entity_types.append(inst)
 
         asg = assignments.get(et)
@@ -675,11 +705,14 @@ def build(nodes: Dict[str, NodeInfo],
                 var=v_iri,
                 role=role,
                 binding=binding,
-                instance=(var.internal_id or _frag(v_iri))
+                # §22 instance path — the occurrence prefix qualifies
+                # the var's identity like it qualifies node IRIs.
+                instance=occ + (var.internal_id or _frag(v_iri))
                          + "@" + _frag(et),
                 indices=bound_indices,
                 matrix=arc_idx if binding == "incidence" else None,
                 value=var.value if binding == "constant" else None,
+                occurrence=occ,
             ))
 
         # -- t0 layer ----------------------------------------------------------

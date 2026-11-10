@@ -690,7 +690,7 @@ def test_schedule_algebraic_loop():
     rep = _build(equations=equations)
     lvl, sched = _levels(rep)
     assert len(sched.loops) == 1
-    assert {q for _t, q in sched.loops[0]} == {
+    assert {q for _o, _t, q in sched.loops[0]} == {
         _eq("prop"), _eq("flow")}
     block_loop = {b.equation: b.loop
                   for lvl_ in sched.levels for b in lvl_}
@@ -722,8 +722,13 @@ def test_schedule_unbound_port_no_edge():
 def _plan(rep, values=None, equations=EQUATIONS, canonicals=None):
     memberships = resolve(NODES, ARCS, SUB_INDICES, PARENTS)
     inc = fbuild(NODES, ARCS, memberships, SUB_INDICES)
-    return plan(rep, schedule(rep), inc, equations, INDICES,
-                values=values, canonicals=canonicals)
+    return plan(
+        rep, schedule(rep), inc, equations, INDICES,
+        # (occurrence, var) keys — the fixture's tables are
+        # host-authored, so occurrence "".
+        values={(k if isinstance(k, tuple) else ("", k)): v
+                for k, v in (values or {}).items()},
+        canonicals=canonicals)
 
 
 def _build_indexed_k():
@@ -1140,7 +1145,7 @@ def _loop_plan() -> CodePlan:
     """A hand-built 2-cycle plan: V_2 = V_3, V_3 = V_2 (loop 0)."""
     n2 = {_idx("idx_node"): ["c1", "c2"]}
     return CodePlan(
-        loops=[[("et", "e1"), ("et", "e2")]],
+        loops=[[("O", "et", "e1"), ("O", "et", "e2")]],
         names={"et": {}},
         levels=[[
             PlanBlock(entity_type="et", equation="e1", lhs=_var("p"),
@@ -2143,12 +2148,25 @@ def test_referenced_composite_endpoint(client):
                  if n.startswith(prefix)]
     assert set(occ_nodes) == {prefix + fx["st"], prefix + fx["sc"]}
 
-    ets = {e["entity_type"]: e for e in body["entity_types"]}
-    cap, tr = ets[_et("lumped_capacity")], ets[_et("diffusion_transport")]
-    assert cap["has_assignment"] and tr["has_assignment"]
-    # host capacity + occurrence capacity under one entity type
-    assert fx["hc"] in cap["nodes"]
-    assert fx["st"] in tr["nodes"] or prefix + fx["st"] in tr["nodes"]
+    # §22 Option A — the use site is the unit of instantiation: the
+    # shared capacity entity type yields two instantiations, one per
+    # occurrence, with disjoint node sets.
+    caps = [e for e in body["entity_types"]
+            if e["entity_type"] == _et("lumped_capacity")]
+    trs = [e for e in body["entity_types"]
+           if e["entity_type"] == _et("diffusion_transport")]
+    host_cap = next(e for e in caps if e["occurrence"] == "")
+    occ_cap = next(e for e in caps if e["occurrence"] == prefix)
+    tr = next(e for e in trs if e["occurrence"] == prefix)
+    assert host_cap["nodes"] == [fx["hc"]]
+    assert occ_cap["nodes"] == [prefix + fx["sc"]]
+    assert tr["nodes"] == [prefix + fx["st"]]
+    assert occ_cap["has_assignment"] and tr["has_assignment"]
+    # instances carry the occurrence path — disjoint identities
+    assert all(v["instance"].startswith(prefix)
+               for v in occ_cap["variables"])
+    assert all(not v["instance"].startswith(prefix)
+               for v in host_cap["variables"])
 
     # boundary arc b1 survives in the host registry, re-pointed at the
     # occurrence instance; the inner copy is not duplicated.
@@ -2188,15 +2206,151 @@ def test_referenced_composite_endpoint(client):
     assert str(hg.value(sub_inst, PROMO["instantiates"])) == fx["sub"]
     assert str(hg.value(sub_inst, PROMO["usesLibrary"])) == onto
     plan = json.loads(str(hg.value(sub_inst, PROMO["plan"])))
-    # Boundary semantics: blocks vectorise over the merged element
-    # set, so a binding that spans the boundary stays host-owned.
-    # Here the transport's J binds A_diff = {host b1, sub a2} — the
-    # boundary arc itself — and the capacity's m/p cover host c1 +
-    # occurrence c2.  Every block crosses → the slice is empty.
-    # §22 Option A (per-occurrence binding split, deferred until a
-    # real referenced-composite case exists) makes this non-empty.
-    assert plan["levels"] == []
-    assert plan["states"] == []
+    # §22 Option A: per-occurrence bindings — the slice owns the
+    # occurrence capacity's state and both occurrences' blocks on
+    # occurrence types (a bound boundary arc does not disqualify a
+    # block; ownership is the instantiation's).
+    assert plan["states"] != []
+    assert all(s["occurrence"] == prefix for s in plan["states"])
+    flat = [b for lvl in plan["levels"] for b in lvl]
+    assert flat
+    assert all(b["occurrence"] == prefix for b in flat)
+    lhs_ets = {(b["entity_type"], b["equation"]) for b in flat}
+    assert (_et("lumped_capacity"), _eq("bal")) in lhs_ets
+    assert (_et("diffusion_transport"), _eq("flow")) in lhs_ets
+
+
+def _seed_two_occurrences(store):
+    """§22: host artefact with TWO occurrences of the same submodel —
+    the Option-A regression case.  Two host capacities each connect a
+    boundary arc to their own occurrence's transport terminal."""
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    asg = f"{onto}/assignments"
+    HOST = "https://example.org/host2"
+    SUB = "https://example.org/sub2"
+
+    host_iri = store.create_artefact_graph(
+        HOST, "model", uses=[onto], uses_library=[onto],
+        uses_assignment=[asg])
+    sub_iri = store.create_artefact_graph(
+        SUB, "model", uses=[onto], uses_library=[onto],
+        uses_assignment=[asg])
+    hg = store.dataset.graph(host_iri)
+    sg = store.dataset.graph(sub_iri)
+
+    def node(g, base, frag, et_frag, label):
+        iri = URIRef(f"{base}/ModelNode_{frag}")
+        g.add((iri, RDF.type, PROMO["ModelNode"]))
+        g.add((iri, PROMO["entityType"], URIRef(_et(et_frag))))
+        g.add((iri, RDFS.label, Literal(label)))
+        return str(iri)
+
+    def arc(g, base, frag, src, tgt):
+        iri = URIRef(f"{base}/ModelArc_{frag}")
+        g.add((iri, RDF.type, PROMO["ModelArc"]))
+        g.add((iri, PROMO["source"], URIRef(src)))
+        g.add((iri, PROMO["target"], URIRef(tgt)))
+        g.add((iri, PROMO["arcType"],
+               Literal("promo:ArcType/token-flow")))
+        return str(iri)
+
+    # one shared submodel: t —a2— c2
+    st = node(sg, SUB, "t1", "diffusion_transport", "T")
+    sc = node(sg, SUB, "c2", "lumped_capacity", "C2")
+    a2 = arc(sg, SUB, "a2", st, sc)
+
+    # host doc: c1 —b1— {ref(sub)} and c3 —b2— {ref(sub)} — the same
+    # submodel used at two sites
+    out = {"host": HOST, "sub": SUB, "st": st, "sc": sc, "a2": a2}
+    for n, (hfrag, hlabel, bfrag, cfrag) in enumerate(
+            [("c1", "C1", "b1", "Composite_1"),
+             ("c3", "C3", "b2", "Composite_2")], start=1):
+        hc = node(hg, HOST, hfrag, "lumped_capacity", hlabel)
+        b = arc(hg, HOST, bfrag, hc, st)
+        comp = URIRef(f"{HOST}/{cfrag}")
+        hg.add((comp, RDF.type, PROMO["Composite"]))
+        hg.add((comp, PROMO["refersTo"], sub_iri))
+        hg.add((comp, PROMO["openArcs"],
+                Literal(json.dumps([{"iri": b, "isSource": False}]))))
+        out[f"hc{n}"] = hc
+        out[f"b{n}"] = b
+        out[f"comp{n}"] = str(comp)
+    return out
+
+
+def test_two_occurrences_of_one_submodel(client):
+    """§22 Option A regression: two occurrences of ONE submodel.
+    Pre-split, both uses collapsed onto shared var IRIs and the
+    second occurrence's inner arcs were silently dropped.  Now each
+    use site instantiates independently: disjoint instance IRIs,
+    disjoint emitted names, both inner arcs, two populated
+    sub-plans."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    fx = _seed_two_occurrences(store)
+    p1, p2 = fx["comp1"] + "/", fx["comp2"] + "/"
+
+    # -- /model -----------------------------------------------------
+    r = client.get("/api/instantiate/model",
+                   params={"graph": fx["host"], "vars": onto})
+    assert r.status_code == 200, r.text
+    body = r.json()
+
+    trs = [e for e in body["entity_types"]
+           if e["entity_type"] == _et("diffusion_transport")]
+    assert {e["occurrence"] for e in trs} == {p1, p2}
+    t1 = next(e for e in trs if e["occurrence"] == p1)
+    t2 = next(e for e in trs if e["occurrence"] == p2)
+    assert t1["nodes"] == [p1 + fx["st"]]
+    assert t2["nodes"] == [p2 + fx["st"]]
+    # disjoint instance identities across occurrences
+    inst1 = {v["instance"] for v in t1["variables"]}
+    inst2 = {v["instance"] for v in t2["variables"]}
+    assert inst1.isdisjoint(inst2)
+    assert all(i.startswith(p1) for i in inst1)
+    assert all(i.startswith(p2) for i in inst2)
+
+    # arc-collision regression: BOTH occurrences' inner arcs are in
+    # the merged arc index — the second used to be dropped.
+    arc_idx = set(body["indices"][_idx("idx_arc")])
+    assert p1 + fx["a2"] in arc_idx
+    assert p2 + fx["a2"] in arc_idx
+    assert fx["b1"] in arc_idx and fx["b2"] in arc_idx
+
+    # ports: each occurrence's effort port binds at its own two
+    # contacts — the host peer and the occurrence's own capacity.
+    pin_ports = [p for p in body["ports"] if p["var"] == ids["pin"]]
+    assert len(pin_ports) == 4
+    assert all(p["status"] == "bound" for p in pin_ports)
+    assert {p["node"] for p in pin_ports} == {p1 + fx["st"], p2 + fx["st"]}
+    assert {p["element"] for p in pin_ports} == {
+        fx["hc1"], fx["hc2"], p1 + fx["sc"], p2 + fx["sc"]}
+
+    # -- /code: disjoint emitted names ------------------------------
+    r = client.get("/api/instantiate/code",
+                   params={"graph": fx["host"], "vars": onto,
+                           "target": "python"})
+    assert r.status_code == 200, r.text
+    src = r.json()["source"]
+    assert "Composite_1_" in src and "Composite_2_" in src
+
+    # -- POST /instantiations: one populated sub-plan per use -------
+    r = client.post("/api/instantiate/instantiations",
+                    params={"graph": fx["host"]},
+                    json={"vars": onto})
+    assert r.status_code == 200, r.text
+    inst_iri = URIRef(r.json()["iri"])
+    hg = store.dataset.graph(inst_iri)
+    subs = list(hg.objects(inst_iri, PROMO["hasSubPlan"]))
+    assert len(subs) == 2
+    paths = {str(hg.value(s, PROMO["occurrencePath"])) for s in subs}
+    assert paths == {p1, p2}
+    for s in subs:
+        plan = json.loads(str(hg.value(s, PROMO["plan"])))
+        assert plan["levels"] != []
+        assert plan["states"] != []
 
 
 def test_initial_endpoint(client):
@@ -2484,19 +2638,19 @@ def test_ic_needs_coverage_states():
         [_var("m"), _var("p")], [(_eq("bal"), _var("m"))])])
     canonicals = {_eq("bal"): _tdiff(_var("m"))}
 
-    needs = _ic_needs(rep, canonicals, set(), lambda v: False)
+    needs = _ic_needs(rep, canonicals, set(), lambda v, occ: False)
     assert [(n.var, n.kind, n.status, n.supplied_by) for n in needs] == [
         (_var("m"), "ic", "needed", None)]
     assert needs[0].instance == "inst"
     assert needs[0].entity_type == _et("lumped_capacity")
 
     # An initialise-class equation on the var supplies the need.
-    needs = _ic_needs(rep, canonicals, {_var("m")}, lambda v: False)
+    needs = _ic_needs(rep, canonicals, {_var("m")}, lambda v, occ: False)
     assert (needs[0].status, needs[0].supplied_by) == (
         "supplied", "initialise")
 
     # Bound value cells supply it too.
-    needs = _ic_needs(rep, canonicals, set(), lambda v: True)
+    needs = _ic_needs(rep, canonicals, set(), lambda v, occ: True)
     assert (needs[0].status, needs[0].supplied_by) == (
         "supplied", "cells")
 
@@ -2507,7 +2661,7 @@ def test_ic_needs_dedup_per_var_kind_type():
         [_var("m"), _var("x")],
         [(_eq("bal"), _var("m")), (_eq("aux"), _var("x"))])])
     canonicals = {q: _tdiff(_var("m")) for q in (_eq("bal"), _eq("aux"))}
-    needs = _ic_needs(rep, canonicals, set(), lambda v: False)
+    needs = _ic_needs(rep, canonicals, set(), lambda v, occ: False)
     assert [(n.var, n.kind, n.equation) for n in needs] == [
         (_var("m"), "ic", _eq("bal"))]
 
@@ -2516,7 +2670,7 @@ def test_ic_needs_unbound_state_still_listed():
     rep = Instantiation(entity_types=[_einst(
         [_var("m")], [(_eq("bal"), _var("m"))])])
     canonicals = {_eq("bal"): _tdiff(_var("ghost"))}
-    needs = _ic_needs(rep, canonicals, set(), lambda v: False)
+    needs = _ic_needs(rep, canonicals, set(), lambda v, occ: False)
     assert (needs[0].var, needs[0].instance) == (_var("ghost"), "")
 
 

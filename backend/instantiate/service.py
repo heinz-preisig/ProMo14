@@ -155,6 +155,11 @@ class EqBindingOut(BaseModel):
 class EntityInstantiationOut(BaseModel):
     entity_type: str
     nodes: List[str] = Field(default_factory=list)
+    #: §22 owning occurrence path — `""` = the host's own content.
+    #: The same entity type may appear several times, once per
+    #: occurrence (Option A: the use site is the unit of
+    #: instantiation).
+    occurrence: str = ""
     has_assignment: bool = False
     closed: bool = False
     state_variable: Optional[str] = None
@@ -209,6 +214,7 @@ class SchedBlockOut(BaseModel):
     equation: str
     lhs: str
     loop: int = -1                       # algebraic-loop id, or -1
+    occurrence: str = ""                 # §22 owning occurrence path
 
 
 class ScheduleOut(BaseModel):
@@ -553,7 +559,9 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
                 a.reference_to = prefix + a.reference_to
 
         # inner topology: re-home under the occurrence path; inner
-        # copies of boundary arcs are dropped (the host's copy wins)
+        # copies of boundary arcs are dropped (the host's copy wins).
+        # Arc IRIs qualify like node IRIs — two occurrences of one
+        # submodel must not share an arc identity.
         for iri, n in sub_nodes.items():
             nodes[prefix + iri] = NodeInfo(
                 iri=prefix + iri, entity_type=n.entity_type,
@@ -565,8 +573,8 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
                 continue
             if a.source not in sub_nodes or a.target not in sub_nodes:
                 continue
-            arcs[iri] = ArcInfo(
-                iri=iri,
+            arcs[prefix + iri] = ArcInfo(
+                iri=prefix + iri,
                 source=prefix + a.source,
                 target=prefix + a.target,
                 carrier=a.carrier,
@@ -878,13 +886,15 @@ def _ic_needs(report, canonicals: Dict[str, Argument],
             if arg is None:
                 continue
             for var, kind in ic_targets(arg, q.lhs):
-                key = (var, kind, e.entity_type)
+                key = (var, kind, e.occurrence, e.entity_type)
                 if key in seen:
                     continue
                 seen.add(key)
                 b = bound.get(var)
-                supplied_by = ("initialise" if var in initialise_lhs
-                               else "cells" if has_cells(var) else None)
+                supplied_by = (
+                    "initialise" if var in initialise_lhs
+                    else "cells" if has_cells(var, e.occurrence)
+                    else None)
                 needs.append(IcNeedOut(
                     var=var, entity_type=e.entity_type, kind=kind,
                     equation=q.equation,
@@ -931,10 +941,33 @@ def _model_dependencies(model_graph, vars_override: Optional[str]):
     return library, assignment
 
 
+def _merged_arc_key(k: str, occ: Dict[str, Any],
+                    occurrences: List[Dict[str, Any]],
+                    arcs: Dict[str, ArcInfo]) -> str:
+    """The merged-registry IRI of an occurrence's inner arc ``k``.
+
+    An inner arc re-homes at the full occurrence path
+    (``occ.path + k``); a boundary arc keeps the IRI it was minted
+    with — at some *shallower* level of the comp chain (or the host
+    itself).  Probe deepest-first and take the registered form;
+    fall back to the full path when nothing is registered (e.g. a
+    permeable arc that never made topology).
+    """
+    chain = [o["comp"] for o in sorted(
+        (o for o in occurrences
+         if o.get("path") and occ["path"].startswith(o["path"])),
+        key=lambda o: len(o["path"]))]
+    for i in range(len(chain), -1, -1):
+        cand = "".join(c + "/" for c in chain[:i]) + k
+        if cand in arcs:
+            return cand
+    return occ["path"] + k
+
+
 def _occurrence_contexts(store, model_graph, occurrences,
                          variables, equations,
                          indices, assignments, labels, canonicals,
-                         dist) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+                         dist, arcs=None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """§22 per-occurrence context merge.
 
     Each referenced-composite occurrence resolves its content under
@@ -950,11 +983,12 @@ def _occurrence_contexts(store, model_graph, occurrences,
     Returns ``(ctx, cell_source)``: ``ctx["problems"]`` carries
     ``reference-cycle`` and ``uncovered-override`` problems;
     ``ctx["dist"]`` is the merged distribution; ``cell_source`` maps
-    each occurrence-supplied variable IRI to the graph whose value
-    cells apply (the override's ``values`` artefact or the submodel
-    itself)."""
+    ``(occurrence_path, var_iri)`` to the graph whose value cells
+    apply (the override's ``values`` artefact or the submodel
+    itself) — per-occurrence, so two uses of one submodel can pin
+    different tables via their own ``values`` overrides."""
     problems: List[Problem] = []
-    cell_source: Dict[str, Any] = {}
+    cell_source: Dict[Tuple[str, str], Any] = {}
     for occ in occurrences:
         if occ["cycle"]:
             problems.append(Problem(
@@ -982,7 +1016,7 @@ def _occurrence_contexts(store, model_graph, occurrences,
         vals_graph = (store.dataset.graph(URIRef(ov["values"]))
                       if ov.get("values") else sub_graph)
         for v in v2:
-            cell_source[v] = vals_graph
+            cell_source[(occ["path"], v)] = vals_graph
 
         # §22 sub-plan provenance: the effective pins this occurrence
         # instantiated under — persisted on the nested
@@ -1028,7 +1062,12 @@ def _occurrence_contexts(store, model_graph, occurrences,
                 dist.nodes.setdefault(
                     occ["path"] + k, set()).update(sp)
             for k, sp in dist2.arcs.items():
-                dist.arcs.setdefault(k, set()).update(sp)
+                # Inner arcs live at the full path; boundary arcs
+                # keep the IRI they were minted with — probe the
+                # comp chain for the registered form.
+                key = (_merged_arc_key(k, occ, occurrences, arcs)
+                       if arcs is not None else occ["path"] + k)
+                dist.arcs.setdefault(key, set()).update(sp)
             for k, rx in dist2.reactions.items():
                 dist.reactions.setdefault(
                     occ["path"] + k, set()).update(rx)
@@ -1059,6 +1098,22 @@ def _occurrence_contexts(store, model_graph, occurrences,
                              + ", ".join(missing))))
 
     return {"problems": problems, "dist": dist}, cell_source
+
+
+def _binding_cells(store, model_graph,
+                   cell_source: Dict[Tuple[str, str], Any],
+                   occurrence: str, var: str) -> Dict[str, Any]:
+    """The effective value-cell table for one (occurrence, var)
+    binding: the occurrence's own value source (submodel or its
+    ``values`` override) with the host artefact's cells overlaid —
+    host pins win on exact coordinates, which never collide since
+    qualified and unqualified element IRIs differ."""
+    cells: Dict[str, Any] = {}
+    src = cell_source.get((occurrence, var))
+    if src is not None:
+        cells.update(store.value_cells(src, var))
+    cells.update(store.value_cells(model_graph, var))
+    return cells
 
 
 @router.put("/values", response_model=ValueCellsOut)
@@ -1158,7 +1213,7 @@ def model_instantiation(
     occ_ctx, cell_source = _occurrence_contexts(
         store, model_graph, occurrences,
         variables, equations, indices, assignments,
-        labels, canonicals, dist)
+        labels, canonicals, dist, arcs)
     dist = occ_ctx["dist"]
 
     species_index = _species_index_iri(store, model_graph) \
@@ -1194,7 +1249,8 @@ def model_instantiation(
         species=dist, species_index=species_index,
         reaction_index=reaction_index,
         temporal_types=temporal_types,
-        parents=parents)
+        parents=parents,
+        occurrence_paths=[o["path"] for o in occurrences])
     # §20 gesture admissibility — persisted model may predate the save
     # gate or have been written by another client; report violations
     # instead of silently instantiating them.
@@ -1207,13 +1263,15 @@ def model_instantiation(
         report.problems.append(Problem(
             kind="algebraic-loop",
             message=(f"algebraic loop {i}: "
-                     + ", ".join(_frag(q) for _t, q in scc))))
+                     + ", ".join(_frag(q) for _o, _t, q in scc))))
     _filter_fixed_unbound(store, model_graph, report)
     # value-table problems (bad-fill/fill-conflict) arise at plan()
     # time — lower once so the report carries them for the cell
     # editor; the plan itself is discarded.
     plan(report, sched, inc, equations, indices,
-         values={v.var: store.value_cells(model_graph, v.var)
+         values={(v.occurrence, v.var): _binding_cells(
+                     store, model_graph, cell_source,
+                     v.occurrence, v.var)
                  for e in report.entity_types for v in e.variables},
          canonicals=canonicals, variables=variables)
 
@@ -1224,6 +1282,7 @@ def model_instantiation(
         entity_types=[EntityInstantiationOut(
             entity_type=e.entity_type,
             nodes=e.nodes,
+            occurrence=e.occurrence,
             has_assignment=e.has_assignment,
             closed=e.closed,
             state_variable=e.state_variable,
@@ -1232,8 +1291,8 @@ def model_instantiation(
                 var=v.var, role=v.role, binding=v.binding,
                 instance=v.instance, indices=v.indices,
                 matrix=v.matrix, value=v.value,
-                values=store.value_cells(
-                    cell_source.get(v.var, model_graph), v.var))
+                values=_binding_cells(store, model_graph, cell_source,
+                                      v.occurrence, v.var))
                 for v in e.variables],
             equations=[EqBindingOut(
                 equation=q.equation, lhs=q.lhs, inputs=q.inputs, constraint=q.constraint)
@@ -1253,15 +1312,17 @@ def model_instantiation(
         schedule=ScheduleOut(
             levels=[[SchedBlockOut(
                 entity_type=b.entity_type, equation=b.equation,
-                lhs=b.lhs, loop=b.loop) for b in lvl]
+                lhs=b.lhs, loop=b.loop, occurrence=b.occurrence)
+                for b in lvl]
                 for lvl in sched.levels],
-            loops=[[[t, q] for t, q in scc] for scc in sched.loops]),
+            loops=[list(scc) for scc in sched.loops]),
         problems=[_problem_out(p) for p in report.problems],
         ic_needs=_ic_needs(
             report, canonicals,
             {q.lhs for q in equations.values()
              if is_initialise_class(q.equation_class)},
-            lambda v: bool(store.value_cells(model_graph, v))),
+            lambda v, occ: bool(_binding_cells(
+                store, model_graph, cell_source, occ, v))),
         labels=labels,
     )
 
@@ -1315,7 +1376,7 @@ def _plan_for(graph_iri: str, vars: Optional[str],
     occ_ctx, cell_source = _occurrence_contexts(
         store, model_graph, occurrences,
         variables, equations, indices, assignments,
-        labels, canonicals, dist)
+        labels, canonicals, dist, arcs)
     dist = occ_ctx["dist"]
 
     species_index = _species_index_iri(store, model_graph) \
@@ -1330,23 +1391,72 @@ def _plan_for(graph_iri: str, vars: Optional[str],
         species=dist, species_index=species_index,
         reaction_index=reaction_index,
         temporal_types=temporal_types,
-        parents=parents)
+        parents=parents,
+        occurrence_paths=[o["path"] for o in occurrences])
     for msg in graph_violations(store, model_graph):
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))
     report.problems.extend(occ_ctx["problems"])
     sched = schedule(report)
     _filter_fixed_unbound(store, model_graph, report)
-    # §20 ν channel: stored value-cell tables on the model artefact,
-    # keyed by variable IRI — plan() expands them over each binding's
-    # element sets; emitters render them as literals.
-    values = {v.var: store.value_cells(
-                  cell_source.get(v.var, model_graph), v.var)
+    # §20 ν channel: stored value-cell tables keyed (occurrence,
+    # var) — the occurrence's own source overlaid by host pins;
+    # plan() expands them over each binding's element sets;
+    # emitters render them as literals.
+    values = {(v.occurrence, v.var): _binding_cells(
+                  store, model_graph, cell_source,
+                  v.occurrence, v.var)
               for e in report.entity_types for v in e.variables}
     cp = plan(report, sched, inc, equations, indices, values=values,
               canonicals=canonicals, occurrences=occurrences,
               variables=variables)
     return cp, report, store
+
+
+def _pinned_plan(store, instantiation: str):
+    """Replay a persisted ``promo:Instantiation``'s plan — the
+    ``?instantiation=`` path of ``/code``, ``/initial`` and
+    ``/code/export``.
+
+    The artefact graph holds ``promo:plan`` JSON on its identifier
+    subject; a ``#occ_N`` fragment names the nested sub-instantiation
+    persisted by ``save_instantiation`` (its own plan, pins and
+    overrides — replays the submodel's contribution standalone).
+    Returns ``(cp, problems, pin)``: the deserialised ``CodePlan``,
+    the recorded problem kinds, and the ``usesLibrary`` pin the
+    plan was computed against (the emitter's var/expr scope).
+    """
+    # The artefact IRI itself carries '#' (``{model}#instantiation_…``)
+    # and sub-plan subjects extend it (``…#occ_0``), so the graph IRI
+    # is found by peeling trailing fragments until ``promo:plan``
+    # turns up on the subject.
+    subj = URIRef(instantiation)
+    g = raw = None
+    cand = instantiation
+    while True:
+        gg = store.dataset.graph(URIRef(cand))
+        raw = (gg.value(subj, PROMO["plan"])
+               or gg.value(URIRef(cand), PROMO["plan"]))
+        if raw is not None:
+            g = gg
+            subj = (subj if gg.value(subj, PROMO["plan"]) is not None
+                    else URIRef(cand))
+            break
+        if "#" not in cand:
+            break
+        cand = cand.rsplit("#", 1)[0]
+    if g is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{instantiation} is not a promo:Instantiation artefact")
+    raw_problems = (g.value(subj, PROMO["problems"])
+                    or g.value(g.identifier, PROMO["problems"]))
+    problems = (json.loads(str(raw_problems))
+                if raw_problems is not None else [])
+    pin = g.value(subj, PROMO["usesLibrary"]) or g.value(
+        g.identifier, PROMO["usesLibrary"])
+    return (code_plan_from_dict(json.loads(str(raw))), problems,
+            str(pin) if pin is not None else None)
 
 
 _EMITTERS = {"python": emit_python, "julia": emit_julia,

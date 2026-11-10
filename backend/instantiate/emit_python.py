@@ -47,7 +47,7 @@ from .emit_common import (
     t0_layout,
     tear_loop,
 )
-from .plan import CodePlan
+from .plan import CodePlan, name_map
 
 
 def _flat_size(indices) -> int:
@@ -253,12 +253,12 @@ class _Python(Dialect):
             off += sz
         for b in sweep:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("        %s = %s" % (nm, rhs))
         for b, nm in zip(tears, names):
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("        _r_%s = (%s) - %s"
                        % (nm, self._den(rhs), nm))
         out.append("        return np.concatenate([%s])"
@@ -275,7 +275,7 @@ class _Python(Dialect):
         # bind eliminated vars at the solved tear values
         for b in sweep:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             nm = b.lhs_name or inst_name(b.lhs_instance)
             out.append("    %s = %s" % (nm, rhs))
 
@@ -300,7 +300,7 @@ class _Python(Dialect):
                                  if len(pieces) == 1
                                  else self.gather_multi(pieces, space)))
         for i, (block, term) in enumerate(spec.residuals):
-            rhs = self.render_rhs(block, space, cp.names.get(block.entity_type, {}))
+            rhs = self.render_rhs(block, space, name_map(cp, block.occurrence, block.entity_type))
             out.append("        _r%d = np.ravel((%s) - %s)" % (i, self._den(rhs), term))
         out.append("        return np.concatenate([%s])" % ", ".join(
             "_r%d" % i for i in range(len(spec.residuals))))
@@ -416,7 +416,7 @@ class _Python(Dialect):
                        % nm)
         for i, (b, term) in enumerate(spec.residuals):
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("        _r%d = (%s) - %s"
                        % (i, self._den(rhs), term))
         out.append("        _rs = [%s]" % ", ".join(
@@ -429,7 +429,7 @@ class _Python(Dialect):
         ne = 0
         for b, term in spec.initials:
             rhs = self.render_rhs(b, space,
-                                  cp.names.get(b.entity_type, {}))
+                                  name_map(cp, b.occurrence, b.entity_type))
             out.append("            _e%d = (%s) - %s  # initialise"
                        % (ne, rhs, term))
             ne += 1
