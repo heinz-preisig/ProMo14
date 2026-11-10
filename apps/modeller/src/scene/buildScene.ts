@@ -161,6 +161,7 @@ function buildNodeSceneObject(
   node: VisibleNode,
   isSelected: boolean,
   highlight: 'valid' | 'invalid' | undefined,
+  dimmed: boolean,
   catalogue: SemanticCatalogue,
   readOnly: boolean,
 ): SceneNode {
@@ -213,6 +214,7 @@ function buildNodeSceneObject(
     treeNodeId: node.treeNodeId,
     modelNodeIri: node.modelNodeIri,
     selectionId: node.id,
+    dimmed: isLeaf && dimmed ? true : undefined,
     highlight,
     interactions: {
       clickable: true,
@@ -236,6 +238,9 @@ export interface BuildSceneOptions {
   } | null
   hoveredNodeId?: string | null
   hoveredHighlight?: 'valid' | 'invalid' | null
+  /** Leaf scene-node ids the armed connect gesture cannot reach with
+   *  the selected arc type — rendered faded. */
+  blockedNodeIds?: Set<string>
   catalogue: SemanticCatalogue
   /** §16: entityTypeIri → token name (mass|energy|…) — the token a
    *  token-flow arc borrows from its incident transport node. */
@@ -246,7 +251,7 @@ export interface BuildSceneOptions {
 }
 
 export function buildScene(options: BuildSceneOptions): SceneObject[] {
-  const { graphView, selectedNodeIds, selectedArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, tokenByEntityType, readOnly } = options
+  const { graphView, selectedNodeIds, selectedArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, blockedNodeIds, catalogue, tokenByEntityType, readOnly } = options
   const objects: SceneObject[] = []
   const nodeMap = new Map<string, VisibleNode>()
 
@@ -389,7 +394,8 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
     const isSelected = selectedNodeIds.has(node.id)
     const isHovered = node.id === hoveredNodeId
     const nodeHighlight = isHovered ? hoveredHighlight ?? undefined : undefined
-    objects.push(buildNodeSceneObject(node, isSelected, nodeHighlight, catalogue, readOnly ?? false))
+    objects.push(buildNodeSceneObject(node, isSelected, nodeHighlight,
+      blockedNodeIds?.has(node.id) ?? false, catalogue, readOnly ?? false))
   }
 
   // --- Open arc handles (top layer) ---

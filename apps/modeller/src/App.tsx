@@ -427,15 +427,49 @@ export default function App() {
       // Cache miss — remote answer in flight; no highlight yet.
       return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
+    // The gesture is legal only for the *selected* carrier — other
+    // licensed types are still listed, but hover marks the pair
+    // invalid so the refusal is visible before release.
+    const licensed = result.connections.map((c) => ({
+      arcTypeIri: c.arcTypeIri,
+      matchedTokens: c.matchedTokens,
+    }))
     return {
-      hoveredHighlight: 'valid' as const,
-      validConnections: result.connections.map((c) => ({
-        arcTypeIri: c.arcTypeIri,
-        matchedTokens: c.matchedTokens,
-      })),
+      hoveredHighlight: licensed.some(
+        (c) => c.arcTypeIri === activeArcType)
+        ? 'valid' as const
+        : 'invalid' as const,
+      validConnections: licensed,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump])
+  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump, activeArcType])
+
+  // §14 admissibility hint: leaves the armed connect cannot reach
+  // with the *selected* carrier — forbidden pair, or allowed under
+  // other carriers only.  Sync resolve warms the cache: a miss
+  // answers neutral (not blocked) and the fetch's cacheBump
+  // recomputes when the real answer lands.
+  const blockedLeafIds = useMemo(() => {
+    const out = new Set<string>()
+    if (!gestureHasSource || !gestureSourceEt) return out
+    for (const n of graphView.nodes) {
+      if (n.type !== 'leaf' || !n.entityType) continue
+      if (n.id === state.selectedVisibleNodeId) continue
+      if (pendingConnection
+          && n.modelNodeIri === pendingConnection.sourceModelIri) continue
+      const res = resolveConnection(
+        gestureSourceEt, n.entityType, catalogue, ruleResolver)
+      if (res.status === 'forbidden'
+          || (res.connections.length > 0
+              && !res.connections.some((c) => c.arcTypeIri === activeArcType))) {
+        out.add(n.id)
+      }
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gestureHasSource, gestureSourceEt, graphView,
+      state.selectedVisibleNodeId, pendingConnection,
+      catalogue, ruleResolver, activeArcType, cacheBump])
 
   // §13/§14 port-satisfaction: adjudicate the hovered pair.  Union
   // over all licensed carriers until the user picks an arc type, then
@@ -478,11 +512,12 @@ export default function App() {
       draggingOpenArc,
       hoveredNodeId,
       hoveredHighlight,
+      blockedNodeIds: blockedLeafIds,
       catalogue,
       tokenByEntityType: entityTokens,
       readOnly: state.viewRefIri !== null,
     }),
-    [graphView, selectedNodeIds, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, catalogue, entityTokens, state.viewRefIri]
+    [graphView, selectedNodeIds, state.selectedModelArcIri, draggingOpenArc, hoveredNodeId, hoveredHighlight, blockedLeafIds, catalogue, entityTokens, state.viewRefIri]
   )
 
   // --- Canvas event handlers (isolated from rendering) ---

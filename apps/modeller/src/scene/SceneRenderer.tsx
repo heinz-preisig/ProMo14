@@ -62,12 +62,14 @@ function renderNode(
     eventProps.onDragEnd = (e: KonvaEventObject<DragEvent>) => handlers.onDragEnd(obj, e)
   }
 
+  const opacity = obj.dimmed ? 0.3 : 1
   if (isComposite) {
     return (
       <Group
         key={obj.id}
         x={obj.x}
         y={obj.y}
+        opacity={opacity}
         {...eventProps}
       >
         {obj.highlight && (
@@ -111,6 +113,7 @@ function renderNode(
       key={obj.id}
       x={obj.x}
       y={obj.y}
+      opacity={opacity}
       {...eventProps}
     >
       {obj.highlight && (

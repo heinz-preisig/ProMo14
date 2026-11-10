@@ -41,6 +41,9 @@ export interface SceneNode extends SceneObjectBase {
   halfExtent?: { x: number; y: number }
   entityType?: string
   highlight?: 'valid' | 'invalid'
+  /** §14 admissibility hint: during a connect gesture the selected
+   *  arc type isn't licensed toward this node — render faded. */
+  dimmed?: boolean
 }
 
 export interface SceneArc extends SceneObjectBase {
