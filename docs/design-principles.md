@@ -275,6 +275,11 @@ keying).  Occurrence-path namespacing at instantiation landed
   re-implement superseded semantics (found 2026-11-06: F_* token
   decls resurrected post-strip).  Review audits the seed layer
   against the rulings, not just data files.
-- §33 machinery — authored/phantom ports, strict referenced
-  boundary (undeclared leaves non-targets), standalone
-  instantiation with phantom closures: ruled, unimplemented.
+- §33 machinery — authored/phantom ports: landed (`14d6aff`);
+  strict referenced boundary: **enforced 2026-11-10** — the
+  connect gesture's automaton swallows an armed completion at any
+  leaf not declared a port (the artefact's root-composite open
+  arcs, `externalIri` = inside leaf); standalone instantiation
+  with phantom closures: ruled, partial — the overlay
+  (`_phantom_overlay`) materializes phantom peers for severed and
+  authored terminals; evaluate-on-use items remain open.

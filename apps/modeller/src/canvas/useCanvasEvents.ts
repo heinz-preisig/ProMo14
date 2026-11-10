@@ -100,6 +100,19 @@ export function useCanvasEvents(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentViewNodeId, state.viewRefIri])
 
+  // §33 strict boundary: in a referenced artefact's view the legal
+  // connect targets are the declared ports' inside leaves — the
+  // artefact's root-composite open arcs record them as externalIri
+  // (same convention extraction writes and _phantom_overlay reads).
+  const refConnectableLeaves = (): ReadonlySet<string> | undefined => {
+    const ref = inRef ? state.refStates.get(state.viewRefIri!) : undefined
+    if (!ref) return undefined
+    const leaves = new Set<string>()
+    for (const a of ref.openArcs.get(ref.tree.rootId) ?? [])
+      if (ref.modelNodes.has(a.externalIri)) leaves.add(a.externalIri)
+    return leaves
+  }
+
   const buildCtx = (): Ctx => {
     const arc = state.selectedModelArcIri
       ? state.modelArcs.get(state.selectedModelArcIri)
@@ -111,6 +124,7 @@ export function useCanvasEvents(
       selectedArcIri: state.selectedModelArcIri,
       selectedArcCarrier: arc ? (arcCarrier(arc.arcType) ?? null) : null,
       graphView,
+      refConnectableLeaves: refConnectableLeaves(),
     }
   }
 

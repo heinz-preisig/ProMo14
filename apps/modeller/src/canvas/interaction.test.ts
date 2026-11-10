@@ -86,6 +86,25 @@ describe('interaction automaton', () => {
     expect(kinds(nav.out)).toEqual(['enterComposite'])
   })
 
+  it('§33 strict boundary: declared-port leaf connects inside ref view', () => {
+    const ro = ctx({ inRef: true, refConnectableLeaves: new Set(['ref/Node_9']) })
+    const r = transition(armed(), { kind: 'nodeRightClick', node: leaf('9', 'ref/Node_9') }, ro)
+    const conn = r.out.find((o) => o.kind === 'connect')
+    expect(conn).toMatchObject({
+      source: { modelIri: 'g/Node_1' },
+      target: { modelIri: 'ref/Node_9' },
+      chained: false,
+    })
+    expect(r.next.name).toBe('idle')
+  })
+
+  it('§33 strict boundary: undeclared leaf is a hard stop', () => {
+    const ro = ctx({ inRef: true, refConnectableLeaves: new Set(['ref/Node_9']) })
+    const r = transition(armed(), { kind: 'nodeRightClick', node: leaf('5', 'ref/Node_5') }, ro)
+    expect(r.out[0]).toMatchObject({ kind: 'swallowed', reason: expect.stringContaining('strict boundary') })
+    expect(r.next).toEqual(armed())   // gesture survives — try another leaf
+  })
+
   it('marquee boxes leaves AND composites', () => {
     const gv = {
       treeNodeId: 0, arcs: [], openArcs: [],
@@ -138,9 +157,11 @@ describe('cross-branch connect — §13 begin/finishArc is branch-independent', 
     expect(r.next.name).toBe('idle')
   })
 
-  it('armed completes on a leaf inside ref view — host arc, no re-arm', () => {
+  it('armed completes on a declared-port leaf inside ref view — host arc, no re-arm', () => {
     const target = { kind: 'leaf' as const, id: 'f', treeNodeId: 9, modelNodeIri: 'F/Node_1', entityType: 'et:B' }
-    const r = transition(armed(), { kind: 'nodeRightClick', node: target }, ctx({ inRef: true }))
+    // §33: the leaf completes because the artefact declared it a port.
+    const r = transition(armed(), { kind: 'nodeRightClick', node: target },
+      ctx({ inRef: true, refConnectableLeaves: new Set(['F/Node_1']) }))
     expect(r.next.name).toBe('idle')
     expect(r.out).toEqual([{
       kind: 'connect',

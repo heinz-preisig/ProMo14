@@ -68,6 +68,11 @@ export interface Ctx {
   selectedArcIri: string | null
   selectedArcCarrier: string | null
   graphView: GraphView
+  /** §33 strict referenced boundary — inside a referenced artefact's
+   *  view, only leaves declared as ports are legal connect targets.
+   *  The adapter fills this from the artefact's root-composite open
+   *  arcs (their ``externalIri`` is the inside leaf). */
+  refConnectableLeaves?: ReadonlySet<string>
 }
 
 export type Output =
@@ -153,6 +158,16 @@ export function transition(
       const refCompletion = ctx.inRef && mode.name === 'armed'
         && n.kind === 'leaf' && !!n.modelNodeIri && !!n.entityType
       if (ctx.inRef && !refCompletion) return ro()
+      // §33 strict boundary: on a referenced occurrence only declared
+      // ports are connect targets — an undeclared leaf is a hard
+      // stop (declare the port in the artefact, or dissolve).
+      if (refCompletion && !ctx.refConnectableLeaves?.has(n.modelNodeIri!)) {
+        return {
+          next: mode,
+          out: [swallow('undeclared leaf — §33 strict boundary: '
+            + 'declare a port on the artefact or dissolve')],
+        }
+      }
 
       if (mode.name === 'armed') {
         if (n.kind === 'leaf' && n.modelNodeIri && n.entityType) {
