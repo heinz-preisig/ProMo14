@@ -266,19 +266,21 @@ unphysical, whatever the capacities' sizes.
 
 ## Open deviations / known gaps
 
-- Transport **interface arity** — opened 2026-11-10, under
-  discussion.  Topology is per-instance by construction: *N* token
-  arcs on one transport node = *N* boundaries (e.g. a cooling fin
-  coupled to several solids and the air).  The canvas refuses only
-  same-pair same-carrier duplicates — never counts ports.  What
-  remains unruled: whether a mechanism's *assigned constitutive
-  form* declares bounded arity (a pairwise through-law needs exactly
-  two ends) vs open arity (a distributed law scales with incidences)
-  — i.e. the declaration lives on the behaviour assignment, not the
-  etype.  `port-coverage` already flags the shape mismatch
-  numerically (3 peers → 9 bound slots) but cannot name the
-  semantic reason; port-satisfaction could consume a declared
-  arity for gesture-time "node full" dimming.
+- Transport **interface arity** — opened 2026-11-10; ruled: derive,
+  don't declare.  Topology is per-instance by construction: *N*
+  token arcs on one transport node = *N* boundaries (a cooling fin
+  coupled to several solids and the air is legal topology).  The
+  canvas refuses only same-pair same-carrier duplicates — never
+  counts ports.  Arity is *derived from the assigned behaviour's
+  index structure*: a per-arc-indexed constitutive (`F[A_arc]`,
+  `k[A_arc]`) is open by construction; a scalar/pairwise coupling
+  (`F = k·Δe`, scalar `k`) is exactly-2 by construction — a third
+  arc has no slot to bind.  Residual gap: `port-coverage` flags
+  the numeric mismatch (3 peers → 9 bound slots) but cannot name
+  the semantic reason ("convection is pairwise"), and whether a
+  mechanism *family* is intrinsically pairwise (through-law vs
+  distributed) may still warrant an ontology-side note on the
+  constitutive relation rather than the etype.
 - `E_29` sibling sub-index contraction (`idx_arc_convection` vs
   `idx_arc_mass`) — checker machinery gap; the current model avoids it
   (uses same-index `F_conv . fmc`).  Options recorded in the
