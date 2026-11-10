@@ -448,6 +448,38 @@ def test_token_vector_key_form_not_a_change(client):
     assert r.status_code == 200, r.text
 
 
+def test_port_variable_without_token_rejected(client):
+    """A port declaring no carriesToken can license no connection —
+    the write path rejects it outright (§3 guard, ruled 2026-11-10)."""
+    r = client.post("/api/equation/variables",
+                    json=_var("V_p", port_variable=True))
+    assert r.status_code == 400
+    assert "carriesToken" in r.text
+
+
+def test_token_vector_without_membership_rejected(client):
+    """A signature with no membership is the half-declared state the
+    persisted-data rule forbids — 400 on the write path too."""
+    r = client.post("/api/equation/variables",
+                    json=_var("V_1", token_vector={"token_mass": 1}))
+    assert r.status_code == 400
+    assert "carriesToken" in r.text
+
+
+def test_token_vector_defaults_pure_signature(client):
+    """carriesToken without tokenVector stamps the pure {member:1}
+    signature at write time — /check still derives and warns."""
+    tok = "https://w3id.org/promo/ontology#token_signal"
+    r = client.post("/api/equation/variables",
+                    json=_var("V_1", tokens=[tok]))
+    assert r.status_code == 200, r.text
+    assert r.json()["token_vector"] == {"token_signal": 1}
+    # … and the default persists as a promo:tokenVector triple
+    g = graph_store.get_store().dataset.graph(URIRef(BASE))
+    tv = g.value(URIRef(f"{BASE}#V_1"), PROMO["tokenVector"])
+    assert tv is not None and "token_signal" in str(tv)
+
+
 def test_domain_backfill_not_a_move(client):
     """Records saved before IRI-backed domains store domain_iri=None; the
     write path derives it from the network name.  A plain save must not

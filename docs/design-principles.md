@@ -113,6 +113,11 @@ edits.  Guards enforce **conscious** semantic change:
 - Detached/orphaned resources get swept via
   `DELETE /api/equation/equations/{iri}` (added 2026-11-05 for the
   E_2/E_3 shadow cleanup).
+- **Write-path token guard** (ruled 2026-11-10): `portVariable` without
+  `carriesToken` and `tokenVector` without `carriesToken` 400 on
+  POST/PUT `/api/equation/variables`; membership without signature
+  defaults to the pure vector `{member: 1}` — drift impossible rather
+  than caught.
 
 *Benign delta class:* a stale line may show live-only vocabulary
 self-declarations (`a rdf:Property`/`rdfs:Class` stamps the serializer

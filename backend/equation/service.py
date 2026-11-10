@@ -700,6 +700,7 @@ def create_variable(
     _validate_variable_latex(record)
     store = get_store()
     _resolve_record_domains(store, graph_iri, record)
+    _guard_token_consistency(record)
     graph = resolve_graph(store, graph_iri)
 
     # §26: the store owns minting — a new variable gets
@@ -752,6 +753,7 @@ def update_variable(
     _assert_absolute_iri(iri)
     store = get_store()
     _resolve_record_domains(store, graph_iri, record)
+    _guard_token_consistency(record)
     graph = resolve_graph(store, graph_iri)
 
     subject = URIRef(iri)
@@ -1285,6 +1287,32 @@ def _validate_variable_latex(record: VariableRecord) -> None:
             status_code=422,
             detail={"field": "aliases.latex", "message": error},
         )
+
+
+def _guard_token_consistency(record: VariableRecord) -> None:
+    """Write-path enforcement of the §3 membership↔signature link.
+
+    - ``portVariable`` requires a ``carriesToken`` — a tokenless port
+      can license no connection.
+    - ``tokenVector`` without ``carriesToken`` is the half-declared
+      state the persisted-data consistency rule rejects.
+    - ``carriesToken`` without ``tokenVector`` defaults to the pure
+      signature ``{member: 1}`` — the var is that token to the first
+      power; ``/check`` still derives the true signature from the
+      defining equation and warns on divergence (§24 advisory).
+    """
+    if record.port_variable and not record.tokens:
+        raise HTTPException(
+            status_code=400,
+            detail=f"portVariable '{record.label}' requires carriesToken")
+    if record.token_vector and not record.tokens:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{record.label}' declares tokenVector "
+                   "without carriesToken")
+    if record.tokens and not record.token_vector:
+        frag = lambda k: k.split("#")[-1].split("/")[-1]
+        record.token_vector = {frag(t): 1 for t in record.tokens}
 
 
 def _assert_absolute_iri(iri: str) -> None:
