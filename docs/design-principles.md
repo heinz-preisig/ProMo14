@@ -45,7 +45,8 @@ rejection after an implemented-then-reverted attempt).  Do not re-propose.
 licensing rules.  Direction and token were relocated off the arc
 deliberately (§15/§23 of the design discussion).
 
-Key rules (all test-enforced):
+Key rules (all test-enforced — incl. on persisted data via
+`test_data_variable_token_consistency`):
 - `carriesToken ⊆ tokenVector` — every declared member appears with a
   nonzero exponent; the vector may legitimately contain conjugate/derived
   terms beyond membership.
@@ -112,6 +113,11 @@ edits.  Guards enforce **conscious** semantic change:
 - Detached/orphaned resources get swept via
   `DELETE /api/equation/equations/{iri}` (added 2026-11-05 for the
   E_2/E_3 shadow cleanup).
+
+*Benign delta class:* a stale line may show live-only vocabulary
+self-declarations (`a rdf:Property`/`rdfs:Class` stamps the serializer
+emits per line) until its next save — seen on model-2/model-3 in the
+2026-11-10 review; isomorphic otherwise, self-heals.
 
 ## 8. Indices are algebraic, not positional
 
@@ -249,10 +255,11 @@ keying).  Occurrence-path namespacing at instantiation landed
   (`{occ}/{internal_id}@{et}`), the schedule DAG runs on
   `(occ, et, eq)` nodes, plan slots/blocks carry explicit
   `occurrence` ownership (a bound boundary arc doesn't disqualify),
-  emitted names get a comp-local-name tag (`Composite_1_V_5`), and
-  value cells resolve qualified-first then prefix-stripped
-  (submodel defaults apply, host pins win).  Sub-plans persist
-  populated per occurrence.  *Remaining:* shared-`var_class`
+  emitted names get the occurrence's composite-IRI-fragment chain as
+  tag (`c_2_V_5`-style), and value cells resolve qualified-first
+  then prefix-stripped (submodel defaults apply, host pins win).
+  Sub-plans persist populated per occurrence and replay standalone
+  via `?instantiation=<artefact>#occ_N` (`_pinned_plan`).  *Remaining:* shared-`var_class`
   constants still duplicate per occurrence (dedup later); a
   spurious shared loop can tag an occurrence whose own DAG is
   acyclic (aggregated port edges are conservative).
