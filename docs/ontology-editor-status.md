@@ -1,6 +1,7 @@
 # Ontology Editor — Implementation Status
 
-**Last updated:** 2026-09-20
+**Last updated:** 2026-09-20 — **realigned to rulings through
+2026-11-10** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
@@ -92,10 +93,10 @@ all working; manual UI testing done 2026-09-14.
 
 ## Backend
 
-`backend/ontology/` now contains the `RdfContext` provider and a
-FastAPI router scaffold.  The provider is functional and tested.
+`backend/ontology/` contains the `RdfContext` provider and a FastAPI
+router with full CRUD.  The provider is functional and tested.
 
-### Planned backend
+### Original backend plan (executed — kept for the record)
 
 - RDF graph store (rdflib or persistent triple store).
 - `RdfContext` provider implementing `EquationContext` — loads
@@ -107,9 +108,10 @@ FastAPI router scaffold.  The provider is functional and tested.
 
 ## Frontend
 
-`apps/ontology-editor/` — empty scaffold.
+`apps/ontology-editor/` — implemented (7 stage tabs, tree rendering,
+token inheritance UI — amended 2026-11-10).
 
-### Planned frontend
+### Original frontend plan (executed — kept for the record)
 
 - React with Tailwind or shadcn/ui.
 - Three-pane layout: domain tree, variable table, detail editor.
@@ -156,10 +158,15 @@ FastAPI router scaffold.  The provider is functional and tested.
    `?graph=<iri>`; `editable_param` rejects frozen version graphs with
    403; `scoped_context` resolves the artefact + transitive
    `usesOntology` pin set (R4).  Editor reads `?graph=` from the URL.
-   Remaining: auto-stamp `usesOntology` when artefacts are created
-   outside `POST /api/catalogue/new`.
+   ~~Remaining: auto-stamp `usesOntology` when artefacts are created
+   outside `POST /api/catalogue/new`.~~ **Done** — pins are born at
+   creation; `editable_param` 404s on empty graphs (amended
+   2026-11-10).
 
 ## Implementation plan
+
+*All phases below landed (v1 verified 2026-09-14; amended
+2026-11-10) — kept as the original plan for the record.*
 
 The ontology editor is the first module in the ProMo14 pipeline.  Its job
 is to author the vocabulary (domain tree, indices, tokens, variables, core
@@ -247,8 +254,9 @@ v1 is complete and verified.  The next concrete steps are:
 
 1. ~~Wire equation editor `/api/equation/context` to `RdfContext`~~ —
    done (2026-09-15).
-2. Consume `resolve-connection` from the modeller's
-   `ConnectionRuleResolver` (replaces the allow-all placeholder).
+2. ~~Consume `resolve-connection` from the modeller's
+   `ConnectionRuleResolver` (replaces the allow-all placeholder)~~ —
+   done (2026-09-18, `RemoteRuleResolver`; amended 2026-11-10).
 3. ~~Extend `RdfContext` to read **all named graphs** in the `RdfStore`~~
    — done (2026-09-15).  Legacy `promo:variable`/`promo:index` support
    was dropped again the same day: the legacy loader is archived and

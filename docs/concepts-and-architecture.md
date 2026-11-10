@@ -1,7 +1,9 @@
 # ProMo — Concepts & Architecture
 
-**Status:** living document — started 2026-10-17. Written while the suite
-is under construction; sections are updated as concepts land, not frozen.
+**Status:** living document — started 2026-10-17; **realigned to rulings
+through 2026-11-10** (edit rules: `docs/README.md` tier map). Written while
+the suite is under construction; sections are updated as concepts land, not
+frozen.
 
 **Purpose.** This is the conceptual layer of the documentation. It states
 what ProMo is for, the philosophy behind it, and the architecture that
@@ -84,7 +86,8 @@ What the separation buys — the criteria the architecture must satisfy:
 - **Reusability** — science artefacts (equations, schemes) apply to many
   engineerings; engineered models compose into larger ones.
 - **Retargetability** — symbolic, checked equations emit to multiple
-  numerical backends (MATLAB, Python; Julia planned) and to documentation.
+  numerical backends (Python, Julia, MATLAB — all three emitted and
+  verified executing; amended 2026-11-10) and to documentation.
 - **Honest algebra** — no numeric literals, units and index structures
   checked at authoring time, checked output trusted downstream.
 - **Teachability** — the artefact boundaries are the concepts a user must
@@ -112,7 +115,7 @@ by pinned IRI links.
 | **Species scheme** | Species app | components, allocations, reactions — *what can happen* chemically | Which species exist, where they can live, what reactions are possible |
 | **Behaviour assignments** | Behaviour Linker | selection: which equations describe each entity type's I/O behaviour (+ graphical assignment) | What is an entity's behaviour? |
 | **Model** | Modeller | topology: nodes typed by entity type, arcs typed by connection rules; hierarchy/composites; placements; fix markings | Where does it happen? What does it mean here? |
-| **Instantiation** | Instantiation (under construction) | value bindings: `promo:value`, `promo:ValueCell` tables, initial conditions | What is it worth? |
+| **Instantiation** | Instantiation app | value bindings: `promo:value`, `promo:ValueCell`/`ValueFill` tables, initial conditions; persisted `promo:Instantiation` plans | What is it worth? |
 | **Glasses** *(planned)* | Graphic Object Editor | domain-specific visual skins | How is it drawn? |
 | **Empirical model selection** *(planned)* | — | e.g. EOS choice, data-driven submodels | Which empirical closure? |
 
@@ -151,9 +154,9 @@ not array dimensions:
 
 - **Topological indices** — `N` (nodes), `A` (token-flow arcs): computed
   from the model topology at instantiation.
-- **Computed indices** — `S` (species): computed by a fixpoint over the
-  species scheme and model placements (§20). `Q` (reactions) similar
-  (planned).
+- **Computed indices** — `S` (species) and `Q` (active reactions):
+  computed by a fixpoint over the species scheme and model placements
+  (§20; `Q` landed 2026-09-23, amended 2026-11-10).
 - **Sub-indices** — e.g. `A_mass`, `A_diff` select members of `A` via the
   transport node's entity type (§16). Membership is resolved at
   instantiation; the checker sees plain indices.
@@ -203,6 +206,10 @@ var/expr graph, plus structural marks:
   (transport) must declare none (§4.3).
 - `instantiated` — variables the entity supplies as bound values rather
   than computing (boundary conditions).
+- `ports` — variables resolved against a peer across an arc (§4.2).
+- `outputs` — external observation sinks: defined variables nothing inside
+  consumes; reachability roots for the closure (§21, added 2026-10-28,
+  amended 2026-11-10).
 - `closed` — whether every variable the selection consumes is either
   produced inside it or resolved externally (port, bound value); an open
   assignment reports `assignment-open` at instantiation.
@@ -226,7 +233,9 @@ artefacts:
 
 - **The record** lives in the var/expr graph — an ordinary variable
   with a fixed index pair `[A_k, N]`, constant class, dimensionless
-  units, the mechanism's token, LaTeX `F`. It exists so equations can
+  units, LaTeX `F`, and **no token declaration** — structure handles
+  stay token-neutral by ruling (design-principles §4; amended
+  2026-11-10). It exists so equations can
   reference the matrix *symbolically*: `d(m)/dt = F_diff·J_diff +
   F_conv·m_conv` is physics, written before any model exists.
 - **The matrix** is instantiation output — `+1` where an arc's
@@ -272,8 +281,10 @@ Species ───┤                                              ├─► Mode
 2. **Behaviour linking** — selects, per entity type, which checked
    equations describe its I/O behaviour. The var/expr graph is bipartite
    and lower-triangular; linking picks a subgraph per entity.
-3. **Modelling** — topology: nodes typed by entity types, arcs carrying
-   tokens; composites for hierarchy/reuse; placements and fix markings.
+3. **Modelling** — topology: nodes typed by entity types, arcs typed by
+   carrier (`token-flow` | `reference`) with a per-contact reference
+   direction; composites for hierarchy/reuse; placements and fix
+   markings. (Amended 2026-11-10: arcs declare no token.)
 4. **Species allocation** (§20) — monotone fixpoint computes which species
    are present at which topological extent: reservoir injection →
    permeable transport → conditional reactions.
@@ -299,12 +310,15 @@ Species ───┤                                              ├─► Mode
 
 ### 4.1 Reference coordinates (§15)
 
-Arcs carry tokens, not directions: drawing order is layout, not physics.
-Every contact between a flow-system entity and a capacity carries a
-semantic reference direction (per-contact sign). Instantiation derives the
+Arcs carry **directions, not tokens**: drawing order is layout, but every
+contact between a flow-system entity and a capacity carries a semantic
+reference direction (per-contact sign, persisted as
+`promo:referenceFrom`/`promo:referenceTo`). Instantiation derives the
 global incidence matrix **F** `[N, A]`; equations reference F
 symbolically, so flipping an orientation only flips signs at codegen — the
-model document stays untouched.
+model document stays untouched. (Amended 2026-11-10: the previous
+phrasing "arcs carry tokens, not directions" had it backwards — direction
+is declared, token is derived.)
 
 **Tokens are implicit, not declared.** An arc's type records only a
 carrier category (`token-flow`, `reference`) — the actual token (mass,
@@ -314,13 +328,15 @@ type, which is what places the arc into a sub-index like `A_mass` or
 re-tokens the arc without touching topology. Consequences:
 
 - The token is *derivable*, never stored — tools that show it must
-  compute it (incident transport node → sub-index → token).
-- **Capacity↔capacity arcs are underdetermined** — with no transport
-  node, no convention derives the token; they may eventually need an
-  explicit token assertion on the arc.
-- UX note: the derived token should be *displayed* in the Modeller
-  (arc label/hover, connect-time confirmation) — planned improvement,
-  see §8.
+  compute it (incident transport node → sub-index → token). The
+  Modeller displays it: `matchedTokens` on the connect gesture and the
+  selected-arc panel (landed 2026-10-17).
+- **Capacity↔capacity arcs are unphysical** — ruled 2026-11-10
+  (design-principles §14): every token flow between two capacities is
+  transport-mediated, including flows to and from the environment.
+  What looked like a token-derivation gap was actually an
+  admissibility gap — the domain+token rules license them today, and
+  enforcement needs role-level adjudication (amended 2026-11-10).
 
 ### 4.2 Port resolution at boundaries
 
@@ -329,11 +345,15 @@ entity that *defines* a comparable variable — the boundary is where
 another artefact supplies the value.
 
 **Everything is a system; an arc is a boundary coupling, not a thing.**
-Capacities and transports are the same kind of entity distinguished
-only by temporal regime: a capacity integrates (dynamic); a transport
-is *event-dynamic* — a capacity whose relaxation is infinitely fast, or
-ignored, hence stateless: no interior, no state variable, no balance
-equation. The arc index enumerates boundaries/connections, not arc
+Capacities and transports are the same kind of entity distinguished by
+temporal regime: a capacity integrates (dynamic); a transport generates
+the flow from the efforts at its ends — the constitutive relation lives
+there, never on the arc. Transports come in two physics grades (ruled
+2026-11-10, design-principles §14): *true physical transport*
+(`distributed` + `dynamic`) holds state of its own, and the
+*event-dynamic simplification* is a capacity-free, stateless
+approximation — no interior, no balance equation (amended 2026-11-10).
+The arc index enumerates boundaries/connections, not arc
 objects, and a boundary slot *is* the peer's variable — coupling is
 sharing, not copying plus a glue equation (the "cut equations" never
 exist):
@@ -484,14 +504,15 @@ overloads them. This list is normative for new documentation.
 Tracked here so the document stays honest about what is built vs.
 designed:
 
-- Composite/reuse semantics — **designed 2026-10-28**
-  (behaviour-linker-design-discussion §22): referenced composites —
-  `refersTo` + per-occurrence override map on the composite, open arcs
-  as the declared interface, per-use-site instantiation keyed by
-  occurrence path, refer-don't-copy (fork + re-point or one-way
-  dissolve for modification), recursive references with
-  `reference-cycle` detection. Remaining: implementation (save /
-  library-pick / insert / connect / override / dissolve gestures).
+- Composite/reuse semantics — **landed** (§22 designed 2026-10-28; §33
+  copy-vs-reference ruled 2026-11-08): `refersTo` + per-occurrence
+  override map on the composite, the artefact's root-composite open
+  arcs as the declared interface (strict boundary enforced
+  2026-11-10 — only declared ports are connect targets), per-use-site
+  instantiation keyed by occurrence path (landed 2026-11-10),
+  `reference-cycle` detection. Insert is two-mode: click = editable
+  copy, Ctrl+click = referenced read-only occurrence (amended
+  2026-11-10).
 - Incidence-factor seeding — designed + implemented 2026-11-01 (BL
   doc §25): `F_*` records are floor seeds derived from the arc
   sub-indices (`_seed_incidence_factors`), hand-authored copies are
@@ -518,14 +539,13 @@ designed:
   over defining equations); problems `fix-conflict`, `fix-partial`,
   `fixed-unbound`; modeller gesture done too — selected leaf shows a
   "Fix (bound at this node)" checklist fed by
-  `GET /entity-variables`. BL admissibility — **designed
-  2026-10-27** (behaviour-linker-design-discussion §21): admissibility
-  is positional lower-triangularity maintained by moves (pick /
-  exchange / delete / unmark output), not a validation pass; a fourth
-  endpoint kind — **output** (external sink, reachability root) — was
-  added. Remaining: engine rewrite from `evaluate()` to
-  invariant-restoring moves, plus `promo:hasOutputVariable`
-  persistence.
+  `GET /entity-variables`. BL admissibility — **landed 2026-10-28**
+  (behaviour-linker-design-discussion §21): admissibility is
+  positional lower-triangularity maintained by moves (pick / exchange
+  / delete / mark-unmark / reorder / pick base), each re-closing the
+  subgraph — not a validation pass; a fourth endpoint kind —
+  **output** (external sink, reachability root, persisted as
+  `promo:hasOutputVariable`) — was added (amended 2026-11-10).
 - Track 2 complete at seed level: problem catalogue
   (`docs/problem-catalogue.md`), doc anchors on `ProblemOut`, per-tool
   guide (`docs/what-am-i-authoring.md`), end-to-end example
@@ -534,7 +554,8 @@ designed:
 - `promo:inDomain` / `network` field naming — see §7.
 - Arc-token display — done 2026-10-17: `matchedTokens` on
   `AllowedConnection` (backend `matched_tokens`), shown in the
-  connect-gesture arc-type list and the selected-arc panel. Remaining:
-  capacity↔capacity arcs are underdetermined (no transport node
-  determines the token — matched_tokens may still answer via endpoint
-  effective tokens; explicit token assertion stays an option).
+  connect-gesture arc-type list and the selected-arc panel.
+  Capacity↔capacity is no longer a derivation question — §14 (ruled
+  2026-11-10) declares such arcs unphysical; mediated-flow enforcement
+  is the open machinery point, not an arc token assertion (amended
+  2026-11-10).

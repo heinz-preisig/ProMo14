@@ -40,4 +40,13 @@ enforcement lives in the ontology and the test suite.
 
 Run `.devin/workflows/design-review.md` on a regular cadence (~weekly
 or every ~10 semantic commits): audits the repo against
-`design-principles.md` and keeps the principles doc refined.
+`design-principles.md`, keeps the principles doc refined, and
+realigns the living docs.
+
+## Docs
+
+`docs/README.md` is the tier map — **records are append-only**
+(banner when superseded), **living docs carry current truth**,
+**guidance docs never contradict the living tier**.  Rulings land
+twice: `design-principles.md` plus the living docs they touch, in the
+same commit.

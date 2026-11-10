@@ -175,7 +175,9 @@ node-indexed, its bound arcs if arc-indexed, both if both).  Without
   `_entity_capabilities`, `_species_index_iri`; `?species=` on `/model`
   + `/code`.
 - `backend/species/service.py` — artefact GET/PUT.
-- `backend/core/graph_store.py` — `_seed_capabilities`, `Species` in
+- `backend/core/seed.py` — `_seed_capabilities` (moved out of
+  `graph_store.py` in the 2026-09-25 mixin split; amended 2026-11-10),
+  `Species` in
   `ARTEFACT_TYPES`.
 - `backend/core/gestures.py` — capability resolution + admissibility
   (`violations`, `graph_violations`), shared by the save gate and the

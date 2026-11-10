@@ -38,9 +38,10 @@ skip meshing and go directly to code generation.
 ## Why this works with the existing architecture
 
 - **Equation editor already has spatial operators.** `TotalDiff`,
-  `ParDiff`, `diffSpace` — the spatial differential index is in the
-  language.  PDEs are expressions with spatial differential operators
-  over a spatial domain.
+  `ParDiff` — differential operators exist; the spatial domain is an
+  ontology index (the `diffSpace(expr)` function was removed
+  2026-09-27, amended 2026-11-10).  PDEs are expressions over a
+  spatial index structure.
 - **Modeller stays generic.** A distributed system is a base entity
   with spatial extent and boundary interfaces.  The modeller connects
   boundaries the same way it connects lumped ports.
@@ -57,7 +58,8 @@ skip meshing and go directly to code generation.
    spatial domain descriptions, boundary condition types, mesh
    parameters.
 2. **Equation editor:** Does it need to know an equation is a PDE, or
-   is the presence of a `diffSpace` index sufficient signal?
+   is the presence of a spatial `Index` in the structure sufficient
+   signal?
 3. **Behaviour linker:** How to describe boundary I/O behaviour of
    distributed entities — which variables are exposed at which
    boundaries.

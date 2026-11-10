@@ -114,6 +114,7 @@ disagrees, the conflict problem forces an explicit resolution.
   an index class, not a sub-index).  Sub-index membership covers the
   authored case today; index-class selection is a wider net that may
   surprise (it follows whatever the index binds).
-- **Expression-valued cells/fills** — `promo:value` stays literal-only
-  (separate open item).
+- **Expression-valued cells/fills** — `promo:value` stays literal-only;
+  expression cells were **rejected 2026-10-28** (`docs/value-expression.md`,
+  design-principles §2 — amended 2026-11-10).
 - **PATCH semantics** — PUT still replaces the whole cell+fill set.

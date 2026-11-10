@@ -45,13 +45,14 @@ from the bottom up.
 ## Produces
 
 - **Var/expr knowledge graph** containing variable and equation resources.
-  Current equations store the LHS variable IRI, textual RHS, incidence IRIs and
-  derived caches. A design investigation proposes replacing the authoritative
-  textual RHS with an ordered, IRI-bound semantic expression while retaining
-  entered source non-authoritatively; this is not yet implemented.
+  Equations persist a canonical, ordered, IRI-bound semantic expression
+  (`promo:rhsExpression` → `promo:Expression`/`promo:hasOperation`/
+  `promo:hasArguments`) — landed 2026-09-27 — beside the textual `promo:rhs`
+  source cache; reads treat the tree as authoritative and regenerate source
+  (amended 2026-11-10).
 - **Checked expressions** — each carries inferred units, ordered index
-  structures, and a variable incidence list. The checked tree is currently
-  transient; persisted equations retain source and derived metadata.
+  structures, and a variable incidence list; the checked tree is what
+  `rhsExpression` persists.
 
 ## Language
 
@@ -72,7 +73,9 @@ index-structured tensor operations.  Key characteristics:
   right-associative).
 - Functions: `exp`, `log`, `ln`, `sin`, `cos`, ... require dimensionless
   input; `sqrt` accepts units only when every exponent is even; `abs`, `neg`,
-  `left`, `right`, `sign`, and scalar reciprocal `inv` are also available.
+  `left`, `right`, `sign`, and the index-preserving elementwise
+  reciprocal `inv` are also available (amended 2026-11-10 — `inv` is
+  elementwise since 2026-09-28, not scalar-only).
   Differential space is represented by ontology indices, not an expression
   function; the historical `diffSpace(expr)` function has been removed.
 - Higher-order: `Integral`, `Product`, `Root` (implicit solve),
@@ -142,7 +145,7 @@ incidence and construct-specific semantic checks:
 | `Root` | Target variable must appear in dependency set |
 | `Instantiate` | Argument is a single `Var`; instance inherits the prototype's units and index structure; incidence empty; LHS class must be `constant`/`parameter` |
 | `sqrt` | Every unit exponent even; result exponents are halved |
-| `inv` | Argument has no indices; units are inverted |
+| `inv` | Index-preserving elementwise reciprocal — `inv(x[N]) → [N]`; units inverted |
 
 Units are 8-exponent SI vectors (`time, length, amount, mass,
 temperature, current, light, nil`). Index structures are ordered sequences of
@@ -197,8 +200,7 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 | `EquationContext` protocol | `equation-context-contract.md` | Ontology seam; checker unchanged when provider changes. |
 | Network hierarchy resolution | `equation-context-contract.md` | Local-first, then accessible ancestors, then global unique fallback. |
 | Units: both SI vector and QUDT IRI | `ontology-data-model.md` | Vector for checking; IRI for semantic identity. |
-| Textual RHS persistence | Current implementation | Equations currently store source text plus incidence/caches. |
-| Ordered IRI semantic expression | `math-language-ontology-comparison.md` | Agreed design direction; operation IRI + ordered arguments, entered source retained non-authoritatively; not yet implemented. |
+| Canonical IRI semantic expression | `math-language-ontology-comparison.md`; status 2026-09-27 | `promo:rhsExpression` stores operation IRI + ordered arguments; `promo:rhs` kept as non-authoritative source cache; reads regenerate source with current labels (amended 2026-11-10). |
 
 ## Interaction with other modules
 

@@ -1,23 +1,24 @@
 # ProMo Suite — Implementation Status
 
-**Last updated:** 2026-10-28
+**Last updated:** 2026-10-28 — **realigned to rulings through
+2026-11-10** (edit rules: `docs/README.md` tier map).
 
 ## Summary
 
 | Module | Backend | Frontend | Tests | Status |
 |--------|---------|----------|-------|--------|
-| Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork`, `PUT /pins`, `DELETE /artefact` | `backend/static/hub.html` at `/` (served no-cache) | covered by service tests | **Working** — artefact lines, all four pin kinds with editor, fork, open-in-app, delete with reference check |
+| Hub + Catalogue | `GET /api/catalogue`, `POST /new`, `POST /fork`, `PUT /pins`, `DELETE /artefact` | `backend/static/hub.html` at `/` (served no-cache) | covered by service tests | **Working** — artefact lines, pin kinds with editor (four editable + `usesModel` derived from `refersTo`, amended 2026-11-10), fork, open-in-app, delete with reference check |
 | Ontology Editor | `RdfStore` + `RdfContext` + full CRUD + seed data + rule resolution + versioning (`freeze_version`, publish/export) | React UI with all v1 tabs + Publish button | TypeScript + Vite build pass | **v1 verified end-to-end**; `?graph=` session param wired |
-| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 198 equation tests; 428 backend tests total | Backend and frontend functional; indexed powers retain exponent indices; Python/Julia dense axis alignment |
+| Equation Editor | Parser + checker + canonical RDF persistence + codegen + LaTeX document; `?graph=` pin-scoped context + artefact-graph writes; §18 mutability guard | React + TypeScript + Vite app | 198 equation tests; 524 backend tests total (amended 2026-11-10, was 428) | Backend and frontend functional; indexed powers retain exponent indices; Python/Julia dense axis alignment |
 | Behaviour Linker | Assignment CRUD, `POST /evaluate`, `POST /move` (§21 move-based closure engine) | Working SPA (:3003), serialized move requests + output roles | closure and service tests | Canonical move-based selections, provider-cone pruning, explicit outputs and unconsumed-tip validation |
 | Modeller | `GET`/`PUT /api/modeller/model` (ADR-007), `GET /behaviour-entity-types` | Phases 1–4 partial | 35 unit tests | Core editing + persistence working; ontology-backed catalogue + rule resolver live; §20 species gestures, capability-gated server-side; palette filtered to entity types with closed assignments |
 | Species | `GET`/`PUT /api/species/species` | `/species` SPA (:3005) | covered by service tests | Named reaction schemes: components, allocations, reactions |
 | Shared (`packages/semantic`) | — | Contracts + placeholder | builds + tests | Placeholder implementations in place |
 | Shared (`packages/ui`) | — | `GRAPH_IRI`/`sessionParam`, `withParams`/`apiFetch`, `useStoreDirty`, store status/save fetchers | `tsc` clean | Single source for session plumbing — apps re-export from `./api` (2026-09-25) |
 | Shared (`backend/core`) | `RdfStore` (versioning, frozen guard, resolution_scope, value cells), catalogue, full ontology CRUD, `deps.py` graph-selection helpers | — | — | `graph_store` split into `vocab`/`persistence`/`seed` mixins (2026-09-25); legacy loader archived to `archive/loader.py` |
-| Model Reuse | — | — | — | Not started |
+| Model Reuse | `refersTo` persistence + occurrence-path instantiation in `service.py` | Referenced composites (read-only ref view, strict §33 boundary), copy/reference insert, extract/dissolve, phantom ports | service + automaton tests | **Landed 2026-11-08/10** (amended 2026-11-10) |
 | Instantiation | resolver + builder + scheduler + `/model`, `/code`, `/species-distribution`, `/values`, `/initial` | value-cell editor, fill editing, coverage/problem badges and t=0 solve UI (:3006; hub backend path) | `test_builder.py` + distribute/fbuilder tests | §15–16, §19, §20 working end-to-end; deps resolved from `usesLibrary`/`usesAssignment` pins |
-| Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code` | — | emitter tests in `test_builder.py` | Derivative function emitted for all three targets; emitters share the `emit_common` dialect walker (2026-09-25) |
+| Code Generation | `plan()` + python/julia/matlab emitters via `GET /api/instantiate/code`; `POST /code/export` + `GET /code/bundle` + run scripts | — | emitter + execution tests | Derivative function + `initialise` for all three targets; `emit_common` dialect walker; `test_01` emitted code **verified executing** on all three (2026-11-04/05; `_Matlab.permute` still unimplemented — amended 2026-11-10) |
 
 ## Versioning & graph selection (2026-09-17)
 
@@ -33,7 +34,8 @@ Implemented per `docs/versioning-and-session-design.md` (commits
   `usesAssignment`, `usesSpecies` are all first-class — declared
   vocabulary, stamped at creation, copied on fork, editable on drafts
   via `PUT /api/catalogue/pins` and the hub **Pins…** editor
-  (per-kind chips).  `resolution_scope` traverses `usesOntology` +
+  (per-kind chips).  `usesModel` joined as the fifth kind — derived
+  from `refersTo` occurrences, not user-edited (amended 2026-11-10).  `resolution_scope` traverses `usesOntology` +
   `usesLibrary`.  `DELETE /api/catalogue/artefact` removes a draft
   (403 on the core ontology / frozen versions, 409 while still
   referenced by pins or `versionOf`).
@@ -367,10 +369,13 @@ npm run dev:equation  # Vite dev server on http://localhost:3002
 - **Design boundary:** expression-valued cells were rejected and reverted.
   Equations carry relations; instantiation carries literal numbers only.
   Computed ICs belong in initialise-class equations.
-- **Validation:** `uv run pytest backend/ -x -q` — **428 passed**;
+- **Validation:** `uv run pytest backend/ -x -q` — **524 passed**
+  (amended 2026-11-10, was 428);
   equation subset — **198 passed**. Dependency deprecation warnings remain.
 - **Deferred:** cross-artefact consistency review once all apps are
-  operational; reaction-domain equations, composites/reuse semantics,
-  and direction-aware donor selection remain follow-up candidates.
+  operational; reaction-domain equations and multi-pin `usesSpecies`
+  remain follow-up candidates (composites/reuse landed 2026-11-08/10;
+  direction-aware donor selection done 2026-10-29 — amended
+  2026-11-10).
 - **Handoff:** `docs/session-handoff-2026-10-28.md` records implementation
   details, decisions and the pickup queue.

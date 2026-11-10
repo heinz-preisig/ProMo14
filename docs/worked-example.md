@@ -42,7 +42,8 @@ own boundary values through the transport.
 ## 3. What instantiation computes
 
 `GET /api/instantiate/model?graph=<model>&vars=<var/expr>` produces the
-report (not yet a persisted artefact):
+report (persisted as a `promo:Instantiation` artefact since 2026-10-17 —
+amended 2026-11-10):
 
 - **Index sets** — `N = {env, transport, lumped}`, `A = {a1, a2}`,
   `A_conv = {a1, a2}`; per-type subsets `N_env = {env}`,

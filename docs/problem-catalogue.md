@@ -1,8 +1,10 @@
 # Problem catalogue
 
-**Status:** living document — started 2026-10-17. Add a section whenever
+**Status:** living document — started 2026-10-17; **realigned 2026-11-10**
+(edit rules: `docs/README.md` tier map). Add a section whenever
 an engine starts emitting a new problem kind; keep `kind` strings
-character-identical to the code that emits them.
+character-identical to the code that emits them — enforced by
+`test_problem_catalogue_coverage`.
 
 This is the Track 2 guidance seed: one entry per problem the engines can
 report, each with **cause** and **remedy** in the vocabulary of
@@ -24,6 +26,15 @@ Emitted today by `backend/instantiate` (`/api/instantiate/model`, `/code`,
 | `ambiguous-port` | port resolution |
 | `algebraic-loop` | scheduling |
 | `inadmissible-gesture` | artefact validity |
+| `unfilled-cells` | value binding |
+| `bad-fill` | value binding |
+| `fill-conflict` | value binding |
+| `port-coverage` | code plan |
+| `port-domain-unresolved` | port typing (§32) |
+| `port-domain-ambiguous` | port typing (§32) |
+| `species-port-mismatch` | occurrence composition |
+| `uncovered-override` | occurrence composition |
+| `reference-cycle` | occurrence composition |
 
 ---
 
@@ -200,6 +211,128 @@ applies to the whole type's binding`
   names the violation. If the rule itself is wrong (capability missing
   on the entity type), that's an ontology change, not a model change.
 
+## Value-binding problems (§20 cells + fills)
+
+`promo:ValueCell` tables and `promo:ValueFill` selectors supply parameter
+and IC values (`docs/value-cells.md`, `docs/value-fill.md`). Fills
+resolve to concrete cells at `plan()` time.
+
+### `unfilled-cells`
+**Message:** `<what> cells for <var> are not all filled — falling back to
+a par lookup`
+
+- **Cause.** A bound variable has a value table but at least one
+  coordinate in its bound extent has neither a cell nor a matching
+  fill — so no complete table exists to emit. The emitter falls back
+  to a runtime `par[…]` lookup for the whole variable.
+- **Remedy.** In the Instantiation app, fill the missing coordinates —
+  a `*` or sub-index fill covers uniform slices in one stroke. Missing
+  cells emit as `NaN` only when a partial table is emitted; an
+  unfillable slot silently becomes a par input, so check the report
+  before assuming the numbers you saw came from the table.
+
+### `bad-fill`
+**Message:** `<n> fill pattern(s) with the wrong axis count ignored`
+
+- **Cause.** A `ValueFill`'s `promo:fillPattern` has a segment count
+  different from the variable's index structure — the pattern can
+  never match any coordinate, so it is ignored.
+- **Remedy.** Fix the pattern in the Instantiation app — usually a
+  variable gained or lost an index after the fill was authored.
+
+### `fill-conflict`
+**Message:** `<n> cell(s) covered by equal-specificity fill patterns
+(first: <coord>) — resolve explicitly`
+
+- **Cause.** Two fills of equal specificity score cover the same cell
+  (e.g. `a1|*` and `*|s2` both reach `a1|s2`). The engine refuses to
+  pick a winner — which value you get must be auditable.
+- **Remedy.** Make one selector strictly more specific (a concrete
+  cell beats every fill; a concrete segment beats a sub-index beats a
+  `*`), or delete the redundant fill. Cross-artefact overlaps score
+  the same way — provenance never decides.
+
+## Code-plan problems
+
+### `port-coverage`
+**Message:** `<var> gathers <n> peer element(s) into <m> bound slot(s) —
+contacts over-cover the slots | slots left unbound`
+
+- **Cause.** A port gather supplies more or fewer peer elements than
+  the variable's bound slot count — the plan cannot map contacts to
+  slots one-to-one. The python emitter pads/truncates deterministically;
+  the problem tells you the shape was off.
+- **Remedy.** Check the topology around the port — usually an arc's
+  sub-index membership or a port's bound extent changed after values
+  or assignments were authored.
+
+## Port-typing problems (§32)
+
+Port variables bound on an entity type get typed by the mechanism that
+carries them — inferred from the arc sub-index covering the entity's
+contacts.
+
+### `port-domain-unresolved`
+**Message:** `no arc sub-index covers <etype>'s contacts — port vars
+can't be bound-typed (§32)`
+
+- **Cause.** The entity type has contacts but no mechanism sub-index
+  covers them, so the port variables' carrier mechanism is
+  undetermined.
+- **Remedy.** Give the entity's contacts a mechanism — usually the
+  transport entity type on the arc needs a `selector`-bearing
+  sub-index, or the model is missing the transport node between
+  capacities.
+
+### `port-domain-ambiguous`
+**Message:** `<etype>'s contacts are covered by several mechanism
+sub-indices at equal depth — port vars need var↔mechanism pairing (§32)`
+
+- **Cause.** More than one mechanism sub-index covers the same
+  contacts at equal specificity — e.g. a boundary carrying mass and
+  heat together. Coverage exists but cannot pick one mechanism.
+- **Remedy.** Pair each port variable to its mechanism — the
+  `promo:Mechanism` `drives`/`carries` vocabulary (§32 stage 2) is
+  the designed slot; until it lands, split the boundary so each arc
+  carries one mechanism.
+
+## Occurrence-composition problems (§22/§33)
+
+Referenced submodels (`refersTo`) merge their content into the host at
+instantiation, keyed by occurrence path.
+
+### `reference-cycle`
+**Message:** `transitive self-reference at <comp>: <iri> is already on
+the reference path`
+
+- **Cause.** An occurrence refers (possibly transitively) back to an
+  artefact already on its own reference path — a model referencing
+  itself through a chain.
+- **Remedy.** Break the cycle — dissolve the occurrence (one-way copy
+  to in-doc content) or re-point `refersTo` to a different artefact.
+
+### `species-port-mismatch`
+**Message:** `occurrence <comp>: arc <a> species <list> not in <tag>
+vocabulary`
+
+- **Cause.** A boundary arc carries species (permeable/distributed
+  set) that the host's or the referenced artefact's pinned species
+  scheme doesn't declare — the occurrence's species vocabulary and
+  the host's disagree across the boundary.
+- **Remedy.** Pin a compatible species artefact (`usesSpecies` +
+  occurrence override), or extend the host scheme with the missing
+  components.
+
+### `uncovered-override`
+**Message:** `occurrence <comp>: override species artefact <iri> lacks
+<list>`
+
+- **Cause.** The occurrence's species-artefact override doesn't
+  declare components the referenced submodel needs — the override
+  narrows rather than covers the scheme.
+- **Remedy.** Point the override at a scheme containing the listed
+  components, or add them to the override scheme.
+
 ---
 
 ## Not yet emitted — expected kinds
@@ -207,9 +340,11 @@ applies to the whole type's binding`
 Reserved for engines/stages under construction. Listed so the catalogue's
 shape is stable before they land:
 
-- **`unfixed-input` / fix-marking violations** — when model-artefact fix
-  marking (ADR-008 layer 2) is enforced rather than deferred.
 - **Meshing problems** — distributed-systems stage: unsupported geometry,
   boundary-condition gaps.
-- **Codegen problems** — unbound parameter slots reaching the emitter
-  (currently surfaced as generic `problems` on `/code`, not kinds).
+- **Mediated-flow violations** — when the §14 ruling (capacity↔capacity
+  arcs unphysical, ruled 2026-11-10) gains role-level enforcement, its
+  reports land here.
+- **Codegen problems** — emitter-level failures beyond `port-coverage`
+  (e.g. an index-set mismatch that cannot emit), currently raised as
+  `VarError` rather than reported kinds.

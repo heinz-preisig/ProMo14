@@ -93,17 +93,32 @@ item: **conforms / drift / gap-status-changed**, with evidence.
    model-executing endpoints, `data/*.trig` edits that bypass the
    API rule.
 
-## 5. Write the report
+## 5. Living-docs realignment (docs/README.md tiers)
 
-5. Create `docs/design-review-YYYY-MM-DD.md` containing:
+Check the **living tier** against rulings landed since each doc's
+header date: `concepts-and-architecture.md`, `*-overview.md`,
+`*-status.md`, normative contracts, `problem-catalogue.md`,
+`what-am-i-authoring.md`, `worked-example.md`, `modeller-gestures.md`.
+
+- Any claim contradicted by a newer ruling → rewrite to current truth
+  with an `(amended YYYY-MM-DD)` marker.
+- Newly emitted `kind="…"` literals → `problem-catalogue.md` section
+  (the `test_problem_catalogue_coverage` test should already flag it).
+- Tier A records (handoffs, discussion docs, ADRs, tickets) are never
+  rewritten — at most a one-line `> **Superseded:**` banner on top.
+
+## 6. Write the report
+
+6. Create `docs/design-review-YYYY-MM-DD.md` containing:
    - header: date, HEAD commit, audit range;
    - per-principle verdict table + evidence (command, key output);
    - drift list — file, what, which principle, severity;
+   - living-docs realignment applied (or proposed if ruling-level);
    - gap-status changes;
    - proposed `design-principles.md` edits, split into
      **mechanical** (applied) vs **ruling-level** (proposed only).
 
-## 6. Refine the principles doc
+## 7. Refine the principles doc
 
 - **Apply:** stale file/symbol references, statements contradicted
   by landed code (cite evidence), resolved gaps moved out of the

@@ -1,6 +1,7 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-27
+**Last updated:** 2026-09-27 — **realigned to rulings through
+2026-11-10** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
@@ -50,7 +51,8 @@ applies and writes go to the working ontology.
 | `test_codegen.py` | Codegen: python/matlab/latex targets | ✅ Passing |
 | `test_document.py` | LaTeX document rendering | ✅ Passing |
 
-190 tests pass in `backend/equation` (2026-09-27).
+190 tests pass in `backend/equation` (2026-09-27; suite total 524 as
+of 2026-11-10).
 
 The ProMo13 corpus replay (73 expressions, 70/73 passing) has been
 archived to `archive/test_corpus.py`.  The new regression baseline will
@@ -217,11 +219,16 @@ Implemented as a React + TypeScript + Vite app in
   bound value `cells`). An `initialise` equation may share a variable's
   LHS with `generic` ones — `hasEquation` is plural, the assignment
   sequence picks which run (`test_initialise_equation_may_share_lhs`).
-  Same story for root-solver initial guesses. Limitation: a *computed*
-  IC needs an `initialise` equation
-  (value cells carry values only) — or an expression-valued cell later.
-  Instantiation-side work still pending: t0 assembly, guess requests;
-  checker/parser unchanged.  The class picker is done (2026-09-28, below).
+  Same story for root-solver initial guesses. A *computed* IC is an
+  `initialise` equation (value cells carry values only) —
+  expression-valued cells were **rejected 2026-10-28**
+  (`docs/value-expression.md`: equations carry all relations,
+  instantiation carries literal numbers only; amended 2026-11-10).
+  The instantiation side landed since: `ic_targets` on the model
+  report, `POST /api/instantiate/initial` (t0 assembly + solve),
+  `initialise` emitters on all three targets, and the `steady_state`
+  fix (amended 2026-11-10).  Checker/parser unchanged.  The class
+  picker is done (2026-09-28, below).
 - **Index uniqueness and binary reduction (2026-09-27):** every persisted or
   ad-hoc variable input must have an ordered index structure with no repeated
   IRI, and the checker retains the same invariant for all expression results.
@@ -350,8 +357,10 @@ Implemented as a React + TypeScript + Vite app in
   back.  The one blocker: `EquationRecord.rhs_latex` was `str` and
   rejected the frontend's `null` → 422 on every equation save; now
   `Optional[str]`.  Verified end-to-end: equation round-trips and
-  renders in `/document`.  Polish item: frontend uses `E_${Date.now()}`
-  internal IDs — sequential `E_N` minting would be cleaner.
+  renders in `/document`.  ~~Polish item: frontend uses
+  `E_${Date.now()}` internal IDs — sequential `E_N` minting would be
+  cleaner.~~ **Done:** the frontend mints sequential `E_N` (amended
+  2026-11-10).
 - ~~Index short-name capitalisation (arc→A, node→N, …).~~ **Done
   (2026-09-18):** seed indices in `graph_store.py` now use `S`/`N`/`A`
   (species/node/arc); persisted `data/ontology.trig` migrated —
@@ -449,7 +458,8 @@ uv run uvicorn backend.main:app --port 8000
 ```bash
 cd /home/heinz/1_Gits/CAM14/ProMo14
 npm install
-npm run dev:equation  # Vite dev server on http://localhost:3001
+npm run dev:equation  # Vite dev server on http://localhost:3002
+                      # (amended 2026-11-10; :3001 is the ontology editor)
 ```
 
 The dev server proxies `/api` to `http://localhost:8000`.

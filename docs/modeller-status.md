@@ -1,11 +1,17 @@
 # Modeller — Implementation Status
 
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-10 — **realigned to rulings through
+2026-11-10** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
-Phases 1–3 complete.  Phase 4 partially done (interactive knots
-implemented; persistence not yet).  35 unit tests passing.  TypeScript
+Phases 1–3 complete.  Phase 4 landed since: model persistence
+(`GET`/`PUT /api/modeller/model`, ADR-007) and ontology-backed
+catalogue/rules (`RemoteCatalogue`/`RemoteRuleResolver`) are live;
+§20 species gestures and §13/§14 port-satisfaction adjudication
+(2026-10-29) are in; November added referenced composites
+(`refersTo`, copy/reference insert, extract/dissolve, strict §33
+boundary — amended 2026-11-10).  35 unit tests passing.  TypeScript
 compiles clean.
 
 ## Feature checklist
@@ -42,11 +48,11 @@ compiles clean.
 | Reset all button | ✅ Done |
 | Catalogue-resolved graphical definitions | ✅ Done |
 | 35 unit tests passing | ✅ Done |
-| Save/load persistence | ❌ Not yet |
+| Save/load persistence | ✅ Done — `GET`/`PUT /api/modeller/model` (ADR-007; amended 2026-11-10) |
 | Multiple GraphView panels (ADR-003) | ❌ Not yet |
-| Ontology integration (real backend) | ❌ Not yet |
+| Ontology integration (real backend) | ✅ Done — `RemoteCatalogue`/`RemoteRuleResolver` (amended 2026-11-10) |
 | Direct arc endpoint reconnection (regular arcs) | ❌ Not yet |
-| Drag-to-create-arc | ❌ Not yet |
+| Drag-to-create-arc | ❌ Not yet — connect is arm + right-click chain (see `modeller-gestures.md`) |
 
 ## Completed phases
 
@@ -151,7 +157,7 @@ Or via the orchestrator: `./dev.sh start modeller` (ensures backend too)
 
 ## Constants
 
-- Default dev server port: 3000
+- Default dev server port: 3004 (amended 2026-11-10)
 - `NODE_RADIUS = 24`, `STROKE_WIDTH = 2`, `ARROW_SIZE = 10`
 - Palette width: 140px
 

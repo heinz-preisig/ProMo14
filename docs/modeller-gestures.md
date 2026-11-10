@@ -1,6 +1,7 @@
 # Modeller gesture map
 
-Canonical list of canvas gestures in `apps/modeller`.  Gestures are
+Canonical list of canvas gestures in `apps/modeller`.  **Realigned to
+rulings through 2026-11-10** (edit rules: `docs/README.md` tier map).  Gestures are
 decided by the **interaction automaton** in `canvas/interaction.ts`
 — a pure `transition(mode, event, ctx) → {next, outputs}` table the
 Konva adapter (`useCanvasEvents.ts`) feeds and executes.  Dead
@@ -76,11 +77,14 @@ occurrence.  **Escape** disarms and clears the selection.
 
 Read-only: pan, zoom, and descending into composites/nested references
 stay live; every mutating gesture emits `swallowed('reference view —
-read-only')` — with one exception: an **armed connect completes** on
-a leaf here, minting a host-owned arc to the foreign endpoint (the
-ref is untouched; the host stub lands on the ref shell).  No chained
-re-arm from a foreign leaf.  `◂ back` in the header returns to the
-host view.
+read-only')` — with one exception, narrowed by the §33 strict boundary
+(ruled 2026-11-08, enforced 2026-11-10): an **armed connect completes
+only on a leaf the artefact declares as a port** — the artefact's
+interface is its root-composite open arcs, and completing at an
+undeclared leaf is a hard stop (`interaction.ts`).  A legal completion
+mints a host-owned arc to the foreign endpoint (the ref is untouched;
+the host stub lands on the ref shell).  No chained re-arm from a
+foreign leaf.  `◂ back` in the header returns to the host view.
 
 ## Palette (Submodels)
 

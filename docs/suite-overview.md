@@ -34,9 +34,11 @@ Ontology Editor → Equation Editor → Behaviour Linker → Modeller → Model 
 | 7 | Meshing (future) | Discretises spatial domains of distributed systems (PDEs) into networks of coupled lumped systems. Only applies to distributed subsystems; lumped and event-dynamic systems skip this step. |
 | 8 | Code Generation | Transforms a validated, instantiated (and meshed) model into numerical code. |
 
-Stages 5–8 are downstream of the current implementation focus and are
-not yet built.  The meshing concept is documented in
-`docs/distributed-systems-design.md`.
+Stages 5, 6 and 8 are built — Model Reuse (referenced composites,
+§33) landed 2026-11-08/10, Instantiation and Code Generation are
+operational with emitted code verified executing on all three targets
+(amended 2026-11-10).  Only stage 7 (meshing) remains unbuilt; its
+concept is documented in `docs/distributed-systems-design.md`.
 
 ## 3. Core modelling concepts: the var/expr bipartite graph
 
@@ -166,9 +168,10 @@ consumes a read-only snapshot:
   ancestors; determines which variables are visible for unqualified
   label resolution.
 
-A `DictContext` provides this from in-memory dicts for testing and the
-API.  A future `RdfContext` will sit on top of a triple store.  The
-checker code does not change when the provider changes.
+A `DictContext` provides this from in-memory dicts for testing; the
+production provider is `RdfContext` (`backend/ontology/rdf_context.py`),
+reading the artefact's pin-scoped named-graph scope (amended
+2026-11-10).  The checker code does not change when the provider changes.
 
 ### 5.2 Equation Editor → Behaviour Linker
 
@@ -205,8 +208,10 @@ The Modeller consumes these through two TypeScript interfaces:
 - `ConnectionRuleResolver` — decides which arc types are valid between
   a source and target entity.
 
-In-memory placeholder implementations exist.  A real ontology backend
-will supply the same interfaces.
+In-memory placeholder implementations exist as fallbacks; production
+resolves over HTTP — `RemoteCatalogue`/`RemoteRuleResolver` in
+`packages/semantic` call `GET /api/ontology/resolve-connection`
+(amended 2026-11-10).
 
 ### 5.4 Modeller → Downstream (Reuse, Instantiation, Codegen)
 
@@ -237,8 +242,11 @@ Behaviour Linker):
 
 ### 6.2 `backend/core` (Python)
 
-Shared backend services (RDF store, IRI minting, ontology client) —
-scaffolded, not yet implemented.
+Shared backend services implemented: `RdfStore` (rdflib.Dataset,
+versioning, frozen-graph guard, `resolution_scope`, value cells),
+catalogue, seed-floor migrations, `deps.py` graph-selection helpers
+(`graph_store` split into `vocab`/`persistence`/`seed` mixins
+2026-09-25 — amended 2026-11-10).
 
 ### 6.3 Graphic Object Editor
 
@@ -261,20 +269,20 @@ ProMo14/
 ├── apps/
 │   ├── modeller/              # React + Konva model composer
 │   ├── equation-editor/       # React + TypeScript + Vite equation editor
-│   ├── ontology-editor/       # Frontend scaffold
-│   ├── behaviour-linker/      # Frontend scaffold
-│   ├── instantiation/         # Instantiation report / codegen viewer
+│   ├── ontology-editor/       # Ontology authoring (v1 verified)
+│   ├── behaviour-linker/      # §21 move-based assignment SPA (:3003)
+│   ├── instantiation/         # Values/IC editor + report viewer (:3006)
 │   └── species/               # Species & reaction artefact editor (§20)
 ├── packages/
 │   └── semantic/              # Shared TS contracts, catalogue, rules
 ├── backend/
 │   ├── equation/              # Parser, checker, compile space, service
-│   ├── ontology/              # Scaffold
-│   ├── behaviour/             # Scaffold
-│   ├── modeller/              # Scaffold
+│   ├── ontology/              # RdfContext + full CRUD + rule resolution
+│   ├── behaviour/             # §21 move-based closure engine
+│   ├── modeller/              # Model persistence + port satisfaction
 │   ├── instantiate/           # §16 resolver, §19 builder, §20 distribution
 │   ├── species/               # §20 species artefact GET/PUT service
-│   └── core/                  # Shared backend services (scaffold)
+│   └── core/                  # RdfStore, catalogue, seeds, deps helpers
 ├── docs/                      # All documentation
 ├── package.json               # npm workspaces root
 └── tsconfig.base.json         # Shared TypeScript config

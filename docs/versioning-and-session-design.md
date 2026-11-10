@@ -78,7 +78,9 @@ IRIs are the stable form.
 
 Type marker stamped at creation:
 `<graphIRI> a promo:Ontology | promo:Library | promo:Assignment |
-promo:Model | promo:Glass`.  Frozen graphs self-mark via
+promo:Model | promo:Glass` — plus `promo:Species` and
+`promo:Instantiation` since those artefact types landed (amended
+2026-11-10).  Frozen graphs self-mark via
 `a promo:Version` (already implemented in `freeze_version`).
 
 The **hub** is the suite entry point — a flat table, not a tree and not

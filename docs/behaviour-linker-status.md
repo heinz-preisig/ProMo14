@@ -1,11 +1,12 @@
 # Behaviour Linker — Implementation Status
 
-**Last updated:** 2026-10-28
+**Last updated:** 2026-10-28 — **realigned to rulings through
+2026-11-10** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
 §21 move-based engine implemented end to end (backend + SPA, 40
-closure tests, full suite 421 green).  Design is resolved — see
+closure tests, full suite 524 green — amended 2026-11-10, was 421).  Design is resolved — see
 `behaviour-linker-design-discussion.md` §1–21.
 
 ## Backend
@@ -278,8 +279,11 @@ assignment without output marks no longer reports `closed`.
    peer's exportable variables, licensed through `matched_tokens`
    (shared `readable_vars`/`_comparable` with the builder; engine
    `instantiate/satisfy.py`).  Connect gesture shows fed/unfed ports
-   advisedly.  Still open: whether `carriesToken` is required for
-   `port_variable`.
+   advisedly.  ~~Still open: whether `carriesToken` is required for
+   `port_variable`.~~ **Ruled 2026-11-10:** yes — the write path
+   enforces it (`port_variable` without `carriesToken` → 400;
+   `tokenVector` without `carriesToken` → 400; membership without a
+   signature defaults to `{member: 1}`).
 9. ~~§15 direction-aware donor selection~~ **Done (2026-10-29):**
    chained/carried port reads donate upstream (`reference_from` end).
    Carried = token-indexed var (species `c`); same-var downstream

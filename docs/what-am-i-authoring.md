@@ -61,7 +61,9 @@ tool.
 
 - **Owns:** behaviour assignments — per entity type, an ordered selection
   of equation IRIs from the var/expr graph plus marks (`base_equation`,
-  `instantiated`, ports), and the entity's graphical assignment.
+  `instantiated`, `ports`, `outputs`), and the entity's graphical
+  assignment (amended 2026-11-10 — `outputs` was added as a fourth
+  endpoint kind 2026-10-28).
 - **Correct when:** each entity type used in a model has a **closed**
   assignment. Remember: `base_equation` *is* the balance — a stateless
   entity (transport) must declare **none**, or its LHS becomes a fake
@@ -120,8 +122,9 @@ tool.
   port resolved to a peer, or `Instantiate`. Parameters get cells for
   every coordinate they index over — missing cells emit as `NaN` in
   generated code.
-- **Produces:** the instantiation *report* (not a persisted artefact
-  yet) — read its problem list; each `kind` links into
+- **Produces:** the instantiation *report*, persisted as a
+  `promo:Instantiation` artefact since 2026-10-17 (amended
+  2026-11-10) — read its problem list; each `kind` links into
   `docs/problem-catalogue.md`.
 - **Not here:** anything structural — topology, equations, species.
   If a problem's remedy says "the model is missing…", that edit happens

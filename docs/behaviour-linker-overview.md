@@ -1,5 +1,10 @@
 # Behaviour Linker Overview
 
+> **Superseded:** this predates the §1–§33 design work.  The living
+> docs are `behaviour-linker-status.md` (implementation state) and
+> `behaviour-linker-design-discussion.md` (rulings); kept as the
+> pre-design record — banner added 2026-11-10.
+
 ## Role in the suite
 
 The Behaviour Linker selects which equations describe the input/output
@@ -47,16 +52,20 @@ graphical vocabulary and persistence format.
 
 ### Arcs as equations
 
-Physical domain arcs (continuity conditions) and information flow arcs
-(output = input) are expressed as equations.  The Behaviour Linker
-defines which variable classes / tokens can carry a flow; the actual
-graph connections are drawn in the Modeller, which generates the
-linking equations.
+*Superseded model (banner 2026-11-10):* physical domain arcs
+(continuity conditions) and information flow arcs (output = input)
+were meant to be expressed as equations.  Under §13 the arc *is* the
+boundary coupling — it carries no equations; the coupling is the
+shared variable itself.
 
 ## Design status
 
-Not yet designed in detail.  The role is defined in ADR-004, but the
-workflow, UI, and data contracts have not been specified.
+*As of writing:* not yet designed in detail — the role is defined in
+ADR-004, but the workflow, UI, and data contracts have not been
+specified.  **Superseded:** the design is resolved through
+`behaviour-linker-design-discussion.md` §1–33 (move-based closure
+engine landed 2026-10-28; strict-boundary and §33 rulings
+2026-11-08/10) — banner 2026-11-10.
 
 ## Interaction with other modules
 

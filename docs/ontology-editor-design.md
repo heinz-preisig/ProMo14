@@ -22,8 +22,9 @@ Managed in the ontology editor:
   user-defined; for entity type composition.
 - **Entity types** — compositions of scale values.  CWA 17960's
   temporal×spatial is a seed/default, not a hardcoded schema.
-- **Connection rules** — 3 types: same-domain physical, cross-domain
-  physical, signal.
+- **Connection rules** — five seeded rules: `physical-same` (token-flow),
+  `signal`, `access`, `sensor`, `actuation` (amended 2026-11-10 — the
+  earlier 3-type sketch predates the seeded set).
 - **Indices** — index definitions, aliases, and token bindings.
 - **Abstract graphical symbols** — level-1 graphics: sketchable glyphs
   for paper/pencil work, part of the visual language definition.
@@ -132,8 +133,11 @@ scale values.
   assigns a specific scale level to a base entity.
 - Special cases: point system (zero-size, reactions), phase
   interface / intraface (zero-size, no reactions, arc element).
-- Transport system is a **node** (event-dynamic distributed), not an
-  arc.  Arcs are only intrafaces (continuity conditions).
+- Transport system is a **node**, not an arc — arcs are only
+  intrafaces (continuity conditions).  Transports come in two physics
+  grades (ruled 2026-11-10, design-principles §14): true physical
+  transport (`distributed` + `dynamic`, holds state) and the
+  event-dynamic simplification (capacity-free).
 - Entity types carry abstract graphical symbols (level-1 graphics).
 - Multi-scale models: a model contains entities at different scale
   levels, connected by arcs.  The ontology allows this; the
@@ -153,15 +157,21 @@ Depend on tokens + domains.
 
 Depend on domains + tokens.  Come last.
 
-- Rule type 1: same domain, shared tokens -> physical arc
+- `physical-same` — same branch, shared tokens -> token-flow arc
   (bidirectional, continuity).
-- Rule type 2: different physical domains, shared tokens -> physical
-  arc (bidirectional, continuity).
-- Rule type 3: signal connections -> information arc (unidirectional):
-  physical->info (observation), info->physical (manipulated variable),
-  within info domain, within physical domain (token signal).
+- `signal` — information-internal signal link (reference carrier).
+- `access` — physical↔physical service coupling (reference carrier).
+- `sensor` — physical→information observation (reference carrier,
+  cross-branch).
+- `actuation` — information→physical manipulation (reference carrier,
+  cross-branch).
+- `physical-cross` was retired 2026-09-15 (token-flow + cross can
+  never apply); amended 2026-11-10 to the seeded five.
 - Continuity is token-specific: an arc carries continuity only for
   tokens shared by both connected nodes.
+- Open machinery point (ruled 2026-11-10, §14): rules adjudicate
+  domain+token only, so capacity↔capacity arcs are still licensed;
+  enforcement needs endpoint-role constraints.
 
 ## Abstract graphical symbols (level-1 graphics)
 
@@ -247,7 +257,8 @@ The layout is a two-pane design within each stage:
 
 1. Editor loads the current ontology from the graph store.
 2. All edits produce patches to the in-memory graph model.
-3. Save commits the graph to the backend store (RDF/JSON/OWL).
+3. Save commits the graph to the backend store (RDF named graphs,
+   serialized as TriG — RDFS-level vocabulary only, no OWL).
 4. The ontology `/context` endpoint provides a read-only snapshot to
    the Equation Editor (tokens, indices, domain tree, axes).
 

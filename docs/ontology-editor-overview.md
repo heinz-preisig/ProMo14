@@ -33,8 +33,9 @@ contracts.
     user-defined; for entity type composition).
   - Entity types (compositions of scale values; CWA 17960
     temporal×spatial as a seed/default, not a hardcoded schema).
-  - Connection rules (3 types: same-domain physical, cross-domain
-    physical, signal).
+  - Connection rules — five seeded rules: `physical-same` (token-flow),
+    `signal`, `access`, `sensor`, `actuation` (amended 2026-11-10; the
+    earlier 3-type sketch predates the seeded set).
   - Indices (`promo:Index` with IRI, label, token binding, network).
   - Abstract graphical symbols (level-1 graphics: sketchable glyphs
     for paper/pencil work; part of the visual language definition).
