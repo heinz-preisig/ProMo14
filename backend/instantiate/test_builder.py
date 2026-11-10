@@ -2353,6 +2353,61 @@ def test_two_occurrences_of_one_submodel(client):
         assert plan["states"] != []
 
 
+def test_pinned_plan_replay(client):
+    """§22 pinned replay regression: ``POST /instantiations`` persists
+    ``promo:plan`` on the artefact and one ``#occ_N`` sub-plan per
+    referenced occurrence; ``?instantiation=`` on ``/code`` replays
+    each without recomputing — identical source top-level, and each
+    sub-plan emits its own contribution standalone."""
+    store = graph_store.get_store()
+    ids = _seed_endpoint_model(store)
+    _seed_assignments(client, ids)
+    onto = str(store.ONTOLOGY_GRAPH_IRI)
+    fx = _seed_referenced_composite(store)
+
+    # fresh plan → pinned artefact (explicit IRI for deterministic #occ)
+    inst = f"{fx['host']}#inst_1"
+    r = client.post("/api/instantiate/instantiations",
+                    params={"graph": fx["host"]},
+                    json={"vars": onto, "iri": inst})
+    assert r.status_code == 200, r.text
+    assert r.json()["iri"] == inst
+
+    # -- top-level replay: byte-identical source to fresh emission ----
+    fresh = client.get("/api/instantiate/code",
+                       params={"graph": fx["host"], "vars": onto,
+                               "target": "python"})
+    assert fresh.status_code == 200 and fresh.json()["ok"], fresh.text
+    r = client.get("/api/instantiate/code",
+                   params={"instantiation": inst, "target": "python"})
+    assert r.status_code == 200, r.text
+    replay = r.json()
+    assert replay["ok"], replay.get("error")
+    assert replay["source"] == fresh.json()["source"]
+    assert replay["problems"] == fresh.json()["problems"]
+
+    # -- #occ_N: each nested sub-plan replays standalone --------------
+    hg = store.dataset.graph(URIRef(inst))
+    subs = list(hg.objects(URIRef(inst), PROMO["hasSubPlan"]))
+    assert subs
+    for s in subs:
+        r = client.get("/api/instantiate/code",
+                       params={"instantiation": str(s),
+                               "target": "python"})
+        assert r.status_code == 200, r.text
+        out = r.json()
+        assert out["ok"], out.get("error")
+        assert "def derivative(t, y, par, out=None):" in out["source"]
+        # the slice's emitted names carry the occurrence tag
+        assert "Composite_1_" in out["source"]
+
+    # -- unknown instantiation → 404 ----------------------------------
+    r = client.get("/api/instantiate/code",
+                   params={"instantiation": f"{fx['host']}#nope",
+                           "target": "python"})
+    assert r.status_code == 404
+
+
 def test_initial_endpoint(client):
     """POST /api/instantiate/initial runs the t=0 solve in-service:
     ``par`` supplies the parameter slot plus the ic0 pin; the response
