@@ -9,6 +9,7 @@ import type { CatalogueLine, EntityVariable, SpeciesDistribution, SpeciesDocumen
 import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { fetchPortSatisfaction } from './api'
+import { hasCarrierArc } from './model/ModelGraph'
 import type { PortSatisfaction } from './api'
 import { deserializeState, hasContent, refViewState, serializeState } from './modelPersistence'
 import type { ModelDocument } from './modelPersistence'
@@ -400,20 +401,28 @@ export default function App() {
   const gestureHasSource = !!(pendingConnection || state.selectedVisibleNodeId)
 
   // --- Compute connection-rule feedback for hovered target ---
-  const { hoveredHighlight, validConnections } = useMemo(() => {
+  const { hoveredHighlight, validConnections, alreadyConnected } = useMemo(() => {
     const sourceEntityType = gestureSourceEt
     const hasSource = gestureHasSource
     if (!hasSource || !hoveredNodeId || sourceEntityType === undefined) {
-      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
+      return { hoveredHighlight: null, alreadyConnected: false, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     const targetNode = graphView.nodes.find((n) => n.id === hoveredNodeId)
     if (targetNode?.type !== 'leaf' || !targetNode.entityType) {
-      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
+      return { hoveredHighlight: null, alreadyConnected: false, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     // Don't show feedback if hovering the pending source itself
     if (pendingConnection && targetNode.modelNodeIri === pendingConnection.sourceModelIri) {
-      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
+      return { hoveredHighlight: null, alreadyConnected: false, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
+    // §14 duplicate guard: a same-carrier arc already spans the pair
+    // — the gesture is refused even when the rules license it.
+    const srcModelIri = pendingConnection?.sourceModelIri
+      ?? graphView.nodes.find(
+        (n) => n.id === state.selectedVisibleNodeId)?.modelNodeIri
+    const alreadyConnected = hasCarrierArc(
+      state.modelArcs, srcModelIri ?? '',
+      targetNode.modelNodeIri ?? '', activeArcType)
     const result = resolveConnection(
       sourceEntityType,
       targetNode.entityType,
@@ -421,11 +430,11 @@ export default function App() {
       ruleResolver,
     )
     if (result.status === 'forbidden') {
-      return { hoveredHighlight: 'invalid' as const, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
+      return { hoveredHighlight: 'invalid' as const, alreadyConnected, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     if (result.connections.length === 0) {
       // Cache miss — remote answer in flight; no highlight yet.
-      return { hoveredHighlight: null, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
+      return { hoveredHighlight: null, alreadyConnected, validConnections: [] as { arcTypeIri: Iri; matchedTokens?: Iri[] }[] }
     }
     // The gesture is legal only for the *selected* carrier — other
     // licensed types are still listed, but hover marks the pair
@@ -435,14 +444,15 @@ export default function App() {
       matchedTokens: c.matchedTokens,
     }))
     return {
-      hoveredHighlight: licensed.some(
+      hoveredHighlight: !alreadyConnected && licensed.some(
         (c) => c.arcTypeIri === activeArcType)
         ? 'valid' as const
         : 'invalid' as const,
+      alreadyConnected,
       validConnections: licensed,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump, activeArcType])
+  }, [state.selectedVisibleNodeId, hoveredNodeId, graphView, pendingConnection, ruleResolver, catalogue, cacheBump, activeArcType, state.modelArcs])
 
   // §14 admissibility hint: leaves the armed connect cannot reach
   // with the *selected* carrier — forbidden pair, or allowed under
@@ -452,6 +462,9 @@ export default function App() {
   const blockedLeafIds = useMemo(() => {
     const out = new Set<string>()
     if (!gestureHasSource || !gestureSourceEt) return out
+    const srcModelIri = pendingConnection?.sourceModelIri
+      ?? graphView.nodes.find(
+        (n) => n.id === state.selectedVisibleNodeId)?.modelNodeIri
     for (const n of graphView.nodes) {
       if (n.type !== 'leaf' || !n.entityType) continue
       if (n.id === state.selectedVisibleNodeId) continue
@@ -461,7 +474,9 @@ export default function App() {
         gestureSourceEt, n.entityType, catalogue, ruleResolver)
       if (res.status === 'forbidden'
           || (res.connections.length > 0
-              && !res.connections.some((c) => c.arcTypeIri === activeArcType))) {
+              && !res.connections.some((c) => c.arcTypeIri === activeArcType))
+          || hasCarrierArc(state.modelArcs, srcModelIri ?? '',
+                           n.modelNodeIri ?? '', activeArcType)) {
         out.add(n.id)
       }
     }
@@ -469,7 +484,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gestureHasSource, gestureSourceEt, graphView,
       state.selectedVisibleNodeId, pendingConnection,
-      catalogue, ruleResolver, activeArcType, cacheBump])
+      catalogue, ruleResolver, activeArcType, cacheBump,
+      state.modelArcs])
 
   // §13/§14 port-satisfaction: adjudicate the hovered pair.  Union
   // over all licensed carriers until the user picks an arc type, then
@@ -1380,9 +1396,11 @@ export default function App() {
           {hoveredHighlight === 'valid'
             ? `Valid target — right-click to connect (${validConnections.length} arc type${validConnections.length > 1 ? 's' : ''})`
             : hoveredHighlight === 'invalid'
-              ? validConnections.length > 0
-                ? `Selected arc type not licensed — ${validConnections.length} other${validConnections.length > 1 ? 's' : ''} allowed`
-                : 'Invalid target — connection not allowed'
+              ? alreadyConnected
+                ? 'Already connected with this arc type'
+                : validConnections.length > 0
+                  ? `Selected arc type not licensed — ${validConnections.length} other${validConnections.length > 1 ? 's' : ''} allowed`
+                  : 'Invalid target — connection not allowed'
               : pendingConnection && !state.selectedVisibleNodeId
                 ? `Source selected (${pendingConnection.sourceModelIri}) — navigate to target view, right-click a leaf to connect`
                 : hoveredObject?.kind === 'knot'

@@ -6,7 +6,7 @@ import type { GraphView, NodeType, ArcType } from '../types'
 import type { SceneObject, SceneInteractionHandlers } from '../scene/types'
 import { resolveConnectionAsync, pickArcType, modelNodeIri } from '@promo/semantic'
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
-import { arcCarrier, defaultOrientation } from '../model/ModelGraph'
+import { arcCarrier, defaultOrientation, hasCarrierArc } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
 import { GRAPH_IRI, loadModelDoc } from '../api'
 import { refViewState } from '../modelPersistence'
@@ -132,6 +132,11 @@ export function useCanvasEvents(
    *  computes the §15 orientation, dispatches insertArc.  Re-arm on
    *  the target is already encoded in the automaton's next mode. */
   const runConnect = async (o: Extract<Output, { kind: 'connect' }>) => {
+    // §14 duplicate guard: a second arc of the same carrier on the
+    // same pair adds no topology — parallel flows take separate
+    // transport nodes.
+    if (hasCarrierArc(state.modelArcs, o.source.modelIri,
+                      o.target.modelIri, activeArcType)) return
     const result = await resolveConnectionAsync(
       o.source.entityType, o.target.entityType, catalogue, ruleResolver)
     const arcType = pickArcType(result, activeArcType)
@@ -539,6 +544,13 @@ export function useCanvasEvents(
 
             const sourceEntityType = oa.isSource ? targetNode.entityType : externalEntityType
             const targetEntityType = oa.isSource ? externalEntityType : targetNode.entityType
+
+            // §14 duplicate guard: retargeting onto a pair already
+            // carrying a same-carrier arc would duplicate incidence —
+            // the dragged arc itself is excluded.
+            if (hasCarrierArc(state.modelArcs, oa.externalIri,
+                              targetNode.modelNodeIri, oa.arcType,
+                              openArc.modelArcIri)) break
 
             const result = await resolveConnectionAsync(
               sourceEntityType,

@@ -8,6 +8,30 @@ import { GRAPH_IRI } from '../api'
  *  ``backend.instantiate.resolver.arc_carrier``. */
 export const arcCarrier = arcTypeCarrier
 
+/** §14 duplicate guard: an arc of the same carrier already spans the
+ *  two nodes (either direction).  One transport node *is* the
+ *  mechanism — a second same-carrier arc adds no topology, only a
+ *  double-counted incidence; parallel flows take separate transport
+ *  nodes.  ``excludeIri`` skips the arc being reconnected. */
+export function hasCarrierArc(
+  arcs: Map<string, ModelArc>,
+  a: string,
+  b: string,
+  arcType: ArcType,
+  excludeIri?: string,
+): boolean {
+  const carrier = arcCarrier(arcType)
+  if (!carrier) return false
+  for (const arc of arcs.values()) {
+    if (arc.iri === excludeIri) continue
+    if (arcCarrier(arc.arcType) !== carrier) continue
+    const same = arc.sourceIri === a && arc.targetIri === b
+    const swapped = arc.sourceIri === b && arc.targetIri === a
+    if (same || swapped) return true
+  }
+  return false
+}
+
 /** §15 default reference direction for a new arc.
  *
  *  Token-flow arcs get an explicit orientation; other carriers return
