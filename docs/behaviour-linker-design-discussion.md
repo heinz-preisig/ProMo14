@@ -3236,6 +3236,56 @@ coupled m+e     drives:{chem-pot, T}  carries:{mass, energy}
   gathers concatenate peer values in contact order, all three
   dialects emit; E_4/E_11 repointed, V_59 deleted.
 
+### Ruled & implemented (stage 2 — vocabulary slice, 2026-11-11)
+
+The `drives`/`carries` coupling signature landed in minimal form;
+the pairing resolver stays deferred until the first multi-mechanism
+model trips `port-domain-ambiguous` (the existing tripwire — no
+silent wrong answer in the meantime).
+
+- **`drives` declared** — `promo:drives` on mechanism leaf entity
+  types: the token the driving *effort* carries (convection →
+  `token_momentum`, diffusion → `token_component_mass`,
+  heat/radiation → `token_energy`, work → `token_momentum` —
+  user-confirmed 2026-11-11).  Set-valued for coupled
+  transports; floor-seeded and migrates on `load()` (additive —
+  user-declared extra drives preserved, seeded value resurrects).
+  Match rule: a peer var couples as the effort iff it is
+  `function:effort`-classified and carries the drive token.
+- **`work_transport` = catch-all** — the bin for every energy
+  transfer that is not mass-, heat- or radiation-coupled.  Its
+  seeded drive is mechanical (force/stress → momentum token);
+  surface/interfacial, elastic and gravitational work all resolve
+  to momentum effort or body-force sources.  Electrical and
+  magnetic work are normally folded into the (electro)chemical
+  potential — the effort stays `component_mass`-tokened and couples
+  on the *mass-transport* side, not through work at all.  The
+  alternative view (an explicit electrical-work term) would need a
+  `token_charge` vocabulary extension — `drives` being set-valued
+  already leaves the slot open (`{momentum, charge}` on a subtype).
+- **`carries` is free** — it is exactly the inherited `promo:token`
+  on the grouping types.  Effort token ≠ carried token is now
+  first-class: convection is momentum-driven but moves mass.
+- **`mechanism_drives`** (`capabilities.py`) — *union* walk up
+  `promo:parent`, unlike `mechanism_token`'s nearest-wins: a
+  subtype may add a coupled drive beside the inherited one.
+- **Write path** — `EntityTypeRecord.drives` + token-typed
+  validation, so user-authored mechanism types declare their own
+  signatures; `VOCAB_DOCS` self-doc on `promo:drives`;
+  `SEED_FLOOR` → 2026-11-11.
+- **§30 amendment (narrow)** — "no driving-force knowledge" narrows:
+  the system now declares the *coupling interface* (which effort
+  kind drives each mechanism) but still not the law — the signature
+  answers *which vars couple*, never *how they relate*.
+  Fick-on-convection remains legal; laws stay user semantics.
+- **Still open**: pairing resolver (var→mechanism on ambiguous
+  boundaries — effort vars match `drives`; flow vars may pin via
+  the `F_k` their defining equation already names),
+  effort-availability advisory at contacts (warn, not gate),
+  `conjugates` (entropy — no consumer yet), `promo:Mechanism`
+  resource layer (needed only when one etype hosts two mechanisms
+  and drives↔carries must pair per-mechanism).
+
 ## 33. Submodel reuse — two insertion modes and the phantom port (2026-11-08)
 
 Continuation of the 11-06 copy-vs-reference discussion.  The user's

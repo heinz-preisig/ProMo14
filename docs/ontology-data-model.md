@@ -779,7 +779,12 @@ applicable to a domain pair:
   `mass_transport` {`diffusion_transport`, `convection_transport`} and
   `energy_transport` {`heat_transport`, `radiation_transport`,
   `work_transport`} (`promo:parent` links).  Arc sub-indices select on
-  these types — see §3.3 and BL design doc §16.
+  these types — see §3.3 and BL design doc §16.  Mechanism leaves
+  carry `promo:drives` = the token their driving effort carries
+  (convection → `token_momentum`, diffusion → `token_component_mass`,
+  heat/radiation → `token_energy`, work → `token_momentum`),
+  union-inherited through `promo:parent`; the carried family stays
+  `promo:token` on the grouping types.  See BL design doc §32.
 - **Scale regimes** — both structural scale trees are grouped under
   `particulate` | `continuum` top-level values; `length` gained a
   `molecular` level under `particulate`.  Entity types bind leaf

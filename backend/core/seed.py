@@ -450,31 +450,38 @@ class SeedMixin:
             self.mint_iri(base, "sval_time_macro_event_dynamic"),
             self.mint_iri(base, "sval_length_microscopic_distributed"),
         ]
-        # (frag, label, parent_frag, bind_scales, token_frag) — parents
-        # first.  The groupings bear promo:token = the family they move
-        # (mechanism_token() walks leaves up to it); leaves inherit via
-        # promo:parent, so their token stays unset.
+        # (frag, label, parent_frag, bind_scales, token_frag,
+        #  drive_frag) — parents first.  The groupings bear promo:token
+        # = the family they move (mechanism_token() walks leaves up to
+        # it); leaves inherit via promo:parent, so their token stays
+        # unset.  Leaves bear promo:drives = the token the driving
+        # effort carries (§32 stage-2 coupling signature; "carries" is
+        # the inherited promo:token — effort token ≠ carried token:
+        # convection is momentum-driven but moves mass).
         tree = [
             ("mass_transport", "Mass Transport", "transport_system", False,
-             "mass"),
+             "mass", None),
             ("energy_transport", "Energy Transport", "transport_system", False,
-             "energy"),
+             "energy", None),
             ("diffusion_transport", "Diffusion Transport", "mass_transport", True,
-             None),
+             None, "component_mass"),
             ("convection_transport", "Convection Transport", "mass_transport", True,
-             None),
+             None, "momentum"),
             ("heat_transport", "Heat Transport", "energy_transport", True,
-             None),
+             None, "energy"),
             ("radiation_transport", "Radiation Transport", "energy_transport", True,
-             None),
+             None, "energy"),
             ("work_transport", "Work Transport", "energy_transport", True,
-             None),
+             None, "momentum"),
         ]
-        for frag, label, parent_frag, bind_scales, token_frag in tree:
+        for (frag, label, parent_frag, bind_scales, token_frag,
+             drive_frag) in tree:
             iri = self.mint_iri(base, f"etype_{frag}")
             parent_iri = self.mint_iri(base, f"etype_{parent_frag}")
             token_iri = (self.mint_iri(base, f"token_{token_frag}")
                          if token_frag else None)
+            drive_iri = (self.mint_iri(base, f"token_{drive_frag}")
+                         if drive_frag else None)
             if (iri, RDF.type, PROMO["EntityType"]) in g:
                 # Migration: reparent seeds that predate the token
                 # grouping (they sit directly under transport_system).
@@ -485,6 +492,11 @@ class SeedMixin:
                     g.set((iri, PROMO["parent"], parent_iri))
                 if token_iri is not None:
                     g.set((iri, PROMO["token"], token_iri))
+                if drive_iri is not None:
+                    # Additive: preserves user-declared extra drives
+                    # (coupled transports) while resurrecting the
+                    # seeded floor value.
+                    g.add((iri, PROMO["drives"], drive_iri))
                 if bind_scales:
                     # Regime migration: drop the molecular time binding
                     # (predates the regime layer) and ensure the
@@ -505,6 +517,7 @@ class SeedMixin:
                               if bind_scales and (sv, None, None) in g],
                 parent=parent_iri,
                 token=token_iri,
+                drives=[drive_iri] if drive_iri is not None else None,
             )
 
     def _seed_arc_sub_indices(self, g: Graph, base: str) -> None:

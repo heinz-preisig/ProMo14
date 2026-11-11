@@ -38,6 +38,7 @@ rejection after an implemented-then-reverted attempt).  Do not re-propose.
 |-------|-------------|---------|
 | Connection rules | `promo:sharedToken` | What *may* flow between domains? |
 | Entity types (mechanism groups) | `promo:token` on grouping types | Which token family does this mechanism move? |
+| Entity types (mechanism leaves) | `promo:drives` (set-valued) | Which effort token drives this mechanism? (§32 stage-2) |
 | Variables | `promo:carriesToken` (membership) + `promo:tokenVector` (algebraic signature) | What does this variable quantify? |
 
 **Arcs carry no token declaration** — carrier category only
@@ -335,9 +336,16 @@ unphysical, whatever the capacities' sizes.
   constants still duplicate per occurrence (dedup later); a
   spurious shared loop can tag an occurrence whose own DAG is
   acyclic (aggregated port edges are conservative).
-- `promo:Mechanism` vocabulary (§32 stage 2) — `drives`/`carries`
-  signatures pairing vars to mechanisms on shared multi-mechanism
-  boundaries; the `port-domain-ambiguous` path waits on it.
+- `promo:Mechanism` vocabulary (§32 stage 2) — **partially landed
+  2026-11-11**: `promo:drives` floor-seeded on mechanism leaves
+  (effort-token coupling signature; `carries` = the inherited
+  `promo:token` family — free) plus the `mechanism_drives`
+  ancestry-union walk.  Still unbuilt: the pairing resolver in
+  `builder.contact_arc_domain` (`port-domain-ambiguous` still
+  terminates), the effort-availability advisory at contacts,
+  `conjugates` (entropy — no consumer), and the `promo:Mechanism`
+  resource layer (needed only when one etype hosts two mechanisms).
+  First consumer = the first multi-mechanism model.
 - Seed-derived vs ruled drift — floor migrations can silently
   re-implement superseded semantics (found 2026-11-06: F_* token
   decls resurrected post-strip).  Review audits the seed layer

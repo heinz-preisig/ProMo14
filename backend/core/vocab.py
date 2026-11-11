@@ -53,6 +53,15 @@ VOCAB_DOCS = {
         "(ADR-008) or a promo:ValueCell's value.  Never an expression: "
         "computed values are promo:Expression trees behind "
         "promo:rhsExpression or 'initialise'-class equations.",
+    "drives":
+        "Mechanism entity type → token(s) its driving effort carries "
+        "(§32 stage-2 coupling signature).  Declared on mechanism "
+        "leaf types, set-valued for coupled transports; inherited "
+        "through promo:parent (mechanism_drives unions the ancestry).  "
+        "Matching test: a peer variable couples as the effort when it "
+        "is classified function:effort and carries this token.  The "
+        "carried side is promo:token ancestry — effort token ≠ "
+        "carried token (convection is momentum-driven, moves mass).",
     "ValueFill":
         "A fill rule covering many cells of a variable's value table "
         "at once — the '*' selector mechanism for mostly-uniform "
@@ -86,7 +95,7 @@ SEED_CONSTANTS = (
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-11-10"
+SEED_FLOOR = "2026-11-11"
 
 # Top-level equation-class hierarchy, seeded by
 # ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for

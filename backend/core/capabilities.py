@@ -109,6 +109,60 @@ def mechanism_token(store, graph_iri, entity_type: str) -> Optional[str]:
     return None
 
 
+def mechanism_drives_in(graph, entity_type: str) -> Set[str]:
+    """``mechanism_drives`` walk against a single (possibly merged)
+    graph."""
+    drives: Dict[str, Set[str]] = {}
+    parents: Dict[str, str] = {}
+    for et in graph.subjects(RDF.type, PROMO["EntityType"]):
+        ds = {str(d) for d in graph.objects(et, PROMO["drives"])}
+        if ds:
+            drives[str(et)] = ds
+        p = graph.value(et, PROMO["parent"])
+        if p is not None:
+            parents[str(et)] = str(p)
+    out: Set[str] = set()
+    cur, seen = entity_type, set()
+    while cur and cur not in seen:
+        seen.add(cur)
+        out |= drives.get(cur, set())
+        cur = parents.get(cur)
+    return out
+
+
+def mechanism_drives(store, graph_iri, entity_type: str) -> Set[str]:
+    """The tokens the mechanism's driving efforts carry —
+    ``promo:drives`` on entity types, *unioned* up the ``promo:parent``
+    ancestry (unlike ``mechanism_token``'s nearest-wins: a subtype may
+    add a coupled drive next to the inherited one), resolved across
+    the artefact's resolution scope.  Empty when no ancestor declares
+    one — a non-mechanism type.
+
+    §32 stage-2 coupling signature: ``drives`` names the effort side
+    (match against a peer var's ``function:effort`` + token), while
+    ``promo:token`` names the carried side — the two differ
+    (convection is momentum-driven but moves mass).
+    """
+    drives: Dict[str, Set[str]] = {}
+    parents: Dict[str, str] = {}
+    for gi in store.resolution_scope(graph_iri):
+        g = store.dataset.graph(gi)
+        for et in g.subjects(RDF.type, PROMO["EntityType"]):
+            ds = {str(d) for d in g.objects(et, PROMO["drives"])}
+            if ds:
+                drives[str(et)] = ds
+            p = g.value(et, PROMO["parent"])
+            if p is not None:
+                parents[str(et)] = str(p)
+    out: Set[str] = set()
+    cur, seen = entity_type, set()
+    while cur and cur not in seen:
+        seen.add(cur)
+        out |= drives.get(cur, set())
+        cur = parents.get(cur)
+    return out
+
+
 def violations(
     store,
     graph_iri,

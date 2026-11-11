@@ -848,6 +848,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
         scale_values: Optional[List[Union[str, URIRef]]] = None,
         parent: Optional[Union[str, URIRef]] = None,
         token: Optional[Union[str, URIRef]] = None,
+        drives: Optional[List[Union[str, URIRef]]] = None,
     ) -> URIRef:
         """Add an entity type (CWA 17960 taxonomy) to the graph."""
         graph.add((iri, RDF.type, PROMO["EntityType"]))
@@ -862,6 +863,13 @@ class RdfStore(PersistenceMixin, SeedMixin):
             if isinstance(token, str):
                 token = URIRef(token)
             graph.set((iri, PROMO["token"], token))
+        if drives is not None:
+            # §32 stage-2: set-valued — a coupled transport declares one
+            # drive per effort kind it couples through.
+            for d in drives:
+                if isinstance(d, str):
+                    d = URIRef(d)
+                graph.add((iri, PROMO["drives"], d))
         if spatial_type is not None:
             self._set_literal(graph, iri, PROMO["spatialType"], spatial_type)
         if spatial_size is not None:

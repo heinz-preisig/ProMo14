@@ -265,6 +265,50 @@ ONTO = "https://w3id.org/promo/ontology"
 PVAR = f"{ONTO}#"
 
 
+def test_seed_mechanism_drives(tmp_path):
+    """§32 stage-2: mechanism leaves carry promo:drives — the token
+    their driving effort carries — resolving through promo:parent
+    ancestry (union, not nearest-wins).  The carried side stays
+    promo:token on the grouping types."""
+    from .capabilities import mechanism_drives, mechanism_token
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+
+    expected = {
+        "convection_transport": "momentum",
+        "diffusion_transport": "component_mass",
+        "heat_transport": "energy",
+        "radiation_transport": "energy",
+        "work_transport": "momentum",
+    }
+    for frag, tok in expected.items():
+        et = URIRef(f"{ONTO}#etype_{frag}")
+        assert set(ont.objects(et, PROMO["drives"])) == {
+            URIRef(f"{ONTO}#token_{tok}")}, frag
+        assert mechanism_drives(store, ont.identifier, str(et)) == {
+            f"{ONTO}#token_{tok}"}, frag
+        # carries side unchanged: family on the grouping ancestor
+        assert mechanism_token(store, ont.identifier, str(et)) is not None
+
+    # Groupings declare no drives themselves; a non-mechanism type
+    # resolves nothing.
+    assert mechanism_drives(
+        store, ont.identifier, f"{ONTO}#etype_mass_transport") == set()
+    assert mechanism_drives(
+        store, ont.identifier, f"{ONTO}#etype_lumped") == set()
+
+    # Ancestry union: a user subtype inherits its parent's drive and
+    # may add a coupled one alongside it.
+    sub = URIRef(f"{ONTO}#etype_test_coupled")
+    ont.add((sub, RDF.type, PROMO["EntityType"]))
+    ont.add((sub, PROMO["parent"],
+             URIRef(f"{ONTO}#etype_convection_transport")))
+    ont.add((sub, PROMO["drives"], URIRef(f"{ONTO}#token_energy")))
+    assert mechanism_drives(store, ont.identifier, str(sub)) == {
+        f"{ONTO}#token_momentum", f"{ONTO}#token_energy"}
+
+
 def test_seed_incidence_factors(tmp_path):
     """§25: one canonical F_<mech> variable per arc sub-index — fixed
     [A_k, N] shape, constant+parameter, dimensionless.  §4 neutrality:

@@ -747,6 +747,9 @@ def create_entity_type(
     if record.token:
         _require_typed(graph, record.token, PROMO["Token"],
                        "Mechanism token")
+    for d in record.drives:
+        _require_typed(graph, d, PROMO["Token"],
+                       "Mechanism drive token")
     store.add_entity_type(
         graph,
         URIRef(record.iri),
@@ -759,6 +762,7 @@ def create_entity_type(
         scale_values=record.scale_values,
         parent=URIRef(record.parent) if record.parent else None,
         token=URIRef(record.token) if record.token else None,
+        drives=record.drives or None,
     )
     return record
 

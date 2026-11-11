@@ -210,6 +210,11 @@ class EntityTypeRecord(BaseModel):
     #: Granularity within the family (e.g. mass vs component_mass) is
     #: a model-objective choice resolved via token ancestry.
     token: Optional[str] = None
+    #: promo:drives — §32 stage-2, declared on mechanism *leaf* types:
+    #: the token(s) the driving effort carries (e.g. convection →
+    #: momentum, diffusion → component_mass).  Set-valued: a coupled
+    #: transport declares one per effort kind it couples through.
+    drives: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
