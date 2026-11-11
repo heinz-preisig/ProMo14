@@ -954,6 +954,9 @@
 
     promo:created a rdf:Property .
 
+    promo:drives a rdf:Property ;
+        promo:doc "Mechanism entity type → token(s) its driving effort carries (§32 stage-2 coupling signature).  Declared on mechanism leaf types, set-valued for coupled transports; inherited through promo:parent (mechanism_drives unions the ancestry).  Matching test: a peer variable couples as the effort when it is classified function:effort and carries this token.  The carried side is promo:token ancestry — effort token ≠ carried token (convection is momentum-driven, moves mass)." .
+
     promo:equationClass a rdf:Property .
 
     promo:fillPattern a rdf:Property ;
@@ -1313,7 +1316,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:n317fc349c4c347969b7c04e666e7e2deb1 ;
+        promo:hasArguments _:n2c36a5e4bb1d4196a61d6cd7f84596f4b1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
@@ -1331,7 +1334,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial V}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:n317fc349c4c347969b7c04e666e7e2deb2 ;
+        promo:hasArguments _:n2c36a5e4bb1d4196a61d6cd7f84596f4b2 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -1349,7 +1352,7 @@
         promo:rhsLatex "\\left( r_{x,N} \\circ r_{y,N} \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:n317fc349c4c347969b7c04e666e7e2deb3 ;
+        promo:hasArguments _:n2c36a5e4bb1d4196a61d6cd7f84596f4b3 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -1367,7 +1370,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:n317fc349c4c347969b7c04e666e7e2deb4 ;
+        promo:hasArguments _:n2c36a5e4bb1d4196a61d6cd7f84596f4b4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -1385,7 +1388,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:n317fc349c4c347969b7c04e666e7e2deb5 ;
+        promo:hasArguments _:n2c36a5e4bb1d4196a61d6cd7f84596f4b5 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#V_10> a promo:Variable ;
@@ -1853,7 +1856,7 @@
     <https://w3id.org/promo/ontology#versionOf> a rdf:Property .
 
     <https://w3id.org/promo/ontology> a promo:Ontology ;
-        promo:seedFloor "2026-11-10" .
+        promo:seedFloor "2026-11-11" .
 
     <https://w3id.org/promo/ontology#V_5> a promo:Variable ;
         rdfs:label "U" ;
@@ -1990,6 +1993,7 @@
         rdfs:label "Convection Transport" ;
         promo:branch "physical" ;
         promo:doc "Transport system — convection transport mechanism" ;
+        promo:drives <https://w3id.org/promo/ontology#token_momentum> ;
         promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_microscopic_distributed>,
             <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> ;
         promo:parent <https://w3id.org/promo/ontology#etype_mass_transport> ;
@@ -2001,6 +2005,7 @@
         rdfs:label "Diffusion Transport" ;
         promo:branch "physical" ;
         promo:doc "Transport system — diffusion transport mechanism" ;
+        promo:drives <https://w3id.org/promo/ontology#token_component_mass> ;
         promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_microscopic_distributed>,
             <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> ;
         promo:parent <https://w3id.org/promo/ontology#etype_mass_transport> ;
@@ -2012,6 +2017,7 @@
         rdfs:label "Heat Transport" ;
         promo:branch "physical" ;
         promo:doc "Transport system — heat transport mechanism" ;
+        promo:drives <https://w3id.org/promo/ontology#token_energy> ;
         promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_microscopic_distributed>,
             <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> ;
         promo:parent <https://w3id.org/promo/ontology#etype_energy_transport> ;
@@ -2023,6 +2029,7 @@
         rdfs:label "Radiation Transport" ;
         promo:branch "physical" ;
         promo:doc "Transport system — radiation transport mechanism" ;
+        promo:drives <https://w3id.org/promo/ontology#token_energy> ;
         promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_microscopic_distributed>,
             <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> ;
         promo:parent <https://w3id.org/promo/ontology#etype_energy_transport> ;
@@ -2034,6 +2041,7 @@
         rdfs:label "Work Transport" ;
         promo:branch "physical" ;
         promo:doc "Transport system — work transport mechanism" ;
+        promo:drives <https://w3id.org/promo/ontology#token_momentum> ;
         promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_microscopic_distributed>,
             <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> ;
         promo:parent <https://w3id.org/promo/ontology#etype_energy_transport> ;
@@ -2176,10 +2184,6 @@
         rdfs:label "Entropy" ;
         promo:tokenKind "conserved" .
 
-    <https://w3id.org/promo/ontology#token_momentum> a promo:Token ;
-        rdfs:label "Momentum" ;
-        promo:tokenKind "conserved" .
-
     <https://w3id.org/promo/ontology#etype_mass_transport> a promo:EntityType ;
         rdfs:label "Mass Transport" ;
         promo:branch "physical" ;
@@ -2215,8 +2219,8 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
         promo:parent <https://w3id.org/promo/ontology#sval_time_continuum> .
 
-    <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
-        rdfs:label "Energy" ;
+    <https://w3id.org/promo/ontology#token_momentum> a promo:Token ;
+        rdfs:label "Momentum" ;
         promo:tokenKind "conserved" .
 
     <https://w3id.org/promo/ontology#etype_energy_transport> a promo:EntityType ;
@@ -2233,14 +2237,18 @@
         rdfs:label "continuum" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> .
 
+    <https://w3id.org/promo/ontology#axis_function_physical> a promo:ClassificationAxis ;
+        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:name "function" .
+
     <https://w3id.org/promo/ontology#token_component_mass> a promo:Token ;
         rdfs:label "Component Mass" ;
         promo:parent <https://w3id.org/promo/ontology#token_mass> ;
         promo:tokenKind "conserved" .
 
-    <https://w3id.org/promo/ontology#axis_function_physical> a promo:ClassificationAxis ;
-        promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:name "function" .
+    <https://w3id.org/promo/ontology#token_energy> a promo:Token ;
+        rdfs:label "Energy" ;
+        promo:tokenKind "conserved" .
 
     <https://w3id.org/promo/ontology#token_mass> a promo:Token ;
         rdfs:label "Mass" ;
@@ -2325,28 +2333,28 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n317fc349c4c347969b7c04e666e7e2deb6 .
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n2c36a5e4bb1d4196a61d6cd7f84596f4b6 .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n317fc349c4c347969b7c04e666e7e2deb7 .
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n2c36a5e4bb1d4196a61d6cd7f84596f4b7 .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
-        rdf:rest _:n317fc349c4c347969b7c04e666e7e2deb8 .
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
+        rdf:rest _:n2c36a5e4bb1d4196a61d6cd7f84596f4b8 .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb7 rdf:first <https://w3id.org/promo/ontology#V_23> ;
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b7 rdf:first <https://w3id.org/promo/ontology#V_23> ;
         rdf:rest () .
 
-    _:n317fc349c4c347969b7c04e666e7e2deb8 rdf:first <https://w3id.org/promo/ontology#V_15> ;
+    _:n2c36a5e4bb1d4196a61d6cd7f84596f4b8 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest () .
 }
 

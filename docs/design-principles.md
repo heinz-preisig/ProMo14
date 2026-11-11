@@ -1,5 +1,7 @@
 # Design principles — ProMo14
 
+Living — realigned to rulings through 2026-11-11.
+
 Curated record of the global ideas and the deliberate deviations from
 mainstream modelling of controlled physical systems.  Each entry states
 the principle, its rationale, and where it is encoded so the rationale
@@ -48,9 +50,10 @@ deliberately (§15/§23 of the design discussion).
 
 Key rules (all test-enforced — incl. on persisted data via
 `test_data_variable_token_consistency`):
-- `carriesToken ⊆ tokenVector` — every declared member appears with a
-  nonzero exponent; the vector may legitimately contain conjugate/derived
-  terms beyond membership.
+- Membership (`carriesToken`) and signature (`tokenVector`) are
+  independent (amended 2026-11-11, discussion §35): a licensed member
+  may have an explicitly empty signature, and a composite signature
+  may contain terms beyond membership.  Neither contains the other.
 - `tokenVector` is derivable from the defining equation's rhs via the
   checker (`TokenVec` propagates exponents through operators);
   `carriesToken` remains a semantic, user-confirmed choice.
@@ -124,17 +127,47 @@ edits.  Guards enforce **conscious** semantic change:
 
 - **Additive token declarations exempt** from the structural lock —
   declaring tokens on an untracked var changes no equation semantics.
-- **Altering/removing** tokens on an equation-referenced var 409s —
-  it changes what downstream checks derive.
+- **Altering/removing carriesToken** on an equation-referenced var
+  409s — membership changes what port licensing derives.  The
+  **tokenVector alone is exempt** (ruled 2026-11-11): the signature
+  feeds only advisories — nothing gates on it — so signature-only
+  edits are the sanctioned fix path for token advisories.
+- **Fixed signature on used variables** (ruled 2026-11-11): an unused
+  variable may be redefined; a used variable must keep its units and
+  index structures — every equation attached or rewritten on it must
+  derive exactly the declared signature.  **"Used" means foreign
+  references only** (amended same day): `via="rhs"`/`"incidence"`
+  uses in *other* equations lock; the variable's own defining
+  equations (`via="lhs"`) are the definition itself — rewriting them
+  is exactly how a signature gets redefined, so they do not lock.
+  The write path 409s structural edits gated on foreign refs; the
+  editor rejects a signature-mismatched Check result at Accept.
 - Frozen (`promo:frozen`) resources are proven — unfreeze first.
 - Detached/orphaned resources get swept via
   `DELETE /api/equation/equations/{iri}` (added 2026-11-05 for the
   E_2/E_3 shadow cleanup).
-- **Write-path token guard** (ruled 2026-11-10): `portVariable` without
-  `carriesToken` and `tokenVector` without `carriesToken` 400 on
-  POST/PUT `/api/equation/variables`; membership without signature
-  defaults to the pure vector `{member: 1}` — drift impossible rather
-  than caught.
+- **Write-path token guard** (ruled 2026-11-10, amended 2026-11-11):
+  `portVariable` without `carriesToken` and `tokenVector` without
+  `carriesToken` 400 on POST/PUT `/api/equation/variables`; an absent
+  `tokenVector` defaults to `{member: 1}`.  Membership and signature
+  are otherwise *decoupled* — an explicit empty `tokenVector` is
+  **membership-without-signature** (licensed, algebraically neutral)
+  and composite signatures may name networks the variable is not
+  licensed for (a mass-flow signs `{mass,time}` on mass membership).
+- **Canonical tokenVector keys** (ruled 2026-11-11): the fragment is
+  the token identity — `TokenVec.from_dict`/`single` canonicalise all
+  accepted key forms (full IRI, `token_mass`, bare `mass`) to the
+  stripped fragment.  Mixed-key storage had produced a ghost basis
+  element (`inv(rho)·fmc` derived `{mass⁻¹ mass time⁻¹}` because
+  `…#token_mass` and `token_mass` never cancelled).  Derived
+  signatures, `/check` output and adopt_derived writes now all emit
+  fragment keys; stored literals in any form still read correctly.
+- **Structured advisories carry fixes** (ruled 2026-11-11):
+  `/api/equation/check` returns `advisories` as
+  `{code, message, cause, fixes[]}` — `clear_signature` writes `{}`
+  on a contributing operand, `adopt_derived` writes the derived
+  signature on the LHS var; the check panel offers them behind an
+  impact confirm (the §18 reference list).
 
 *Benign delta class:* a stale line may show live-only vocabulary
 self-declarations (`a rdf:Property`/`rdfs:Class` stamps the serializer
@@ -350,12 +383,10 @@ unphysical, whatever the capacities' sizes.
   re-implement superseded semantics (found 2026-11-06: F_* token
   decls resurrected post-strip).  Review audits the seed layer
   against the rulings, not just data files.
-- Mediated-flow licensing (§14) — ruled 2026-11-10, unenforced:
-  `resolve_connection` adjudicates domain+token only, so
-  capacity↔capacity arcs are still licensed.  Needs role-level
-  adjudication — either rules extended with endpoint role
-  constraints, or roles declared on etypes (signature-derived vs
-  explicit grouping supertype is open).
+- Mediated-flow licensing (§14) — enforced 2026-11-10 via the
+  ontology-declared `requiresMechanism` rule constraint.  Compatibility
+  callers omitting endpoint entity types still skip this check; new
+  callers must supply them.
 - §33 machinery — authored/phantom ports: landed (`14d6aff`);
   strict referenced boundary: **enforced 2026-11-10** — the
   connect gesture's automaton swallows an armed completion at any
@@ -364,3 +395,12 @@ unphysical, whatever the capacities' sizes.
   with phantom closures: ruled, partial — the overlay
   (`_phantom_overlay`) materializes phantom peers for severed and
   authored terminals; evaluate-on-use items remain open.
+- **Token declaration surface vs algebra** — opened and ruled
+  2026-11-11 (discussion doc §35): `carriesToken` + `tokenVector` +
+  the port⇒token guard + the §18 lock interact into a trap the V_23
+  incident exposed — a forced mass membership on a geometry port
+  token-neutralised every equation through it, unfixable in the UI.
+  Ruled for fix mechanics over redesign: membership-without-
+  signature legal, `token_vector` exempt from §18, advisories carry
+  structured fixes.  Still open: the wider surface question
+  (derived-only `tokenVector`, ports-only declaration).

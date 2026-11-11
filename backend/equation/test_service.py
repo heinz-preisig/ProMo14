@@ -125,6 +125,38 @@ def test_check_token_empty_signature_warns_basis_change(client):
     assert any("basis change" in w for w in body["warnings"])
 
 
+def test_check_advisories_structured(client):
+    """Structured advisories (ruled 2026-11-11): the basis-change
+    advisory names the contributing operand signatures and offers a
+    concrete fix per operand — advisories carry remediation, not just
+    diagnosis."""
+    r = client.post("/api/equation/check", json={
+        "text": "( c . Mm )",
+        "lhs": "rho",
+        "variables": [
+            _var("V_c", label="c",
+                 token_vector={"token_component_mass": 1, "token_mass": -1}),
+            _var("V_Mm", label="Mm",
+                 token_vector={"token_mass": 1, "token_component_mass": -1}),
+            _var("V_rho", label="rho"),
+        ],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    basis = [a for a in body["advisories"]
+             if a["code"] == "token_basis_change"]
+    assert len(basis) == 1
+    ops = basis[0]["cause"]["operands"]
+    assert {o["label"] for o in ops} == {"c", "Mm"}
+    fixes = basis[0]["fixes"]
+    assert {f["action"] for f in fixes} == {"clear_signature"}
+    assert {f["variable"] for f in fixes} == {
+        f"{BASE}#V_c",
+        f"{BASE}#V_Mm",
+    }
+
+
 def test_check_token_mismatch_warns_vs_declared(client):
     """§24: computed signature differing from the LHS variable's declared
     tokenVector is an advisory."""
@@ -143,7 +175,7 @@ def test_check_token_mismatch_warns_vs_declared(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] is True
-    assert body["tokens"] == {"token_energy": 1, "token_time": -1}
+    assert body["tokens"] == {"energy": 1, "time": -1}
     assert body["tokens_pretty"] == "energy time^-1"
     assert any("does not match the declared" in w for w in body["warnings"])
 
@@ -192,7 +224,7 @@ def test_check_token_neutral_operands_derive_signature(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] is True
-    assert body["tokens"] == {"token_component_mass": -1}
+    assert body["tokens"] == {"component_mass": -1}
 
 
 def test_check_unclassified_operand_stays_untracked(client):

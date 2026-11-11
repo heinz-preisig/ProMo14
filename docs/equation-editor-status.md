@@ -1,7 +1,7 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-09-27 — **realigned to rulings through
-2026-11-10** (edit rules: `docs/README.md` tier map).
+**Last updated:** 2026-11-11 — **realigned to rulings through
+2026-11-11** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
@@ -51,8 +51,8 @@ applies and writes go to the working ontology.
 | `test_codegen.py` | Codegen: python/matlab/latex targets | ✅ Passing |
 | `test_document.py` | LaTeX document rendering | ✅ Passing |
 
-190 tests pass in `backend/equation` (2026-09-27; suite total 524 as
-of 2026-11-10).
+The full backend suite passes **543 tests** (2026-11-11).  Equation
+editor frontend tests and the TypeScript/Vite production build also pass.
 
 The ProMo13 corpus replay (73 expressions, 70/73 passing) has been
 archived to `archive/test_corpus.py`.  The new regression baseline will
@@ -68,9 +68,8 @@ Implemented as a React + TypeScript + Vite app in
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `PortVariableEditor` | `components/PortVariableEditor.tsx` | Single-dialog port variable definition: domain tree, class, name, LaTeX symbol, SI units, index structures. |
 | `VariableEditor` | `components/VariableEditor.tsx` | Direct port-variable editor — currently unreferenced (kept for the debug context popup). |
-| `DependentVariableEditor` | `components/DependentVariableEditor.tsx` | RHS expression input, Check, LaTeX preview, and result panel. |
+| `DependentVariableEditor` | `components/DependentVariableEditor.tsx` | Unified foundation/dependent creation; manual or derived signature, Check, LaTeX preview, and result panel. |
 | `VariablePalette` | `components/VariablePalette.tsx` | Variable list grouped by network — filter box, collapsible groups, alphabetical sort (2026-09-20); click to view details, `×` to delete with cascade impact. |
 | `VariableTable` | `components/VariableTable.tsx` | Sortable/filterable repository browser in the main pane; expandable rows show a variable's equations (2026-09-20). |
 | `ExpressionInput` | `components/ExpressionInput.tsx` | Operator/function buttons and keyboard input. |
@@ -81,7 +80,15 @@ Implemented as a React + TypeScript + Vite app in
 
 ### Features
 
-- Port and dependent variable creation.
+- Unified **New variable…** dialog: foundation (manual signature, no RHS)
+  or dependent (signature derived from Check); either may be connectable.
+- Structured token advisories with operand causes and confirm-before-apply
+  fixes; membership and algebraic signature are independent (§35).
+- Signature-only edits remain legal on referenced variables; foreign RHS
+  references lock units and index structures, while owning definitions
+  alone do not. Accept rejects a mismatched signature on a used variable.
+- Token signature keys canonicalise to fragments, so mixed IRI/prefixed/bare
+  keys cancel correctly in token algebra (2026-11-11).
 - Domain / network tree selection.
 - SI unit vector entry.
 - Index structure selection with `short_name` display.
@@ -402,25 +409,13 @@ Implemented as a React + TypeScript + Vite app in
   as a migration for pre-existing `ontology.trig`.  Codegen inlines
   `promo:value` when present (`half . M` → `0.5 * V_3`); unbound
   parameters keep their `V_N` slot until the instantiation stage.
-- **Variable-definition UX (2026-09-19):** the sidebar now has two
-  buttons — *New port variable…* and *New dependent variable…* — that
-  open their editors directly (the multi-step `VariableWizard` is
-  gone).  `PortVariableEditor.tsx` is a single dialog with the same
-  header widgets as the dependent editor (domain tree, class, name,
-  LaTeX symbol) plus the SI unit vector, index-structure picker and a
-  doc field.  Accept/Add is gated on the base requirements: port —
-  name + domain + class (units default to dimensionless, indices to
-  scalar); dependent — name + domain + class + a successful check.
-  Names are validated against the lexer identifier rule
-  `[a-zA-Z_][a-zA-Z0-9_]*` (shared `validation.ts`, enforced again by
-  a `VariableIn.label` validator in `service.py`); the last
-  domain/class choice is remembered across both editors.
-  **Names are case-sensitive end-to-end:** the minted IRI preserves
-  case (`promo:Rho` ≠ `promo:rho`), matching the lexer and the
-  `rdfs:label` lookup — previously `toLowerCase()` in the mint made
-  `Rho`/`rho` silently collide on one IRI.  Both editors warn on an
-  exact-name collision (save overwrites) and on a case-only variant
-  (`findNameCollision` in `validation.ts`).
+- **Variable-definition UX (amended 2026-11-11):** **New variable…**
+  opens `DependentVariableEditor` with remembered foundation/dependent
+  mode, domain and classifications. Foundation exposes units, indices
+  and token declarations without an expression panel; dependent derives
+  its signature from Check. Both expose **Port (connectable)**. Names
+  remain case-sensitive, lexer-validated, and collision-checked; variable
+  identity is the server-minted internal-ID IRI, not the label.
 - LaTeX→image cache (deferred, noted 2026-09-18): old-ProMo rendered
   per-variable/equation PNGs (`V_N.png`/`E_N.png`, standalone .tex →
   latex → pnglatex.bash) into the ontology's LaTeX dir, invalidated by

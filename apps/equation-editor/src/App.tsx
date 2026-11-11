@@ -5,7 +5,7 @@ import { useStoreDirty } from '@promo/ui'
 import type { ClassificationAxis, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
-import DependentVariableEditor from './components/DependentVariableEditor'
+import DependentVariableEditor, { type VariableMode } from './components/DependentVariableEditor'
 import VariableDetailDialog from './components/VariableDetailDialog'
 import VariablePalette from './components/VariablePalette'
 import VariableTable from './components/VariableTable'
@@ -31,6 +31,9 @@ export default function App() {
   // offered as defaults the next time one is opened.
   const [lastDomain, setLastDomain] = useState('')
   const [lastClassifications, setLastClassifications] = useState<Record<string, string>>({})
+  // Last creation mode picked in the variable editor (foundation vs
+  // dependent) — offered as the default the next time it opens.
+  const [lastVarMode, setLastVarMode] = useState<VariableMode>('dependent')
 
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
@@ -112,7 +115,7 @@ export default function App() {
   // Variable-only save from the equation editor (e.g. a LaTeX-symbol
   // edit while attaching an equation) — no new equation appended.
   const saveOnlyVariable = useCallback((v: Variable) => {
-    saveEditedVariable(v).catch((err) => {
+    return saveEditedVariable(v).catch((err) => {
       console.error('Failed to save variable:', err)
       setSaveErr(`Failed to save variable: ${err}`)
     })
@@ -339,6 +342,7 @@ export default function App() {
       {selectedVariable && (
         <VariableDetailDialog
           variable={selectedVariable}
+          variables={variables}
           indices={indices}
           networkTree={networkTree}
           axes={axes}
@@ -384,6 +388,8 @@ export default function App() {
         tokenCatalogue={tokenCatalogue}
         initialDomain={lastDomain}
         initialClassifications={lastClassifications}
+        initialMode={lastVarMode}
+        onModeChange={setLastVarMode}
         editing={dependentEditing}
         editingEquation={editingEquation}
         onDefaultsChange={(d, c) => {

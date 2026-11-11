@@ -27,5 +27,16 @@ export function useVariableLock(iri: string | null | undefined) {
     }
   }, [iri])
 
-  return { count, references, used: (count ?? 0) > 0 }
+  const foreignCount = count === null
+    ? null
+    : references.filter((r) => r.via !== 'lhs').length
+  return {
+    count,
+    references,
+    used: (count ?? 0) > 0,
+    /** §18 lock basis: references from *other* equations' rhs only —
+     *  the variable's own defining equations (via === 'lhs') do not
+     *  lock it (ruled 2026-11-11). */
+    foreignUsed: (foreignCount ?? 0) > 0,
+  }
 }

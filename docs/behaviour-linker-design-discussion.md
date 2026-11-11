@@ -3583,3 +3583,188 @@ trivial to see how one defines the various variables and functional
 blocks."  The control-block authoring recipe — which flag, which
 endpoint, which network, which tokens for `u`/`x`/`y`/`s` — needs a
 user-facing worked example.  Open.
+
+## 35. Token layer usability — declaration surface vs algebra — OPEN (2026-11-11)
+
+Raised by the user after the `V_23` (volume) incident: "the whole
+token association causes a lot of problems and is very hard for a
+user to catch what has to be done and what not — once there is no AI
+to check this will become infeasible."  Logged as an open design
+question — analysis only, no ruling yet.
+
+### The incident that exposed it
+
+- `V_23` (volume) is flagged `portVariable` ⇒ the 2026-11-10 guard
+  requires `carriesToken` ⇒ declared `{mass:1}`.
+- `rho := m/V` then derives `{}` — `sig(m) − sig(V)` cancels — and
+  the check warns "basis change, not a relation".
+- The user tried to remove V's mass token ⇒ blocked twice: the
+  guard (port needs a token) and §18 (V is referenced by 15
+  equations — tokens and port status both locked).
+- The warning is *correct* — the algebra honestly reports that the
+  equation carries no net token — but it cannot point at the cause,
+  and the causing declaration is unfixable through the UI.
+
+### What the layers actually buy
+
+- `promo:carriesToken` — membership set.  Real consumers: port
+  licensing (`satisfy.py`), §32 drives matching, the write guard.
+- `promo:tokenVector` — exponent map.  Consumer: only the checker's
+  advisory algebra; nothing gates on it.  The consistency rule
+  (every member ⇒ nonzero exponent) welds membership to signature:
+  a licensing declaration becomes algebraically active.
+- §18: token ADDs exempt, ALTERs locked once referenced — the
+  declaration is optional until a port forces it, then sticky when
+  wrong.
+
+### The traps a user meets
+
+- Two declarations that look like one concept, bound by an
+  invisible consistency rule.
+- Three leaf states render identically: untracked (absorbs),
+  tracked-empty (`{}` → `"1"`), neutral-by-kind (bound value /
+  constant / parameter).
+- Cross-dialog blast radius: declare on `V`, the warning surfaces
+  inside `rho`'s check.
+- Advisories point at the equation, never at the declaration that
+  caused it.
+
+### Reframing — the algebra is not the bug
+
+The exponent algebra produces the right answers: `x_i = n_i/n`
+*should* be token-neutral (a mole fraction is a basis change);
+`rho = m/V` *should* derive `{mass}` — and does, once `V` is
+neutral.  The noise comes from a licensing declaration (port ⇒
+forced mass membership) having algebraic consequences it was never
+meant to have.
+
+### Options on the table
+
+- **Neutral-port membership** — smallest change.  Ports may declare
+  "no network" (empty `carriesToken` for non-bearing kinds, or a
+  neutral token with exponent-0 semantics).  `V` stays a port, goes
+  neutral, `m/V` derives `{mass}`, warnings go quiet.  Needs
+  licensing semantics for neutral ports — §34's split suggests the
+  requirement may be over-broad along exactly that seam: membership
+  is meaningful for token-flow *coupling points*, not for signal or
+  geometry *terminals*.
+- **`tokenVector` derived-only** — users author only `carriesToken`;
+  the leaf signature derives from membership + kind convention
+  (extensive `+1`, intensive `−1`) and persists as a cache.
+  Removes the second declaration, the consistency rule, and the
+  declared-vs-derived mismatch advisory.  Composite signatures
+  (`{energy:1, time:-1}`) lose their authored form — acceptable
+  only if no consumer needs them declared.
+- **Set-algebra collapse** — *analysed and rejected*: `a/b` as
+  union gives mole fractions a mass membership; as symmetric
+  difference gives `rho` no membership.  Exponents carry the
+  cancellation information that separates density from ratio.
+  Recorded to preempt the obvious simplification.
+- **Narrow the declaration surface** — if only ports need
+  membership, token declaration becomes a port-authoring step and
+  non-ports never see the picker.
+- **UX-only mitigation** — live signature preview in
+  `TokenSection`; advisories that name the responsible declaration.
+  Does not remove the structural complexity; combines with any of
+  the above.
+
+### Open
+
+Which direction — and how much of the §24 apparatus survives.  The
+synthesis that currently looks strongest: membership authored only
+where it means something (ports), the signature always derived, and
+neutral ports legal.  Ties into the §34 two-senses finding and the
+parked `portVariable`-flip exemption; also part of the recurring
+"the user cannot know" theme (§34 doc gap) — this is its
+structural version.
+
+### Suggested-fix mechanics (user direction, same day)
+
+The user's pushback: advisories must ship with remediation, not just
+diagnosis — "the user cannot fix it in a simple way by declaring V
+as tokenless".  Two consequences:
+
+- **Advisories become structured** — `{code, cause, fixes[]}` instead
+  of bare strings; the UI renders each warning with fix buttons that
+  either apply a concrete edit (via the normal save endpoints) or
+  open the responsible declaration.  The `cause` names the operand
+  whose signature produced the result (here: `V_23 {mass:1}`
+  cancelling `m {mass:1}`), not just the equation.
+- **The natural fix must be legal.**  For `V_23` the desired fix —
+  "tokenless signature" — is blocked twice today, and both blockers
+  turn out to be adjustable without weakening the model:
+
+  1. *Consistency rule* (member ⇒ nonzero exponent): relax to
+     **membership-without-signature** — `carriesToken {mass}` +
+     `tokenVector {}` = "belongs to the mass network, contributes
+     no signature".  Licensing keeps its membership, the algebra
+     sees neutral.  `V` stays a mass port AND `m/V` derives
+     `{mass:1}`.  This cleanly separates the two predicates into
+     what they were always meant to be — licensing vs algebra —
+     and makes "declare V tokenless" literally available.
+  2. *§18 token-ALTER lock* on referenced vars: `tokenVector` feeds
+     only advisories — nothing gates on it — so a signature-only
+     change is exemptable by the same argument as the token-ADD
+     exemption.  `carriesToken` changes stay locked (licensing is
+     a real consumer).  Alternatively a confirm-and-apply path
+     showing the referencing equations as impact.
+
+  Both are rulings; the mechanics (structured advisory → fix
+  button → confirm → normal save path) then work for every
+  warning class, not just this one.
+
+### Ruled & implemented (2026-11-11, same session)
+
+The user ruled for fix mechanics over mechanism redesign: advisories
+ship with remediation, and the natural fix is made legal.
+
+- **Membership-without-signature** — `carriesToken {X}` +
+  `tokenVector {}` is legal: licensed for the network,
+  algebraically neutral.  The containment rule was *deleted*, not
+  weakened — the persisted data proved both directions free:
+  members need not sign (the geometry-port fix), and composite
+  signatures legitimately exceed membership (ten vars sign
+  `{mass,time}`/`{energy,momentum}`-style decompositions on a
+  single membership).
+- **§18 exemption for signature-only changes** — `token_vector`
+  feeds only advisory signatures; nothing gates on it.  Dropped
+  from the lock set; `carriesToken` stays locked.  This is what
+  makes the fix usable on referenced variables — the exact V_23
+  case (15 references, port flag locked and untouched).
+- **Structured advisories** — `/check` returns `advisories` as
+  `{code, message, cause, fixes[]}`.  `token_basis_change` names
+  the contributing operand signatures and offers `clear_signature`
+  per operand; `token_signature_mismatch` offers `adopt_derived`
+  on the LHS var.  `warnings` keeps the same items as strings.
+- **UI fix flow** — the check panel renders advisories with the
+  operand signatures and fix buttons; clicking a fix shows the
+  impact (the §18 reference list — N equations whose derived
+  signature changes) then applies via the normal variable save.
+  Both `draftVariable` paths emit `{}` when membership is kept
+  with an emptied signature (previously `undefined` → re-defaulted
+  `{member:1}` — the manual neutral path was inexpressible).
+- Tests: signature-only exemption, port + empty signature legal,
+  composite-exceeds-membership legal, advisory structure, and the
+  persisted-data consistency rule updated to the decoupled form.
+  540 backend tests pass.
+
+Still open from §35: the wider surface question (derived-only
+`tokenVector`, ports-only declaration) — the fix mechanics landed;
+whether the declaration surface shrinks further stays on the table.
+
+### Session completion amendments (2026-11-11)
+
+- Token algebra canonicalises full IRIs, prefixed token fragments and bare
+  fragments to the same fragment identity. This removes ghost basis terms
+  when mixed persisted key forms should cancel; regression tests cover it.
+- The variable creation surface is one foundation/dependent dialog.
+  Foundation declares a signature without an RHS; dependent derives it
+  from Check. Connectability is independent of the creation mode.
+- The fixed units/index signature rule locks on foreign RHS/incidence
+  references only. Owning defining equations alone do not make a variable
+  used: rewriting its definition is the legal redefinition path. The UI
+  lists own definitions separately from foreign uses and blocks Accept
+  when a used variable would receive a mismatched signature.
+- Final verification: 543 backend tests pass; equation-editor frontend
+  tests and TypeScript/Vite production build pass. Serialized data changes
+  from the authoring session are included without manual TriG edits.

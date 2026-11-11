@@ -1,7 +1,7 @@
 import 'katex/dist/katex.min.css'
 import { useEffect, useState } from 'react'
 import type { ClassificationAxis, Domain, EquationClass, Index, NetworkTree, TokenRecord, Variable } from '../types'
-import { equationClassLabel } from '../variableUtils'
+import { equationClassLabel, referenceDisplay } from '../variableUtils'
 import TokenSection from './TokenSection'
 import { astToLatex, indexShortLabel, renderLatex, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
@@ -12,6 +12,9 @@ const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current
 
 export interface VariableDetailDialogProps {
   variable: Variable
+  /** All variables — resolves §18 reference entries to the variable
+   *  that owns each referencing equation. */
+  variables?: Variable[]
   indices: Index[]
   networkTree: NetworkTree
   axes: ClassificationAxis[]
@@ -37,6 +40,7 @@ export interface VariableDetailDialogProps {
  *  while referenced. The backend enforces the same field-level policy. */
 export default function VariableDetailDialog({
   variable,
+  variables = [],
   indices,
   networkTree,
   axes,
@@ -71,7 +75,7 @@ export default function VariableDetailDialog({
   // §18 usage lock — units and index structures remain locked while used;
   // domain moves are planned atomically by the backend and may qualify
   // editable references to preserve their variable IRI bindings.
-  const { count: refCount, references } = useVariableLock(variable.iri)
+  const { references } = useVariableLock(variable.iri)
 
   // Reinitialise + refresh the usage lock whenever another variable is shown.
   useEffect(() => {
@@ -87,8 +91,10 @@ export default function VariableDetailDialog({
     setMsg('')
   }, [variable])
 
-  const locked = (refCount ?? 0) > 0
   const foreignRefCount = references.filter((ref) => ref.via !== 'lhs').length
+  // §18: only foreign references lock — own defining equations (lhs)
+  // are the definition itself and do not block redefinition.
+  const locked = foreignRefCount > 0
   const latexSuggestion = label.trim() ? suggestLatexAlias(label) : ''
   const latexError = validateLatexAlias(latexSym)
   const canSave = label.trim() && network && !latexError
@@ -147,7 +153,12 @@ export default function VariableDetailDialog({
       aliases,
       doc: doc.trim(),
       tokens: Array.from(carriesTokens),
-      token_vector: Object.keys(tokenVector).length ? { ...tokenVector } : undefined,
+      // carriesToken with an emptied signature = licensed but neutral
+      // membership (ruled 2026-11-11); {} must not collapse to
+      // undefined — the write path would re-default to {member:1}.
+      token_vector: Object.keys(tokenVector).length
+        ? { ...tokenVector }
+        : carriesTokens.size ? {} : undefined,
       equations,
     }
   }
@@ -239,8 +250,21 @@ export default function VariableDetailDialog({
               padding: '6px 8px',
             }}
           >
-            Referenced by {refCount} equation(s) — role and domain remain editable.
+            Referenced by {foreignRefCount} foreign equation(s) — role and domain remain editable.
             {' '}A domain move qualifies editable references when safe. Units and index structures remain locked.
+            <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+              {references.map((ref) => {
+                const { eqId, ownerLabel } = referenceDisplay(ref, variables)
+                return (
+                  <li key={`${ref.graph}#${eqId}`}>
+                    <code>{eqId}</code>
+                    {ref.via === 'lhs'
+                      ? ' — defines this variable'
+                      : ` — used in the rhs of ${ownerLabel ?? 'another variable'}`}
+                  </li>
+                )
+              })}
+            </ul>
           </div>
         )}
 

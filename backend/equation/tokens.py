@@ -55,14 +55,27 @@ class TokenVec:
 
     @classmethod
     def from_dict(cls, exponents: Dict[str, int]) -> "TokenVec":
+        # Keys are canonicalised to the token fragment ("mass"): stored
+        # declarations mix key forms — full IRIs
+        # ({"https://…#token_mass": 1} on V_73/rho), prefixed fragments
+        # ({"token_mass": 1} on V_56/fmc) and bare fragments — and
+        # literal key equality would keep them as *separate* basis
+        # elements, so inv(rho)·fmc derived the ghost signature
+        # {mass⁻¹ mass time⁻¹} that no declared vector could match
+        # (ruled 2026-11-11: the fragment IS the token identity, the
+        # same rule ``carries`` already applies).
+        merged: Dict[str, int] = {}
+        for k, v in exponents.items():
+            key = token_frag(k)
+            merged[key] = merged.get(key, 0) + v
         entries = tuple(sorted(
-            (k, v) for k, v in exponents.items() if v != 0
+            (k, v) for k, v in merged.items() if v != 0
         ))
         return cls(entries)
 
     @classmethod
     def single(cls, token_iri: str) -> "TokenVec":
-        return cls(((token_iri, 1),))
+        return cls(((token_frag(token_iri), 1),))
 
     @classmethod
     def from_json(cls, text: str) -> Optional["TokenVec"]:

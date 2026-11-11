@@ -36,8 +36,8 @@ def test_tokenvec_mul_sub_inverse():
     assert e_dot == TokenVec.from_dict({T_E: 1, T_T: -1})
     assert e_dot.pretty() == "energy time^-1"
     # e_dot/h would give the flow back; e_dot - h = {component_mass:+1, time:-1}
-    assert (e_dot - h).as_dict() == {T_M: 1, T_T: -1}
-    assert e_dot.inverse().as_dict() == {T_E: -1, T_T: 1}
+    assert (e_dot - h).as_dict() == {token_frag(T_M): 1, token_frag(T_T): -1}
+    assert e_dot.inverse().as_dict() == {token_frag(T_E): -1, token_frag(T_T): 1}
 
 
 def test_tokenvec_zero_exponents_canonical():
@@ -49,7 +49,7 @@ def test_tokenvec_zero_exponents_canonical():
 
 def test_tokenvec_from_json_and_frag():
     v = TokenVec.from_json('{"token_energy": 1, "token_mass": -1}')
-    assert v.as_dict() == {"token_energy": 1, "token_mass": -1}
+    assert v.as_dict() == {"energy": 1, "mass": -1}
     assert token_frag(T_E) == "energy"
     assert v.pretty() == "energy mass^-1"
 
@@ -108,6 +108,23 @@ def test_checker_sum_mismatch_warns():
     assert any("token mismatch" in w for w in space.warnings)
 
 
+def test_mixed_key_forms_cancel():
+    """Stored declarations mix tokenVector key forms — full IRIs on
+    some variables (rho), prefixed fragments on others (fmc).  The
+    algebra must treat them as the same basis element, else
+    inv(rho)·fmc derives the ghost signature {mass⁻¹ mass time⁻¹}
+    that no declared vector can match (ruled 2026-11-11)."""
+    rho = _var("v:rho", "rho", {T_M.replace("component_mass", "mass"): 1})
+    fmc = _var("v:fmc", "fmc", {"token_mass": 1, "token_time": -1})
+    space = _space(rho, fmc)
+    checked = check(parse("( inv( rho ) . fmc )"), space)
+    assert checked.tokens == TokenVec.from_dict({T_T: -1})
+    # Every accepted key form reads to the same canonical vector.
+    canon = TokenVec.from_dict({"mass": 1})
+    assert TokenVec.from_dict({"token_mass": 1}) == canon
+    assert TokenVec.from_dict({T_M.replace("component_mass", "mass"): 1}) == canon
+
+
 def test_checker_sqrt_even_exponents():
     # A var with a squared token signature, e.g. variance-like quantity.
     x2 = _var("v:x2", "x2", {T_E: 2})
@@ -123,9 +140,12 @@ def test_data_variable_token_consistency():
 
     For every ``promo:Variable`` in ``data/*.trig``:
     - each ``promo:carriesToken`` must name a declared ``promo:Token``;
-    - each ``carriesToken`` must appear with a nonzero exponent in the
-      variable's ``promo:tokenVector`` (network membership ⊆ algebraic
-      signature — the reverse is NOT required);
+    - a member's ``promo:tokenVector`` must exist (the write path
+      defaults it) — but members need not appear in it: membership
+      without signature is the licensed-but-neutral form
+      (ruled 2026-11-11).  Signatures may also exceed membership —
+      composite decompositions name networks the variable is not
+      licensed for;
     - a ``promo:portVariable true`` variable must carry at least one
       token — a port with no token can never be licensed
       (instantiate/satisfy.py).
@@ -167,12 +187,9 @@ def test_data_variable_token_consistency():
             for c in ct:
                 if c not in declared:
                     violations.append(f"{name}: carriesToken {frag(c)} not a declared Token")
-                if tv is None:
-                    violations.append(
-                        f"{name}: carriesToken {frag(c)} but no tokenVector")
-                elif not any(v != 0 and frag(k) == frag(c) for k, v in tv.items()):
-                    violations.append(
-                        f"{name}: carriesToken {frag(c)} not in tokenVector {tv}")
+            if ct and tv is None:
+                violations.append(
+                    f"{name}: carriesToken but no tokenVector")
             if tv is not None and not ct:
                 violations.append(
                     f"{name}: tokenVector declared but no carriesToken")

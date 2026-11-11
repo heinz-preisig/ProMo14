@@ -1,7 +1,10 @@
 """Tests for the variable mutability policy (design doc §18).
 
-A variable referenced by an equation keeps units, index structures, tokens,
-port status and reference-key names locked.  Role/classifications remain
+A variable referenced by an equation keeps units, index structures, token
+*membership* (carriesToken — licensing is a real consumer), port status and
+reference-key names locked.  The token *signature* (tokenVector) is exempt
+(ruled 2026-11-11): it feeds only advisories, so signature-only edits are the
+sanctioned fix path for token advisories.  Role/classifications remain
 editable; network remains editable only while references are its own defining
 LHS equations.  Surface names and the value slot stay free.  Enforcement lives
 in ``backend/equation/service.py`` — POST and PUT both guard, DELETE is blocked
@@ -197,6 +200,31 @@ def test_structural_edit_free_when_unused(client):
     _post(client, _var("V_1", units=[0, 0, 0, 1, 0, 0, 0, 0]))
     r = _put(client, _var("V_1", units=[1, 0, 0, 0, 0, 0, 0, 0]))
     assert r.status_code == 200, r.text
+
+
+def test_own_equation_does_not_lock_signature(client):
+    """A variable used only by its own defining equation(s) is not
+    *used* in the §18 sense — its signature may be redefined (ruled
+    2026-11-11).  Rewriting the equation is precisely how a signature
+    change is expressed."""
+    _post(client, _var("V_1", units=[0, 0, 0, 1, 0, 0, 0, 0], equations={
+        "root": _eq("E_1", f"{BASE}#V_1", "2"),
+    }))
+    r = _put(client, _var("V_1", units=[1, 0, 0, 0, 0, 0, 0, 0]))
+    assert r.status_code == 200, r.text
+
+
+def test_own_and_foreign_refs_still_lock(client):
+    """Mixed case: own defining equation + a foreign rhs use → locked."""
+    _post(client, _var("V_1", units=[0, 0, 0, 1, 0, 0, 0, 0], equations={
+        "root": _eq("E_1", f"{BASE}#V_1", "2"),
+    }))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_2", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+    r = _put(client, _var("V_1", units=[1, 0, 0, 0, 0, 0, 0, 0]))
+    assert r.status_code == 409
+    assert "units" in r.json()["detail"]["locked_fields"]
 
 
 def test_post_update_path_is_guarded(client):
@@ -411,7 +439,9 @@ def test_additive_token_declarations_exempt_when_referenced(client):
 
 
 def test_altering_token_declarations_blocked_when_referenced(client):
-    """Removing/changing an existing token declaration stays locked."""
+    """Removing/changing carriesToken stays locked — port licensing is a
+    real consumer.  ``token_vector`` alone is exempt (ruled 2026-11-11):
+    the signature feeds only advisories, nothing gates on it."""
     _post(client, _var("V_1",
         tokens=["https://w3id.org/promo/ontology#token_mass"],
         token_vector={"token_mass": 1}))
@@ -422,7 +452,51 @@ def test_altering_token_declarations_blocked_when_referenced(client):
     r = _put(client, _var("V_1"))  # drops both declarations
     assert r.status_code == 409
     locked = r.json()["detail"]["locked_fields"]
-    assert "tokens" in locked and "token_vector" in locked
+    assert "tokens" in locked and "token_vector" not in locked
+
+
+def test_signature_only_change_exempt_when_referenced(client):
+    """Ruled 2026-11-11: ``token_vector`` feeds only advisories — nothing
+    gates on it — so signature-only edits pass the §18 lock on a
+    referenced variable.  This is the sanctioned fix path for token
+    advisories: membership-without-signature."""
+    _post(client, _var("V_1",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={"token_mass": 1}))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    # Clear the signature, keep the membership — the geometry-port fix.
+    r = _put(client, _var("V_1",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={}))
+    assert r.status_code == 200, r.text
+
+
+def test_port_membership_without_signature_legal(client):
+    """Ruled 2026-11-11: a port may carry membership with an explicitly
+    empty signature — licensed for the network, algebraically neutral
+    (the geometry-port fix)."""
+    r = client.post("/api/equation/variables", json=_var(
+        "V_v",
+        port_variable=True,
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={},
+    ))
+    assert r.status_code == 200, r.text
+
+
+def test_signature_may_exceed_membership(client):
+    """Composite signatures legitimately name networks the variable is
+    not licensed for — a mass-flow signs ``{mass,time}`` but belongs to
+    mass only (data-proven: ten persisted variables)."""
+    r = client.post("/api/equation/variables", json=_var(
+        "V_f",
+        tokens=["https://w3id.org/promo/ontology#token_mass"],
+        token_vector={"token_mass": 1, "token_time": -1},
+    ))
+    assert r.status_code == 200, r.text
 
 
 def test_token_vector_key_form_not_a_change(client):
@@ -473,11 +547,11 @@ def test_token_vector_defaults_pure_signature(client):
     r = client.post("/api/equation/variables",
                     json=_var("V_1", tokens=[tok]))
     assert r.status_code == 200, r.text
-    assert r.json()["token_vector"] == {"token_signal": 1}
+    assert r.json()["token_vector"] == {"signal": 1}
     # … and the default persists as a promo:tokenVector triple
     g = graph_store.get_store().dataset.graph(URIRef(BASE))
     tv = g.value(URIRef(f"{BASE}#V_1"), PROMO["tokenVector"])
-    assert tv is not None and "token_signal" in str(tv)
+    assert tv is not None and "signal" in str(tv)
 
 
 def test_domain_backfill_not_a_move(client):

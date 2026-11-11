@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { checkExpression, generateExpression, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from '../types'
+import { checkExpression, generateExpression, loadContext, parseExpression } from '../api'
+import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenFix, TokenRecord, Variable } from '../types'
 import TokenSection, { normaliseTokenVector, specificMember } from './TokenSection'
 import AxisClassifications, {
   applicableAxes,
@@ -9,7 +9,7 @@ import AxisClassifications, {
   findTermIri,
   tokenPolicy,
 } from '../axisClassifications'
-import { nextEquationId, nextInternalId } from '../variableUtils'
+import { nextEquationId, nextInternalId, referenceDisplay, signatureMismatch } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
 import ExpressionInput, { type ExpressionInputHandle } from './ExpressionInput'
 import LaTeXPreview from './LaTeXPreview'
@@ -33,6 +33,14 @@ const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current
  *  picker option; shown (disabled) when the RHS is an Instantiate. */
 const AUTO_CLASS = 'instantiate'
 
+/** Creation-mode choice at the top of the new-variable dialog:
+ *  ``foundation`` declares a variable with a manually-picked signature
+ *  and no defining expression (parameters, constants, boundary ports);
+ *  ``dependent`` authors an equation — units/indices/token-vector
+ *  derive from the checked expression.  §34: the port flag is
+ *  orthogonal — either mode may be connectable. */
+export type VariableMode = 'foundation' | 'dependent'
+
 export interface DependentVariableEditorProps {
   open: boolean
   onClose: () => void
@@ -54,11 +62,15 @@ export interface DependentVariableEditorProps {
   /** When set, the editor rewrites this stored equation on ``editing``
    *  instead of appending a new one (edit-equation mode). */
   editingEquation?: { id: string; record: EquationRecord } | null
+  /** Creation mode offered when the dialog opens on a NEW variable —
+   *  attach/edit-equation mode always forces ``dependent``. */
+  initialMode?: VariableMode
+  onModeChange?: (mode: VariableMode) => void
   onDefaultsChange?: (domain: string, classifications: Record<string, string>) => void
   onAccept: (v: Variable, eq: SavedEquation) => void
   /** Persist the variable record alone (no new equation) — enables
    *  saving field edits like the LaTeX symbol while attaching. */
-  onSaveVariable?: (v: Variable) => void
+  onSaveVariable?: (v: Variable) => void | Promise<void>
 }
 
 export default function DependentVariableEditor({
@@ -75,6 +87,8 @@ export default function DependentVariableEditor({
   initialClassifications,
   editing,
   editingEquation,
+  initialMode = 'dependent',
+  onModeChange,
   onDefaultsChange,
   onAccept,
   onSaveVariable,
@@ -90,12 +104,18 @@ export default function DependentVariableEditor({
   const [eqClass, setEqClass] = useState('')
   const [parseError, setParseError] = useState<string | null>(null)
   const [checkResult, setCheckResult] = useState<CheckResponse | null>(null)
+  // Set after an advisory fix saves — triggers a re-check once the
+  // refreshed `variables` prop arrives so the panel reflects the fix.
+  const [recheckAfterFix, setRecheckAfterFix] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
   // §34: port-ness is a declaration on the variable, not a separate
   // kind — a dependent variable may also be connectable.
   const [isPort, setIsPort] = useState(false)
+  // Creation mode (new variables only — editing forces dependent):
+  // ``foundation`` = declared signature, no expression column.
+  const [mode, setMode] = useState<VariableMode>(initialMode)
   // Manual signature — used only when no equation derives one
   // (declared vars: terminals, parameters, constants).
   const [units, setUnits] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
@@ -108,7 +128,7 @@ export default function DependentVariableEditor({
   const [genCode, setGenCode] = useState<string | null>(null)
   const [genLoading, setGenLoading] = useState(false)
   // §18 usage lock — structural fields grey out while referenced.
-  const { used } = useVariableLock(editing?.iri)
+  const { foreignUsed, references } = useVariableLock(editing?.iri)
 
   useEffect(() => {
     if (open) {
@@ -127,6 +147,7 @@ export default function DependentVariableEditor({
       setCarriesTokens(new Set(editing?.tokens ?? []))
       setTokenVector(editing?.token_vector ?? {})
       setIsPort(editing?.port_variable ?? false)
+      setMode(editing || editingEquation ? 'dependent' : initialMode)
       setUnits([...(editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0])])
       setSelectedIndices(new Set(editing?.index_structures ?? []))
       // Stored class may be a label or an IRI — match both.
@@ -141,7 +162,11 @@ export default function DependentVariableEditor({
       setGenCode(null)
       setGenLoading(false)
     }
-  }, [open, editing, editingEquation])
+    // Keyed on identity, not object: a mid-session variable save
+    // (e.g. a token-advisory fix) replaces `editing` with a fresh
+    // record — re-initialising then would wipe the pending equation
+    // text and look like the old equation "coming back".
+  }, [open, editing?.iri, editingEquation?.id])
 
   useEffect(() => {
     setAst(null)
@@ -230,14 +255,27 @@ export default function DependentVariableEditor({
     equationClasses.find((c) => c.label === AUTO_CLASS)?.iri ?? ''
   // Instantiate RHS pins the class; otherwise the picked value stands.
   const effectiveEqClass = isInstantiate ? instantiateClassIri : eqClass
-  // Structural fields lock while the edited variable is used — the
-  // Instantiate kind-forcing must not bypass the lock either.
-  // `used` resolves async, so also treat "has stored equations" as
-  // locked — a variable's own defining equations count as references
-  // (§18 lhs refs) and make the lock deterministic from open.
-  const hasStoredEquations = !!editing &&
-    Object.keys(editing.equations ?? {}).length > 0
-  const structuralLocked = !!editing && (used || hasStoredEquations)
+  // Structural fields lock while the edited variable is referenced by
+  // *other* equations (§18 foreign refs).  The variable's own defining
+  // equations do not lock — rewriting them is how the signature is
+  // redefined (ruled 2026-11-11).
+  const structuralLocked = !!editing && foreignUsed
+
+  // Foundation mode = declared signature: no expression column, manual
+  // units/indices.  Attaching/editing an equation on an existing
+  // variable is inherently the dependent path.
+  const isFoundation = !editing && mode === 'foundation'
+
+  // §18 fixed-signature rule: a variable referenced by other
+  // equations keeps its units and index structures — an attached or
+  // rewritten equation must derive exactly those.  A variable used
+  // only by its own defining equations (or by nothing) may be
+  // redefined freely: the derived signature then replaces the
+  // declared one.
+  const signatureClash =
+    editing && structuralLocked && checkResult?.ok
+      ? signatureMismatch(editing, checkResult)
+      : []
 
   // Names must be valid expression-language identifiers (lexer rule).
   const nameValid = isValidVariableName(name)
@@ -283,6 +321,16 @@ export default function DependentVariableEditor({
       setLoading(false)
     }
   }, [text, variables, indices, domain, name, classifications, networkTree])
+
+  // Advisory-fix feedback: once the save's refreshed `variables` (and
+  // `editing`, batched in the same update) arrive, re-run Check so the
+  // advisory list reflects the fix instead of the stale result.
+  useEffect(() => {
+    if (!recheckAfterFix) return
+    setRecheckAfterFix(false)
+    void handleCheck()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variables, recheckAfterFix])
 
   /** The draft LHS variable — shared by /check, /generate, accept and the
    *  LaTeX preview so all see the same record (incl. the latex alias).
@@ -330,17 +378,44 @@ export default function DependentVariableEditor({
         // Locked pins only an existing signature — declaring one on a
         // var that has none is additive, exempt from the lock (§24).
         ? editing.token_vector
-        : checkResult?.ok && checkResult.tokens
-            && Object.keys(checkResult.tokens).length
+        : checkResult?.ok && checkResult.tokens != null
+          // A tracked signature — including the empty one — is the
+          // honest algebra: adopt it ({} = token-neutral result).
           ? normaliseTokenVector(checkResult.tokens, tokenCatalogue)
           : (text.trim() ? editing?.token_vector : undefined)
-            ?? (Object.keys(tokenVector).length ? { ...tokenVector } : undefined),
+            ?? (Object.keys(tokenVector).length
+                ? { ...tokenVector }
+                // carriesToken with an emptied signature = licensed
+                // but neutral membership (ruled 2026-11-11).
+                : carriesTokens.size ? {} : undefined),
       aliases,
       doc,
     }
   }, [name, domain, variables, checkResult, latexSym, doc, editing,
       classifications, structuralLocked, carriesTokens, tokenVector, isPort,
       units, selectedIndices, text, tokenCatalogue])
+
+  /** Applies a structured-advisory fix (§24 fix mechanics, ruled
+   *  2026-11-11).  Signature-only writes are §18-exempt — membership
+   *  stays untouched; only the algebraic signature changes. */
+  const applyTokenFix = async (fix: TokenFix) => {
+    if (!onSaveVariable) return
+    // The variable PUT replaces the equations dict wholesale, so the
+    // fix must write onto a *fresh* record — a stale snapshot (the
+    // `variables` prop or the open-time `editing` record) would revert
+    // an equation rewrite accepted since the editor opened.
+    const ctx = await loadContext()
+    const fresh = ctx.variables.find((v) => v.iri === fix.variable)
+    if (!fresh) return
+    if (fix.action === 'clear_signature') {
+      await onSaveVariable({ ...fresh, token_vector: {} })
+    } else if (fix.action === 'adopt_derived' && fix.token_vector != null) {
+      await onSaveVariable({ ...fresh, token_vector: fix.token_vector })
+    }
+    // Re-verify: the advisory card must reflect the fix, not the stale
+    // pre-fix check result (deferred until `variables` refreshes).
+    setRecheckAfterFix(true)
+  }
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
@@ -399,11 +474,13 @@ export default function DependentVariableEditor({
         ? `Invalid LaTeX symbol — ${latexError}`
         : !checkResult?.ok
           ? 'Run Check on the expression first'
-          : null
+          : signatureClash.length
+            ? `Signature fixed — ${editing?.label ?? 'the variable'} is referenced; the expression derives different ${signatureClash.join(' and ')}`
+            : null
 
   const handleAccept = () => {
     const lhs = name.trim()
-    if (!lhs || !domain || latexError || !checkResult?.ok) return
+    if (!lhs || !domain || latexError || !checkResult?.ok || signatureClash.length) return
 
     const draft = draftVariable()
 
@@ -453,6 +530,23 @@ export default function DependentVariableEditor({
     else setText((prev) => prev + token)
   }, [])
 
+  // Flipping to foundation clears the derived signature — a stale
+  // checkResult from dependent typing must not leak into the declared
+  // signature.  The expression text survives (flipping back restores).
+  const selectMode = useCallback(
+    (m: VariableMode) => {
+      setMode(m)
+      onModeChange?.(m)
+      if (m === 'foundation') {
+        setCheckResult(null)
+        setAst(null)
+        setParseError(null)
+        setGenCode(null)
+      }
+    },
+    [onModeChange],
+  )
+
   const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
 
   // Variable-only edits (LaTeX symbol, doc, domain, classifications) vs
@@ -482,7 +576,10 @@ export default function DependentVariableEditor({
       onSaveVariable?.(draftVariable())
       return
     }
-    if (text.trim()) return
+    // Dependent mode with a typed expression belongs to Accept
+    // instead; foundation mode always saves (hidden stale text is
+    // ignored — a declared variable owns no equation).
+    if (!isFoundation && text.trim()) return
     onSaveVariable?.(draftVariable())
     onClose()
   }
@@ -506,8 +603,9 @@ export default function DependentVariableEditor({
     >
       <div
         style={{
-          width: '90vw',
-          height: '90vh',
+          width: isFoundation ? 'min(880px, 92vw)' : '90vw',
+          height: isFoundation ? 'auto' : '90vh',
+          maxHeight: '90vh',
           background: '#fff',
           borderRadius: 6,
           padding: 20,
@@ -535,13 +633,13 @@ export default function DependentVariableEditor({
                   : 'New variable'}
             </h3>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              {acceptBlockReason && (
+              {!isFoundation && acceptBlockReason && (
                 <span style={{ fontSize: 11, color: '#b8860b' }}>{acceptBlockReason}</span>
               )}
               <button type="button" onClick={onClose}>
                 Cancel
               </button>
-              {onSaveVariable && (editing || !text.trim()) && (
+              {onSaveVariable && (editing || isFoundation) && (
                 <button
                   type="button"
                   onClick={handleSaveVariable}
@@ -559,16 +657,75 @@ export default function DependentVariableEditor({
                   Save variable
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleAccept}
-                disabled={!!acceptBlockReason}
-                title={acceptBlockReason ?? undefined}
-              >
-                {editingEquation ? 'Save equation' : editing ? 'Add equation' : 'Accept'}
-              </button>
+              {!isFoundation && (
+                <button
+                  type="button"
+                  onClick={handleAccept}
+                  disabled={!!acceptBlockReason}
+                  title={acceptBlockReason ?? undefined}
+                >
+                  {editingEquation ? 'Save equation' : editing ? 'Add equation' : 'Accept'}
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Row 1b: creation-mode switch — decides which panels the
+               dialog offers (new variables only; attaching an equation
+               to an existing variable is always the dependent path). */}
+          {!editing && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 24,
+                alignItems: 'center',
+                marginBottom: 10,
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: '#555' }}>This variable is:</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="var-mode"
+                  checked={mode === 'foundation'}
+                  onChange={() => selectMode('foundation')}
+                />
+                <span>
+                  <strong>foundation</strong> — declared; signature picked
+                  manually (parameter, constant, boundary port)
+                </span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="var-mode"
+                  checked={mode === 'dependent'}
+                  onChange={() => selectMode('dependent')}
+                />
+                <span>
+                  <strong>dependent</strong> — defined by an expression of
+                  existing variables; signature derives from Check
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* Used-by readout — names the equations that pin this
+               variable's signature (§18); explains the lock. */}
+          {editing && references.length > 0 && (
+            <div style={{ fontSize: 11, color: '#8d6e00', marginBottom: 10 }}>
+              Used by:{' '}
+              {references
+                .map((ref) => {
+                  const { eqId, ownerLabel } = referenceDisplay(ref, variables)
+                  return ref.via === 'lhs'
+                    ? `${eqId} (defines it)`
+                    : `${eqId} (rhs of ${ownerLabel ?? '?'})`
+                })
+                .join(' · ')}
+            </div>
+          )}
 
           {/* Row 2: domain tree + stacked classification/name fields */}
           <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -680,7 +837,7 @@ export default function DependentVariableEditor({
 
               {/* Declared-variable signature — no RHS means no checker
                   derivation, so units/indices are picked manually. */}
-              {!structuralLocked && !text.trim() && (
+              {isFoundation && (
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontSize: 12 }}>Units (SI vector)</span>
@@ -757,6 +914,7 @@ export default function DependentVariableEditor({
           </div>
         </div>
 
+        {!isFoundation && (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 16 }}>
           <div
             style={{
@@ -850,7 +1008,7 @@ export default function DependentVariableEditor({
               lhs={name.trim() || undefined}
             />
 
-            <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} variables={variables} />
+            <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} variables={variables} onApplyFix={applyTokenFix} />
 
             {checkResult?.ok && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -900,6 +1058,29 @@ export default function DependentVariableEditor({
             </div>
           </div>
         </div>
+        )}
+
+        {isFoundation && (
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            <label style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              Documentation
+              <textarea
+                value={doc}
+                onChange={(e) => setDoc(e.target.value)}
+                placeholder="Add a description for this variable…"
+                style={{ width: '100%', minHeight: 60, fontSize: 13, padding: 8 }}
+              />
+            </label>
+          </div>
+        )}
       </div>
     </div>
   )

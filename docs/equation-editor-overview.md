@@ -1,5 +1,7 @@
 # Equation Editor Overview
 
+Living — realigned to rulings through 2026-11-11.
+
 ## Role in the suite
 
 The Equation Editor defines the mathematical behaviour of base
@@ -88,27 +90,37 @@ Full grammar and token table: see ADR-005.
 
 ### 1. Port variable (foundation)
 
-A port variable carries physical meaning directly; it has no defining RHS expression.
+A foundation variable is declared without a defining RHS expression.
+Port-ness is independent: the connectable flag may be set on either
+a foundation or a dependent variable (amended 2026-11-11, §34).
 
-1. Click **New port variable…** in the left sidebar.
+1. Click **New variable…** in the left sidebar and pick
+   **foundation** on the mode switch at the top of the dialog (a
+   declared variable — no expression panel is shown).
 2. In the dialog header, select a **domain / network** from the tree, a
    **variable class**, and enter a **name** (letters, digits and
    underscore; must not start with a digit — names are case-sensitive).
    Optionally set a **LaTeX symbol**.
-3. In the body, enter the **SI unit vector** and select the **index
-   structures** from the ProMo ontology indices.  Each index shows its
-   `short_name` (e.g. `N` for `node`) for quick reading.
-4. Click **Add variable** — enabled once name, domain and class are
+3. In the body, enter the **SI unit vector**, select the **index
+   structures** from the ProMo ontology indices (each index shows its
+   `short_name`, e.g. `N` for `node`), and declare **tokens**
+   (carriesToken + token vector).  **Port (connectable)** marks the
+   variable as connectable across an entity boundary.
+4. Click **Save variable** — enabled once name and domain are
    set. The variable appears in the left palette.
 
 ### 2. Dependent variable (RHS definition)
 
 A dependent variable is defined by a checked RHS expression over existing variables.
 
-1. Click **New dependent variable…** in the left sidebar.
+1. Click **New variable…** in the left sidebar and pick
+   **dependent** (the default mode).
 2. In the editor header, select a **domain / network**, a **variable
    class**, and enter the **LHS name** (same identifier rules as port
-   variables).  Optionally set a **LaTeX symbol**.
+   variables).  Optionally set a **LaTeX symbol**.  Units, index
+   structures and the token vector are **not** picked here — they
+   derive from the checked expression; the **Port (connectable)**
+   flag remains available for cross-entity supply (§34).
 3. Type the RHS expression using the variable palette and the operator/function buttons.
 4. Click **Check** (or `Ctrl/Cmd + Enter`) to parse and semantically check the RHS in one step.
    - The **LaTeX preview** shows the expression with index subscripts using the index `short_name`.
@@ -118,13 +130,27 @@ A dependent variable is defined by a checked RHS expression over existing variab
    the RHS has passed Check — to store the equation and create the
    dependent variable.
 
-Both editors remember the last domain/class choice and warn when the
-name collides with an existing variable (exact match overwrites; a
-case-only difference is flagged since names are case-sensitive).
+The editor remembers the last mode, domain and class choice, and
+warns when the name collides with an existing variable (exact match
+overwrites; a case-only difference is flagged since names are
+case-sensitive).
+
+**Fixed-signature rule** (§18): a variable that is not referenced by
+*other* equations can be redefined — a new or rewritten equation may
+change its units and index structures (owning definitions does not
+count as "used": the variable's own equations are its definition,
+so rewriting one is the sanctioned way to change the signature).
+A variable referenced inside another equation's rhs has a fixed
+signature: any equation attached or rewritten on it must derive
+exactly the stored units and index structures, and a
+signature-mismatched Check result blocks Accept.  The write path
+independently 409s structural edits on foreign-referenced
+variables.
 
 ### 3. Inspecting, editing and deleting variables
 
-- Click any variable in the left palette to open a **detail popup** with its IRI, network, class, units, index structures (`short_name` + label), and defining equation.
+- Click any variable in the left palette to open a **detail popup** with its IRI, network, class, units, index structures (`short_name` + label), and defining equation.  The lock banner also lists **which equations reference it** — its own definitions (`lhs`) versus foreign uses inside another variable's rhs.
+- Token **advisories** under a check result carry structured **fixes** (ruled 2026-11-11): e.g. an empty token signature offers "Declare 'V' signature-neutral (keep membership)" per contributing operand; clicking a fix shows the impacted equations (the reference list) before applying.  Signature-only writes pass the §18 lock; membership (`carriesToken`) stays locked — licensed-but-neutral membership (`carriesToken` + empty `tokenVector`) is legal.
 - Click the `×` next to a variable to delete it.  The editor computes and shows the **cascade impact**: all dependent variables and equations that will be removed because they depend on the target directly or indirectly.
 - The **Debug equation context (JSON)** popup (opened from the right pane) lets advanced users edit variables, indices, the network tree, and the active expression network directly.  Click **Apply** to load the edited context back into the editor.
 
@@ -180,8 +206,13 @@ backend/equation/
 
 The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 
-- **Port variable editor** (`PortVariableEditor`) — single dialog: domain tree, class, name, LaTeX symbol, SI unit vector, index structures.
-- **Dependent variable editor** (`DependentVariableEditor`) — same header widgets plus expression input, single **Check** action that parses then semantically checks, LaTeX preview with index subscripts, and result panel.
+- **Variable editor** (`DependentVariableEditor`) — one dialog with a
+  creation-mode switch: **foundation** offers the manual signature
+  pickers (SI units, index structures, tokens) and no expression
+  column; **dependent** offers the variable palette plus expression
+  input, a single **Check** action that parses then semantically
+  checks, LaTeX preview with index subscripts, and a result panel.
+  The **Port (connectable)** flag is available in both modes.
 - **Variable palette** (`VariablePalette`) — grouped by network; click to view details, click `×` to delete with cascade impact analysis.
 - **Expression input** (`ExpressionInput`) — operator/function buttons and keyboard shortcuts; one **Check** button triggers parse + check.
 - **LaTeX preview** (`LaTeXPreview`) — rendered expression, including index subscripts from each variable's `index_structures` mapped through the `short_name` of the index.
@@ -221,3 +252,11 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 - `docs/math-language-ontology-comparison.md` — historical comparison and the
   agreed requirements for compact language semantics and canonical IRI-bound
   expression storage.
+
+### Token signature key identity (2026-11-11)
+
+Token algebra normalises full token IRIs, `token_mass`-style keys and
+bare fragments to the same fragment identity (`mass`).  Mixed persisted
+key forms therefore cancel correctly; check results and adopted derived
+signatures emit canonical fragment keys.  Membership declarations remain
+separate from these advisory algebraic signatures.

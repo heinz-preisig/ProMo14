@@ -10,6 +10,51 @@ export function equationClassLabel(
   return classes.find((c) => c.iri === ref)?.label ?? ref
 }
 
+/** §18 fixed-signature rule: a used variable keeps its units and
+ *  index structures — any equation attached or rewritten on it must
+ *  derive exactly the declared signature.  Returns the mismatching
+ *  field labels (``[]`` when the derived signature matches, or when a
+ *  derived field is untracked and cannot be compared). */
+export function signatureMismatch(
+  declared: { units?: number[] | null; index_structures?: string[] | null },
+  derived: { units?: number[] | null; indices?: string[] | null },
+): string[] {
+  const bad: string[] = []
+  if (
+    derived.units &&
+    JSON.stringify(derived.units) !==
+      JSON.stringify(declared.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
+  ) {
+    bad.push('units')
+  }
+  if (
+    derived.indices &&
+    JSON.stringify(derived.indices) !==
+      JSON.stringify(declared.index_structures ?? [])
+  ) {
+    bad.push('index structure')
+  }
+  return bad
+}
+
+/** Display pieces for a §18 ``/references`` entry: the equation's
+ *  local id and the label of the variable that owns the equation.
+ *  ``via === 'lhs'`` marks the variable's own defining equations;
+ *  other values are foreign uses inside an rhs. */
+export function referenceDisplay(
+  ref: { equation: string; graph: string; via: string },
+  variables: Variable[],
+): { eqId: string; ownerLabel: string | null } {
+  const eqId = ref.equation.split('#').pop() ?? ref.equation
+  const owner = variables.find((v) =>
+    Object.entries(v.equations ?? {}).some(
+      ([key, eq]) =>
+        key === eqId || eq.iri === ref.equation || eq.internal_id === eqId,
+    ),
+  )
+  return { eqId, ownerLabel: owner?.label ?? null }
+}
+
 /** Next free ``V_n`` internal id across the variable set. */
 export function nextInternalId(variables: Variable[]): string {
   const max = variables

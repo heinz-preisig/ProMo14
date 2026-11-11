@@ -57,7 +57,7 @@ from .document import (
 from .errors import VarError
 from .parser import ParseError, parse
 from .syntax import Instantiate, Node, Var
-from .tokens import TokenVec
+from .tokens import TokenVec, token_frag
 from .units import Units
 
 import copy
@@ -200,6 +200,11 @@ class CheckResponse(BaseModel):
     tokens: Optional[Dict[str, int]] = None
     tokens_pretty: Optional[str] = None
     warnings: List[str] = Field(default_factory=list)
+    #: §24 advisories, structured — ``{code, message, cause, fixes}``.
+    #: ``warnings`` keeps the same items as plain strings; ``fixes``
+    #: are concrete remediation actions the UI may offer (ruled
+    #: 2026-11-11 — an advisory without a fix path is a dead end).
+    advisories: List[Dict[str, Any]] = Field(default_factory=list)
     error: Optional[str] = None
     error_kind: Optional[str] = None
     candidates: Optional[List[Dict[str, Any]]] = None  # AmbiguousVariableError
@@ -389,8 +394,33 @@ def _build_space(req: CheckRequest) -> CompileSpace:
     )
 
 
+def _leaf_signatures(checked) -> List[Dict[str, Any]]:
+    """Var leaves carrying a non-empty tracked token signature — the
+    operands whose declarations fed the computed signature.  Neutral
+    and untracked leaves are omitted: only non-empty signatures can
+    cancel or contribute."""
+    found: List[Dict[str, Any]] = []
+
+    def walk(node) -> None:
+        if not node.children:
+            if node.tokens is not None and not node.tokens.is_empty():
+                found.append({
+                    "iri": next(iter(node.incidence), None),
+                    "label": node.label,
+                    "tokens": node.tokens.as_dict(),
+                    "pretty": node.tokens.pretty(),
+                })
+            return
+        for child in node.children:
+            walk(child)
+
+    walk(checked)
+    return found
+
+
 def _token_advisories(checked, space, lhs_label):
-    """(tokens_map, tokens_pretty, warnings) for a checked expression.
+    """(tokens_map, tokens_pretty, warnings, advisories) for a checked
+    expression.
 
     §24 advisories — never a gate:
     - any warnings the checker itself collected (sum/maxmin mismatches,
@@ -399,20 +429,50 @@ def _token_advisories(checked, space, lhs_label):
       (same information in two networks), not a relation;
     - a computed signature that differs from the LHS variable's declared
       ``tokenVector``.
+
+    Structured advisories carry a ``cause`` and concrete ``fixes``
+    (ruled 2026-11-11): ``clear_signature`` declares an operand
+    signature-neutral while keeping its membership — the
+    membership-without-signature form the same ruling legalised;
+    ``adopt_derived`` writes the derived signature onto the LHS
+    variable's ``tokenVector``.
     """
     warnings = list(space.warnings)
+    advisories: List[Dict[str, Any]] = [
+        {"code": "checker", "message": w, "fixes": []}
+        for w in warnings
+    ]
     tokens_map = None
     tokens_pretty = None
     if checked.tokens is None:
-        return tokens_map, tokens_pretty, warnings
+        return tokens_map, tokens_pretty, warnings, advisories
     tokens_map = checked.tokens.as_dict()
     tokens_pretty = checked.tokens.pretty()
     if checked.tokens.is_empty():
-        warnings.append(
+        message = (
             "token signature is empty — the expression is a basis "
             "change (same information in two networks), not a "
             "relation (§24)"
         )
+        leaves = _leaf_signatures(checked)
+        advisories.append({
+            "code": "token_basis_change",
+            "message": message,
+            "cause": {"operands": leaves},
+            "fixes": [
+                {
+                    "action": "clear_signature",
+                    "variable": leaf["iri"],
+                    "label": (
+                        "Declare '%s' signature-neutral "
+                        "(keep membership)" % leaf["label"]
+                    ),
+                }
+                for leaf in leaves
+                if leaf["iri"]
+            ],
+        })
+        warnings.append(message)
     if lhs_label:
         try:
             lhs_var = space.resolve(lhs_label).variable
@@ -421,12 +481,32 @@ def _token_advisories(checked, space, lhs_label):
         if lhs_var is not None and lhs_var.token_vector:
             declared = TokenVec.from_dict(lhs_var.token_vector)
             if checked.tokens != declared:
-                warnings.append(
+                message = (
                     "token signature %r does not match the declared "
                     "tokenVector %r of '%s'"
                     % (tokens_pretty, declared.pretty(), lhs_label)
                 )
-    return tokens_map, tokens_pretty, warnings
+                advisories.append({
+                    "code": "token_signature_mismatch",
+                    "message": message,
+                    "cause": {
+                        "variable": lhs_var.iri,
+                        "label": lhs_label,
+                        "declared": declared.as_dict(),
+                        "derived": tokens_map,
+                    },
+                    "fixes": [{
+                        "action": "adopt_derived",
+                        "variable": lhs_var.iri,
+                        "token_vector": tokens_map,
+                        "label": (
+                            "Set '%s' tokenVector to the derived %s"
+                            % (lhs_label, tokens_pretty)
+                        ),
+                    }],
+                })
+                warnings.append(message)
+    return tokens_map, tokens_pretty, warnings, advisories
 
 
 @router.post("/check", response_model=CheckResponse)
@@ -447,7 +527,7 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
             resp.candidates = e.candidates
         return resp
 
-    tokens_map, tokens_pretty, warnings = _token_advisories(
+    tokens_map, tokens_pretty, warnings, advisories = _token_advisories(
         checked, space, req.lhs
     )
 
@@ -461,6 +541,7 @@ def check_endpoint(req: CheckRequest) -> CheckResponse:
         tokens=tokens_map,
         tokens_pretty=tokens_pretty,
         warnings=warnings,
+        advisories=advisories,
     )
 
 
@@ -672,7 +753,7 @@ def _canonicalise_equations(
         equation.rhs_latex = latex
         # §24 advisories travel with the equation record so the editor sees
         # them on save, not only via /check.
-        _, _, equation.warnings = _token_advisories(
+        _, _, equation.warnings, _ = _token_advisories(
             checked, space, record.label
         )
         canonical[equation.iri] = expression
@@ -1068,15 +1149,19 @@ def _guard_structural_edit(store, graph, iri: str,
         allowed.add("network")
         allowed.add("domain_iri")
     blocked = [field for field in changed if field not in allowed]
-    if refs and blocked:
+    # Only *foreign* references lock (another equation's rhs).  A
+    # variable's own defining equations (via="lhs") are the definition
+    # itself — rewriting them is exactly how an otherwise-unused
+    # variable's signature gets redefined (ruled 2026-11-11).
+    if foreign_refs and blocked:
         raise HTTPException(status_code=409, detail={
             "message": (
                 "Variable is referenced by %d equation(s); "
                 "structural field(s) locked: %s"
-                % (len(refs), ", ".join(blocked))
+                % (len(foreign_refs), ", ".join(blocked))
             ),
             "locked_fields": blocked,
-            "references": refs,
+            "references": foreign_refs,
         })
 
 
@@ -1085,21 +1170,19 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
     incoming record.  ``global_ID`` falls back to the IRI fragment (the
     reader's convention), so an absent alias is not a change."""
     fragment = record.iri.split("#")[-1].split("/")[-1]
-    # Additive token declarations are exempt: declaring carriesToken /
-    # tokenVector on a previously untracked variable adds metadata —
-    # it changes no equation semantics.  Removing or *altering* existing
-    # declarations remains a locked structural change.
+    # Additive token declarations are exempt: declaring carriesToken
+    # on a previously untracked variable adds metadata — it changes no
+    # equation semantics.  Removing or *altering* existing membership
+    # remains a locked structural change (port licensing is a real
+    # consumer).
     old_tokens = sorted(getattr(old, "tokens", []))
     new_tokens = sorted(record.tokens)
-    # tokenVector keys interoperate by fragment (IRI- vs fragment-keyed
-    # vectors denote the same exponent map — TokenVec's convention).
-    frag = lambda k: k.split("#")[-1].split("/")[-1]
-    old_tv = {frag(k): v for k, v in
-              (getattr(old, "token_vector", None) or {}).items()}
-    new_tv = {frag(k): v for k, v in (record.token_vector or {}).items()}
     # additive: previously untracked -> declared; report as no change
     tokens_pair = (old_tokens, new_tokens) if old_tokens else (old_tokens, old_tokens)
-    tv_pair = (old_tv, new_tv) if old_tv else (old_tv, old_tv)
+    # ``token_vector`` is absent from the lock set (ruled 2026-11-11):
+    # it feeds only advisory signatures — nothing gates on it — so a
+    # signature-only edit is the sanctioned fix path for token
+    # advisories, the same argument as the additive exemption.
     pairs = [
         ("units",
          old.units.as_list() if getattr(old, "units", None) else [0] * 8,
@@ -1108,7 +1191,6 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
          sorted(getattr(old, "index_structures", [])),
          sorted(record.index_structures)),
         ("tokens", tokens_pair[0], tokens_pair[1]),
-        ("token_vector", tv_pair[0], tv_pair[1]),
         ("classifications",
          dict(getattr(old, "classifications", {})),
          dict(record.classifications)),
@@ -1300,6 +1382,15 @@ def _guard_token_consistency(record: VariableRecord) -> None:
       signature ``{member: 1}`` — the var is that token to the first
       power; ``/check`` still derives the true signature from the
       defining equation and warns on divergence (§24 advisory).
+    - *Membership without signature* (ruled 2026-11-11): an explicit
+      empty ``tokenVector`` is legal — the variable is licensed for
+      the network but algebraically neutral (the geometry-port fix:
+      V carries ``mass`` yet contributes no signature).  The two
+      predicates are now decoupled: members need not sign, and a
+      composite signature may name networks the variable is not
+      licensed for (a mass-flow signs ``{mass, time}`` — it belongs
+      to the mass network, it is not a "time quantity").  Licensing
+      and algebra are separate claims.
     """
     if record.port_variable and not record.tokens:
         raise HTTPException(
@@ -1310,22 +1401,11 @@ def _guard_token_consistency(record: VariableRecord) -> None:
             status_code=400,
             detail=f"'{record.label}' declares tokenVector "
                    "without carriesToken")
-    frag = lambda k: k.split("#")[-1].split("/")[-1]
-    if record.tokens and not record.token_vector:
-        record.token_vector = {frag(t): 1 for t in record.tokens}
-    # §3 containment: a carried token must appear with nonzero exponent
-    # in the signature — the wrong-but-declared network case (e.g.
-    # ticking ``mass`` on a component-mass density) otherwise passes
-    # silently and mis-licenses ports.
-    if record.tokens and record.token_vector:
-        entries = {frag(k) for k, v in record.token_vector.items() if v}
-        missing = [t for t in record.tokens if frag(t) not in entries]
-        if missing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"'{record.label}': carriesToken(s) "
-                       f"{[frag(m) for m in missing]} have no nonzero "
-                       "exponent in tokenVector")
+    # Canonical key form is the token fragment ("mass") — TokenVec
+    # canonicalises all accepted key forms (IRI / prefixed fragment /
+    # bare) to it, so defaults must emit it too.
+    if record.tokens and record.token_vector is None:
+        record.token_vector = {token_frag(t): 1 for t in record.tokens}
 
 
 def _assert_absolute_iri(iri: str) -> None:
