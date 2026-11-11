@@ -3768,3 +3768,53 @@ whether the declaration surface shrinks further stays on the table.
 - Final verification: 543 backend tests pass; equation-editor frontend
   tests and TypeScript/Vite production build pass. Serialized data changes
   from the authoring session are included without manual TriG edits.
+
+
+## 36. Global equation consistency check and feasible fixes (2026-11-11)
+
+### Ruling
+
+The user clarified that consistency during construction is maintained by
+rules on equation definition and deletion; lower-triangular construction
+is the main structural concern. Token assignment cannot be made equally
+sharp. The distinction between membership and signature is already
+settled, not reopened: an explicit global consistency check is needed.
+
+Placement: the equation editor, with authoritative backend checking over
+one resolved context snapshot (selected artefact plus pins). The user
+approved feasible fixes as part of the report. Control semantics is left
+for a separate discussion; this feature invents no physics or control laws.
+
+### Implementation
+
+- `GET /api/equation/consistency` checks all attached equations in scope
+  using the existing parser, checker and token advisories. It compares
+  derived units/index sets to the LHS declaration, including explicit-empty
+  token signatures. Errors, advisories, untracked and consistent results
+  are separate; expressions with warnings are never counted as consistent.
+- Each result names the equation, owner graph(s), expression, declared and
+  derived signatures, operand declarations and incompatible sum terms.
+  The editor links to variable/equation editors and owning artefacts.
+- Feasible `adopt_derived` and `clear_signature` corrections require an
+  impact preview (in-scope transitive consumers and cross-artefact direct
+  references) and explicit confirmation. Alternative definitions that do
+  not agree block a suggested correction rather than silently swapping the
+  inconsistency between equations.
+- `POST /api/equation/consistency/fix?graph=...` recomputes the report,
+  rejects stale revisions or unoffered actions and writes only the offered
+  tokenVector. Membership is not invented or altered; units, indices and
+  equations are untouched. Frozen variables/equations/versions and foreign
+  owning graphs block corrections. Pinned declarations must be edited in
+  their owning artefact, never shadow-copied into the selected graph.
+- A correction reruns the whole report and refreshes editor context. Local
+  context edits mark an existing report out of date. Checks are read-only;
+  corrections use ordinary dirty tracking and still require Save for disk
+  persistence. There is no blind bulk-adoption operation.
+
+### Limits
+
+This audits declarations and propagation; it does not certify physical
+meaning, solver solvability, model-bound port typing or lower-triangular
+assignment closure. Structural issues open the authoring editor rather
+than rewriting user equations or bypassing referenced-variable locks.
+Untracked operations/declarations are visible without guessing signatures.

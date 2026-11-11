@@ -260,3 +260,33 @@ bare fragments to the same fragment identity (`mass`).  Mixed persisted
 key forms therefore cancel correctly; check results and adopted derived
 signatures emit canonical fragment keys.  Membership declarations remain
 separate from these advisory algebraic signatures.
+
+
+## Global consistency check
+
+Use **Check consistency…** in the header to check all equations in the
+selected artefact and its pinned scope. The report opens inside the editor
+and distinguishes structural errors, token advisories, untracked results
+and consistent equations. An untracked result is not a verified token pass.
+This complements the definition/deletion construction rules; it does not
+replace them (ruled 2026-11-11, discussion §36).
+
+Expand a result to inspect its expression, owner artefact, declared/derived
+signatures, conflicting terms and operand declarations. Open the relevant
+variable or equation directly; owning-artefact links let you correct a pin
+at its source instead of creating a local shadow.
+
+Where feasible, a suggested token signature correction offers an impact
+preview and confirmation. The preview lists potentially affected equations
+through the in-scope dependency chain and direct references across artefacts.
+Apply changes only the signature, then rechecks the full scope. Membership,
+units, indices and equations remain unchanged. Suggestions are not proof of
+semantic correctness: inspect the cause before adopting a derived result.
+Alternative definitions that disagree, frozen resources, missing membership
+or a foreign owning graph block application and explain the next step.
+
+Edits make the report out of date; **Check / recheck** refreshes it. The
+backend independently rejects a stale correction. Corrections update the
+in-memory store; use **Save** to persist them. Structural problems still
+require authoring decisions—there is no automatic equation rewrite or
+"fix everything" button. Control semantics is unchanged.

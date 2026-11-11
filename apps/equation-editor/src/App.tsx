@@ -4,6 +4,7 @@ import { deleteVariable, documentUrl, listTokens, loadContext, saveOntology, sav
 import { useStoreDirty } from '@promo/ui'
 import type { ClassificationAxis, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from './types'
 import ContextEditor from './components/ContextEditor'
+import ConsistencyPanel from './components/ConsistencyPanel'
 import DeleteVariableDialog, { type DeleteImpact } from './components/DeleteVariableDialog'
 import DependentVariableEditor, { type VariableMode } from './components/DependentVariableEditor'
 import VariableDetailDialog from './components/VariableDetailDialog'
@@ -38,6 +39,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null)
   const [selectedVariable, setSelectedVariable] = useState<Variable | null>(null)
   const [debugOpen, setDebugOpen] = useState(false)
+  const [consistencyOpen, setConsistencyOpen] = useState(false)
   const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
   const [saveMsg, setSaveMsg] = useState('')
   // Async save/load failures — stays up until dismissed (unlike saveMsg
@@ -175,6 +177,18 @@ export default function App() {
     setExpressionNetwork(ctx.expressionNetwork)
   }, [])
 
+  const refreshConsistencyContext = useCallback(async () => {
+    const ctx = await loadContext()
+    setVariables(ctx.variables)
+    setIndices(ctx.indices)
+    setNetworkTree(ctx.network_tree)
+    setAxes(ctx.axes ?? [])
+    setDomains(ctx.domains ?? [])
+    setEquationClasses(ctx.equation_classes ?? [])
+    refreshDirty()
+    return JSON.stringify([ctx.variables, ctx.indices, ctx.network_tree])
+  }, [refreshDirty])
+
   return (
     <div
       style={{
@@ -216,6 +230,7 @@ export default function App() {
             flexShrink: 0,
           }}
         >
+          <button type="button" onClick={() => setConsistencyOpen(true)} style={{ fontSize: 12 }}>Check consistency…</button>
           {storeDirty && (
             <span style={{ fontSize: 12, color: '#b8860b', whiteSpace: 'nowrap' }} title="Unsaved changes in the store">
               ● unsaved
@@ -326,6 +341,15 @@ export default function App() {
             </button>
           </div>
 
+          <ConsistencyPanel
+            open={consistencyOpen}
+            contextKey={JSON.stringify([variables, indices, networkTree])}
+            variables={variables}
+            onRefresh={refreshConsistencyContext}
+            onVariable={setSelectedVariable}
+            onEquation={openEquationEditor}
+            onClose={() => setConsistencyOpen(false)}
+          />
           <VariableTable
             variables={variables}
             indices={indices}

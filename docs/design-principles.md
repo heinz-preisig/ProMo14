@@ -314,6 +314,26 @@ unphysical, whatever the capacities' sizes.
 
 ---
 
+## 15. Construction rules and global consistency checks complement each other
+
+Ruled 2026-11-11 (discussion §36): equation definition/deletion rules
+maintain consistency during construction; lower-triangular dependency
+ordering is a structural invariant. Token association cannot be enforced
+with the same sharpness. The membership/signature distinction remains
+settled; an explicit consistency audit is therefore necessary.
+
+The equation editor provides a global check over the selected artefact
+and its pinned scope, using the backend's existing checker. Structural
+errors, token advisories, untracked results and consistent equations are
+reported separately. Untracked is not a successful token check.
+
+Corrections are explicit, impact-previewed and confirmed. Feasible token
+signature changes may be applied without changing membership, units,
+indices or authored expressions. Frozen resources, owning-graph boundaries
+and stale reports remain guarded. Corrections recheck the full scope;
+there is no automatic "make all declarations agree" operation. Control
+semantics remains a separate discussion.
+
 ## Open deviations / known gaps
 
 - Transport **interface arity** — opened 2026-11-10; ruled: derive,

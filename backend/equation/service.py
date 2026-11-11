@@ -45,6 +45,7 @@ from .canonical_rdf import (
 from .checker import check
 from .codegen import TARGETS, render
 from .compile_space import CompileSpace, Index, Variable, kind_tag
+from .consistency import build_report
 from .context import DictContext
 from .document import (
     PdfCompileError,
@@ -335,6 +336,66 @@ def _refresh_equation_latex(ctx, v) -> None:
             equation["rhs_latex"] = render(checked, space, "latex")
         except Exception:
             pass
+
+
+class ConsistencyFixRequest(BaseModel):
+    revision: str
+    equation: str
+    variable: str
+    action: str
+
+
+def _consistency_report(store, graph_iri):
+    ctx = scoped_context(store, graph_iri)
+    scope = store.resolution_scope(graph_iri) if graph_iri else [
+        str(g.identifier) for g in store.dataset.graphs()]
+
+    def owners(subject, variable, frozen=False):
+        if not subject:
+            return []
+        result = []
+        for iri in scope:
+            graph = store.graph(iri)
+            node = URIRef(subject)
+            present = ((node, RDF.type, PROMO['Variable']) in graph
+                       if variable else (node, None, None) in graph)
+            if present and (not frozen or store.is_frozen(graph) or _is_frozen(graph, node)):
+                result.append(str(iri))
+        return result
+
+    return build_report(ctx, graph_iri, owners, _token_advisories)
+
+
+@router.get('/consistency')
+def consistency_endpoint(graph_iri: Optional[str] = Depends(graph_param)):
+    return _consistency_report(get_store(), graph_iri)
+
+
+@router.post('/consistency/fix')
+def consistency_fix_endpoint(req: ConsistencyFixRequest,
+                             graph_iri: Optional[str] = Depends(editable_param)):
+    store = get_store()
+    report = _consistency_report(store, graph_iri)
+    if req.revision != report['revision']:
+        raise HTTPException(status_code=409, detail='Report is out of date — recheck before applying a fix')
+    offered = [fix for row in report['equations'] if row['equation'] == req.equation
+               for finding in row['findings'] for fix in finding.get('fixes', [])
+               if fix.get('variable') == req.variable and fix['action'] == req.action]
+    if not offered:
+        raise HTTPException(status_code=400, detail='This correction is not offered by the current report')
+    fix = offered[0]
+    if fix.get('blocked'):
+        raise HTTPException(status_code=409, detail=fix['blocked'])
+    replacement = {} if req.action == 'clear_signature' else fix.get('token_vector')
+    if replacement is None:
+        raise HTTPException(status_code=400, detail='No replacement signature available')
+    graph = resolve_graph(store, graph_iri)
+    record = VariableRecord(iri=req.variable, label='signature', tokens=[
+        str(t) for t in graph.objects(URIRef(req.variable), PROMO['carriesToken'])],
+        token_vector=replacement)
+    _guard_token_consistency(record)
+    graph.set((URIRef(req.variable), PROMO['tokenVector'], Literal(json.dumps(replacement))))
+    return _consistency_report(store, graph_iri)
 
 
 @router.post("/parse", response_model=ParseResponse)

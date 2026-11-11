@@ -223,3 +223,39 @@ export interface SavedEquation {
   /** Picked equation class — a promo:EquationClass IRI. */
   equation_class?: string
 }
+
+export interface ConsistencyOperand {
+  iri: string
+  label: string
+  tokens: Record<string, number> | null
+  graphs: string[]
+}
+
+export interface ConsistencyFinding {
+  code: string
+  message: string
+  fixes: (TokenFix & { blocked?: string | null })[]
+}
+
+export interface ConsistencyRow {
+  variable: string
+  label: string
+  equation: string
+  equation_id: string
+  network: string
+  graphs: string[]
+  rhs: string
+  status: 'error' | 'advisory' | 'untracked' | 'consistent'
+  declared: { units: number[]; indices: string[]; tokens: Record<string, number> | null }
+  derived: { units: number[]; indices: string[]; tokens: Record<string, number> | null } | null
+  operands: ConsistencyOperand[]
+  conflicts: { expression: string; tokens: Record<string, number> }[][]
+  findings: ConsistencyFinding[]
+}
+
+export interface ConsistencyReport {
+  graph: string | null
+  revision: string
+  equations: ConsistencyRow[]
+  summary: Record<ConsistencyRow['status'], number>
+}

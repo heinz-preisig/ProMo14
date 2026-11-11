@@ -10,6 +10,18 @@ space, units, context protocol, and FastAPI service are implemented and
 tested; the React + TypeScript + Vite frontend in
 `apps/equation-editor/` is also implemented.
 
+## Global consistency report (2026-11-11)
+
+Implemented in `backend/equation/consistency.py` and the equation service,
+with `ConsistencyPanel` in the editor. `GET /consistency` is read-only and
+scoped; `POST /consistency/fix` accepts only a freshly offered, confirmed
+signature correction in the editable owning graph. The report separates
+structural errors, token advisories, untracked results and consistent
+checks, with operand/term diagnostics and navigation to authoring surfaces.
+Corrections preview dependency impact, respect frozen/alternative-definition
+constraints and recheck the full scope. Context edits invalidate the report.
+No equation rewrites, membership changes or control-specific semantics.
+
 ## Backend
 
 | Component | File | Status |
@@ -31,6 +43,8 @@ tested; the React + TypeScript + Vite frontend in
 | `/api/equation/parse` | POST | Syntax-only parse; returns AST as JSON |
 | `/api/equation/check` | POST | Parse + semantic check; returns units, indices, incidence |
 | `/api/equation/context` | GET | Variables, indices, network tree for the selected graph's pin set |
+| `/api/equation/consistency` | GET | Read-only global report over the selected artefact and pinned scope |
+| `/api/equation/consistency/fix` | POST | Revision-checked, offered signature correction in the editable owning graph |
 | `/api/equation/variables` | POST/PUT/DELETE | Variable CRUD in the selected artefact graph |
 
 All endpoints accept `?graph=<iri>` (2026-09-17).  The context resolves
@@ -38,7 +52,8 @@ against the artefact plus its transitive `usesOntology` closure
 (`RdfStore.resolution_scope`, R4); variable writes land in the selected
 artefact graph and mint IRIs under `{graphIRI}#`; frozen version graphs
 are rejected with 403.  Without `?graph=` the legacy dataset-wide scope
-applies and writes go to the working ontology.
+applies to reads; writes require an explicit editable `?graph=` (amended
+2026-11-11).
 
 ## Tests
 
@@ -50,9 +65,10 @@ applies and writes go to the working ontology.
 | `test_units.py` | SI unit vector arithmetic | ✅ Passing |
 | `test_codegen.py` | Codegen: python/matlab/latex targets | ✅ Passing |
 | `test_document.py` | LaTeX document rendering | ✅ Passing |
+| `test_consistency.py` | Report classifications, scoped/read-only checks, guarded fixes, stale revisions, alternatives | ✅ 12 passing |
 
-The full backend suite passes **543 tests** (2026-11-11).  Equation
-editor frontend tests and the TypeScript/Vite production build also pass.
+The full backend suite passes **555 tests** (2026-11-11).  Equation
+editor frontend tests (**11**) and the TypeScript/Vite production build also pass.
 
 The ProMo13 corpus replay (73 expressions, 70/73 passing) has been
 archived to `archive/test_corpus.py`.  The new regression baseline will
@@ -244,6 +260,18 @@ Implemented as a React + TypeScript + Vite app in
   language.
 
 ## Pending items
+
+- **Control token semantics:** open design discussion, not an automatic
+  data-fix task. Signal/observation/manipulation arithmetic remains flagged.
+- **Scoped data ownership:** shutdown save exposed `p_term` and `V` records
+  under library IRIs in both ontology/library graphs with different token
+  signatures. Inspect ownership and migration/write behaviour before cleanup;
+  see `session-handoff-2026-11-11.md`. The global report is scope-relative,
+  not a cross-artefact integrity audit.
+- **Independent signature editing:** an unchecked membership may retain a
+  signature exponent the picker does not let the user edit manually. The
+  suggested-signature Apply path works; the general editing surface remains
+  a UX follow-up.
 
 - ~~**Indexed `inv` decision (next)**~~ **Done (2026-09-28):** `inv` is
   index-preserving elementwise reciprocal; stale `root!` qualifier in

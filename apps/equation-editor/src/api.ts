@@ -1,4 +1,4 @@
-import type { AstNode, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, SavedEquation, TokenRecord, Variable } from './types'
+import type { AstNode, ConsistencyReport, CheckRequest, CheckResponse, ContextResponse, GenerateRequest, GenerateResponse, ParseRequest, ParseResponse, SavedEquation, TokenRecord, Variable } from './types'
 import { nextEquationId } from './variableUtils'
 import { apiFetch, withParams } from '@promo/ui'
 
@@ -211,4 +211,22 @@ export function nodeToString(node: AstNode): string {
     default:
       return JSON.stringify(node)
   }
+}
+
+export async function checkConsistency(): Promise<ConsistencyReport> {
+  const res = await apiFetch('/api/equation/consistency')
+  if (!res.ok) throw await apiError(res, 'Consistency check failed')
+  return res.json()
+}
+
+export async function fixConsistency(
+  revision: string, equation: string, variable: string, action: string,
+): Promise<ConsistencyReport> {
+  const res = await apiFetch('/api/equation/consistency/fix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ revision, equation, variable, action }),
+  })
+  if (!res.ok) throw await apiError(res, 'Correction failed')
+  return res.json()
 }
