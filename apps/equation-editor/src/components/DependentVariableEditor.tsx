@@ -248,6 +248,9 @@ export default function DependentVariableEditor({
     setError(null)
     try {
       const parseRes = await parseExpression(text)
+      // setClassifications is async — carry the synced map in
+      // clsOverride so the /check below doesn't see the stale kind.
+      let clsOverride: Record<string, string> | undefined
       if (parseRes.ok && parseRes.ast) {
         setAst(parseRes.ast)
         // Instantiate LHS must be a bound-value kind — sync the
@@ -260,7 +263,8 @@ export default function DependentVariableEditor({
         ) {
           const hit = findTermIri(axes, 'function', 'parameter')
           if (hit) {
-            setClassifications((prev) => ({ ...prev, [hit.axisIri]: hit.termIri }))
+            clsOverride = { ...classifications, [hit.axisIri]: hit.termIri }
+            setClassifications(clsOverride)
           }
         }
       } else {
@@ -269,7 +273,7 @@ export default function DependentVariableEditor({
         return
       }
 
-      const res = await checkExpression(buildRequest())
+      const res = await checkExpression(buildRequest(clsOverride))
       setCheckResult(res)
     } catch (e) {
       setError(String(e))
@@ -286,7 +290,9 @@ export default function DependentVariableEditor({
    *  In editing mode it carries the existing record (iri, internal_id,
    *  equations, classifications, audit fields) so saveVariable's
    *  replace-semantics POST loses nothing. */
-  const draftVariable = useCallback((): Variable => {
+  const draftVariable = useCallback((
+    clsOverride?: Record<string, string>,
+  ): Variable => {
     const lhs = name.trim()
     const aliases = { ...(editing?.aliases ?? {}) }
     if (latexSym.trim()) aliases.latex = latexSym.trim()
@@ -319,7 +325,7 @@ export default function DependentVariableEditor({
           ?? Array.from(selectedIndices),
       internal_id: editing?.internal_id ?? nextInternalId(variables),
       port_variable: isPort,
-      classifications,
+      classifications: clsOverride ?? classifications,
       tokens: Array.from(carriesTokens),
       aliases,
       doc,
@@ -331,9 +337,11 @@ export default function DependentVariableEditor({
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
    *  creating. */
-  const contextVariables = useCallback((): Variable[] => {
+  const contextVariables = useCallback((
+    clsOverride?: Record<string, string>,
+  ): Variable[] => {
     if (!nameValid) return variables
-    const draft = draftVariable()
+    const draft = draftVariable(clsOverride)
     return editing
       ? variables.map((x) => (x.iri === editing.iri ? draft : x))
       : [...variables, draft]
@@ -341,12 +349,14 @@ export default function DependentVariableEditor({
 
   /** The check request for the current inputs — shared by /check and
    *  /generate so both see the same draft LHS variable. */
-  const buildRequest = useCallback((): CheckRequest => {
+  const buildRequest = useCallback((
+    clsOverride?: Record<string, string>,
+  ): CheckRequest => {
     const lhs = name.trim()
     const selectedDomainIri = domains.find((item) => item.name === domain)?.iri ?? null
     return {
       text,
-      variables: contextVariables(),
+      variables: contextVariables(clsOverride),
       indices,
       variable_definition_network: domain,
       variable_definition_domain_iri: selectedDomainIri,
