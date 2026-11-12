@@ -1,7 +1,7 @@
 # ProMo — Concepts & Architecture
 
 **Status:** living document — started 2026-10-17; **realigned to rulings
-through 2026-11-10** (edit rules: `docs/README.md` tier map). Written while
+through 2026-11-12** (edit rules: `docs/README.md` tier map). Written while
 the suite is under construction; sections are updated as concepts land, not
 frozen.
 
@@ -259,6 +259,28 @@ change — equations, assignments, and code templates are untouched.
 
 The same "symbolic handle → derived matrix" pattern will serve the
 stoichiometric matrices when reaction-scheme instantiation lands.
+
+### 3.6 Information processing and its physical interfaces
+
+Ruled 2026-11-12 (design-principles §16; discussion §37): control, or
+information processing, operates solely on **unidirectional signals**.
+Observation and manipulation are earmarked signals identifying interaction
+with the physical system, not generic names for every controller input
+and output.
+
+- **Observation** reads a physical quantity into a signal, through an
+  instrument in real-world systems. States, secondary states and flows
+  may all be observed. A flow measurement is a reading, not transport of
+  the extensive quantity.
+- **Manipulation** acts on a **transport system**, through a transducer
+  to the actuator (the “valve”) regulating extensive flow between
+  capacities. It does not act directly on capacities.
+- **Internal information processing** transforms and transmits signals.
+  Each connection is unidirectional; a network of such connections may
+  form a feedback loop.
+
+This states the semantics; explicit alignment of the ontology representation
+and existing token declarations remains to be done.
 
 ---
 

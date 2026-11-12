@@ -3818,3 +3818,78 @@ meaning, solver solvability, model-bound port typing or lower-triangular
 assignment closure. Structural issues open the authoring editor rather
 than rewriting user equations or bypassing referenced-variable locks.
 Untracked operations/declarations are visible without guessing signatures.
+
+## 37. Signals and the physical–information interfaces (2026-11-12)
+
+### Ruling
+
+The user clarified that control, or information processing, operates solely
+on unidirectional signals. Observation and manipulation are earmarked
+signals, primarily used for interaction with the physical system.
+
+Observation reads a physical quantity and makes it available as a signal,
+through an instrument in real-world systems. The user explicitly corrected
+any restriction to states and secondary states: **a flow can also be
+observed**. Reading a flow does not transport the extensive quantity itself.
+
+Manipulation acts through a transducer to the “valves” controlling the flow
+of extensive quantities between capacities. The user made the target
+explicit: **manipulations act on transport systems**.
+
+Thus observation/manipulation describe the reading/acting interfaces to
+physics, not simply all controller inputs/outputs. Connections within
+information processing carry signals. Their unidirectionality does not
+prevent composition into a feedback loop.
+
+### Documentation and implementation boundary
+
+Recorded as design-principles §16 and reflected in the conceptual
+architecture. This is a semantic ruling, not an automatic rewrite of the
+ontology, token signatures or user equations. The representation of these
+earmarks and alignment of existing declarations remain implementation work.
+
+## 38. Simplify token authoring; preserve signature algebra before removal (2026-11-12)
+
+### Decision and rationale
+
+The user found manual token association/exponent maintenance too difficult
+for reliable equation authoring, to the point of threatening usability of
+the project. Repairing individual declarations does not address that burden.
+The user approved the direction of separating semantic connectivity from
+algebra and preserving the existing implementation before changing it.
+
+Control uses normalised, dimensionless signals. Generic controllers define
+signal inputs and outputs, not observation/manipulation variables. Those
+physical-interface roles are derived at model connection time; manipulation
+acts on transport systems. General information processing remains open.
+Dimensionless control signals do not imply dimensionless time parameters.
+
+The agreed simplification direction is to retain tokens for semantic
+connection membership/licensing, remove manual token-exponent authoring,
+signature-driven forced membership and membership-to-signature defaulting,
+and remove the associated token-signature authoring advisories from the
+required contract. Units, index checks and connection licensing remain.
+Do not merely hide exponent controls while retaining unexplained warnings.
+Existing declarations require an explicit, impact-reviewed API migration;
+no equations or serialized TriG are to be hand-rewritten.
+
+### Preservation checkpoint
+
+Before simplification, save the live store through POST /api/ontology/save,
+commit the current code, documentation and serialized artefacts, and create
+the annotated tag `archive/token-signature-algebra`. Push the checkpoint
+and tag to origin. The tagged data preserves the user-authored state at
+this boundary, including existing diagnostic inconsistencies; it is not a
+claim of semantic integrity or repair of split graph ownership.
+
+The checkpoint retains token-vector propagation, signature authoring,
+actionable advisories, confirmed global-audit corrections and their tests.
+Revival should require a demonstrated checking benefit that cannot be
+provided by units, indices and connection licensing, without imposing a
+second manually coordinated algebra on users. Recover code selectively
+from Git rather than maintaining a dormant legacy path or feature flag.
+
+This section records the new direction. At this checkpoint the active
+implementation and living implementation contracts still describe the
+pre-simplification machinery; align those contracts when the replacement
+lands. No token-algebra code or authored declarations are removed here.

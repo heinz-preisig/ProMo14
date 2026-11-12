@@ -129,6 +129,24 @@
     <https://w3id.org/promo/library> a promo:Library ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
 
+    <https://w3id.org/promo/library#V_59> a promo:Variable ;
+        rdfs:label "pGain" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_flow>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_signal> ;
+        promo:doc "Proportional gain" ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
+        promo:internalID "V_59" ;
+        promo:latex "p" ;
+        promo:network "control" ;
+        promo:portVariable true ;
+        promo:tokenVector "{\"token_signal\": 1}" ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
+
     <https://w3id.org/promo/library#V_60> a promo:Variable ;
         rdfs:label "value" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
@@ -524,39 +542,21 @@
         promo:hasOperation promolg:DefiniteIntegral .
 
     <https://w3id.org/promo/library#E_31> a promo:Equation ;
-        promo:created "2026-11-09T15:44:28.166Z" ;
+        promo:created "2026-11-12T10:38:16.643Z" ;
         promo:doc "" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
-        promo:incidenceList "[\"https://w3id.org/promo/library#V_59\", \"https://w3id.org/promo/library#V_64\"]" ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_62\", \"https://w3id.org/promo/library#V_74\"]" ;
         promo:internalID "E_31" ;
-        promo:lhs <https://w3id.org/promo/library#V_67> ;
-        promo:modified "2026-11-09T15:44:28.166Z" ;
+        promo:lhs <https://w3id.org/promo/library#V_75> ;
+        promo:modified "2026-11-12T10:38:16.643Z" ;
         promo:network "control" ;
-        promo:rhs "pGain . e" ;
+        promo:rhs "setPoint - u" ;
         promo:rhsExpression <https://w3id.org/promo/library#E_31/expression> ;
-        promo:rhsLatex "p \\circ e" .
+        promo:rhsLatex "s - u" .
 
     <https://w3id.org/promo/library#E_31/expression> a promo:Expression ;
-        promo:hasArguments _:nf65d0ae1d99749c5ab54ec6c891e89bbb22 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    <https://w3id.org/promo/library#E_32> a promo:Equation ;
-        promo:created "2026-11-09T12:38:13.509Z" ;
-        promo:doc "" ;
-        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
-        promo:incidenceList "[\"https://w3id.org/promo/library#V_62\", \"https://w3id.org/promo/library#V_66\"]" ;
-        promo:internalID "E_32" ;
-        promo:lhs <https://w3id.org/promo/library#V_64> ;
-        promo:modified "2026-11-09T13:39:06.587Z" ;
-        promo:network "control" ;
-        promo:rhs "( setPoint - obs )" ;
-        promo:rhsExpression <https://w3id.org/promo/library#E_32/expression> ;
-        promo:rhsLatex "\\left( s - o \\right)" .
-
-    <https://w3id.org/promo/library#E_32/expression> a promo:Expression ;
-        promo:hasArguments _:nf65d0ae1d99749c5ab54ec6c891e89bbb23 ;
+        promo:hasArguments _:Nbc27d8c2f36c48d688a8defe6d984e52 ;
         promo:hasOperation promolg:Subtract .
 
     <https://w3id.org/promo/library#E_33> a promo:Equation ;
@@ -964,24 +964,6 @@
         promo:tokenVector "{\"energy\": 1, \"entropy\": -1}" ;
         promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_59> a promo:Variable ;
-        rdfs:label "pGain" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_flow>,
-            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_signal> ;
-        promo:doc "Proportional gain" ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
-        promo:internalID "V_59" ;
-        promo:latex "p" ;
-        promo:network "control" ;
-        promo:portVariable true ;
-        promo:tokenVector "{\"token_signal\": 1}" ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
-
     <https://w3id.org/promo/library#V_62> a promo:Variable ;
         rdfs:label "setPoint" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
@@ -996,40 +978,6 @@
         promo:network "control" ;
         promo:portVariable true ;
         promo:tokenVector "{\"token_signal\": 1}" ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_66> a promo:Variable ;
-        rdfs:label "obs" ;
-        promo:aliases "{\"latex\": \"o\", \"global_ID\": \"https://w3id.org/promo/library#V_66\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_flow> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_observation> ;
-        promo:doc "observation — measured plant output (signal input)" ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
-        promo:internalID "V_66" ;
-        promo:latex "o" ;
-        promo:network "control" ;
-        promo:portVariable true ;
-        promo:tokenVector "{\"token_observation\": 1}" ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_67> a promo:Variable ;
-        rdfs:label "y" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_info_role_output> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_manipulation> ;
-        promo:doc "controller output" ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_31> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
-        promo:internalID "V_67" ;
-        promo:latex "y" ;
-        promo:network "control" ;
-        promo:portVariable true ;
-        promo:tokenVector "{\"token_manipulation\": 1}" ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_68> a promo:Variable ;
@@ -1108,6 +1056,38 @@
         promo:portVariable false ;
         promo:tokenVector "{\"component_mass\": 1}" ;
         promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_74> a promo:Variable ;
+        rdfs:label "u" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_info_role_input> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_signal> ;
+        promo:doc "controller input" ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
+        promo:internalID "V_74" ;
+        promo:latex "u" ;
+        promo:network "control" ;
+        promo:portVariable true ;
+        promo:tokenVector "{}" ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_75> a promo:Variable ;
+        rdfs:label "e" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_signal> ;
+        promo:doc "" ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_31> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
+        promo:internalID "V_75" ;
+        promo:latex "e" ;
+        promo:network "control" ;
+        promo:portVariable false ;
+        promo:tokenVector "{}" ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
         promo:created "2026-09-21T11:31:22.783Z" ;
@@ -1224,23 +1204,6 @@
         promo:portVariable false ;
         promo:tokenVector "{\"token_mass\": 1}" ;
         promo:unitVector "[0, 0, 0, 1, 0, 0, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_64> a promo:Variable ;
-        rdfs:label "e" ;
-        promo:aliases "{\"latex\": \"e\", \"global_ID\": \"https://w3id.org/promo/library#V_64\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_signal> ;
-        promo:doc "control error" ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_32> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_control> ;
-        promo:internalID "V_64" ;
-        promo:latex "e" ;
-        promo:network "control" ;
-        promo:portVariable false ;
-        promo:tokenVector "{\"token_signal\": 1}" ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_73> a promo:Variable ;
         rdfs:label "rho" ;
@@ -1472,6 +1435,12 @@
         promo:tokenVector "{}" ;
         promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
 
+    _:N318db71dac2344929167a2d686b88230 rdf:first <https://w3id.org/promo/library#V_74> ;
+        rdf:rest () .
+
+    _:Nbc27d8c2f36c48d688a8defe6d984e52 rdf:first <https://w3id.org/promo/library#V_62> ;
+        rdf:rest _:N318db71dac2344929167a2d686b88230 .
+
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb1 rdf:first <https://w3id.org/promo/ontology#V_16> ;
         rdf:rest _:nf65d0ae1d99749c5ab54ec6c891e89bbb94 .
 
@@ -1674,9 +1643,6 @@
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb154 rdf:first <https://w3id.org/promo/library#V_10> ;
         rdf:rest () .
 
-    _:nf65d0ae1d99749c5ab54ec6c891e89bbb155 rdf:first <https://w3id.org/promo/library#V_64> ;
-        rdf:rest () .
-
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb156 rdf:first _:nf65d0ae1d99749c5ab54ec6c891e89bbb157 ;
         rdf:rest _:nf65d0ae1d99749c5ab54ec6c891e89bbb158 .
 
@@ -1822,9 +1788,6 @@
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb195 rdf:first <https://w3id.org/promo/library#V_35> ;
         rdf:rest () .
 
-    _:nf65d0ae1d99749c5ab54ec6c891e89bbb196 rdf:first <https://w3id.org/promo/library#V_66> ;
-        rdf:rest () .
-
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb197 rdf:first <https://w3id.org/promo/library#V_35> ;
         rdf:rest () .
 
@@ -1911,9 +1874,6 @@
         promo:hasArguments _:nf65d0ae1d99749c5ab54ec6c891e89bbb221 ;
         promo:hasOperation promolg:inv .
 
-    _:nf65d0ae1d99749c5ab54ec6c891e89bbb22 rdf:first <https://w3id.org/promo/library#V_59> ;
-        rdf:rest _:nf65d0ae1d99749c5ab54ec6c891e89bbb155 .
-
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb220 rdf:first _:nf65d0ae1d99749c5ab54ec6c891e89bbb224 ;
         rdf:rest () .
 
@@ -1947,9 +1907,6 @@
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb229 a promo:Expression ;
         promo:hasArguments _:nf65d0ae1d99749c5ab54ec6c891e89bbb230 ;
         promo:hasOperation promolg:PartialDerivative .
-
-    _:nf65d0ae1d99749c5ab54ec6c891e89bbb23 rdf:first <https://w3id.org/promo/library#V_62> ;
-        rdf:rest _:nf65d0ae1d99749c5ab54ec6c891e89bbb196 .
 
     _:nf65d0ae1d99749c5ab54ec6c891e89bbb230 rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:nf65d0ae1d99749c5ab54ec6c891e89bbb231 .

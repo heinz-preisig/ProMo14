@@ -1,6 +1,6 @@
 # Design principles — ProMo14
 
-Living — realigned to rulings through 2026-11-11.
+Living — realigned to rulings through 2026-11-12.
 
 Curated record of the global ideas and the deliberate deviations from
 mainstream modelling of controlled physical systems.  Each entry states
@@ -333,6 +333,29 @@ indices or authored expressions. Frozen resources, owning-graph boundaries
 and stale reports remain guarded. Corrections recheck the full scope;
 there is no automatic "make all declarations agree" operation. Control
 semantics remains a separate discussion.
+
+## 16. Information processing uses unidirectional signals
+
+User-ruled 2026-11-12 (discussion §37): control, or information processing,
+operates solely on **unidirectional signals**. Observation and manipulation
+are **earmarked signals**, primarily marking interaction with the physical
+system rather than ordinary internal information processing.
+
+- **Observation** reads a physical quantity into a signal, through an
+  instrument in real-world systems. It may read a state, secondary state
+  or **flow**; it is not restricted to stored quantities. Reading a flow
+  is distinct from transporting the extensive quantity itself.
+- **Manipulation acts on transport systems**, through a transducer to the
+  physical actuator (the “valve”) regulating the flow of extensive
+  quantities between capacities. It does not act directly on capacities
+  or bypass the transport system.
+- These earmarks distinguish reading/acting interfaces to physics, not
+  every controller input/output. Internal connections carry signals;
+  unidirectional connections may compose into a feedback loop.
+
+*Implementation boundary:* ontology representation and existing token
+signatures still require explicit alignment. This ruling does not
+implicitly change user equations or declarations.
 
 ## Open deviations / known gaps
 
