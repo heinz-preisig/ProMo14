@@ -5,7 +5,7 @@ import { equationClassLabel, referenceDisplay } from '../variableUtils'
 import TokenSection from './TokenSection'
 import { astToLatex, indexShortLabel, renderLatex, suggestLatexAlias, validateLatexAlias } from '../latex'
 import { useVariableLock } from '../useVariableLock'
-import AxisClassifications, { applicableAxes, kindTag, tokenPolicy } from '../axisClassifications'
+import AxisClassifications, { applicableAxes, kindTag } from '../axisClassifications'
 import NetworkTreeSelect from './NetworkTreeSelect'
 
 const UNIT_LABELS = ['time', 'length', 'amount', 'mass', 'temperature', 'current', 'light', 'nil']
@@ -68,9 +68,6 @@ export default function VariableDetailDialog({
   const [carriesTokens, setCarriesTokens] = useState<Set<string>>(
     new Set(variable.tokens ?? []),
   )
-  const [tokenVector, setTokenVector] = useState<Record<string, number>>(
-    variable.token_vector ?? {},
-  )
   const [msg, setMsg] = useState('')
   // §18 usage lock — units and index structures remain locked while used;
   // domain moves are planned atomically by the backend and may qualify
@@ -87,7 +84,6 @@ export default function VariableDetailDialog({
     setUnits(variable.units ?? [0, 0, 0, 0, 0, 0, 0, 0])
     setSelectedIndices(new Set(variable.index_structures ?? []))
     setCarriesTokens(new Set(variable.tokens ?? []))
-    setTokenVector(variable.token_vector ?? {})
     setMsg('')
   }, [variable])
 
@@ -113,15 +109,6 @@ export default function VariableDetailDialog({
       const next = new Set(prev)
       if (next.has(iri)) next.delete(iri)
       else next.add(iri)
-      return next
-    })
-  }
-
-  const setTokenExponent = (iri: string, value: string) => {
-    setTokenVector((prev) => {
-      const next = { ...prev }
-      if (value.trim() === '' || Number(value) === 0) delete next[iri]
-      else next[iri] = Number(value)
       return next
     })
   }
@@ -153,12 +140,6 @@ export default function VariableDetailDialog({
       aliases,
       doc: doc.trim(),
       tokens: Array.from(carriesTokens),
-      // carriesToken with an emptied signature = licensed but neutral
-      // membership (ruled 2026-11-11); {} must not collapse to
-      // undefined — the write path would re-default to {member:1}.
-      token_vector: Object.keys(tokenVector).length
-        ? { ...tokenVector }
-        : carriesTokens.size ? {} : undefined,
       equations,
     }
   }
@@ -444,10 +425,7 @@ export default function VariableDetailDialog({
           <TokenSection
             tokenCatalogue={tokenCatalogue}
             carriesTokens={carriesTokens}
-            tokenVector={tokenVector}
             onToggleToken={toggleToken}
-            onSetExponent={setTokenExponent}
-            policy={tokenPolicy(axes, classifications)}
           />
           </div>
         </div>

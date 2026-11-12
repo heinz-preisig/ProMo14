@@ -1,7 +1,7 @@
 # Equation Editor — Implementation Status
 
-**Last updated:** 2026-11-11 — **realigned to rulings through
-2026-11-11** (edit rules: `docs/README.md` tier map).
+**Last updated:** 2026-11-12 — **realigned to rulings through
+2026-11-12** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
@@ -10,17 +10,18 @@ space, units, context protocol, and FastAPI service are implemented and
 tested; the React + TypeScript + Vite frontend in
 `apps/equation-editor/` is also implemented.
 
-## Global consistency report (2026-11-11)
+## Global structural consistency report (amended 2026-11-12)
 
-Implemented in `backend/equation/consistency.py` and the equation service,
-with `ConsistencyPanel` in the editor. `GET /consistency` is read-only and
-scoped; `POST /consistency/fix` accepts only a freshly offered, confirmed
-signature correction in the editable owning graph. The report separates
-structural errors, token advisories, untracked results and consistent
-checks, with operand/term diagnostics and navigation to authoring surfaces.
-Corrections preview dependency impact, respect frozen/alternative-definition
-constraints and recheck the full scope. Context edits invalidate the report.
-No equation rewrites, membership changes or control-specific semantics.
+`GET /consistency` is read-only over the selected artefact and pins. It
+checks expression validity, units and index conformity, with error/consistent
+categories, operand declarations and authoring navigation. Context edits
+invalidate the displayed snapshot. The signature-fix endpoint is removed.
+
+Token exponent controls, propagation, forced membership, defaults and
+advisories have been removed (§38). Connection membership remains explicit;
+units, index checks and licensing remain in force. Existing vectors are
+inactive stored metadata; no live declarations have been bulk-migrated.
+Archive: Git tag `archive/token-signature-algebra`, checkpoint `bcbf22f`.
 
 ## Backend
 
@@ -44,7 +45,6 @@ No equation rewrites, membership changes or control-specific semantics.
 | `/api/equation/check` | POST | Parse + semantic check; returns units, indices, incidence |
 | `/api/equation/context` | GET | Variables, indices, network tree for the selected graph's pin set |
 | `/api/equation/consistency` | GET | Read-only global report over the selected artefact and pinned scope |
-| `/api/equation/consistency/fix` | POST | Revision-checked, offered signature correction in the editable owning graph |
 | `/api/equation/variables` | POST/PUT/DELETE | Variable CRUD in the selected artefact graph |
 
 All endpoints accept `?graph=<iri>` (2026-09-17).  The context resolves
@@ -65,10 +65,10 @@ applies to reads; writes require an explicit editable `?graph=` (amended
 | `test_units.py` | SI unit vector arithmetic | ✅ Passing |
 | `test_codegen.py` | Codegen: python/matlab/latex targets | ✅ Passing |
 | `test_document.py` | LaTeX document rendering | ✅ Passing |
-| `test_consistency.py` | Report classifications, scoped/read-only checks, guarded fixes, stale revisions, alternatives | ✅ 12 passing |
+| `test_consistency.py` | Structural diagnostics, scoped/read-only checks, metadata independence | ✅ 4 passing |
 
-The full backend suite passes **555 tests** (2026-11-11).  Equation
-editor frontend tests (**11**) and the TypeScript/Vite production build also pass.
+The full backend suite passes **534 tests** (2026-11-12).  Equation
+editor frontend tests (**12**) and the TypeScript/Vite production build also pass.
 
 The ProMo13 corpus replay (73 expressions, 70/73 passing) has been
 archived to `archive/test_corpus.py`.  The new regression baseline will
@@ -98,13 +98,10 @@ Implemented as a React + TypeScript + Vite app in
 
 - Unified **New variable…** dialog: foundation (manual signature, no RHS)
   or dependent (signature derived from Check); either may be connectable.
-- Structured token advisories with operand causes and confirm-before-apply
-  fixes; membership and algebraic signature are independent (§35).
-- Signature-only edits remain legal on referenced variables; foreign RHS
-  references lock units and index structures, while owning definitions
-  alone do not. Accept rejects a mismatched signature on a used variable.
-- Token signature keys canonicalise to fragments, so mixed IRI/prefixed/bare
-  keys cancel correctly in token algebra (2026-11-11).
+- Membership-only **Connection networks** controls, independent of units
+  and expressions; no exponent picker or forced token suggestions.
+- Foreign references continue to lock units and indices. An existing
+  variable's own defining equations alone do not lock them.
 - Domain / network tree selection.
 - SI unit vector entry.
 - Index structure selection with `short_name` display.
@@ -261,18 +258,15 @@ Implemented as a React + TypeScript + Vite app in
 
 ## Pending items
 
-- **Control token semantics:** open design discussion, not an automatic
-  data-fix task. Signal/observation/manipulation arithmetic remains flagged.
+- **Control interfaces:** normalised, dimensionless signals are ruled.
+  Transport-only actuation licensing and derived observation/manipulation
+  roles at model connections need alignment; broader information processing
+  remains open.
 - **Scoped data ownership:** shutdown save exposed `p_term` and `V` records
   under library IRIs in both ontology/library graphs with different token
   signatures. Inspect ownership and migration/write behaviour before cleanup;
   see `session-handoff-2026-11-11.md`. The global report is scope-relative,
   not a cross-artefact integrity audit.
-- **Independent signature editing:** an unchecked membership may retain a
-  signature exponent the picker does not let the user edit manually. The
-  suggested-signature Apply path works; the general editing surface remains
-  a UX follow-up.
-
 - ~~**Indexed `inv` decision (next)**~~ **Done (2026-09-28):** `inv` is
   index-preserving elementwise reciprocal; stale `root!` qualifier in
   `E_12` rewritten to `universe!`.

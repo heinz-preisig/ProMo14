@@ -103,144 +103,31 @@ def test_check_instantiate_state_var_rejected(client):
     assert "constant" in body["error"] or "parameter" in body["error"]
 
 
-def test_check_token_empty_signature_warns_basis_change(client):
-    """§24: an expression collapsing to {} is a basis change, not a
-    relation — warn, never block.  `c` (component_mass/mass) times `Mm`
-    (mass/component_mass) is token-neutral."""
+@pytest.mark.parametrize("text", ["setPoint - u", "setPoint . u"])
+def test_signal_membership_does_not_create_algebra(client, text):
     r = client.post("/api/equation/check", json={
-        "text": "( c . Mm )",
-        "lhs": "rho",
+        "text": text,
         "variables": [
-            _var("V_c", label="c",
-                 token_vector={"token_component_mass": 1, "token_mass": -1}),
-            _var("V_Mm", label="Mm",
-                 token_vector={"token_mass": 1, "token_component_mass": -1}),
-            _var("V_rho", label="rho"),
+            _var("V_s", label="setPoint", tokens=[f"{BASE}#token_signal"],
+                 token_vector={"signal": 1}),
+            _var("V_u", label="u", tokens=[f"{BASE}#token_signal"],
+                 token_vector={}),
         ],
     })
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["ok"] is True
-    assert body["tokens"] == {}
-    assert any("basis change" in w for w in body["warnings"])
+    assert body["units"] == [0] * 8
+    assert "tokens" not in body
+    assert "advisories" not in body
 
 
-def test_check_advisories_structured(client):
-    """Structured advisories (ruled 2026-11-11): the basis-change
-    advisory names the contributing operand signatures and offers a
-    concrete fix per operand — advisories carry remediation, not just
-    diagnosis."""
+def test_units_still_reject_incompatible_signal_sum(client):
     r = client.post("/api/equation/check", json={
-        "text": "( c . Mm )",
-        "lhs": "rho",
-        "variables": [
-            _var("V_c", label="c",
-                 token_vector={"token_component_mass": 1, "token_mass": -1}),
-            _var("V_Mm", label="Mm",
-                 token_vector={"token_mass": 1, "token_component_mass": -1}),
-            _var("V_rho", label="rho"),
-        ],
+        "text": "a + b",
+        "variables": [_var("V_a", label="a"),
+                      _var("V_b", label="b", units=[1, 0, 0, 0, 0, 0, 0, 0])],
     })
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["ok"] is True
-    basis = [a for a in body["advisories"]
-             if a["code"] == "token_basis_change"]
-    assert len(basis) == 1
-    ops = basis[0]["cause"]["operands"]
-    assert {o["label"] for o in ops} == {"c", "Mm"}
-    fixes = basis[0]["fixes"]
-    assert {f["action"] for f in fixes} == {"clear_signature"}
-    assert {f["variable"] for f in fixes} == {
-        f"{BASE}#V_c",
-        f"{BASE}#V_Mm",
-    }
-
-
-def test_check_token_mismatch_warns_vs_declared(client):
-    """§24: computed signature differing from the LHS variable's declared
-    tokenVector is an advisory."""
-    r = client.post("/api/equation/check", json={
-        "text": "( m . h )",
-        "lhs": "e_dot",
-        "variables": [
-            _var("V_m", label="m",
-                 token_vector={"token_mass": 1, "token_time": -1}),
-            _var("V_h", label="h",
-                 token_vector={"token_energy": 1, "token_mass": -1}),
-            _var("V_e_dot", label="e_dot",
-                 token_vector={"token_energy": 1, "token_entropy": -1}),
-        ],
-    })
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["ok"] is True
-    assert body["tokens"] == {"energy": 1, "time": -1}
-    assert body["tokens_pretty"] == "energy time^-1"
-    assert any("does not match the declared" in w for w in body["warnings"])
-
-
-def test_check_token_matching_declared_no_warning(client):
-    """No advisory when the computed signature equals the declaration."""
-    r = client.post("/api/equation/check", json={
-        "text": "( m . h )",
-        "lhs": "e_dot",
-        "variables": [
-            _var("V_m", label="m",
-                 token_vector={"token_mass": 1, "token_time": -1}),
-            _var("V_h", label="h",
-                 token_vector={"token_energy": 1, "token_mass": -1}),
-            _var("V_e_dot", label="e_dot",
-                 token_vector={"token_energy": 1, "token_time": -1}),
-        ],
-    })
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["ok"] is True
-    assert body["warnings"] == []
-
-
-def test_check_token_neutral_operands_derive_signature(client):
-    """§4 leaf neutrality: ``promo:value``-bound and bound-kind operands
-    are verified-empty, not untracked — the cfV pattern
-    ``half·(F − d·|F|)·c`` derives the tracked operand's signature."""
-    r = client.post("/api/equation/check", json={
-        "text": "( ( half . ( F - ( d . abs( F ) ) ) ) * c )",
-        "lhs": "cfV",
-        "variables": [
-            _var("V_half", label="half", type="constant", value="0.5"),
-            _var("V_F", label="F", type="constant",
-                 index_structures=[f"{BASE}#I_1"]),
-            _var("V_d", label="d", type="parameter"),
-            _var("V_c", label="c",
-                 index_structures=[f"{BASE}#I_1"],
-                 token_vector={"token_component_mass": -1}),
-            _var("V_cfV", label="cfV",
-                 index_structures=[f"{BASE}#I_1"]),
-        ],
-        "indices": [{"iri": f"{BASE}#I_1", "label": "S",
-                     "network": "root"}],
-    })
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["ok"] is True
-    assert body["tokens"] == {"component_mass": -1}
-
-
-def test_check_unclassified_operand_stays_untracked(client):
-    """A bearing-kind variable without a declared signature keeps the
-    product untracked — missing declarations stay loud (absorb rule)."""
-    r = client.post("/api/equation/check", json={
-        "text": "( f . c )",
-        "lhs": "x",
-        "variables": [
-            _var("V_f", label="f"),  # type="state", no token_vector
-            _var("V_c", label="c",
-                 token_vector={"token_component_mass": -1}),
-            _var("V_x", label="x"),
-        ],
-    })
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["ok"] is True
-    assert body["tokens"] is None
+    assert r.status_code == 200
+    assert r.json()["ok"] is False
+    assert r.json()["error_kind"] == "UnitError"

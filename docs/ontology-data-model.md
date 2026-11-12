@@ -617,63 +617,26 @@ promo:Hadamard a promo:Token ;
 `promo:parent` links subtokens; `promo:internal_code`/`promo:aliases`
 carry the surface-syntax aliases.
 
-### 3.7 Token algebra (§24)
+### 3.7 Connection membership (amended 2026-11-12)
 
-Two distinct declarations, both on `promo:Variable`:
+`promo:carriesToken` declares the networks a variable belongs to for port
+licensing. It is independent of units, indices and defining equations.
+Connectable variables require membership; ordinary equation operands are
+not required to carry a token exponent vector.
 
-- **`promo:carriesToken`** — network *membership*, authoritative for
-  port licensing (arc supply matching).  A variable belongs to the
-  networks it declares.
-- **`promo:tokenVector`** — algebraic *signature*: a JSON sparse
-  exponent map `{token IRI or fragment: int}` propagated through
-  expressions by the checker (`backend/equation/tokens.py`,
-  `checker.py`).  `None` = untracked (absorbs, never gates).
+Token-signature algebra and manual `promo:tokenVector` authoring were
+removed (discussion §38, design-principles §3). Existing vector literals
+still round-trip as inactive stored metadata; no bulk migration is implied.
+They do not generate warnings, constrain membership or feed the checker.
+The prior implementation is preserved under Git tag
+`archive/token-signature-algebra` (checkpoint `bcbf22f`).
 
-**Signature rules** — every declared `carriesToken` appears at a
-*nonzero* exponent in the variable's `tokenVector`:
-
-- **Extent variables** (the measure a network is counted over) carry
-  their own token at `+1`: `n` `{component_mass:+1}`, `V` `{mass:+1}`,
-  `Axy` `{momentum:+1}`.
-- **Intensive quantities** normed by an extent carry it at `−1`:
-  `c = n/V` `{component_mass:+1, mass:−1}`, `Mm = m/n`
-  `{mass:+1, component_mass:−1}`.
-- **Flows** divide by `token_time`: `fm_conv`
-  `{momentum:+1, time:−1}`.  **Efforts** are `d(extent)/d(extent')`:
-  `T` `{energy:+1, entropy:−1}`, `p_term` `{energy:+1, mass:−1}`,
-  `p_mech` `{energy:+1, momentum:−1}` — the effort·flow = energy·time⁻¹
-  conjugacy invariant follows.
-- **`token_time`** is `tokenKind "basis"`: an algebraic basis element,
-  never a `carriesToken` target — nothing is conserved per unit time.
-- **Frame variables** (`t`, `r_x`/`r_y`/`r_z`, function `frame`) are the
-  free coordinates — no `carriesToken`, no `tokenVector`,
-  `portVariable false`.  The token belongs to what lives *in* the
-  domain, not to the coordinate that locates it.
-- **`{}`-collapse** — a signature that collapses to empty means the
-  expression is a *basis change* (same information in two networks),
-  not a relation: `ρ = m/V` `{mass:+1, mass:−1}`, mole fractions
-  `{component_mass:+1, component_mass:−1}`.  Generalised: *any
-  quantity normed by its own network's extent is token-neutral.*
-  `/check` warns; never blocks.  A `{}` variable may still declare
-  `carriesToken` — `ρ` is a mass-network quantity; membership is
-  honest even when the signature is neutral (the nonzero-exponent
-  rule governs *ports*, which need real signatures to match).
-  `tokenVector "{}"` (explicit) differs from absent: `{}` is tracked
-  and propagates; absent is `None`/untracked and absorbs.
-- **Inverse signatures** — conductance-class variables can carry
-  negative vectors: `k_conv` `{energy:−1, time:−1}` (conductance per
-  unit effort·time, verified against `fV = k·ρ⁻¹·A·F·p_mech`).  Such
-  vars declare no `carriesToken` — no exponent is positive membership.
-- **Space/time asymmetry** — time enters token space (as `−1` on
-  flows) because every conserved quantity flows *in* time; space
-  never enters it — spatial resolution lives in index structures and
-  domains instead.  A `token_space` basis element is deferred until
-  spatial modelling needs quantities normed by position.
-
-Advisories (`space.warnings` → `CheckResponse.warnings` →
-`EquationRecord.warnings`, transient) cover sum/`maxmin` signature
-mismatches, odd `sqrt` exponents, `{}`-collapse, and computed-vs-declared
-LHS mismatches.
+Control uses normalised, dimensionless signals. Generic controller inputs
+and outputs use Signal membership; observation/manipulation describe the
+physical interfaces at model composition, not intrinsic controller variable
+algebra. Broader information processing remains open. Existing specialised
+memberships and rule constraints require explicit follow-up, not silent
+reclassification.
 
 ## 4. Loader contract
 

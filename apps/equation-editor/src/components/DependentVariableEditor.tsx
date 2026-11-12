@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { checkExpression, generateExpression, loadContext, parseExpression } from '../api'
-import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenFix, TokenRecord, Variable } from '../types'
-import TokenSection, { normaliseTokenVector, specificMember } from './TokenSection'
+import { checkExpression, generateExpression, parseExpression } from '../api'
+import type { AstNode, CheckRequest, CheckResponse, ClassificationAxis, CodegenTarget, Domain, EquationClass, EquationRecord, Index, NetworkTree, SavedEquation, TokenRecord, Variable } from '../types'
+import TokenSection from './TokenSection'
 import AxisClassifications, {
   applicableAxes,
   kindTag,
   FIELD_LABEL_STYLE,
   findTermIri,
-  tokenPolicy,
 } from '../axisClassifications'
 import { nextEquationId, nextInternalId, referenceDisplay, signatureMismatch } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
@@ -106,7 +105,6 @@ export default function DependentVariableEditor({
   const [checkResult, setCheckResult] = useState<CheckResponse | null>(null)
   // Set after an advisory fix saves — triggers a re-check once the
   // refreshed `variables` prop arrives so the panel reflects the fix.
-  const [recheckAfterFix, setRecheckAfterFix] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [doc, setDoc] = useState('')
@@ -123,7 +121,6 @@ export default function DependentVariableEditor({
   // §24 token declarations: carriesToken (network membership, port
   // licensing) and tokenVector (algebraic signature, exponent map).
   const [carriesTokens, setCarriesTokens] = useState<Set<string>>(new Set())
-  const [tokenVector, setTokenVector] = useState<Record<string, number>>({})
   const [genTarget, setGenTarget] = useState<CodegenTarget>('python')
   const [genCode, setGenCode] = useState<string | null>(null)
   const [genLoading, setGenLoading] = useState(false)
@@ -145,7 +142,6 @@ export default function DependentVariableEditor({
       setError(null)
       setDoc(editing?.doc ?? '')
       setCarriesTokens(new Set(editing?.tokens ?? []))
-      setTokenVector(editing?.token_vector ?? {})
       setIsPort(editing?.port_variable ?? false)
       setMode(editing || editingEquation ? 'dependent' : initialMode)
       setUnits([...(editing?.units ?? [0, 0, 0, 0, 0, 0, 0, 0])])
@@ -196,46 +192,6 @@ export default function DependentVariableEditor({
       else next.add(iri)
       return next
     })
-  }
-
-  const setTokenExponent = (iri: string, value: string) => {
-    setTokenVector((prev) => {
-      const next = { ...prev }
-      if (value.trim() === '' || Number(value) === 0) delete next[iri]
-      else next[iri] = Number(value)
-      return next
-    })
-  }
-
-  // §24 suggestion: the checked equation's derived signature — the
-  // variable adopts it (algebraic).  carriesToken stays the user's
-  // pick except when the signature forces it: a unique most-specific
-  // token resolves membership unambiguously and is auto-set below.
-  const tokenSuggestion =
-    checkResult?.ok && checkResult.tokens && Object.keys(checkResult.tokens).length
-      ? { vector: checkResult.tokens, pretty: checkResult.tokens_pretty ?? '' }
-      : null
-
-  // Forced membership: when the checked signature has a unique
-  // most-specific token (ancestry drops strict ancestors), network
-  // membership isn't a choice — it's that token.  Auto-set it once per
-  // distinct survivor; a later manual uncheck doesn't retrigger.
-  const suggestionMember = tokenSuggestion
-    ? specificMember(tokenSuggestion.vector, tokenCatalogue)
-    : null
-  useEffect(() => {
-    if (suggestionMember) {
-      setCarriesTokens((prev) =>
-        prev.has(suggestionMember)
-          ? prev
-          : new Set([...prev, suggestionMember]),
-      )
-    }
-  }, [suggestionMember])
-
-  const applyTokenSuggestion = () => {
-    if (!tokenSuggestion) return
-    setTokenVector(normaliseTokenVector(tokenSuggestion.vector, tokenCatalogue))
   }
 
   // Report the current domain/classifications so the app can offer
@@ -325,13 +281,6 @@ export default function DependentVariableEditor({
   // Advisory-fix feedback: once the save's refreshed `variables` (and
   // `editing`, batched in the same update) arrive, re-run Check so the
   // advisory list reflects the fix instead of the stale result.
-  useEffect(() => {
-    if (!recheckAfterFix) return
-    setRecheckAfterFix(false)
-    void handleCheck()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variables, recheckAfterFix])
-
   /** The draft LHS variable — shared by /check, /generate, accept and the
    *  LaTeX preview so all see the same record (incl. the latex alias).
    *  In editing mode it carries the existing record (iri, internal_id,
@@ -372,50 +321,12 @@ export default function DependentVariableEditor({
       port_variable: isPort,
       classifications,
       tokens: Array.from(carriesTokens),
-      // §24 signature is algebraic = derivable — it adopts like
-      // units/indices; carriesToken stays the user's pick.
-      token_vector: structuralLocked && editing?.token_vector
-        // Locked pins only an existing signature — declaring one on a
-        // var that has none is additive, exempt from the lock (§24).
-        ? editing.token_vector
-        : checkResult?.ok && checkResult.tokens != null
-          // A tracked signature — including the empty one — is the
-          // honest algebra: adopt it ({} = token-neutral result).
-          ? normaliseTokenVector(checkResult.tokens, tokenCatalogue)
-          : (text.trim() ? editing?.token_vector : undefined)
-            ?? (Object.keys(tokenVector).length
-                ? { ...tokenVector }
-                // carriesToken with an emptied signature = licensed
-                // but neutral membership (ruled 2026-11-11).
-                : carriesTokens.size ? {} : undefined),
       aliases,
       doc,
     }
   }, [name, domain, variables, checkResult, latexSym, doc, editing,
-      classifications, structuralLocked, carriesTokens, tokenVector, isPort,
+      classifications, structuralLocked, carriesTokens, isPort,
       units, selectedIndices, text, tokenCatalogue])
-
-  /** Applies a structured-advisory fix (§24 fix mechanics, ruled
-   *  2026-11-11).  Signature-only writes are §18-exempt — membership
-   *  stays untouched; only the algebraic signature changes. */
-  const applyTokenFix = async (fix: TokenFix) => {
-    if (!onSaveVariable) return
-    // The variable PUT replaces the equations dict wholesale, so the
-    // fix must write onto a *fresh* record — a stale snapshot (the
-    // `variables` prop or the open-time `editing` record) would revert
-    // an equation rewrite accepted since the editor opened.
-    const ctx = await loadContext()
-    const fresh = ctx.variables.find((v) => v.iri === fix.variable)
-    if (!fresh) return
-    if (fix.action === 'clear_signature') {
-      await onSaveVariable({ ...fresh, token_vector: {} })
-    } else if (fix.action === 'adopt_derived' && fix.token_vector != null) {
-      await onSaveVariable({ ...fresh, token_vector: fix.token_vector })
-    }
-    // Re-verify: the advisory card must reflect the fix, not the stale
-    // pre-fix check result (deferred until `variables` refreshes).
-    setRecheckAfterFix(true)
-  }
 
   /** The variable context for /check, /generate and the LaTeX preview —
    *  the draft replaces the stored record when editing, appends when
@@ -562,9 +473,7 @@ export default function DependentVariableEditor({
     JSON.stringify(Array.from(selectedIndices)) !==
       JSON.stringify(editing.index_structures ?? []) ||
     JSON.stringify([...carriesTokens].sort()) !==
-      JSON.stringify([...(editing.tokens ?? [])].sort()) ||
-    JSON.stringify(Object.entries(tokenVector).sort()) !==
-      JSON.stringify(Object.entries(editing.token_vector ?? {}).sort())
+      JSON.stringify([...(editing.tokens ?? [])].sort())
   )
 
   // A new variable with an empty RHS is equation-less by intent —
@@ -903,12 +812,7 @@ export default function DependentVariableEditor({
               <TokenSection
                 tokenCatalogue={tokenCatalogue}
                 carriesTokens={carriesTokens}
-                tokenVector={tokenVector}
                 onToggleToken={toggleToken}
-                onSetExponent={setTokenExponent}
-                policy={tokenPolicy(axes, classifications)}
-                suggestion={tokenSuggestion}
-                onApplySuggestion={applyTokenSuggestion}
               />
             </div>
           </div>
@@ -1008,7 +912,7 @@ export default function DependentVariableEditor({
               lhs={name.trim() || undefined}
             />
 
-            <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} variables={variables} onApplyFix={applyTokenFix} />
+            <ResultPanel result={checkResult} loading={loading} indices={indices} label={name.trim()} variables={variables} />
 
             {checkResult?.ok && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

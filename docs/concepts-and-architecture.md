@@ -279,8 +279,18 @@ and output.
   Each connection is unidirectional; a network of such connections may
   form a feedback loop.
 
-This states the semantics; explicit alignment of the ontology representation
-and existing token declarations remains to be done.
+Control signals are normalised and dimensionless. A generic controller
+uses signal inputs/outputs; observation/manipulation are model-connection
+roles, not permanent classifications of those controller variables. Time
+constants and integration coordinates retain their appropriate units.
+General information processing remains open (discussion §38).
+
+Token membership serves connectivity, not exponent algebra. The editor
+requires no token-vector authoring or token-signature repairs. Units and
+indices remain checked. Existing vectors are retained as inactive stored
+metadata; the previous implementation is recoverable at Git tag
+`archive/token-signature-algebra` (`bcbf22f`). Physical-interface connection
+rule alignment and migration of old memberships remain explicit follow-up.
 
 ---
 

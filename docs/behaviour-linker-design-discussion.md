@@ -3893,3 +3893,25 @@ This section records the new direction. At this checkpoint the active
 implementation and living implementation contracts still describe the
 pre-simplification machinery; align those contracts when the replacement
 lands. No token-algebra code or authored declarations are removed here.
+
+
+### Simplification implementation (2026-11-12)
+
+Removed the checker token-vector propagation module and token-signature
+responses/advisories, membership-to-signature defaults, global signature-fix
+endpoint and signature categories. Retained expression/unit/index checking,
+read-only scoped structural consistency reporting, membership licensing,
+port membership guards and the existing mutability/frozen protections.
+
+The editor now offers membership-only Connection networks, with no exponent
+picker, signature-derived suggestions or automatic membership selection.
+Existing vectors round-trip as inactive metadata; no bulk declaration
+migration or authored-equation rewrite was performed. The saved data may
+therefore still contain old observation/manipulation memberships. Their
+impact-reviewed correction and transport-only actuation licensing remain
+follow-up, not silently completed by this change.
+
+Regression coverage checks mixed old signature metadata no longer produces
+signal mismatch/squared-signal advisories, units remain enforced, no vector
+is defaulted from membership, metadata survives an ordinary edit, structural
+reports stay scoped/read-only and membership controls offer no exponents.

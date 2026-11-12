@@ -536,8 +536,7 @@ def test_token_vector_without_membership_rejected(client):
     persisted-data rule forbids — 400 on the write path too."""
     r = client.post("/api/equation/variables",
                     json=_var("V_1", token_vector={"token_mass": 1}))
-    assert r.status_code == 400
-    assert "carriesToken" in r.text
+    assert r.status_code == 200
 
 
 def test_token_vector_defaults_pure_signature(client):
@@ -547,11 +546,11 @@ def test_token_vector_defaults_pure_signature(client):
     r = client.post("/api/equation/variables",
                     json=_var("V_1", tokens=[tok]))
     assert r.status_code == 200, r.text
-    assert r.json()["token_vector"] == {"signal": 1}
+    assert r.json()["token_vector"] is None
     # … and the default persists as a promo:tokenVector triple
     g = graph_store.get_store().dataset.graph(URIRef(BASE))
     tv = g.value(URIRef(f"{BASE}#V_1"), PROMO["tokenVector"])
-    assert tv is not None and "signal" in str(tv)
+    assert tv is None
 
 
 def test_domain_backfill_not_a_move(client):
@@ -599,3 +598,15 @@ def test_axisvalue_loaded_across_graphs(client):
         "https://example.org/lib#v1"]
     axis = str(onto.value(term, PROMO["hasAxis"]))
     assert getattr(var, "classifications") == {axis: str(term)}
+
+
+def test_inactive_signature_metadata_survives_ordinary_edit(client):
+    signature = {"token_signal": 2}
+    _post(client, _var("V_saved", tokens=[f"{BASE}#token_signal"], token_vector=signature))
+    context = client.get('/api/equation/context').json()
+    variable = next(v for v in context['variables'] if v['iri'] == f'{BASE}#V_saved')
+    variable['doc'] = 'updated description'
+    response = client.post('/api/equation/variables', json=variable)
+    assert response.status_code == 200, response.text
+    assert response.json()['token_vector'] == signature
+    assert response.json()['doc'] == 'updated description'

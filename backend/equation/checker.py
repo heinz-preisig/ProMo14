@@ -44,33 +44,8 @@ from .syntax import (
     MaxMin, Node, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff,
     UFunc, Var,
 )
-from .tokens import TokenVec, tadd, tmul, tsub
 from .units import Units
 
-
-def _leaf_tokens(var) -> Optional[TokenVec]:
-    """Algebraic signature of a variable leaf; ``None`` = untracked.
-
-    §4 neutrality ruling at the leaf, two verified-empty cases:
-
-    - a bound ``promo:value`` — a literal number carries no token by
-      definition (universal constants ``half``/``one``/``zero``; they
-      hold no classifications, so the kind projection can't see them);
-    - bound-value kinds ``constant``/``parameter`` (the same
-      ``BOUND_KINDS`` projection the Instantiate gate uses) are
-      token-neutral *by kind*.
-
-    An explicit declaration still wins (a token-bearing parameter like
-    a heat capacity declares it).  Bearing kinds stay untracked — a
-    missing signature there is an authoring gap, and untracked
-    absorbing keeps it loud."""
-    tv = getattr(var, "token_vector", None)
-    if tv is not None:
-        return TokenVec.from_dict(tv)
-    if getattr(var, "value", None) is not None or \
-            getattr(var, "type", "") in BOUND_KINDS:
-        return TokenVec()
-    return None
 
 # Kept for readability: the LHS gate tests ``BOUND_KINDS`` (§24) — the
 # derived kind tags ``constant``/``parameter`` produced by ``kind_tag``.
@@ -104,9 +79,6 @@ class Checked:
     label: str
     incidence: FrozenSet[str] = field(default_factory=frozenset)
     children: List["Checked"] = field(default_factory=list)
-    #: §24 token algebra signature; ``None`` = untracked (any operand
-    #: untracked propagates untracked — never blocks checking).
-    tokens: Optional[TokenVec] = None
 
     def __post_init__(self) -> None:
         if len(self.indices) != len(set(self.indices)):
@@ -138,7 +110,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             indices=list(var.index_structures),
             label=node.name,
             incidence=frozenset([var.iri]) if var.iri else frozenset(),
-            tokens=_leaf_tokens(var),
         )
 
     if isinstance(node, Group):
@@ -150,7 +121,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=inner.incidence,
             children=[inner],
-            tokens=inner.tokens,
         )
 
     if isinstance(node, Add):
@@ -173,7 +143,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],
-            tokens=tadd(left.tokens, right.tokens, warn=space.warnings.append),
         )
 
     if isinstance(node, Expand):
@@ -197,7 +166,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],
-            tokens=tmul(left.tokens, right.tokens),
         )
 
     if isinstance(node, IndexPreservingProduct):
@@ -210,7 +178,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],
-            tokens=tmul(left.tokens, right.tokens),
         )
 
     if isinstance(node, Reduce):
@@ -237,7 +204,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],
-            tokens=tmul(left.tokens, right.tokens),
         )
 
     if isinstance(node, Power):
@@ -257,7 +223,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             incidence=base.incidence | exp.incidence,
             children=[base, exp],
             # Symbolic exponent — token scaling not computable → untracked.
-            tokens=None,
+
         )
 
     if isinstance(node, MaxMin):
@@ -280,7 +246,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=a.incidence | b.incidence,
             children=[a, b],
-            tokens=tadd(a.tokens, b.tokens, warn=space.warnings.append),
         )
 
     if isinstance(node, UFunc):
@@ -314,22 +279,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
                 "unknown ufunc unit rule %r for %s" % (rule, node.name)
             )
 
-        if rule == "retain":
-            tokens = arg.tokens
-        elif rule == "inverse":
-            tokens = arg.tokens.inverse() if arg.tokens else None
-        elif rule == "sqrt":
-            tokens = arg.tokens.square_root() if arg.tokens else None
-            if arg.tokens is not None and tokens is None:
-                space.warnings.append(
-                    "sqrt of token vector %s has odd exponents — untracked"
-                    % arg.tokens.pretty()
-                )
-        else:
-            # "none" forces dimensionless input — the output carries no
-            # token signature either; "loose" is untracked by definition.
-            tokens = None
-
         indices = list(arg.indices)
 
         return Checked(
@@ -339,7 +288,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=arg.incidence,
             children=[arg],
-            tokens=tokens,
         )
 
     if isinstance(node, Instantiate):
@@ -369,7 +317,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=frozenset(),
             children=[proto],
-            tokens=proto.tokens,
         )
 
     if isinstance(node, Integral):
@@ -397,7 +344,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             # real dependencies.
             incidence=y.incidence | xl.incidence | xu.incidence,
             children=[y, x, xl, xu],
-            tokens=tmul(y.tokens, x.tokens),
         )
 
     if isinstance(node, Product):
@@ -423,7 +369,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=arg.incidence,
             children=[arg],
-            tokens=arg.tokens,
         )
 
     if isinstance(node, Root):
@@ -447,7 +392,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             # Root solves for the LHS variable — its signature is the
             # declared one, but keep the computed body's for the warning
             # comparison in the service layer.
-            tokens=body.tokens,
+
         )
 
     if isinstance(node, TotalDiff):
@@ -460,7 +405,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=x.incidence | y.incidence,
             children=[x, y],
-            tokens=tsub(x.tokens, y.tokens),
         )
 
     if isinstance(node, ParDiff):
@@ -473,7 +417,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=x.incidence | y.incidence,
             children=[x, y],
-            tokens=tsub(x.tokens, y.tokens),
         )
 
     if isinstance(node, ReduceSum):
@@ -490,7 +433,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=arg.incidence,
             children=[arg],
-            tokens=arg.tokens,
         )
 
     if isinstance(node, Call):
@@ -507,7 +449,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             label=space.new_temp(),
             incidence=frozenset(incidence),
             children=args,
-            tokens=None,
         )
 
     raise VarError("unknown node type: %s" % type(node).__name__)

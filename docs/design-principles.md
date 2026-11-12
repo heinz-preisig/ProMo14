@@ -34,32 +34,31 @@ equations, never expression-valued cells.
 *Decision:* user-ruled 2026-10-28 (`docs/value-expression.md` records the
 rejection after an implemented-then-reverted attempt).  Do not re-propose.
 
-## 3. The token model — three layers, each answering a different question
+## 3. Tokens describe semantic connectivity, not a second equation algebra
+
+Amended 2026-11-12 (discussion §38): token declarations answer which
+networks may connect and which physical mechanisms move or are driven by
+which quantities. They are not manually coordinated exponent vectors.
 
 | Layer | Declaration | Answers |
 |-------|-------------|---------|
-| Connection rules | `promo:sharedToken` | What *may* flow between domains? |
-| Entity types (mechanism groups) | `promo:token` on grouping types | Which token family does this mechanism move? |
-| Entity types (mechanism leaves) | `promo:drives` (set-valued) | Which effort token drives this mechanism? (§32 stage-2) |
-| Variables | `promo:carriesToken` (membership) + `promo:tokenVector` (algebraic signature) | What does this variable quantify? |
+| Connection rules | `promo:sharedToken` | What may flow between domains? |
+| Mechanism groups | `promo:token` | Which token family does this mechanism move? |
+| Mechanism leaves | `promo:drives` (set-valued) | Which effort token drives this mechanism? |
+| Variables | `promo:carriesToken` | Which networks license this variable at a connection? |
 
-**Arcs carry no token declaration** — carrier category only
-(`token-flow` vs `reference`); the token falls out of entity types and
-licensing rules.  Direction and token were relocated off the arc
-deliberately (§15/§23 of the design discussion).
+**Arcs declare no token** — carrier category only. The connected entity
+semantics and ontology rules determine what the connection means.
+Membership matching uses token ancestry comparability and the declared
+carrier kind. Units and indices remain the equation algebra's checked
+signature; membership neither generates nor constrains token exponents.
 
-Key rules (all test-enforced — incl. on persisted data via
-`test_data_variable_token_consistency`):
-- Membership (`carriesToken`) and signature (`tokenVector`) are
-  independent (amended 2026-11-11, discussion §35): a licensed member
-  may have an explicitly empty signature, and a composite signature
-  may contain terms beyond membership.  Neither contains the other.
-- `tokenVector` is derivable from the defining equation's rhs via the
-  checker (`TokenVec` propagates exponents through operators);
-  `carriesToken` remains a semantic, user-confirmed choice.
-- Ports license via token **ancestry comparability** (`promo:parent` on
-  tokens), filtered by `tokenKind`→carrier (`conserved`→token-flow,
-  `reference`→reference).
+Manual `tokenVector` authoring, propagation, signature-driven membership,
+membership-to-vector defaults and token-signature advisories have been
+removed. Existing stored vectors are inactive metadata, retained without
+bulk data migration; they do not affect checking or connection licensing.
+The previous implementation and API-saved artefacts are preserved at Git
+tag **`archive/token-signature-algebra`** (checkpoint `bcbf22f`).
 
 ## 4. What carries tokens and what does not — the neutrality ruling
 
@@ -79,21 +78,9 @@ records token-free and strips legacy declarations at load (floor
 migration — file-level strips alone get resurrected);
 `test_graph_store` asserts neutrality.
 
-*Leaf semantics (ruled 2026-11-10):* an absent `tokenVector` is
-**untracked** — it poisons every product it touches so missing
-declarations stay loud.  Two cases read as **verified-empty**
-instead (neutral by definition, no declaration needed):
-
-- a bound `promo:value` — a literal number carries no token
-  (`half`/`one`/`zero` hold no classifications, so the kind
-  projection can't see them);
-- bound-value kinds `constant`/`parameter` — the same `BOUND_KINDS`
-  projection the `Instantiate` gate uses.
-
-An explicit `tokenVector` declaration always wins (a token-bearing
-parameter like a heat capacity declares it).  `{}` is a third,
-explicit state — *verified-neutral by declaration* — and persists
-through `add_variable` (2026-11-10 fix: `if tv:` used to drop it).
+The neutrality ruling concerns meaningful network membership; it does not
+require users to encode algebraic cancellation or coefficient exponents.
+Equation checking uses units and indices (amended 2026-11-12, §38).
 
 ## 5. Mass granularity is a model-objective choice
 
@@ -127,11 +114,9 @@ edits.  Guards enforce **conscious** semantic change:
 
 - **Additive token declarations exempt** from the structural lock —
   declaring tokens on an untracked var changes no equation semantics.
-- **Altering/removing carriesToken** on an equation-referenced var
-  409s — membership changes what port licensing derives.  The
-  **tokenVector alone is exempt** (ruled 2026-11-11): the signature
-  feeds only advisories — nothing gates on it — so signature-only
-  edits are the sanctioned fix path for token advisories.
+- **Altering/removing carriesToken** on an equation-referenced variable
+  remains guarded: membership affects port licensing. The simplification
+  does not silently reclassify existing variables or bypass this lock.
 - **Fixed signature on used variables** (ruled 2026-11-11): an unused
   variable may be redefined; a used variable must keep its units and
   index structures — every equation attached or rewritten on it must
@@ -146,28 +131,10 @@ edits.  Guards enforce **conscious** semantic change:
 - Detached/orphaned resources get swept via
   `DELETE /api/equation/equations/{iri}` (added 2026-11-05 for the
   E_2/E_3 shadow cleanup).
-- **Write-path token guard** (ruled 2026-11-10, amended 2026-11-11):
-  `portVariable` without `carriesToken` and `tokenVector` without
-  `carriesToken` 400 on POST/PUT `/api/equation/variables`; an absent
-  `tokenVector` defaults to `{member: 1}`.  Membership and signature
-  are otherwise *decoupled* — an explicit empty `tokenVector` is
-  **membership-without-signature** (licensed, algebraically neutral)
-  and composite signatures may name networks the variable is not
-  licensed for (a mass-flow signs `{mass,time}` on mass membership).
-- **Canonical tokenVector keys** (ruled 2026-11-11): the fragment is
-  the token identity — `TokenVec.from_dict`/`single` canonicalise all
-  accepted key forms (full IRI, `token_mass`, bare `mass`) to the
-  stripped fragment.  Mixed-key storage had produced a ghost basis
-  element (`inv(rho)·fmc` derived `{mass⁻¹ mass time⁻¹}` because
-  `…#token_mass` and `token_mass` never cancelled).  Derived
-  signatures, `/check` output and adopt_derived writes now all emit
-  fragment keys; stored literals in any form still read correctly.
-- **Structured advisories carry fixes** (ruled 2026-11-11):
-  `/api/equation/check` returns `advisories` as
-  `{code, message, cause, fixes[]}` — `clear_signature` writes `{}`
-  on a contributing operand, `adopt_derived` writes the derived
-  signature on the LHS var; the check panel offers them behind an
-  impact confirm (the §18 reference list).
+- **Write-path membership guard** (amended 2026-11-12): a connectable
+  variable (`portVariable`) requires `carriesToken`. Membership creates no
+  algebraic signature. Existing vector metadata is preserved but ignored
+  by the checker; no automatic declaration migration is performed.
 
 *Benign delta class:* a stale line may show live-only vocabulary
 self-declarations (`a rdf:Property`/`rdfs:Class` stamps the serializer
@@ -314,25 +281,19 @@ unphysical, whatever the capacities' sizes.
 
 ---
 
-## 15. Construction rules and global consistency checks complement each other
+## 15. Construction rules and global structural checks complement each other
 
-Ruled 2026-11-11 (discussion §36): equation definition/deletion rules
-maintain consistency during construction; lower-triangular dependency
-ordering is a structural invariant. Token association cannot be enforced
-with the same sharpness. The membership/signature distinction remains
-settled; an explicit consistency audit is therefore necessary.
+Amended 2026-11-12 (discussions §36, §38): definition/deletion rules and
+lower-triangular ordering maintain consistency during construction. The
+explicit equation-editor audit rechecks the selected artefact and pinned
+scope for expression validity, units and index conformity.
 
-The equation editor provides a global check over the selected artefact
-and its pinned scope, using the backend's existing checker. Structural
-errors, token advisories, untracked results and consistent equations are
-reported separately. Untracked is not a successful token check.
-
-Corrections are explicit, impact-previewed and confirmed. Feasible token
-signature changes may be applied without changing membership, units,
-indices or authored expressions. Frozen resources, owning-graph boundaries
-and stale reports remain guarded. Corrections recheck the full scope;
-there is no automatic "make all declarations agree" operation. Control
-semantics remains a separate discussion.
+The report distinguishes structural errors from structurally consistent
+equations, exposes operand declarations and links to owning authoring
+surfaces. It is read-only; it does not certify physical meaning, connection
+licensing, solver solvability or assignment closure. Local edits make a
+report stale. Token-signature categories and correction writes are removed;
+authored equations and declarations are never rewritten to silence errors.
 
 ## 16. Information processing uses unidirectional signals
 
@@ -340,6 +301,12 @@ User-ruled 2026-11-12 (discussion §37): control, or information processing,
 operates solely on **unidirectional signals**. Observation and manipulation
 are **earmarked signals**, primarily marking interaction with the physical
 system rather than ordinary internal information processing.
+
+Control signals are **normalised and dimensionless**. Generic controllers
+define signal inputs/outputs, not observation/manipulation variables; those
+roles belong to model connections. This does not erase physical time units
+from time constants or integration coordinates. General information
+processing beyond control remains an open design question.
 
 - **Observation** reads a physical quantity into a signal, through an
   instrument in real-world systems. It may read a state, secondary state
@@ -353,9 +320,9 @@ system rather than ordinary internal information processing.
   every controller input/output. Internal connections carry signals;
   unidirectional connections may compose into a feedback loop.
 
-*Implementation boundary:* ontology representation and existing token
-signatures still require explicit alignment. This ruling does not
-implicitly change user equations or declarations.
+*Implementation boundary:* connection-role derivation and transport-only
+actuation licensing still need alignment. Existing controller memberships
+are not automatically migrated; user equations remain untouched.
 
 ## Open deviations / known gaps
 
@@ -438,12 +405,9 @@ implicitly change user equations or declarations.
   with phantom closures: ruled, partial — the overlay
   (`_phantom_overlay`) materializes phantom peers for severed and
   authored terminals; evaluate-on-use items remain open.
-- **Token declaration surface vs algebra** — opened and ruled
-  2026-11-11 (discussion doc §35): `carriesToken` + `tokenVector` +
-  the port⇒token guard + the §18 lock interact into a trap the V_23
-  incident exposed — a forced mass membership on a geometry port
-  token-neutralised every equation through it, unfixable in the UI.
-  Ruled for fix mechanics over redesign: membership-without-
-  signature legal, `token_vector` exempt from §18, advisories carry
-  structured fixes.  Still open: the wider surface question
-  (derived-only `tokenVector`, ports-only declaration).
+- **Existing token declarations and physical-interface licensing** —
+  generic controller variables may still carry observation/manipulation
+  memberships from earlier authoring. Correction requires explicit impact
+  review, not automatic data rewriting. The actuation rule still needs a
+  transport-target constraint; no persisted role sticker is needed where
+  the role can be derived. General information processing remains open.

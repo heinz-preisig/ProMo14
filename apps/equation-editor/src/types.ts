@@ -119,45 +119,9 @@ export interface CheckResponse {
   indices?: string[] | null
   incidence?: string[] | null
   label?: string | null
-  /** §24 computed token signature (null = untracked). */
-  tokens?: Record<string, number> | null
-  tokens_pretty?: string | null
-  /** §24 advisories — warnings never block. */
-  warnings?: string[]
-  /** §24 structured advisories — ``{code, message, cause, fixes}``
-   *  (ruled 2026-11-11): warnings carry remediation, not just
-   *  diagnosis. */
-  advisories?: TokenAdvisory[]
   error?: string | null
   error_kind?: string | null
   candidates?: Array<Record<string, unknown>> | null
-}
-
-/** A concrete remediation action offered by a structured advisory. */
-export interface TokenFix {
-  action: 'clear_signature' | 'adopt_derived' | string
-  /** Variable record IRI the fix writes to. */
-  variable?: string | null
-  /** Replacement tokenVector (adopt_derived). */
-  token_vector?: Record<string, number> | null
-  /** Button label. */
-  label: string
-}
-
-/** A structured §24 advisory — ``cause`` names the operands or the
- *  declaration that produced it; ``fixes`` are concrete actions the UI
- *  may apply. */
-export interface TokenAdvisory {
-  code: string
-  message: string
-  cause?: {
-    operands?: { iri: string | null; label: string; pretty: string }[]
-    variable?: string | null
-    label?: string
-    declared?: Record<string, number>
-    derived?: Record<string, number> | null
-  }
-  fixes?: TokenFix[]
 }
 
 /** promo:Token catalogue entry (GET /api/ontology/tokens). */
@@ -227,14 +191,14 @@ export interface SavedEquation {
 export interface ConsistencyOperand {
   iri: string
   label: string
-  tokens: Record<string, number> | null
+  units: number[]
+  indices: string[]
   graphs: string[]
 }
 
 export interface ConsistencyFinding {
   code: string
   message: string
-  fixes: (TokenFix & { blocked?: string | null })[]
 }
 
 export interface ConsistencyRow {
@@ -245,11 +209,10 @@ export interface ConsistencyRow {
   network: string
   graphs: string[]
   rhs: string
-  status: 'error' | 'advisory' | 'untracked' | 'consistent'
-  declared: { units: number[]; indices: string[]; tokens: Record<string, number> | null }
-  derived: { units: number[]; indices: string[]; tokens: Record<string, number> | null } | null
+  status: 'error' | 'consistent'
+  declared: { units: number[]; indices: string[] }
+  derived: { units: number[]; indices: string[] } | null
   operands: ConsistencyOperand[]
-  conflicts: { expression: string; tokens: Record<string, number> }[][]
   findings: ConsistencyFinding[]
 }
 

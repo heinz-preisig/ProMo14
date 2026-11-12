@@ -1,6 +1,6 @@
 # Equation Editor Overview
 
-Living — realigned to rulings through 2026-11-11.
+Living — realigned to rulings through 2026-11-12.
 
 ## Role in the suite
 
@@ -103,8 +103,8 @@ a foundation or a dependent variable (amended 2026-11-11, §34).
    Optionally set a **LaTeX symbol**.
 3. In the body, enter the **SI unit vector**, select the **index
    structures** from the ProMo ontology indices (each index shows its
-   `short_name`, e.g. `N` for `node`), and declare **tokens**
-   (carriesToken + token vector).  **Port (connectable)** marks the
+   `short_name`, e.g. `N` for `node`), and select **Connection networks**
+   for membership licensing (no exponent entry).  **Port (connectable)** marks the
    variable as connectable across an entity boundary.
 4. Click **Save variable** — enabled once name and domain are
    set. The variable appears in the left palette.
@@ -118,7 +118,7 @@ A dependent variable is defined by a checked RHS expression over existing variab
 2. In the editor header, select a **domain / network**, a **variable
    class**, and enter the **LHS name** (same identifier rules as port
    variables).  Optionally set a **LaTeX symbol**.  Units, index
-   structures and the token vector are **not** picked here — they
+   structures are **not** picked here — they
    derive from the checked expression; the **Port (connectable)**
    flag remains available for cross-entity supply (§34).
 3. Type the RHS expression using the variable palette and the operator/function buttons.
@@ -150,7 +150,9 @@ variables.
 ### 3. Inspecting, editing and deleting variables
 
 - Click any variable in the left palette to open a **detail popup** with its IRI, network, class, units, index structures (`short_name` + label), and defining equation.  The lock banner also lists **which equations reference it** — its own definitions (`lhs`) versus foreign uses inside another variable's rhs.
-- Token **advisories** under a check result carry structured **fixes** (ruled 2026-11-11): e.g. an empty token signature offers "Declare 'V' signature-neutral (keep membership)" per contributing operand; clicking a fix shows the impacted equations (the reference list) before applying.  Signature-only writes pass the §18 lock; membership (`carriesToken`) stays locked — licensed-but-neutral membership (`carriesToken` + empty `tokenVector`) is legal.
+- **Connection networks** selects membership independently of equations and
+  units. No token signature is authored, derived or repaired. Existing
+  stored token vectors are inactive metadata (amended 2026-11-12, §38).
 - Click the `×` next to a variable to delete it.  The editor computes and shows the **cascade impact**: all dependent variables and equations that will be removed because they depend on the target directly or indirectly.
 - The **Debug equation context (JSON)** popup (opened from the right pane) lets advanced users edit variables, indices, the network tree, and the active expression network directly.  Click **Apply** to load the edited context back into the editor.
 
@@ -253,40 +255,24 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
   agreed requirements for compact language semantics and canonical IRI-bound
   expression storage.
 
-### Token signature key identity (2026-11-11)
-
-Token algebra normalises full token IRIs, `token_mass`-style keys and
-bare fragments to the same fragment identity (`mass`).  Mixed persisted
-key forms therefore cancel correctly; check results and adopted derived
-signatures emit canonical fragment keys.  Membership declarations remain
-separate from these advisory algebraic signatures.
-
-
 ## Global consistency check
 
-Use **Check consistency…** in the header to check all equations in the
-selected artefact and its pinned scope. The report opens inside the editor
-and distinguishes structural errors, token advisories, untracked results
-and consistent equations. An untracked result is not a verified token pass.
-This complements the definition/deletion construction rules; it does not
-replace them (ruled 2026-11-11, discussion §36).
+Use **Check consistency…** to recheck all equations in the selected artefact
+and pinned scope for expression validity, units and index conformity. The
+read-only report separates **error** and **consistent** results. Expand a
+row to inspect units, indices and operand declarations; open the variable,
+equation or owning artefact to make an explicit correction. Edits mark the
+report stale; **Check / recheck** refreshes it.
 
-Expand a result to inspect its expression, owner artefact, declared/derived
-signatures, conflicting terms and operand declarations. Open the relevant
-variable or equation directly; owning-artefact links let you correct a pin
-at its source instead of creating a local shadow.
+There are no token-signature advisories, untracked-token categories or
+signature-fix writes. Structural consistency is not proof of physical
+meaning, connection validity or assignment closure. No equation rewrite or
+membership migration is automatic (amended 2026-11-12, discussion §38).
 
-Where feasible, a suggested token signature correction offers an impact
-preview and confirmation. The preview lists potentially affected equations
-through the in-scope dependency chain and direct references across artefacts.
-Apply changes only the signature, then rechecks the full scope. Membership,
-units, indices and equations remain unchanged. Suggestions are not proof of
-semantic correctness: inspect the cause before adopting a derived result.
-Alternative definitions that disagree, frozen resources, missing membership
-or a foreign owning graph block application and explain the next step.
+## Archived token-signature implementation
 
-Edits make the report out of date; **Check / recheck** refreshes it. The
-backend independently rejects a stale correction. Corrections update the
-in-memory store; use **Save** to persist them. Structural problems still
-require authoring decisions—there is no automatic equation rewrite or
-"fix everything" button. Control semantics is unchanged.
+Git tag `archive/token-signature-algebra` at checkpoint `bcbf22f` preserves
+the former exponent algebra, editor, advisories, confirmed fixes, tests and
+API-saved artefacts. Discussion §38 records the reason for removal and
+criteria for revival. Normal equation authoring now uses units, indices,
+network membership and authored expressions without a second token algebra.

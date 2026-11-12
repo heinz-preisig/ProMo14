@@ -111,60 +111,6 @@ export function kindSummary(
   return parts.join(' · ')
 }
 
-/** §24 token-neutrality ruling projected from classifications:
- *  physical ``state|effort|flow|reaction`` carry a conserved token;
- *  information ``state|input|output`` carry a reference token;
- *  ``constant|parameter|frame`` are neutral.  Term ancestry counts
- *  (``fundamental-state`` inherits ``state``); bound-value terms win
- *  over function/role — a constant or parameter is neutral whatever
- *  else is picked. */
-export interface TokenPolicy {
-  bearing: boolean
-  family: 'conserved' | 'reference' | null
-  kind: string
-}
-
-export function tokenPolicy(
-  axes: ClassificationAxis[],
-  classifications: Record<string, string>,
-): TokenPolicy {
-  const kind = kindTag(axes, classifications)
-  const labelsOf = (axis: ClassificationAxis): Set<string> => {
-    const byIri = new Map(axis.terms.map((t) => [t.iri, t]))
-    const out = new Set<string>()
-    let cur = axis.terms.find((t) => t.iri === classifications[axis.iri])
-    while (cur) {
-      out.add(cur.label)
-      cur = cur.parent ? byIri.get(cur.parent) : undefined
-    }
-    return out
-  }
-  for (const a of axes) {
-    const ls = labelsOf(a)
-    if (ls.has('constant') || ls.has('parameter')) {
-      return { bearing: false, family: null, kind }
-    }
-  }
-  for (const a of axes) {
-    const ls = labelsOf(a)
-    const functionAxis =
-      a.name === 'function' || a.iri.includes('function')
-    const roleAxis = a.name === 'role' || a.iri.includes('role')
-    if (functionAxis) {
-      if (ls.has('frame')) return { bearing: false, family: null, kind }
-      if (['state', 'effort', 'flow', 'reaction'].some((l) => ls.has(l))) {
-        return { bearing: true, family: 'conserved', kind }
-      }
-    }
-    if (roleAxis) {
-      if (['state', 'input', 'output'].some((l) => ls.has(l))) {
-        return { bearing: true, family: 'reference', kind }
-      }
-    }
-  }
-  return { bearing: false, family: null, kind }
-}
-
 /** IRI of the term labelled ``label`` on the axis named ``axisName`` —
  *  used to pre-fill picks (e.g. determination=port on port variables). */
 export function findTermIri(

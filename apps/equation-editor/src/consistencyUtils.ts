@@ -16,9 +16,3 @@ export function affectedEquations(report: ConsistencyReport, variable: string): 
   }
   return report.equations.filter((r) => affected.has(r))
 }
-
-export function signatureText(tokens: Record<string, number> | null): string {
-  if (tokens === null) return 'untracked'
-  const entries = Object.entries(tokens).filter(([, n]) => n !== 0)
-  return entries.length ? entries.map(([k, n]) => `${k}^${n}`).join(' ') : 'neutral ({})'
-}
