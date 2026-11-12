@@ -951,6 +951,11 @@ export default function App() {
             <option key={d.iri} value={d.iri}>{d.name}</option>
           ))}
         </select>
+        <label style={S.label}>Target entity type (including subtypes)</label>
+        <select style={S.select} value={draftRule.target_entity_type || ''} onChange={(e) => setDraftRule({ ...draftRule, target_entity_type: e.target.value || null })}>
+          <option value="">(any)</option>
+          {entityTypes.map((et) => <option key={et.iri} value={et.iri}>{et.label}</option>)}
+        </select>
         <label style={S.label}>Shared tokens</label>
         <div style={S.checkList}>
           {tokens.map((t) => (

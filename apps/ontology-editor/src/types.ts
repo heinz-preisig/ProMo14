@@ -162,6 +162,7 @@ export interface ConnectionRuleRecord {
   rule_type: string // label, e.g. "physical-same" | "signal" | "access" | "sensor" | "actuation"
   source_domain: string | null
   target_domain: string | null
+  target_entity_type?: string | null
   shared_tokens: string[]
   direction: string | null // "bidirectional" | "unidirectional"
   carrier: string | null // "token-flow" | "reference"

@@ -53,6 +53,11 @@ VOCAB_DOCS = {
         "(ADR-008) or a promo:ValueCell's value.  Never an expression: "
         "computed values are promo:Expression trees behind "
         "promo:rhsExpression or 'initialise'-class equations.",
+    "targetEntityType":
+        "Connection rule target entity type, including subtypes reached "
+        "through promo:parent. A constrained rule requires the caller to "
+        "supply the matching target entity type; swapped bidirectional "
+        "matches constrain the original rule target, not drawing order.",
     "drives":
         "Mechanism entity type → token(s) its driving effort carries "
         "(§32 stage-2 coupling signature).  Declared on mechanism "
@@ -95,7 +100,7 @@ SEED_CONSTANTS = (
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-11-11"
+SEED_FLOOR = "2026-11-12"
 
 # Top-level equation-class hierarchy, seeded by
 # ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for

@@ -289,8 +289,9 @@ Token membership serves connectivity, not exponent algebra. The editor
 requires no token-vector authoring or token-signature repairs. Units and
 indices remain checked. Existing vectors are retained as inactive stored
 metadata; the previous implementation is recoverable at Git tag
-`archive/token-signature-algebra` (`bcbf22f`). Physical-interface connection
-rule alignment and migration of old memberships remain explicit follow-up.
+`archive/token-signature-algebra` (`bcbf22f`). Transport-only actuation is enforced through the ontology-declared
+`targetEntityType` constraint, including descendants. Existing controller
+membership corrections remain explicit follow-up.
 
 ---
 

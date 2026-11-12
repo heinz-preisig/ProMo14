@@ -384,6 +384,7 @@ class SeedMixin:
         self._seed_equation_classes(g, base)
         self._seed_capabilities(g, base)
         self._seed_rule_mechanism_flags(g, base)
+        self._seed_actuation_target(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
@@ -713,6 +714,14 @@ class SeedMixin:
         if (rule, RDF.type, PROMO["ConnectionRule"]) not in g:
             return
         g.set((rule, PROMO["requiresMechanism"], Literal(True)))
+
+    def _seed_actuation_target(self, g: Graph, base: str) -> None:
+        rule = self.mint_iri(base, "rule_actuation")
+        target = self.mint_iri(base, "etype_transport_system")
+        if ((rule, RDF.type, PROMO["ConnectionRule"]) in g
+                and (target, RDF.type, PROMO["EntityType"]) in g
+                and g.value(rule, PROMO["targetEntityType"]) is None):
+            g.add((rule, PROMO["targetEntityType"], target))
 
     def _seed_scale_regimes(self, g: Graph, base: str) -> None:
         """Group scale levels under regime values (particulate|continuum).

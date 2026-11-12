@@ -598,6 +598,7 @@ class RdfContext(EquationContext):
                 "source_domain": str(source) if source else None,
                 "target_domain": str(target) if target else None,
                 "shared_tokens": tokens,
+                "target_entity_type": str(self._graph.value(s, PROMO["targetEntityType"])) if self._graph.value(s, PROMO["targetEntityType"]) else None,
                 "direction": str(direction) if direction else None,
                 "carrier": str(carrier) if carrier else None,
                 "scope": str(scope) if scope else None,

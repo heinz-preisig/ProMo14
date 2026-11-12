@@ -3915,3 +3915,21 @@ Regression coverage checks mixed old signature metadata no longer produces
 signal mismatch/squared-signal advisories, units remain enforced, no vector
 is defaulted from membership, metadata survives an ordinary edit, structural
 reports stay scoped/read-only and membership controls offer no exponents.
+
+
+### Transport-only actuation implementation (2026-11-12)
+
+Added generic `promo:targetEntityType` / API `target_entity_type` on
+connection rules. Resolution requires that endpoint type or a descendant;
+missing endpoint types fail closed for constrained rules. A swapped
+bidirectional match checks the rule's original target. Rule CRUD validates
+and round-trips the constraint, and the ontology editor exposes the target
+picker. No rule-name special case is introduced in the resolver.
+
+Seed floor `2026-11-12` adds a transport-system target constraint to the
+existing core actuation rule when absent, preserves an explicitly declared
+custom target and remains idempotent. Fork floors remain opt-in; frozen
+versions are untouched. Tests cover transport descendants, capacity and
+environment rejection, generic/swapped constraints, CRUD validation,
+removal and idempotent floor application. This does not reclassify existing
+controller variables or introduce a persisted sticker.

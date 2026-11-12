@@ -814,6 +814,8 @@ def create_connection_rule(
                    "Source domain")
     _require_typed(graph, record.target_domain, PROMO["Domain"],
                    "Target domain")
+    _require_typed(graph, record.target_entity_type, PROMO["EntityType"],
+                   "Target entity type")
     for tok in record.shared_tokens or []:
         _require_typed(graph, tok, PROMO["Token"], "Shared token")
     store.add_connection_rule(
@@ -824,6 +826,7 @@ def create_connection_rule(
         carrier=record.carrier,
         scope=record.scope,
         requires_mechanism=record.requires_mechanism,
+        target_entity_type=record.target_entity_type,
         source_domain=record.source_domain,
         target_domain=record.target_domain,
         shared_tokens=record.shared_tokens or [],
@@ -938,6 +941,10 @@ def resolve_connection(
         orientation = _rule_match_orientation(rule, src_chain, tgt_chain)
         if orientation is None:
             continue
+        if rule.target_entity_type:
+            endpoint = target_etype if orientation == "forward" else source_etype
+            if not endpoint or URIRef(rule.target_entity_type) not in store.ancestor_chain(graph, URIRef(endpoint)):
+                continue
         scope = rule.scope or "any"
         if scope == "same" and src_branch != tgt_branch:
             continue
@@ -1309,6 +1316,7 @@ def _list_connection_rule_records(ctx) -> List[ConnectionRuleRecord]:
                 source_domain=str(source) if source else None,
                 target_domain=str(target) if target else None,
                 shared_tokens=tokens,
+                target_entity_type=str(graph.value(s, PROMO["targetEntityType"])) if graph.value(s, PROMO["targetEntityType"]) else None,
                 direction=str(direction) if direction else None,
                 carrier=str(carrier) if carrier else None,
                 scope=str(scope) if scope else None,

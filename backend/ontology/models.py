@@ -236,6 +236,7 @@ class ConnectionRuleRecord(BaseModel):
     #: Enforcement needs the caller's etypes (`source_etype`/`target_etype`
     #: on resolve-connection); without them the check is skipped.
     requires_mechanism: bool = False
+    target_entity_type: Optional[str] = None
     description: str = ""
     #: Synthesised ``promo#ArcType/<carrier>`` — server-side on reads;
     #: clients never synthesise arc-type IRIs themselves (§26).

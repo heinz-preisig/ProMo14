@@ -617,7 +617,10 @@ def test_resolve_cross_branch(client):
     info = _domain_iri(client, "information")
     rules = _resolve(client, phys, info)
     assert [r["rule_type"] for r in rules] == ["sensor"]
-    rules = _resolve(client, info, phys)
+    assert _resolve(client, info, phys) == []
+    rules = _resolve_etypes(client, info, phys,
+                            _etype_iri(client, "Info Dynamic"),
+                            _etype_iri(client, "Convection Transport"))
     assert [r["rule_type"] for r in rules] == ["actuation"]
 
 
@@ -1409,3 +1412,66 @@ def test_catalogue_delete_artefact(client):
         "/api/catalogue/artefact",
         params={"iri": str(store.ONTOLOGY_GRAPH_IRI)},
     ).status_code == 403
+
+
+@pytest.mark.parametrize("target_label,allowed", [
+    ("Convection Transport", True), ("Heat Transport", True),
+    ("Lumped", False), ("Environment", False),
+])
+def test_actuation_requires_transport_target(client, target_label, allowed):
+    rules = _resolve_etypes(client, _domain_iri(client, "information"),
+                            _domain_iri(client, "physical"),
+                            _etype_iri(client, "Info Dynamic"),
+                            _etype_iri(client, target_label))
+    assert ("actuation" in {r["rule_type"] for r in rules}) is allowed
+
+
+def test_target_entity_constraint_is_generic_and_roundtrips(client):
+    phys = _domain_iri(client, "physical")
+    info = _domain_iri(client, "information")
+    lumped = _etype_iri(client, "Lumped")
+    controller = _etype_iri(client, "Info Dynamic")
+    response = client.post('/api/ontology/connection-rules', json={
+        'iri': '', 'rule_type': 'custom-directed-interface',
+        'source_domain': info, 'target_domain': phys,
+        'target_entity_type': lumped, 'direction': 'bidirectional',
+        'carrier': 'reference', 'scope': 'cross',
+        'shared_tokens': [_token_iri(client, 'Signal')],
+    })
+    assert response.status_code == 200, response.text
+    iri = response.json()['iri']
+    rules = client.get('/api/ontology/connection-rules').json()
+    assert next(r for r in rules if r['iri'] == iri)['target_entity_type'] == lumped
+    assert iri in {r['iri'] for r in _resolve_etypes(client, info, phys, controller, lumped)}
+    assert iri in {r['iri'] for r in _resolve_etypes(client, phys, info, lumped, controller)}
+    assert iri not in {r['iri'] for r in _resolve_etypes(client, phys, info,
+                      _etype_iri(client, 'Environment'), controller)}
+    response = client.post('/api/ontology/connection-rules', json={
+        **response.json(), 'target_entity_type': None,
+    })
+    assert response.status_code == 200, response.text
+    assert iri in {r['iri'] for r in _resolve(client, info, phys)}
+
+
+def test_target_entity_constraint_rejects_untyped_target(client):
+    response = client.post('/api/ontology/connection-rules', json={
+        'iri': '', 'rule_type': 'invalid-target',
+        'target_entity_type': _domain_iri(client, 'physical'),
+    })
+    assert response.status_code == 422
+
+
+def test_actuation_floor_idempotent_and_preserves_explicit_target(client):
+    store = graph_store.get_store()
+    graph = store.ontology_graph
+    rule = URIRef('https://w3id.org/promo/ontology#rule_actuation')
+    predicate = graph_store.PROMO['targetEntityType']
+    target = URIRef('https://w3id.org/promo/ontology#etype_transport_system')
+    assert graph.value(rule, predicate) == target
+    before = set(graph)
+    store.apply_seed_floor(graph, str(graph.identifier))
+    assert set(graph) == before
+    custom = URIRef(_etype_iri(client, 'Convection Transport'))
+    graph.set((rule, predicate, custom))
+    store.apply_seed_floor(graph, str(graph.identifier))
+    assert graph.value(rule, predicate) == custom

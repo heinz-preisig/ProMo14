@@ -896,6 +896,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
         carrier: Optional[str] = None,
         scope: Optional[str] = None,
         requires_mechanism: bool = False,
+        target_entity_type: Optional[Union[str, URIRef]] = None,
         description: str = "",
     ) -> URIRef:
         """Add a connection rule definition to the graph."""
@@ -909,6 +910,9 @@ class RdfStore(PersistenceMixin, SeedMixin):
             self._set_literal(graph, iri, PROMO["scope"], scope)
         self._set_literal(graph, iri, PROMO["requiresMechanism"],
                           requires_mechanism)
+        graph.remove((iri, PROMO["targetEntityType"], None))
+        if target_entity_type is not None:
+            graph.add((iri, PROMO["targetEntityType"], URIRef(target_entity_type)))
         if source_domain is not None:
             if isinstance(source_domain, str):
                 source_domain = URIRef(source_domain)

@@ -259,9 +259,9 @@ Implemented as a React + TypeScript + Vite app in
 ## Pending items
 
 - **Control interfaces:** normalised, dimensionless signals are ruled.
-  Transport-only actuation licensing and derived observation/manipulation
-  roles at model connections need alignment; broader information processing
-  remains open.
+  Transport-only actuation licensing is implemented via the ontology rule
+  target constraint. Existing controller membership corrections and role
+  display remain separate; broader information processing remains open.
 - **Scoped data ownership:** shutdown save exposed `p_term` and `V` records
   under library IRIs in both ontology/library graphs with different token
   signatures. Inspect ownership and migration/write behaviour before cleanup;

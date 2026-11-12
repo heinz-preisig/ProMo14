@@ -320,9 +320,17 @@ processing beyond control remains an open design question.
   every controller input/output. Internal connections carry signals;
   unidirectional connections may compose into a feedback loop.
 
-*Implementation boundary:* connection-role derivation and transport-only
-actuation licensing still need alignment. Existing controller memberships
-are not automatically migrated; user equations remain untouched.
+*Encoded (2026-11-12):* the actuation rule declares
+`promo:targetEntityType` = the transport-system type. Resolution checks the
+target's ancestry, including for swapped bidirectional rules; missing
+endpoint type information does not license a constrained rule. This is a
+generic ontology constraint, not a hardcoded actuation exception. The seed
+floor adds the constraint to the core rule when absent; explicit custom
+targets are preserved. Frozen ontology versions are not migrated.
+
+*Implementation boundary:* role display remains derived from connection
+rules; no separate persisted sticker is introduced. Existing controller
+memberships are not automatically migrated; user equations remain untouched.
 
 ## Open deviations / known gaps
 
@@ -408,6 +416,6 @@ are not automatically migrated; user equations remain untouched.
 - **Existing token declarations and physical-interface licensing** —
   generic controller variables may still carry observation/manipulation
   memberships from earlier authoring. Correction requires explicit impact
-  review, not automatic data rewriting. The actuation rule still needs a
-  transport-target constraint; no persisted role sticker is needed where
-  the role can be derived. General information processing remains open.
+  review, not automatic data rewriting. Transport-target actuation licensing
+  is implemented; no persisted role sticker is needed where the role can
+  be derived. General information processing remains open.

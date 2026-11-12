@@ -733,6 +733,11 @@ applicable to a domain pair:
   `scope=cross` can never apply — cross-branch pairs share no tokens.
   `physical-same` covers all intra-physical continuity, including the
   different-subdomain (liquid–gas) case the old name referred to.
+- A rule may constrain `promo:targetEntityType` (API `target_entity_type`):
+  the target entity must be that type or a descendant. Missing endpoint
+  types do not satisfy a constrained rule. Swapped bidirectional matches
+  constrain the original rule target. The seeded actuation rule targets
+  the transport-system type, never a capacity (2026-11-12, §16).
 - Results are ordered most-specific first (closest ancestor wins over
   wildcard rules).
 
