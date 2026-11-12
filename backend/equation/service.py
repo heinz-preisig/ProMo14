@@ -401,6 +401,15 @@ def _build_space(req: CheckRequest) -> CompileSpace:
     )
 
 
+@router.post("/parse", response_model=ParseResponse)
+def parse_endpoint(req: ParseRequest) -> ParseResponse:
+    try:
+        node = parse(req.text)
+    except ParseError as e:
+        return ParseResponse(ok=False, error=str(e))
+    return ParseResponse(ok=True, ast=node_to_dict(node))
+
+
 @router.post("/check", response_model=CheckResponse)
 def check_endpoint(req: CheckRequest) -> CheckResponse:
     space = _build_space(req)
