@@ -552,9 +552,6 @@ export default function DependentVariableEditor({
                   : 'New variable'}
             </h3>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              {!isFoundation && acceptBlockReason && (
-                <span style={{ fontSize: 11, color: '#b8860b' }}>{acceptBlockReason}</span>
-              )}
               <button type="button" onClick={onClose}>
                 Cancel
               </button>
@@ -588,6 +585,20 @@ export default function DependentVariableEditor({
               )}
             </div>
           </div>
+
+          {/* Row 1a: blocked-state reason — its own line, loud. */}
+          {!isFoundation && acceptBlockReason && (
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 'bold',
+                color: '#b8860b',
+                marginBottom: 10,
+              }}
+            >
+              {acceptBlockReason}
+            </div>
+          )}
 
           {/* Row 1b: creation-mode switch — decides which panels the
                dialog offers (new variables only; attaching an equation

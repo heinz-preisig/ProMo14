@@ -45,6 +45,9 @@ export default function App() {
   // Async save/load failures — stays up until dismissed (unlike saveMsg
   // which auto-clears); without this a failed POST is invisible.
   const [saveErr, setSaveErr] = useState('')
+  // Transient "written to the library" confirmation — every
+  // saveEditedVariable call sets it; auto-clears after a few seconds.
+  const [savedNotice, setSavedNotice] = useState('')
   // Host capability from /context — false when the backend has no TeX
   // toolchain (e.g. default Docker image); gates the PDF doc link.
   const [pdfCapable, setPdfCapable] = useState(false)
@@ -80,6 +83,13 @@ export default function App() {
       })
   }, [])
 
+  // Auto-clear the save confirmation — re-armed on each save.
+  useEffect(() => {
+    if (!savedNotice) return
+    const t = setTimeout(() => setSavedNotice(''), 6000)
+    return () => clearTimeout(t)
+  }, [savedNotice])
+
   // Persist an edited variable (detail dialog + inline table edits);
   // an optional equation is appended to the variable's equations.
   // Errors propagate so the caller can show the 409 lock message.
@@ -103,6 +113,11 @@ export default function App() {
         : prev,
     )
     refreshDirty()
+    setSavedNotice(
+      eq
+        ? `${eq.id} saved — ${v.label} recorded in the library`
+        : `${v.label} recorded in the library`,
+    )
   }, [refreshDirty, variables])
 
   // Equation editor accept — covers both "new dependent variable" and
@@ -469,6 +484,31 @@ export default function App() {
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Save confirmation — a variable/equation write landed in the
+          in-memory store; click or ~6 s to dismiss. */}
+      {savedNotice && (
+        <div
+          role="status"
+          onClick={() => setSavedNotice('')}
+          style={{
+            position: 'fixed',
+            right: 24,
+            bottom: 24,
+            zIndex: 2000,
+            padding: '14px 20px',
+            background: '#2e7d32',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 'bold',
+            borderRadius: 6,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+            cursor: 'pointer',
+          }}
+        >
+          ✓ {savedNotice}
         </div>
       )}
 
