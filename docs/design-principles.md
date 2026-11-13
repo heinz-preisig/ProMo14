@@ -149,16 +149,22 @@ Different index sets bind positionally (flat) — required by loop
 residuals.  `subIndexOf` partitions are the mechanism sub-indices
 (`idx_arc_convection` ⊂ `idx_arc_mass` ⊂ `idx_arc`); the checker
 contracts by exact IRI only — sibling contraction is a known open gap
-(`E_29`).
+(`E_29`).  The infix contraction `*` requires operands to share
+**exactly one** index IRI and contracts it implicitly; when operands
+share several (or none of the right ones), the explicit-index forms
+`reduceSum(body, K)` / `Product(body, K)` name the index to eliminate
+(clarified 2026-11-12 — `E_42`: `reduceSum(F_diff . fnd, A_diff)`
+reduces `A_diff` while `N,S` survive).
 
 ## 9. Species distribution is computed, not declared
 
 The §20 fixpoint engine (`instantiate/distribute.py`) computes per-node/
-arc species sets `S` and active-reaction sets `Q` from topology and
+arc species sets `S` and active-reaction sets `K` from topology and
 capability declarations — species ride *on* mass-family arcs rather
 than getting their own network.  Stoichiometry ν is a parameter-class
-variable indexed `[Q,S]`, valued at instantiation — scheme equations
-need no coefficient slots.
+variable indexed `[S,K]`, valued at instantiation — scheme equations
+need no coefficient slots.  (Reaction index renamed `q`→`K`,
+2026-11-12 — ProMo12 convention `N_{S,K}`.)
 
 ## 10. No OWL — RDFS only
 

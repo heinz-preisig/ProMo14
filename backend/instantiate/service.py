@@ -611,7 +611,7 @@ def _species_index_iri(store, model_graph) -> Optional[str]:
 
 
 def _reaction_index_iri(store, model_graph) -> Optional[str]:
-    """The ``Q`` index — ``indexClass "conversion"`` (reactions carry
+    """The ``K`` index — ``indexClass "conversion"`` (reactions carry
     no token; the class is the discriminator)."""
     for gi in store.resolution_scope(model_graph.identifier):
         g = store.dataset.graph(gi)
@@ -691,7 +691,7 @@ def _species_distribution(store, model_graph, species_graph_iri
 
 class SpeciesDistributionOut(BaseModel):
     """§20 readout: species present per node / carried per arc, and
-    the active reaction set per node (the ``Q`` index's elements)."""
+    the active reaction set per node (the ``K`` index's elements)."""
     species: Optional[str] = None   # resolved species artefact IRI
     nodes: Dict[str, List[str]] = {}
     arcs: Dict[str, List[str]] = {}
