@@ -43,6 +43,8 @@ def _space():
             type="constant", value="0.5"),
         var("http://promo.example/var/alpha", "V_11", "alpha", Units(),
             [T, N], type="parameter"),
+        var("http://promo.example/var/beta", "V_12", "beta", Units(),
+            [N, T], type="parameter"),
     ]}
     indices = {i.iri: i for i in [t_idx, n_idx]}
     return CompileSpace(
@@ -211,6 +213,19 @@ def test_julia_elementwise_alignment():
     assert gen("alpha . N", "julia") == \
         "V_11 .* (_x -> reshape(_x, 1, size(_x, 1)))(V_4)"
     assert gen("rho . v", "julia") == "V_1 .* V_2"
+
+
+def test_add_aligns_same_set_different_order():
+    """alpha[T,N] + beta[N,T] (ruled 2026-11-13): the right operand is
+    permuted onto the result axes for position-bound targets; matlab
+    binds by label, no permute."""
+    assert gen("alpha + beta", "python") == \
+        "V_11 + np.transpose(V_12, (1, 0))"
+    assert gen("beta + alpha", "python") == \
+        "V_12 + np.transpose(V_11, (1, 0))"
+    assert gen("alpha + beta", "julia") == \
+        "V_11 + permutedims(V_12, (2, 1))"
+    assert gen("alpha + beta", "matlab") == "V_11 + V_12"
 
 
 def test_matlab_reduce_sum_labels():

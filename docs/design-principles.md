@@ -145,6 +145,10 @@ emits per line) until its next save — seen on model-2/model-3 in the
 
 Index conformity is checked by index **IRI sets** (ordered-union);
 `dialect.permute` normalizes operand order to the declared lhs order.
+Element-wise `+`/`-` likewise conform by set (ruled 2026-11-13):
+the result order follows the left operand and the renderer permutes
+the right one (`_align`) for position-bound targets — matlab binds by
+label.  A differing index set still fails.
 Different index sets bind positionally (flat) — required by loop
 residuals.  `subIndexOf` partitions are the mechanism sub-indices
 (`idx_arc_convection` ⊂ `idx_arc_mass` ⊂ `idx_arc`); the checker

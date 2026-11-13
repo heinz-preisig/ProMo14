@@ -127,7 +127,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
         left = check(node.left, space, lhs)
         right = check(node.right, space, lhs)
         units = left.units + right.units  # UnitError on mismatch (old order)
-        if left.indices != right.indices:
+        if left.index_set() != right.index_set():
             raise IndexStructureError(
                 "add incompatible index structures %s %s %s"
                 % (

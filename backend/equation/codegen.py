@@ -317,7 +317,14 @@ class Renderer:
                     left = "%s.toarray()" % left
                 elif rs and not ls:
                     right = "%s.toarray()" % right
-            return "%s %s %s" % (left, node.op, right)
+            # Same-set different-order operands are legal — lay each on
+            # the result's axes (permute for python/julia; matlab and
+            # latex bind by name/order already).
+            return "%s %s %s" % (
+                self._align(left, ch[0], c.indices),
+                node.op,
+                self._align(right, ch[1], c.indices),
+            )
 
         if isinstance(node, Expand):
             left, right = self.render(ch[0]), self.render(ch[1])

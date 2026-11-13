@@ -425,13 +425,26 @@ def test_expand_order_is_left_then_right():
     assert c.indices == [T, N]
 
 
-def test_add_requires_same_index_order():
-    """[T,N] + [N,T] is rejected — the sequence IS the structure."""
+def test_add_same_set_any_order_conforms():
+    """[T,N] + [N,T] conforms (ruled 2026-11-13): the set is the
+    structure; the result order follows the left operand and emission
+    permutes the right one (§8)."""
     space = _space()
     _add_var(space, "w1", Units(), [T, N])
     _add_var(space, "w2", Units(), [N, T])
+    c = check(parse("w1 + w2"), space)
+    assert c.indices == [T, N]
+    c = check(parse("w2 - w1"), space)
+    assert c.indices == [N, T]
+
+
+def test_add_different_set_rejected():
+    """[T,N] + [N] still fails — a different set is a real mismatch."""
+    space = _space()
+    _add_var(space, "w1", Units(), [T, N])
+    _add_var(space, "w3", Units(), [N])
     try:
-        check(parse("w1 + w2"), space)
+        check(parse("w1 + w3"), space)
     except IndexStructureError:
         return
     raise AssertionError("expected IndexStructureError")
