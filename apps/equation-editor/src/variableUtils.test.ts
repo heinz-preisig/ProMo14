@@ -20,11 +20,14 @@ describe('signatureMismatch — §18 fixed-signature rule', () => {
     expect(signatureMismatch(declared, derived)).toEqual(['units'])
   })
 
-  it('flags differing index structures, including order', () => {
+  it('flags differing index sets — order is canonical, not signature (§8)', () => {
     const declared = { units: ZERO, index_structures: [IDX_N, IDX_A] }
+    // Same set, different order conforms: declaration order is the
+    // canonical axis order and dialect.permute normalizes on bind.
     expect(
       signatureMismatch(declared, { units: ZERO, indices: [IDX_A, IDX_N] }),
-    ).toEqual(['index structure'])
+    ).toEqual([])
+    // A different set is a real mismatch.
     expect(
       signatureMismatch(declared, { units: ZERO, indices: [IDX_N] }),
     ).toEqual(['index structure'])

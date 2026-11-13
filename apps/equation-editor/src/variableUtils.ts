@@ -29,8 +29,8 @@ export function signatureMismatch(
   }
   if (
     derived.indices &&
-    JSON.stringify(derived.indices) !==
-      JSON.stringify(declared.index_structures ?? [])
+    JSON.stringify([...derived.indices].sort()) !==
+      JSON.stringify([...(declared.index_structures ?? [])].sort())
   ) {
     bad.push('index structure')
   }
