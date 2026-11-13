@@ -1304,6 +1304,40 @@
 
     promo:versionOf a rdf:Property .
 
+    <https://w3id.org/promo/library#V_10> a promo:Variable ;
+        rdfs:label "p_term" ;
+        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"https://w3id.org/promo/library#V_10\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_effort> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:doc "Thermodynamic pressure — -dU/dV conjugate to V (p*V work pair); EoS/-del A/del V at the molecular level." ;
+        promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_10" ;
+        promo:latex "p" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_mass\": -1}" ;
+        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_23> a promo:Variable ;
+        rdfs:label "V" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
+        promo:doc "volum" ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_23" ;
+        promo:latex "V" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:tokenVector "{\"token_mass\": 1}" ;
+        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
+
     <https://w3id.org/promo/ontology#E_1> a promo:Equation ;
         promo:created "2026-09-21T11:30:15.213Z" ;
         promo:doc "" ;
@@ -1319,7 +1353,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:n09d477f35b1f49c298636fe2eb3a6dfdb1 ;
+        promo:hasArguments _:n638241496dea4d77b6ee2c60041bb235b1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_2> a promo:Equation ;
@@ -1327,9 +1361,9 @@
         promo:doc "" ;
         promo:equationClass "generic" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:incidenceList "[\"https://w3id.org/promo/ontology#V_5\", \"https://w3id.org/promo/ontology#V_23\"]" ;
+        promo:incidenceList "[\"https://w3id.org/promo/ontology#V_5\", \"https://w3id.org/promo/library#V_23\"]" ;
         promo:internalID "E_2" ;
-        promo:lhs <https://w3id.org/promo/ontology#V_10> ;
+        promo:lhs <https://w3id.org/promo/library#V_10> ;
         promo:modified "2026-09-21T11:31:22.783Z" ;
         promo:network "physical" ;
         promo:rhs "ParDiff( U, V )" ;
@@ -1337,7 +1371,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial V}" .
 
     <https://w3id.org/promo/ontology#E_2/expression> a promo:Expression ;
-        promo:hasArguments _:n09d477f35b1f49c298636fe2eb3a6dfdb2 ;
+        promo:hasArguments _:n638241496dea4d77b6ee2c60041bb235b2 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -1355,7 +1389,7 @@
         promo:rhsLatex "\\left( r_{x,N} \\circ r_{y,N} \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:n09d477f35b1f49c298636fe2eb3a6dfdb3 ;
+        promo:hasArguments _:n638241496dea4d77b6ee2c60041bb235b3 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -1373,7 +1407,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:n09d477f35b1f49c298636fe2eb3a6dfdb4 ;
+        promo:hasArguments _:n638241496dea4d77b6ee2c60041bb235b4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -1391,25 +1425,8 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:n09d477f35b1f49c298636fe2eb3a6dfdb5 ;
+        promo:hasArguments _:n638241496dea4d77b6ee2c60041bb235b5 ;
         promo:hasOperation promolg:Instantiate .
-
-    <https://w3id.org/promo/ontology#V_10> a promo:Variable ;
-        rdfs:label "p_term" ;
-        promo:aliases "{\"latex\": \"p\", \"global_ID\": \"https://w3id.org/promo/ontology#V_10\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_effort> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
-        promo:doc "Thermodynamic pressure — -dU/dV conjugate to V (p*V work pair); EoS/-del A/del V at the molecular level." ;
-        promo:hasEquation <https://w3id.org/promo/ontology#E_2> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_10" ;
-        promo:latex "p" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:tokenVector "{\"token_energy\": 1, \"token_mass\": -1}" ;
-        promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#V_14> a promo:Variable ;
         rdfs:label "r_x" ;
@@ -1483,23 +1500,6 @@
         promo:network "universe" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 0, 0, 0]" .
-
-    <https://w3id.org/promo/ontology#V_23> a promo:Variable ;
-        rdfs:label "V" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_secondary_state> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_mass> ;
-        promo:doc "volum" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_23" ;
-        promo:latex "V" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:tokenVector "{\"token_mass\": 1}" ;
-        promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#V_7> a promo:Variable ;
         rdfs:label "S" ;
@@ -1669,13 +1669,13 @@
 
     <https://w3id.org/promo/ontology#idx_reaction_q> a promo:Index ;
         rdfs:label "reaction" ;
-        promo:aliases "{\"global_ID\": \"I_11\", \"internal_code\": \"q\"}" ;
+        promo:aliases "{\"global_ID\": \"I_11\", \"internal_code\": \"K\"}" ;
         promo:doc "Reaction index (conversion source), reactions domain" ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_reactions> ;
         promo:indexClass "conversion" ;
         promo:internalID "I_11" ;
         promo:network "reactions" ;
-        promo:shortName "q" .
+        promo:shortName "K" .
 
     <https://w3id.org/promo/ontology#publishedOn> a rdf:Property .
 
@@ -2337,28 +2337,28 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n09d477f35b1f49c298636fe2eb3a6dfdb6 .
+    _:n638241496dea4d77b6ee2c60041bb235b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n638241496dea4d77b6ee2c60041bb235b6 .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n09d477f35b1f49c298636fe2eb3a6dfdb7 .
+    _:n638241496dea4d77b6ee2c60041bb235b2 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n638241496dea4d77b6ee2c60041bb235b7 .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
-        rdf:rest _:n09d477f35b1f49c298636fe2eb3a6dfdb8 .
+    _:n638241496dea4d77b6ee2c60041bb235b3 rdf:first <https://w3id.org/promo/ontology#V_14> ;
+        rdf:rest _:n638241496dea4d77b6ee2c60041bb235b8 .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n638241496dea4d77b6ee2c60041bb235b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n638241496dea4d77b6ee2c60041bb235b5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+    _:n638241496dea4d77b6ee2c60041bb235b6 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb7 rdf:first <https://w3id.org/promo/ontology#V_23> ;
+    _:n638241496dea4d77b6ee2c60041bb235b7 rdf:first <https://w3id.org/promo/library#V_23> ;
         rdf:rest () .
 
-    _:n09d477f35b1f49c298636fe2eb3a6dfdb8 rdf:first <https://w3id.org/promo/ontology#V_15> ;
+    _:n638241496dea4d77b6ee2c60041bb235b8 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest () .
 }
 
