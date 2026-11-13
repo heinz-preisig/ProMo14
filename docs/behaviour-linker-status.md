@@ -132,9 +132,12 @@ closure tests, full suite 524 green — amended 2026-11-10, was 421).  Design is
   a fixed sequence of *unique* indices — the checker now rejects
   duplicates and preserves declaration order through the checked
   tree (`Checked.indices` was previously sorted, losing the declared
-  axis order).  Element-wise ops require the same sequence, not just
-  the same set.  This is the codegen axis convention: `F[N,A]` emits
-  rows=N, cols=A, matching the fbuilder matrices.
+  axis order).  ~~Element-wise ops require the same sequence~~ —
+  superseded 2026-11-13: `+`/`-` conform by index **set**, result
+  order follows the left operand, emitters permute (`_align`);
+  declaration order remains the canonical axis order
+  (design-principles §8).  `F[N,A]` emits rows=N, cols=A, matching
+  the fbuilder matrices.
 - **Codegen (2026-09-22):** `plan.py` lowers report+schedule into a
   target-agnostic `CodePlan` (state layout, port gathers as index
   maps, incidence matrices restricted to bound elements, param/input

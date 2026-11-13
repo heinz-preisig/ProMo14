@@ -55,6 +55,9 @@ The var/expr graph is a **bipartite graph**:
     reduced index for reductions); element-wise ops require the same
     sequence, not just the same set.  Codegen emits axes in this
     order — no label lookup needed at runtime.
+    *(Superseded 2026-11-13 — design-principles §8: `+`/`-` conform
+    by index set, result order = left operand, `_align` permutes at
+    emit; declaration order stays canonical.)*
   - `promo:variableClass` (legacy string, being replaced by classifications)
   - `promo:hasEquation` → equation IRIs (the bipartite edges)
 
