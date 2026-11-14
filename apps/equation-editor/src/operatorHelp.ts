@@ -12,9 +12,8 @@ export interface OperatorHelpEntry {
 export const OPERATOR_HELP: OperatorHelpEntry[] = [
   { label: '+', syntax: 'a + b', description: 'add' },
   { label: '-', syntax: 'a - b', description: 'subtract' },
-  { label: '*', syntax: 'a * b', description: 'reduce product — operands must have exactly one common index' },
-  { label: ':', syntax: 'a : b', description: 'expand (outer) product' },
-  { label: '.', syntax: 'a . b', description: 'index-preserving product — retains common indices and may expand the index set' },
+  { label: '*', syntax: 'a * b', description: 'product — elementwise over shared indices, ordered union otherwise (scalars included); contract with reduceSum' },
+  { label: ':', syntax: 'a : b', description: 'expand (outer) product — operands must not share an index' },
   { label: '^', syntax: 'a ^ b', description: 'power — right-associative' },
   {
     label: 'Integral',
@@ -44,7 +43,7 @@ export const OPERATOR_HELP: OperatorHelpEntry[] = [
   {
     label: 'reduceSum',
     syntax: 'reduceSum(expr, i)',
-    description: 'sum of expr over running index i',
+    description: 'sum of expr over running index i — e.g. reduceSum(a * b, i) contracts the shared index i',
   },
   {
     label: 'Instantiate',

@@ -5,7 +5,7 @@ import pytest
 from .parser import ParseError, parse
 from .syntax import (
     Add, Expand, Group, IndexPreservingProduct, Instantiate, Integral, MaxMin,
-    ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc, Var,
+    ParDiff, Power, Product, ReduceSum, Root, TotalDiff, UFunc, Var,
 )
 
 
@@ -41,11 +41,14 @@ def test_expand():
 
 
 def test_index_preserving_product():
-    assert parse("a . b") == IndexPreservingProduct(Var("a"), Var("b"))
+    # §40: `*` is THE product — elementwise over shared indices.
+    assert parse("a * b") == IndexPreservingProduct(Var("a"), Var("b"))
 
 
-def test_reduce():
-    assert parse("a * b") == Reduce(Var("a"), Var("b"))
+def test_dot_infix_retired():
+    # §40: the legacy `.` elementwise infix is gone — use `*`.
+    with pytest.raises(ParseError):
+        parse("a . b")
 
 
 def test_reduce_with_index_is_rejected():
@@ -54,8 +57,8 @@ def test_reduce_with_index_is_rejected():
 
 
 def test_term_left_associative():
-    # a . b * c -> (a . b) * c
-    assert parse("a . b * c") == Reduce(
+    # a * b * c -> (a * b) * c
+    assert parse("a * b * c") == IndexPreservingProduct(
         IndexPreservingProduct(Var("a"), Var("b")), Var("c")
     )
 
@@ -68,7 +71,7 @@ def test_power_right_associative():
 
 def test_power_precedence():
     # a * b ^ c -> a * (b ^ c)
-    assert parse("a * b ^ c") == Reduce(
+    assert parse("a * b ^ c") == IndexPreservingProduct(
         Var("a"), Power(Var("b"), Var("c"))
     )
 
@@ -81,7 +84,7 @@ def test_brackets():
 
 def test_brackets_affect_precedence():
     # (a + b) * c is not a * b + c
-    assert parse("(a + b) * c") == Reduce(
+    assert parse("(a + b) * c") == IndexPreservingProduct(
         Group(Add("+", Var("a"), Var("b"))), Var("c")
     )
 
@@ -161,8 +164,8 @@ def test_reduce_sum():
 
 
 def test_complex_expression():
-    # U - p . V
-    node = parse("U - p . V")
+    # U - p * V
+    node = parse("U - p * V")
     assert isinstance(node, Add)
     assert node.op == "-"
     assert node.left == Var("U")
@@ -172,7 +175,7 @@ def test_complex_expression():
 
 
 def test_integral_inside_sum():
-    node = parse("Integral(U :: t in [t0, te]) - p . V")
+    node = parse("Integral(U :: t in [t0, te]) - p * V")
     assert isinstance(node, Add)
     assert node.op == "-"
     assert isinstance(node.left, Integral)

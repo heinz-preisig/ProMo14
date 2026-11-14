@@ -1,4 +1,48 @@
-import type { EquationClass, Variable } from './types'
+import type { EquationClass, Index, Variable } from './types'
+import { indexShortLabel } from './latex'
+
+/** SI exponent-vector → compact symbol string; '—' when dimensionless.
+ *  Order matches UNIT_LABELS in the editors:
+ *  time, length, amount, mass, temperature, current, light, nil. */
+const UNIT_SYMBOLS = ['s', 'm', 'mol', 'kg', 'K', 'A', 'cd', 'nil']
+
+export function formatUnits(units?: number[] | null): string {
+  if (!units || units.every((e) => !e)) return '—'
+  return units
+    .map((e, i) => (e ? `${UNIT_SYMBOLS[i]}${e !== 1 ? `^${e}` : ''}` : ''))
+    .filter(Boolean)
+    .join('·')
+}
+
+/** Compact hover card for a variable.
+ *  Line 1 = identity: ``network!label · internal_id · owning-graph``.
+ *  Line 2 = semantics: kind, doc, units, index list (or ``scalar``),
+ *  bound value, and the insertion token when it differs from the
+ *  bare label. */
+export function variableTooltip(
+  v: Variable,
+  opts: { indices?: Index[]; insert?: string; kind?: string } = {},
+): string {
+  const [base, local] = v.iri.split('#')
+  const graph = base?.split('/').filter(Boolean).pop() ?? ''
+  const id = v.internal_id || local || ''
+  const qualified = `${v.network ?? 'root'}!${v.label}`
+  const idx = (v.index_structures ?? [])
+    .map((iri) => {
+      const found = opts.indices?.find((i) => i.iri === iri)
+      return (found && indexShortLabel(found)) || iri.split('#').pop() || iri
+    })
+    .join(',')
+  const parts = [
+    opts.kind || v.type || 'unclassified',
+    v.doc,
+    `units: ${formatUnits(v.units)}`,
+    idx ? `[${idx}]` : 'scalar',
+    v.value != null && v.value !== '' ? `= ${v.value}` : '',
+    opts.insert && opts.insert !== v.label ? `inserts as ${opts.insert}` : '',
+  ].filter(Boolean)
+  return `${qualified}${id ? ` · ${id}` : ''}${graph ? ` · ${graph}` : ''}\n${parts.join(' — ')}`
+}
 
 /** Display label for a stored ``equation_class`` — resolves an
  *  EquationClass IRI to its label; legacy bare labels pass through. */

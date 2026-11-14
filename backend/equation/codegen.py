@@ -37,7 +37,7 @@ from .compile_space import CompileSpace
 from .errors import VarError
 from .syntax import (
     Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
-    MaxMin, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc,
+    MaxMin, ParDiff, Power, Product, ReduceSum, Root, TotalDiff, UFunc,
     Var,
 )
 
@@ -359,9 +359,6 @@ class Renderer:
                                       self._align(right, ch[1], c.indices))
             return r"%s \circ %s" % (left, right)
 
-        if isinstance(node, Reduce):
-            return self._render_reduce(node, ch)
-
         if isinstance(node, Power):
             base, exp = self.render(ch[0]), self.render(ch[1])
             if self.target in ("python", "julia"):
@@ -479,6 +476,16 @@ class Renderer:
 
         if isinstance(node, ReduceSum):
             index_iri = self.space.get_index(node.index.name)
+            # §40 contraction fast-path: ``reduceSum(a * b, i)`` where
+            # the operands share exactly ``{i}`` is the classical
+            # product contraction — emit the dedicated contraction
+            # form (matmul / einsum label-set / \sum a b) instead of
+            # a literal elementwise-then-sum.
+            if isinstance(ch[0].node, IndexPreservingProduct) \
+                    and len(ch[0].children) == 2:
+                l, r = ch[0].children
+                if (l.index_set() & r.index_set()) == {index_iri}:
+                    return self._render_contraction(l, r, index_iri)
             body = self.render(ch[0])
             axis = self._index_axis(ch[0], index_iri)
             if self.target == "python":
@@ -525,14 +532,11 @@ class Renderer:
 
         raise VarError("codegen: unknown node type %s" % type(node).__name__)
 
-    # -- reduce (contraction) -------------------------------------------------
+    # -- contraction (reduceSum over an index-preserving product) ---------
 
-    def _render_reduce(self, node: Reduce, ch: List[Checked]) -> str:
-        left, right = ch[0], ch[1]
+    def _render_contraction(
+            self, left: Checked, right: Checked, reduced_iri: str) -> str:
         l_src, r_src = self.render(left), self.render(right)
-
-        common = left.index_set() & right.index_set()
-        reduced_iri = next(iter(common))
 
         if self.target == "latex":
             return r"\sum_{%s} %s \, %s" % (

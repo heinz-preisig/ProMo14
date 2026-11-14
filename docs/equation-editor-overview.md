@@ -70,9 +70,11 @@ index-structured tensor operations.  Key characteristics:
   be class `constant` or `parameter` (ADR-008).
 - Function-call syntax only (`Integral(...)`, `Product(...)`, etc.).
 - No unary minus (negation is `neg(...)`).
-- Operators: `+`/`-` (sum), `*` (reduce product), `:` (expand product),
-  `.` (index-preserving product; historically called Hadamard), `^` (power,
-  right-associative).
+- Operators: `+`/`-` (sum), `*` (product — elementwise over shared
+  indices, ordered union otherwise), `:` (expand product),
+  `^` (power, right-associative).  Contractions are always explicit:
+  `reduceSum(a * b, i)` / `Product(body, i)`.  (§40, 2026-11-14: `.`
+  and the implicit-reduction `*` were retired.)
 - Functions: `exp`, `log`, `ln`, `sin`, `cos`, ... require dimensionless
   input; `sqrt` accepts units only when every exponent is even; `abs`, `neg`,
   `left`, `right`, `sign`, and the index-preserving elementwise

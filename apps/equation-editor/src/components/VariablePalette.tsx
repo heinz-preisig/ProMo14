@@ -1,6 +1,7 @@
 import 'katex/dist/katex.min.css'
 import { useMemo, useState } from 'react'
 import { astToLatex, renderLatex } from '../latex'
+import { variableTooltip } from '../variableUtils'
 import type { Index, NetworkTree, Variable } from '../types'
 
 /** Map of network → steps above ``from`` in the domain tree
@@ -197,7 +198,7 @@ export default function VariablePalette({
                       {bound && `=${v.value}`}
                     </>
                   )
-                  const title = `${v.iri}${v.type ? ' — kind: ' + v.type : ''}${bound ? ' — value: ' + v.value : ''}${v.doc ? ' — ' + v.doc : ''}${insert !== label ? ' — inserts as ' + insert : ''}`
+                  const title = variableTooltip(v, { indices, insert })
                   const style = {
                     fontSize: 12,
                     padding: '3px 6px',

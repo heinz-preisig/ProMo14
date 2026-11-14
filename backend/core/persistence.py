@@ -118,6 +118,10 @@ class PersistenceMixin:
         # union read sees one description.
         self._migrate_incidence_factors()
         self._heal_vocab_ns_refs()
+        # §40: retire ``.`` and the implicit-reduction ``*`` — rewrite
+        # stored canonical trees and literal spellings first so the
+        # canonical migration below sees current operations only.
+        self._migrate_product_operators()
         self._migrate_canonical_rhs()
 
         # Idempotent vocabulary migration: every artefact graph is
@@ -629,6 +633,121 @@ class PersistenceMixin:
                     if text != str(o):
                         g.remove((s, p, o))
                         g.add((s, p, Literal(text)))
+                        changed = True
+        if changed:
+            self.mark_dirty()
+
+    def _migrate_product_operators(self) -> None:
+        """§40: rewrite stored product-operator spellings.
+
+        ``a . b`` (elementwise) → ``a * b`` and ``a * b`` (legacy
+        contraction) → ``reduceSum(a * b, i)`` where ``i`` is the
+        operands' shared index, recomputed from the declared index
+        structures.  Canonical ``rhsExpression`` trees are authoritative
+        and rewritten semantically (``ReduceProduct`` → ``SumOverIndex``
+        wrapping an ``IndexPreservingProduct``); their ``promo:rhs``
+        cache is regenerated.  Literal-only equations are re-parsed
+        under the legacy table, transformed, and re-printed.
+
+        Equations that cannot be mapped mechanically — a legacy ``*``
+        whose operands do not share exactly one index, or text that
+        fails the legacy parse — are left untouched and logged; they
+        were never checkable anyway.  Idempotent: post-migration data
+        contains neither the ``.`` infix nor ``ReduceProduct`` ops.
+        """
+        import logging
+
+        from backend.equation.canonical import to_source
+        from backend.equation.canonical_rdf import (
+            RHS_EXPRESSION,
+            attach_rhs_expression,
+            read_rhs_expression,
+        )
+        from backend.equation.checker import check
+        from backend.equation.codegen import render
+        from backend.equation.compile_space import CompileSpace
+        from backend.equation.errors import VarError
+        from backend.equation.migrate_products import (
+            MigrationAnomaly,
+            rewrite_canonical,
+            rewrite_literal,
+        )
+        from backend.equation.parser import ParseError, parse
+        from backend.equation.syntax import Var
+        from backend.ontology.rdf_context import RdfContext
+
+        log = logging.getLogger(__name__)
+        changed = False
+        for graph in self.dataset.graphs():
+            equations = [
+                e for e in graph.subjects(RDF.type, PROMO["Equation"])
+                if graph.value(e, PROMO["rhs"]) is not None
+                or graph.value(e, RHS_EXPRESSION) is not None
+            ]
+            if not equations:
+                continue
+            context = RdfContext(
+                self, graph_iris=self.resolution_scope(graph.identifier))
+            for equation in equations:
+                owner = graph.value(None, PROMO["hasEquation"], equation)
+                variable = (
+                    context.variables().get(str(owner))
+                    if owner is not None else None)
+                if variable is None:
+                    continue
+                network = str(
+                    graph.value(equation, PROMO["network"])
+                    or variable.network)
+                space = CompileSpace(
+                    context.variables(),
+                    context.indices(),
+                    variable_definition_network=variable.network,
+                    expression_definition_network=network,
+                    accessible_networks=context.accessible_networks(network),
+                    network_tree=context.tree(),
+                )
+                try:
+                    canonical = read_rhs_expression(graph, equation)
+                except Exception:
+                    canonical = None
+                literal = graph.value(equation, PROMO["rhs"])
+
+                if canonical is not None:
+                    try:
+                        new_canonical, touched = rewrite_canonical(
+                            canonical, space)
+                    except MigrationAnomaly as exc:
+                        log.warning(
+                            "§40 migration skipped %s: %s", equation, exc)
+                        continue
+                    source = to_source(new_canonical, space)
+                    if touched:
+                        attach_rhs_expression(
+                            graph, equation, new_canonical,
+                            URIRef("%s/expression" % equation))
+                    if touched or source != str(literal or ""):
+                        graph.set(
+                            (equation, PROMO["rhs"], Literal(source)))
+                        try:
+                            checked = check(
+                                parse(source), space, Var(variable.label))
+                            graph.set((
+                                equation, PROMO["rhsLatex"],
+                                Literal(render(checked, space, "latex"))))
+                        except (ParseError, VarError):
+                            pass
+                        changed = True
+                elif literal is not None:
+                    try:
+                        source, touched = rewrite_literal(
+                            str(literal), space)
+                    except (ParseError, MigrationAnomaly) as exc:
+                        log.warning(
+                            "§40 migration skipped %s: %s", equation, exc)
+                        continue
+                    if touched:
+                        graph.set(
+                            (equation, PROMO["rhs"], Literal(source)))
                         changed = True
         if changed:
             self.mark_dirty()

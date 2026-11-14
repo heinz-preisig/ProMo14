@@ -17,9 +17,11 @@ topology abstracted away:
 - **Status** — ``satisfied`` (exactly one comparable candidate),
   ``ambiguous`` (several), ``unbound`` (none — includes the
   ``state_hidden`` hint when the peer's unflagged state was the only
-  comparable), or ``unlicensed`` (no ``matched_tokens`` entry is
-  comparable to the port's tokens — the arc's rule licenses the
-  connection kind but not this exchange).
+  comparable), ``effort-unavailable`` (a ``function:effort`` port
+  found no effort-classified peer var carrying the mechanism's
+  ``promo:drives`` token), or ``unlicensed`` (no ``matched_tokens``
+  entry is comparable to the port's tokens — the arc's rule
+  licenses the connection kind but not this exchange).
 """
 
 from __future__ import annotations
@@ -37,7 +39,7 @@ class PortDemand:
     var: str
     label: str = ""
     tokens: List[str] = field(default_factory=list)
-    #: satisfied|ambiguous|unbound|unlicensed|unreachable
+    #: satisfied|ambiguous|unbound|effort-unavailable|unlicensed|unreachable
     status: str = "unbound"
     #: comparable exportable candidates on the peer (variable IRIs)
     candidates: List[str] = field(default_factory=list)
@@ -62,7 +64,8 @@ def _adjudicate(asg: AssignmentInfo, peer_asg: Optional[AssignmentInfo],
                 variables: Dict[str, VarInfo],
                 equations: Dict[str, EqInfo],
                 token_parents: Dict[str, str],
-                matched_tokens: Optional[Set[str]]) -> SideReport:
+                matched_tokens: Optional[Set[str]],
+                drives: Dict[str, Set[str]]) -> SideReport:
     """Judge one direction: ``asg``'s ports read from ``peer_asg``'s
     exportable variables through an arc carrying ``matched_tokens``
     (``None`` = licensing unknown, skip the license check)."""
@@ -71,6 +74,9 @@ def _adjudicate(asg: AssignmentInfo, peer_asg: Optional[AssignmentInfo],
         side.has_assignment = False
     supply = readable_vars(peer_asg, equations) if peer_asg else set()
     peer_state = peer_asg.state_variable if peer_asg else None
+    # §38: the demand side's mechanism drives — the effort tokens an
+    # effort-role port must find on the peer.
+    drive_tokens = drives.get(asg.entity_type, set())
 
     for v_iri in asg.ports:
         var = variables.get(v_iri)
@@ -106,6 +112,16 @@ def _adjudicate(asg: AssignmentInfo, peer_asg: Optional[AssignmentInfo],
             if w_iri == peer_state and not w.port_variable:
                 hidden = True    # accumulation stays internal
                 continue
+            # §38 effort coupling: an effort port reads a
+            # function:effort peer var carrying a token comparable to
+            # the mechanism's promo:drives (when declared).
+            if (var.effort and w_iri != v_iri and not w.effort):
+                continue
+            if (var.effort and w_iri != v_iri
+                    and drive_tokens and not any(
+                    _comparable(d, wt, token_parents)
+                    for d in drive_tokens for wt in w.tokens)):
+                continue
             raw.append(w_iri)
         flagged = [c for c in raw if variables[c].port_variable]
         demand.candidates = flagged or raw
@@ -115,7 +131,8 @@ def _adjudicate(asg: AssignmentInfo, peer_asg: Optional[AssignmentInfo],
         elif len(demand.candidates) > 1:
             demand.status = "ambiguous"
         else:
-            demand.status = "unbound"
+            demand.status = (
+                "effort-unavailable" if var.effort else "unbound")
         side.ports.append(demand)
     return side
 
@@ -129,6 +146,7 @@ def port_satisfaction(
     token_parents: Dict[str, str],
     matched_tokens: Optional[Set[str]] = None,
     unidirectional: bool = False,
+    drives: Optional[Dict[str, Set[str]]] = None,
 ) -> Tuple[SideReport, SideReport]:
     """Adjudicate a proposed source↔target connection.  Both directions
     are judged for bidirectional (token-flow) arcs — each side's ports
@@ -138,17 +156,18 @@ def port_satisfaction(
     never be fed and report ``unreachable`` (§14 direction).  Entity
     types without an assignment report ``has_assignment=False`` and
     no demands."""
+    drives = drives or {}
     src_asg = assignments.get(source)
     tgt_asg = assignments.get(target)
     source_side = _unreachable_side(src_asg, variables, source,
                                     token_parents, matched_tokens) \
         if unidirectional else (
             _adjudicate(src_asg, tgt_asg, variables, equations,
-                        token_parents, matched_tokens)
+                        token_parents, matched_tokens, drives)
             if src_asg else SideReport(entity_type=source,
                                        has_assignment=False))
     target_side = (_adjudicate(tgt_asg, src_asg, variables, equations,
-                               token_parents, matched_tokens)
+                               token_parents, matched_tokens, drives)
                    if tgt_asg else SideReport(entity_type=target,
                                               has_assignment=False))
     return source_side, target_side

@@ -322,8 +322,9 @@ class _Julia(Dialect):
     def footer(self, out: List[str], cp: CodePlan,
                space: CompileSpace) -> None:
         """Emits the helpers the rendered body can reference:
-        ``contract`` (the Reduce → ``contract(a,b,(li,),(ri,))``
-        codegen emits) whenever it appears, then ``_solve_balance`` —
+        ``contract`` (the reduceSum contraction fast-path →
+        ``contract(a,b,(li,),(ri,))`` codegen emits) whenever it
+        appears, then ``_solve_balance`` —
         the checked-solve shim shared by the constrained ``_balance``
         and the t=0 solve: a consistency check at size 0, convergence
         + residual bound otherwise.  The underdetermined-rank guard

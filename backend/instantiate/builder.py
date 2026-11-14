@@ -86,6 +86,9 @@ class VarInfo:
     value: Optional[str] = None
     var_class: str = ""                    # derived kind tag (§24)
     port_variable: bool = False
+    #: classified ``function:effort`` (§32 drives pairing) — an effort
+    #: port reads the conjugate potential from the contact's peer.
+    effort: bool = False
 
 
 @dataclass
@@ -304,6 +307,7 @@ def build(nodes: Dict[str, NodeInfo],
           temporal_types: Optional[Dict[str, str]] = None,
           parents: Optional[Dict[str, str]] = None,
           occurrence_paths: Optional[List[str]] = None,
+          drives: Optional[Dict[str, Set[str]]] = None,
           ) -> Instantiation:
     """Assemble the instantiated equation set for a model.
 
@@ -766,11 +770,18 @@ def build(nodes: Dict[str, NodeInfo],
                     msg += (" — peer state is comparable but not "
                             "exported (set port_variable or add a "
                             "measurement variable)")
+                if pb.status == "effort-unavailable":
+                    msg += (" — peer exports no function:effort var "
+                            "carrying the mechanism's drive token")
                 problems.append(Problem(
                     kind=f"{pb.status}-port", message=msg,
                     node=pb.node, entity_type=et))
 
         for n in t_nodes:
+            # §32/§38: the demand node's mechanism drives — the effort
+            # tokens its effort-role ports must find on the peer.
+            drive_tokens = (drives or {}).get(
+                nodes[n].entity_type or "", set())
             for v_iri in asg.ports:
                 var = variables.get(v_iri)
                 if var is None:
@@ -823,6 +834,18 @@ def build(nodes: Dict[str, NodeInfo],
                         if w_iri == state and not w.port_variable:
                             hidden = True   # accumulation stays internal
                             continue
+                        # §38 effort coupling: an effort port reads a
+                        # function:effort peer var carrying a token
+                        # comparable to the mechanism's promo:drives.
+                        if (var.effort and w_iri != v_iri
+                                and not w.effort):
+                            continue
+                        if (var.effort and w_iri != v_iri
+                                and drive_tokens and not any(
+                                _comparable(d, wt, token_parents)
+                                for d in drive_tokens
+                                for wt in w.tokens)):
+                            continue
                         raw.append((peer, w_iri))
                     flagged = [c for c in raw
                                if variables[c[1]].port_variable]
@@ -851,6 +874,8 @@ def build(nodes: Dict[str, NodeInfo],
                                 else peer)
                         elif len(cands) > 1:
                             pb.status = "ambiguous"
+                        elif var.effort:
+                            pb.status = "effort-unavailable"
                         emit_port(pb, var, state_hidden=hidden)
                 else:
                     per_contact = [candidates_at(a_iri)
@@ -885,6 +910,8 @@ def build(nodes: Dict[str, NodeInfo],
                                     else peer)
                             elif len(contact) > 1:
                                 pb.status = "ambiguous"
+                            elif var.effort:
+                                pb.status = "effort-unavailable"
                             emit_port(pb, var, state_hidden=hidden)
                         continue
                     cands = [
@@ -909,6 +936,8 @@ def build(nodes: Dict[str, NodeInfo],
                             else peer)
                     elif len(cands) > 1:
                         pb.status = "ambiguous"
+                    elif var.effort:
+                        pb.status = "effort-unavailable"
                     emit_port(pb, var, state_hidden=hidden)
 
     # -- port chaining ---------------------------------------------------

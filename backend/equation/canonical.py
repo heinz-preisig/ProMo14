@@ -10,7 +10,7 @@ from .compile_space import CompileSpace
 from .errors import VarError
 from .syntax import (
     Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
-    MaxMin, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff, UFunc,
+    MaxMin, ParDiff, Power, Product, ReduceSum, Root, TotalDiff, UFunc,
     Var,
 )
 
@@ -43,6 +43,10 @@ SUBTRACT = _operation("Subtract")
 POWER = _operation("Power")
 EXPAND_PRODUCT = _operation("ExpandProduct")
 INDEX_PRESERVING_PRODUCT = _operation("IndexPreservingProduct")
+#: Retired §40 operation — kept ONLY as a read-side signature so stored
+#: ``rhsExpression`` trees containing it stay loadable for the
+#: load-time migration (``_migrate_product_operators``); ``from_checked``
+#: never emits it and ``to_source`` never prints it.
 REDUCE_PRODUCT = _operation("ReduceProduct")
 PRODUCT_OVER_INDEX = _operation("ProductOverIndex")
 SUM_OVER_INDEX = _operation("SumOverIndex")
@@ -134,8 +138,6 @@ def from_checked(checked: Checked, space: CompileSpace) -> Argument:
         return Expression(EXPAND_PRODUCT, _children(children, space))
     if isinstance(node, IndexPreservingProduct):
         return Expression(INDEX_PRESERVING_PRODUCT, _children(children, space))
-    if isinstance(node, Reduce):
-        return Expression(REDUCE_PRODUCT, _children(children, space))
     if isinstance(node, Power):
         return Expression(POWER, _children(children, space))
     if isinstance(node, Instantiate):
@@ -182,17 +184,13 @@ def to_source(argument: Argument, space: CompileSpace) -> str:
             SUBTRACT: "-",
             POWER: "^",
             EXPAND_PRODUCT: ":",
-            INDEX_PRESERVING_PRODUCT: ".",
+            INDEX_PRESERVING_PRODUCT: "*",
         }
         _arity(argument, 2)
         return "( %s %s %s )" % (
             to_source(args[0], space), symbols[operation],
             to_source(args[1], space),
         )
-    if operation == REDUCE_PRODUCT:
-        _arity(argument, 2)
-        return "( %s * %s )" % (
-            to_source(args[0], space), to_source(args[1], space))
     if operation == PRODUCT_OVER_INDEX:
         _arity(argument, 2)
         return "Product( %s, %s )" % (

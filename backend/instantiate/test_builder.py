@@ -167,12 +167,12 @@ VARIABLES = {
 
 EQUATIONS = {
     _eq("bal"): EqInfo(_eq("bal"), _var("m"), [_var("F"), _var("J")],
-                       "E_1", rhs="V_4 * V_3"),
+                       "E_1", rhs="reduceSum(V_4 * V_3, A_diff)"),
     _eq("prop"): EqInfo(_eq("prop"), _var("p"), [_var("m")], "E_2",
                         rhs="V_1"),
     _eq("flow"): EqInfo(_eq("flow"), _var("J"),
                         [_var("k"), _var("p_in")], "E_3",
-                        rhs="V_5 . V_6"),
+                        rhs="V_5 * V_6"),
 }
 
 ASSIGNMENTS = {
@@ -400,14 +400,14 @@ def test_event_dynamic_port_binds_contact_arcs():
     binds the contact ARCS under the covering mechanism sub-index —
     the shared var stays itself, bound-typed (no arc-typed
     duplicate).  The plan carries the bound form to the emit-time
-    check: `p * F` contracts over A_diff leaving [N] to broadcast
-    to the lhs's [A_diff]; checked against the DECLARED [N] it
-    would contract N and green-light the wrong math."""
+    check: `reduceSum(p * F, A_diff)` contracts over A_diff leaving
+    [N] to broadcast to the lhs's [A_diff]; checked against the
+    DECLARED [N] it would contract N and green-light the wrong math."""
     equations = dict(EQUATIONS)
     equations[_eq("flow")] = EqInfo(
         _eq("flow"), _var("J"),
         [_var("k"), _var("p"), _var("F")],
-        "E_3", rhs="V_5 . (V_2 * V_4)")
+        "E_3", rhs="V_5 * reduceSum(V_2 * V_4, A_diff)")
     # J declared [N, A_diff] — the flow law produces a per-node rate
     # that broadcasts onto the contact arcs (test_01's fmc shape).
     variables = dict(VARIABLES)
@@ -1104,7 +1104,7 @@ def test_emit_python_lhs_index_conformity():
         levels=[[PlanBlock(
             entity_type="et", equation="e_x", lhs=_var("F"),
             lhs_instance="V_4@et", lhs_name="V_4", lhs_indices=na,
-            bound=dict(na), rhs="V_3 . V_2")]],
+            bound=dict(na), rhs="V_3 * V_2")]],
     )
     src = emit_python(perm, _emit_space())
     assert "V_4 = (V_3[:, None] * V_2).transpose((1, 0))" in src
@@ -1795,9 +1795,9 @@ def _seed_endpoint_model(store):
     pin = var("p_in", "effort in", [_idx("idx_arc_diffusion")],
               [_tok("mass")], internal_id="V_6")
 
-    e_bal = eq("bal", m, [f, j], "E_1", rhs="V_4 * V_3")
+    e_bal = eq("bal", m, [f, j], "E_1", rhs="reduceSum(V_4 * V_3, A_diff)")
     e_prop = eq("prop", p, [m], "E_2", rhs="V_1")
-    e_flow = eq("flow", j, [k, pin], "E_3", rhs="V_5 . V_6")
+    e_flow = eq("flow", j, [k, pin], "E_3", rhs="V_5 * V_6")
     return {
         "nodes": (n1, n2, n3), "m": m, "p": p, "j": j, "f": f,
         "k": k, "pin": pin,

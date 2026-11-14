@@ -30,7 +30,6 @@ const expressionRule = () =>
             T('-'),
             T('*'),
             T(':'),
-            T('.'),
             T('^'),
           ),
           NT('factor'),

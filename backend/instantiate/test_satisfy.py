@@ -10,6 +10,7 @@ from backend.instantiate.satisfy import port_satisfaction
 MASS = "promo#tok_mass"
 ENERGY = "promo#tok_energy"
 SIGNAL = "promo#tok_signal"
+MOMENTUM = "promo#tok_momentum"
 
 # mass ⊃ component_mass, signal ⊃ observation|manipulation
 TOKEN_PARENTS = {
@@ -19,9 +20,10 @@ TOKEN_PARENTS = {
 }
 
 
-def _v(iri, tokens=(), port_variable=False):
+def _v(iri, tokens=(), port_variable=False, effort=False):
     return VarInfo(iri=iri, label=iri.rsplit("/", 1)[-1],
-                   tokens=list(tokens), port_variable=port_variable)
+                   tokens=list(tokens), port_variable=port_variable,
+                   effort=effort)
 
 
 def _eq(iri, lhs):
@@ -290,3 +292,97 @@ def test_unidirectional_source_unlicensed_token():
     assert src_side.ports[0].status == "unlicensed"
     assert src_side.ports[0].candidates == []
     assert src_side.unsatisfied == ["v_mass"]
+
+
+# -- §38 effort coupling --------------------------------------------------
+
+
+def test_effort_port_binds_effort_peer_carrying_drive_token():
+    """Convection (drives momentum) reads the peer's effort var —
+    pressure — which is function:effort and carries the drive token."""
+    variables = {
+        "v_p": _v("v_p", [MOMENTUM], effort=True),
+        "v_e": _v("v_e", [MOMENTUM], effort=True),
+    }
+    src = _asg("et_conv", ports=["v_p"])
+    tgt = _asg("et_cap", sequence=["e1"])
+    src_side, _ = port_satisfaction(
+        "et_conv", "et_cap", {"et_conv": src, "et_cap": tgt},
+        variables, {"e1": _eq("e1", "v_e")}, TOKEN_PARENTS,
+        matched_tokens={MOMENTUM},
+        drives={"et_conv": {MOMENTUM}})
+    assert src_side.ports[0].status == "satisfied"
+    assert src_side.ports[0].candidates == ["v_e"]
+
+
+def test_effort_port_rejects_non_effort_peer():
+    """A momentum-carrying peer var is NOT the effort unless it is
+    function:effort-classified — token comparability alone is not the
+    conjugate pairing."""
+    variables = {
+        "v_p": _v("v_p", [MOMENTUM], effort=True),
+        "v_flux": _v("v_flux", [MOMENTUM]),
+    }
+    src = _asg("et_conv", ports=["v_p"])
+    tgt = _asg("et_cap", sequence=["e1"])
+    src_side, _ = port_satisfaction(
+        "et_conv", "et_cap", {"et_conv": src, "et_cap": tgt},
+        variables, {"e1": _eq("e1", "v_flux")}, TOKEN_PARENTS,
+        matched_tokens={MOMENTUM},
+        drives={"et_conv": {MOMENTUM}})
+    assert src_side.ports[0].status == "effort-unavailable"
+    assert src_side.ports[0].candidates == []
+
+
+def test_effort_port_rejects_effort_peer_wrong_drive():
+    """An effort var carrying energy cannot drive a momentum-driven
+    mechanism — the drive token must be comparable."""
+    variables = {
+        "v_p": _v("v_p", [MOMENTUM], effort=True),
+        "v_T": _v("v_T", [ENERGY], effort=True),
+    }
+    src = _asg("et_conv", ports=["v_p"])
+    tgt = _asg("et_cap", sequence=["e1"])
+    src_side, _ = port_satisfaction(
+        "et_conv", "et_cap", {"et_conv": src, "et_cap": tgt},
+        variables, {"e1": _eq("e1", "v_T")}, TOKEN_PARENTS,
+        matched_tokens={MOMENTUM},
+        drives={"et_conv": {MOMENTUM}})
+    assert src_side.ports[0].status == "effort-unavailable"
+
+
+def test_effort_port_no_drives_falls_back_to_role():
+    """Mechanism with no promo:drives declared: the effort-role match
+    still applies (peer must be function:effort), the drive-token
+    check is skipped."""
+    variables = {
+        "v_p": _v("v_p", [MOMENTUM], effort=True),
+        "v_e": _v("v_e", [MOMENTUM], effort=True),
+        "v_x": _v("v_x", [MOMENTUM]),
+    }
+    src = _asg("et_mech", ports=["v_p"])
+    tgt = _asg("et_cap", sequence=["e1", "e2"])
+    src_side, _ = port_satisfaction(
+        "et_mech", "et_cap", {"et_mech": src, "et_cap": tgt},
+        variables, {"e1": _eq("e1", "v_e"), "e2": _eq("e2", "v_x")},
+        TOKEN_PARENTS, matched_tokens={MOMENTUM})
+    assert src_side.ports[0].status == "satisfied"
+    assert src_side.ports[0].candidates == ["v_e"]
+
+
+def test_non_effort_port_ignores_drives():
+    """Flow/other ports bind by plain comparability even when the
+    demand side's mechanism declares drives."""
+    variables = {
+        "v_f": _v("v_f", [MASS]),
+        "v_w": _v("v_w", [MASS]),
+    }
+    src = _asg("et_conv", ports=["v_f"])
+    tgt = _asg("et_cap", sequence=["e1"])
+    src_side, _ = port_satisfaction(
+        "et_conv", "et_cap", {"et_conv": src, "et_cap": tgt},
+        variables, {"e1": _eq("e1", "v_w")}, TOKEN_PARENTS,
+        matched_tokens={MASS},
+        drives={"et_conv": {MOMENTUM}})
+    assert src_side.ports[0].status == "satisfied"
+    assert src_side.ports[0].candidates == ["v_w"]

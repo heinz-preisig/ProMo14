@@ -103,7 +103,7 @@ def test_check_instantiate_state_var_rejected(client):
     assert "constant" in body["error"] or "parameter" in body["error"]
 
 
-@pytest.mark.parametrize("text", ["setPoint - u", "setPoint . u"])
+@pytest.mark.parametrize("text", ["setPoint - u", "setPoint * u"])
 def test_signal_membership_does_not_create_algebra(client, text):
     r = client.post("/api/equation/check", json={
         "text": text,

@@ -152,36 +152,34 @@ def test_add_incompatible_indices():
     raise AssertionError("expected IndexStructureError")
 
 
-def test_reduce():
+def test_reduce_sum_contracts_shared_index():
     space = _space()
-    # rho and v both carry species index; reduce removes N
-    node = parse("rho * v")
+    # rho and v both carry species index; reduceSum removes N
+    node = parse("reduceSum(rho * v, N)")
     c = check(node, space)
     assert c.units == Units(mass=1, length=-2, time=-1)
     assert c.indices == []
 
 
-def test_reduce_rejects_multiple_common_indices():
+def test_product_keeps_multiple_common_indices():
+    # §40: `*` never contracts — w1 * w2 is elementwise over {N, T}
     space = _space()
     _add_var(space, "w1", Units(), [N, T])
     _add_var(space, "w2", Units(), [N, T])
-    try:
-        check(parse("w1 * w2"), space)
-    except IndexStructureError:
-        return
-    raise AssertionError("expected IndexStructureError")
+    c = check(parse("w1 * w2"), space)
+    assert set(c.indices) == {N, T}
 
 
 def test_index_preserving_product():
     space = _space()
-    node = parse("rho . N")
+    node = parse("rho * N")
     c = check(node, space)
     assert c.units == Units(mass=1, length=-3)
     assert c.indices == ["http://promo.example/index/N"]
 
 
 def test_index_preserving_product_expands_index_set():
-    c = check(parse("rho . x"), _space())
+    c = check(parse("rho * x"), _space())
     assert c.indices == [
         "http://promo.example/index/N",
         "http://promo.example/index/T",

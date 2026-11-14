@@ -37,7 +37,7 @@ def _canonical(source, lhs=None):
 
 def test_rdf_round_trip_preserves_nested_canonical_expression():
     graph = Graph()
-    canonical = _canonical("(rho . x) + (rho . x)")
+    canonical = _canonical("(rho * x) + (rho * x)")
     root = attach_rhs_expression(graph, URIRef(f"{BASE}/eq/E_1"), canonical)
 
     assert (root, RDF.type, EXPRESSION) in graph
@@ -84,7 +84,7 @@ def test_replacing_rhs_clears_nested_expression_graph():
     root = URIRef(f"{BASE}/eq/E_4/expression")
 
     first = _canonical("rho + rho")
-    second = _canonical("rho . x")
+    second = _canonical("rho * x")
     attach_rhs_expression(graph, equation, first, root)
     attach_rhs_expression(graph, equation, second, root)
 

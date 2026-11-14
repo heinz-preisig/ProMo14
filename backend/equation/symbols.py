@@ -13,7 +13,7 @@ Adding a new operator or function:
 - **New keyword-driven construct** (e.g. a new aggregate): add to ``keywords``
   and extend ``_factor`` in ``parser.py`` with its grammar rule.
 - **New infix operator at an existing precedence level** (``+``, ``-`` level 1;
-  ``*``, ``:``, ``.`` level 2; ``^`` level 3): add it to ``infix`` with the
+  ``*``, ``:`` level 2; ``^`` level 3): add it to ``infix`` with the
   matching ``precedence`` and ``right_assoc`` flag and add the corresponding
   AST factory in ``_make_infix`` in ``parser.py``.
 - **New infix precedence level**: add the precedence to ``infix`` and add a
@@ -87,7 +87,16 @@ class SymbolTable:
 
 
 # -----------------------------------------------------------------------------
-# Default language — matches the ProMo13 TPG grammar.
+# Default language.
+#
+# Product operators (§40): ``*`` is THE product — elementwise over shared
+# indices, ordered union otherwise (scalars included; a shared index is
+# never contracted implicitly).  ``:`` is the disjoint-outer-product
+# assertion — same ordered union, but errors when operands share an
+# index.  Contraction is always explicit: ``reduceSum(expr, index)``.
+# The legacy `.` infix (elementwise) and `*`-as-contraction spelling
+# were retired — stored equations are migrated at load
+# (``persistence._migrate_product_operators``).
 # -----------------------------------------------------------------------------
 
 DEFAULT_TABLE = SymbolTable(
@@ -134,11 +143,10 @@ DEFAULT_TABLE = SymbolTable(
         "+": InfixEntry("+", precedence=1, right_assoc=False, factory="add"),
         "-": InfixEntry("-", precedence=1, right_assoc=False, factory="add"),
         ":": InfixEntry(":", precedence=2, right_assoc=False, factory="expand"),
-        ".": InfixEntry(
-            ".", precedence=2, right_assoc=False,
+        "*": InfixEntry(
+            "*", precedence=2, right_assoc=False,
             factory="index_preserving_product",
         ),
-        "*": InfixEntry("*", precedence=2, right_assoc=False, factory="reduce"),
         "^": InfixEntry("^", precedence=3, right_assoc=True, factory="power"),
     },
 )

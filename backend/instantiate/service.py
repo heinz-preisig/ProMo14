@@ -47,7 +47,7 @@ from backend.behaviour.service import (
     _read_assignment,
 )
 from backend.core.capabilities import (
-    entity_capabilities, graph_violations,
+    entity_capabilities, graph_violations, mechanism_drives,
 )
 from backend.core.config import get_data_dir
 from backend.core.graph_store import PROMO, get_store
@@ -833,6 +833,11 @@ def _vars_collect(store, vars_graph: Optional[str]):
             value=v.value,
             var_class=v.type,
             port_variable=v.port_variable,
+            # §38: function:effort — the conjugate-potential role the
+            # mechanism's promo:drives pairing matches against.
+            effort=any(
+                t.split("#")[-1] == "term_function_effort"
+                for t in getattr(v, "classifications", {}).values()),
         )
         labels[iri] = v.label
         for eq in getattr(v, "equations", {}).values():
@@ -1250,7 +1255,9 @@ def model_instantiation(
         reaction_index=reaction_index,
         temporal_types=temporal_types,
         parents=parents,
-        occurrence_paths=[o["path"] for o in occurrences])
+        occurrence_paths=[o["path"] for o in occurrences],
+        drives={et: mechanism_drives(store, model_graph.identifier, et)
+                for et in assignments})
     # §20 gesture admissibility — persisted model may predate the save
     # gate or have been written by another client; report violations
     # instead of silently instantiating them.
@@ -1392,7 +1399,9 @@ def _plan_for(graph_iri: str, vars: Optional[str],
         reaction_index=reaction_index,
         temporal_types=temporal_types,
         parents=parents,
-        occurrence_paths=[o["path"] for o in occurrences])
+        occurrence_paths=[o["path"] for o in occurrences],
+        drives={et: mechanism_drives(store, model_graph.identifier, et)
+                for et in assignments})
     for msg in graph_violations(store, model_graph):
         report.problems.append(Problem(
             kind="inadmissible-gesture", message=msg))

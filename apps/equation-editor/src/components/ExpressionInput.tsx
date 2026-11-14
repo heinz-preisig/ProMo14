@@ -28,7 +28,6 @@ const OP_BUTTONS: { label: string; value: string; tip?: string }[] = [
   { label: '-', value: ' - ' },
   { label: '*', value: ' * ' },
   { label: ':', value: ' : ' },
-  { label: '.', value: ' . ' },
   { label: '^', value: ' ^ ' },
   { label: '(', value: ' (', tip: 'open group' },
   { label: ')', value: ') ', tip: 'close group' },

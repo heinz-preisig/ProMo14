@@ -75,7 +75,7 @@ def test_python_group():
 
 
 def test_python_index_preserving_product():
-    assert gen("rho . v", "python") == "V_1 * V_2"
+    assert gen("rho * v", "python") == "V_1 * V_2"
 
 
 def test_python_reciprocal():
@@ -91,10 +91,10 @@ def test_python_expand():
 
 
 def test_python_reduce_tensordot_axes():
-    # rho[N] * v[N]: the shared index N sits at position 0 in both
-    # operands — a 1-D·1-D contraction renders as ``@`` (sparse-safe
-    # matmul, here the inner product).
-    assert gen("rho * v", "python") == "V_1 @ V_2"
+    # reduceSum(rho[N] * v[N], N): the shared index N sits at position
+    # 0 in both operands — a 1-D·1-D contraction renders as ``@``
+    # (sparse-safe matmul, here the inner product).
+    assert gen("reduceSum(rho * v, N)", "python") == "V_1 @ V_2"
 
 
 def test_python_power():
@@ -107,10 +107,10 @@ def test_python_elementwise_alignment():
     [N,t] — N gains a trailing singleton, alpha is transposed."""
     assert gen("N ^ alpha", "python") == \
         "V_4[:, None] ** np.transpose(V_11, (1, 0))"
-    assert gen("N . alpha", "python") == \
+    assert gen("N * alpha", "python") == \
         "V_4[:, None] * np.transpose(V_11, (1, 0))"
     # result [t,N]: N already aligns with the trailing axis
-    assert gen("alpha . N", "python") == "V_11 * V_4"
+    assert gen("alpha * N", "python") == "V_11 * V_4"
     # activity kinetics shape: Product over N leaves [t]
     assert gen("Product(N ^ alpha, N)", "python") == \
         "np.prod(V_4[:, None] ** np.transpose(V_11, (1, 0)), axis=0)"
@@ -138,7 +138,7 @@ def test_python_instantiate():
 
 def test_python_constant_value_inlined():
     # A variable with a pre-bound promo:value renders as the literal.
-    assert gen("half . M", "python") == "0.5 * V_3"
+    assert gen("half * M", "python") == "0.5 * V_3"
 
 
 def test_python_integral():
@@ -179,7 +179,7 @@ def test_python_call():
 
 def test_matlab_index_preserving_product_einsum_no_reduce():
     # Shared indices become element-wise "pages" when nothing is reduced.
-    assert gen("rho . v", "matlab") == "einsum(V_1, V_2)"
+    assert gen("rho * v", "matlab") == "einsum(V_1, V_2)"
 
 
 def test_matlab_reciprocal():
@@ -198,7 +198,8 @@ def test_matlab_expand_einsum_outer():
 
 
 def test_matlab_reduce_einsum_labels():
-    assert gen("rho * v", "matlab") == "einsum(V_1, V_2, {'N'})"
+    assert gen("reduceSum(rho * v, N)", "matlab") == \
+        "einsum(V_1, V_2, {'N'})"
 
 
 def test_matlab_power():
@@ -210,9 +211,9 @@ def test_julia_elementwise_alignment():
     order, insert singletons for missing non-trailing axes."""
     assert gen("N ^ alpha", "julia") == \
         "V_4 .^ permutedims(V_11, (2, 1))"
-    assert gen("alpha . N", "julia") == \
+    assert gen("alpha * N", "julia") == \
         "V_11 .* (_x -> reshape(_x, 1, size(_x, 1)))(V_4)"
-    assert gen("rho . v", "julia") == "V_1 .* V_2"
+    assert gen("rho * v", "julia") == "V_1 .* V_2"
 
 
 def test_add_aligns_same_set_different_order():
@@ -289,7 +290,7 @@ def test_latex_group():
 
 
 def test_latex_index_preserving_product():
-    assert gen("rho . v", "latex") == r"{\rho}_{N} \circ {v}_{N}"
+    assert gen("rho * v", "latex") == r"{\rho}_{N} \circ {v}_{N}"
 
 
 def test_latex_reciprocal():
@@ -302,7 +303,7 @@ def test_latex_expand():
 
 
 def test_latex_reduce_sums_shared_index():
-    assert gen("rho * v", "latex") == \
+    assert gen("reduceSum(rho * v, N)", "latex") == \
         r"\sum_{N} {\rho}_{N} \, {v}_{N}"
 
 

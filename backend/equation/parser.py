@@ -45,7 +45,7 @@ from typing import List, Optional
 from .symbols import DEFAULT_TABLE, SymbolTable
 from .syntax import (
     Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
-    MaxMin, Node, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff,
+    MaxMin, Node, ParDiff, Power, Product, ReduceSum, Root, TotalDiff,
     UFunc, Var,
 )
 
@@ -256,8 +256,6 @@ class Parser:
             return Expand(left, right)
         if f == "index_preserving_product":
             return IndexPreservingProduct(left, right)
-        if f == "reduce":
-            return Reduce(left, right)
         if f == "power":
             return Power(left, right)
         raise ParseError(f"No AST factory for infix operator {info.symbol!r}")

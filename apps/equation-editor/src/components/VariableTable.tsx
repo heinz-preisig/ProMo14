@@ -3,19 +3,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { astToLatex, indexShortLabel, renderLatex } from '../latex'
 import type { ClassificationAxis, EquationClass, Index, Variable } from '../types'
 import { kindSummary } from '../axisClassifications'
-import { equationClassLabel } from '../variableUtils'
-
-/** SI symbols matching UNIT_LABELS in the editors:
- *  time, length, amount, mass, temperature, current, light, nil. */
-const UNIT_SYMBOLS = ['s', 'm', 'mol', 'kg', 'K', 'A', 'cd', 'nil']
-
-function formatUnits(units?: number[]): string {
-  if (!units || units.every((e) => !e)) return '—'
-  return units
-    .map((e, i) => (e ? `${UNIT_SYMBOLS[i]}${e !== 1 ? `^${e}` : ''}` : ''))
-    .filter(Boolean)
-    .join('·')
-}
+import { equationClassLabel, formatUnits, variableTooltip } from '../variableUtils'
 
 type SortKey = 'label' | 'type' | 'network' | 'eqs'
 
@@ -257,7 +245,7 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                     <tr
                       onClick={() => onSelect?.(v)}
                       style={{ cursor: onSelect ? 'pointer' : 'default' }}
-                      title={v.iri}
+                      title={variableTooltip(v, { indices, kind: kindSummary(axes, v.classifications ?? {}) })}
                     >
                       <td style={{ padding: '4px 4px 4px 8px', borderBottom: '1px solid #eee' }}>
                         {eqs.length > 0 && (
@@ -283,7 +271,7 @@ export default function VariableTable({ variables, indices, axes = [], equationC
                       </td>
                       <td
                         onClick={(e) => startEdit(e, v, 'label')}
-                        title={onSave ? 'Click to rename' : v.iri}
+                        title={onSave ? 'Click to rename' : variableTooltip(v, { indices, kind: kindSummary(axes, v.classifications ?? {}) })}
                         style={{ padding: '4px 8px', borderBottom: '1px solid #eee', fontWeight: 500 }}
                       >
                         {editCell?.iri === v.iri && editCell.field === 'label'

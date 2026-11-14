@@ -40,14 +40,8 @@ class Expand:
 
 @dataclass(frozen=True)
 class IndexPreservingProduct:
-    """Product ``left . right`` retaining common indices."""
-    left: "Node"
-    right: "Node"
-
-
-@dataclass(frozen=True)
-class Reduce:
-    """Reduce product ``left * right`` over their one common index."""
+    """Product ``left * right`` — elementwise over shared indices,
+    ordered union of both index structures (§40)."""
     left: "Node"
     right: "Node"
 
@@ -139,6 +133,6 @@ class Call:
 
 
 Node = Union[
-    Var, Group, Add, Expand, IndexPreservingProduct, Reduce, Power, Instantiate,
+    Var, Group, Add, Expand, IndexPreservingProduct, Power, Instantiate,
     Integral, Product, Root, MaxMin, TotalDiff, ParDiff, ReduceSum, UFunc, Call,
 ]

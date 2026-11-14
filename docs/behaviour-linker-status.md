@@ -109,9 +109,13 @@ closure tests, full suite 524 green — amended 2026-11-10, was 421).  Design is
   sets); per-contact port resolution across arcs — R3 rule: peer's
   defined vars with comparable token (`promo:parent` ancestry) minus
   the unflagged state, `port_variable` preferred among candidates;
+  §39 effort coupling — a `function:effort` port binds only a
+  `function:effort` peer carrying a token comparable to the
+  mechanism's `promo:drives` (identity always couples);
   `tokenKind` carrier pre-filter; problem report
-  (untyped nodes, missing/open assignments, unbound/ambiguous ports,
-  unmarked inputs).  `GET /api/instantiate/model?graph=&vars=`
+  (untyped nodes, missing/open assignments, unbound/ambiguous/
+  effort-unavailable ports, unmarked inputs).
+  `GET /api/instantiate/model?graph=&vars=`
   serves the report incl. the incidence matrices.
 - `scheduler.py` — §19 evaluation scheduling (new, 2026-09-22):
   dependency DAG over `(entity_type, equation)` blocks — intra-type

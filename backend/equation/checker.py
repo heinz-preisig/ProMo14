@@ -41,7 +41,7 @@ from .compile_space import BOUND_KINDS, CompileSpace
 from .errors import IndexStructureError, UnitError, VarError
 from .syntax import (
     Add, Call, Expand, Group, IndexPreservingProduct, Instantiate, Integral,
-    MaxMin, Node, ParDiff, Power, Product, Reduce, ReduceSum, Root, TotalDiff,
+    MaxMin, Node, ParDiff, Power, Product, ReduceSum, Root, TotalDiff,
     UFunc, Var,
 )
 from .units import Units
@@ -175,32 +175,6 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             node=node,
             units=left.units * right.units,
             indices=_union(left.indices, right.indices),
-            label=space.new_temp(),
-            incidence=left.incidence | right.incidence,
-            children=[left, right],
-        )
-
-    if isinstance(node, Reduce):
-        left = check(node.left, space, lhs)
-        right = check(node.right, space, lhs)
-        common = left.index_set() & right.index_set()
-        if len(common) != 1:
-            raise IndexStructureError(
-                "ReduceProduct -- the operands must have exactly one common index"
-                "\n first argument indices : %s"
-                "\n second argument indices: %s"
-                % (
-                    space.pretty_index_list(left.indices),
-                    space.pretty_index_list(right.indices),
-                )
-            )
-        reduced_iri = next(iter(common))
-        result_indices = _without(
-            _union(left.indices, right.indices), reduced_iri)
-        return Checked(
-            node=node,
-            units=left.units * right.units,
-            indices=result_indices,
             label=space.new_temp(),
             incidence=left.incidence | right.incidence,
             children=[left, right],

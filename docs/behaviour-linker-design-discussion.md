@@ -3936,3 +3936,110 @@ versions are untouched. Tests cover transport descendants, capacity and
 environment rejection, generic/swapped constraints, CRUD validation,
 removal and idempotent floor application. This does not reclassify existing
 controller variables or introduce a persisted sticker.
+
+## 39. Effort coupling — the continuity arc knows its conjugate variable (2026-11-13)
+
+### Problem
+
+A physical token-flow arc asserts **continuity in effort and flow**.
+The transport therefore must know *which* effort variable it reads at
+each contacted capacity — at connection time, not as a deferred
+instantiation inference.  The coupling signature existed in the
+vocabulary since §32 stage-2 (`promo:drives` on mechanism leaves,
+`function:effort` on variables) but had no consumer: peer matching was
+raw token comparability, so any token-comparable variable could serve
+as "the effort" and the mechanism's drive signature could not exclude
+a wrong one.
+
+### Ruling
+
+- **Match rule (effort-role ports only).**  A port variable classified
+  `function:effort` couples iff the peer exports a variable that is
+  also `function:effort` **and** carries a token comparable to the
+  demand-side mechanism's `promo:drives` (unioned up the
+  `promo:parent` ancestry).  Identity (the shared boundary variable)
+  always couples.  Flow and other ports bind by plain comparability,
+  unchanged — the drive filter does not apply to them.
+- **Derived, not stored.**  The pairing is recomputed from the pins —
+  mechanism → drives → peer var-set — at both decision points: the
+  modeller's connect-time adjudicator (`port_satisfaction`, advisory)
+  and instantiation's port binder (authoritative).  No arc payload is
+  written; the connection's semantics derive from ontology + library.
+- **Distinct status.**  An effort port with no qualifying peer reports
+  `effort-unavailable` (instantiation problem kind
+  `effort-unavailable-port`), distinct from generic `unbound` — the
+  hint names the missing export, not just the empty candidate list.
+- **Graceful without drives.**  A mechanism (or non-mechanism demand
+  side) declaring no `promo:drives` skips the token half of the rule;
+  the effort-role match still applies.
+
+### Implementation
+
+`VarInfo.effort` flags `function:effort`-classified variables
+(`_vars_collect` reads the `promo:axisValue` term).  `mechanism_drives`
+maps each demand entity type to its drive-token set — supplied to
+`build()` and `port_satisfaction()` by both service layers.  The
+candidate loops in `satisfy._adjudicate` and `builder.candidates_at`
+apply the rule; `emit_port` hints *"peer exports no function:effort
+var carrying the mechanism's drive token"*.
+
+Regression coverage: effort binds an effort peer carrying the drive
+token; a merely token-comparable non-effort peer is rejected; an
+effort peer on the wrong drive token is rejected; absent `drives`
+degrades to role-only matching; non-effort ports are unaffected.
+548 backend tests pass.
+
+### Open
+
+- **Signal-arc variable selection** (the access issue) — the same
+  arc→variable binding slot, semantics differing by arc kind;
+  discussion follows this section.
+- **Multi-mechanism pairing** — `drives` is unioned over the demand
+  type's ancestry; per-contact mechanism resolution remains the §32
+  stage-2 `port-domain-ambiguous` tripwire.
+
+## 40. One product, explicit contraction — `*` unified, `.` retired (2026-11-14)
+
+### Problem
+
+Two different operations shared the product surface: `a . b` was the
+index-preserving (elementwise) product while `a * b` was an implicit
+*reduce* product that contracted the single shared index — and the
+explicit form `reduceSum(a . b, i)` used yet a third spelling for the
+same underlying multiplication.  `rho * v` looked like a product but
+silently summed; there was no way to write an elementwise product over
+shared indices with the `*` glyph, and the implicit rule broke down
+exactly where it mattered (zero or several shared indices).
+
+### Ruled
+
+- `a * b` is THE index-preserving product: elementwise over shared
+  indices, ordered union of operand index structures otherwise
+  (scalars included — `half * M` is legal).  It never contracts.
+- `a . b` is retired — no `.` infix remains.
+- Every contraction is explicit: `reduceSum(a * b, i)` names the
+  summed index.  `a : b` (expand) is unchanged.
+- The implicit-`Reduce` AST node and the `promolg:ReduceProduct`
+  canonical op are gone; `ReduceProduct` survives only as a
+  read-side signature so stored `rhsExpression` trees load for the
+  migration.
+
+### Migration (load-time, `persistence._migrate_product_operators`)
+
+- Canonical trees: `ReduceProduct(a,b)` →
+  `SumOverIndex(IndexPreservingProduct(a,b), shared)` with `shared`
+  recomputed bottom-up from declared index structures; `.` spells
+  `*` on regeneration.
+- Literal-only equations: re-parsed under a legacy table, `_LegacyReduce`
+  → `reduceSum( (a * b), i )`, re-printed.  A `*` under an enclosing
+  aggregator whose index matches the shared one is already-migrated
+  text — the rewrite is idempotent.
+- Anomalies (shared index not exactly one, legacy parse failure) are
+  logged and left untouched — those expressions were never checkable.
+- Real data: all stored equations migrated mechanically; zero
+  anomalies.  No equation needed a semantics change — every stored
+  `*` contracted exactly one shared index.
+
+Regression coverage: `test_migrate_products.py` exercises literal and
+canonical rewrites plus idempotency; parser/checker/codegen/builder
+tests cover the new `*` semantics.  548 backend tests pass.

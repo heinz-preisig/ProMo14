@@ -46,8 +46,8 @@ def test_source_regeneration_qualifies_foreign_variable():
     ("source", "lhs"),
     [
         ("rho + rho", None),
-        ("rho . x", None),
-        ("rho * v", None),
+        ("rho * x", None),
+        ("reduceSum(rho * v, N)", None),
         ("one ^ one", None),
         ("Product(N, N)", None),
         ("reduceSum(rho, N)", None),

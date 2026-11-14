@@ -45,7 +45,9 @@ from pydantic import BaseModel, Field
 from rdflib import RDF, RDFS, Literal, URIRef
 
 from backend.behaviour.service import _read_assignment
-from backend.core.capabilities import violations as capability_violations
+from backend.core.capabilities import (
+    mechanism_drives, violations as capability_violations,
+)
 from backend.core.graph_store import PROMO, get_store
 from backend.core.iri import composite_iri, local_name, model_iri
 from backend.core.deps import editable_param, graph_param, resolve_graph
@@ -309,7 +311,10 @@ def port_satisfaction_endpoint(
     src_side, tgt_side = port_satisfaction(
         source, target, assignments, variables, equations,
         token_parents, matched_tokens=matched,
-        unidirectional=unidirectional)
+        unidirectional=unidirectional,
+        drives={e: mechanism_drives(store, str(model_graph.identifier),
+                                    e)
+                for e in {source, target}})
 
     def _out(side) -> PortSideOut:
         return PortSideOut(

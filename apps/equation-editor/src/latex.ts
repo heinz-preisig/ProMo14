@@ -11,8 +11,7 @@ export interface LatexContext {
 
 function needsBraces(node: AstNode): boolean {
   return node.type === 'Add' || node.type === 'Expand' ||
-         node.type === 'IndexPreservingProduct' || node.type === 'Reduce' ||
-         node.type === 'Power'
+         node.type === 'IndexPreservingProduct' || node.type === 'Power'
 }
 
 function wrap(node: AstNode, ctx?: LatexContext, force = false): string {
@@ -130,11 +129,6 @@ export function astToLatex(node: AstNode, ctx?: LatexContext): string {
       return `${wrap(node.left as AstNode, ctx)} \\times ${wrap(node.right as AstNode, ctx)}`
     case 'IndexPreservingProduct':
       return `${wrap(node.left as AstNode, ctx)} \\circ ${wrap(node.right as AstNode, ctx)}`
-    case 'Reduce': {
-      const left = wrap(node.left as AstNode, ctx)
-      const right = wrap(node.right as AstNode, ctx)
-      return `${left} \\cdot ${right}`
-    }
     case 'Power':
       return `${wrap(node.base as AstNode, ctx, true)}^{${astToLatex(node.exponent as AstNode, ctx)}}`
     case 'Instantiate': {
