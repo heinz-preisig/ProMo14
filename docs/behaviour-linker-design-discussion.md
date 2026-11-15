@@ -4043,3 +4043,328 @@ exactly where it mattered (zero or several shared indices).
 Regression coverage: `test_migrate_products.py` exercises literal and
 canonical rewrites plus idempotency; parser/checker/codegen/builder
 tests cover the new `*` semantics.  548 backend tests pass.
+
+## 41. Reference coordinate and vector components — two new indices — RULED (2026-11-14)
+
+### Problem
+
+The transport laws need the effort drop *along the transport's own
+reference coordinate* (the through-direction), but the only direction
+carrier in the expression language is `F_k` — node–arc incidence.
+Two consequences surfaced after §40 made contractions explicit:
+
+- **Declared vs bound divergence.**  In the declared space `p_mech`
+  is `[N]` and `p_mech * F_conv` shares `N`, so the library check
+  wants `reduceSum(…, N)` = `Fᵀ·p` per arc.  In the transport's
+  *bound* scope `p_mech` binds `{A_conv:[contacts]}` (peer efforts),
+  and the physics needs `F·p` = contraction over the contact axis —
+  `Σ_a F[T,a]·p_a` = the through-drop `p_C₁ − p_C₂`, signed by the
+  per-contact incidences at the transport's row (§15's orientation).
+  `reduceSum(…, N)` in that scope computes `p[a]·Σ_n F[n,a]` =
+  identically zero.  Verified in live emission: `fmc ≡ 0`.
+- **The old implicit `*` hid this** — "contract the shared index"
+  resolved per context (N declared, `A_conv` bound).  §40's explicit
+  `reduceSum(…, idx)` pinned the declared reading; no single literal
+  spelling satisfies both contexts.
+
+The `F·p` trick also conflates roles: node–arc incidence is doing
+double duty as the transport's reference direction, and it only works
+for a 2-port through-path.
+
+### Proposal (under discussion)
+
+Two orthogonal indices, added to the index algebra:
+
+- **`X` — reference coordinate** (through-direction).  Lives on the
+  transport; elements are contacts in coordinate order (`x_in`,
+  `x_out` for 2-port).  Contact-bound efforts (`p_mech`, `T`, `μ`)
+  bind `X` instead of an arc sub-index — declared *and* bound
+  contexts then evaluate the identical contraction.
+- **Direction as data**: a signed vector `σ[X]` (`+1` in, `−1` out;
+  constant for 2-port, per-contact orientation for n-port — same
+  source data as `F`'s transport row).  Laws read
+  `fmc = k·A·reduceSum(σ * p_mech, X)` — the drop *is* the coordinate
+  contraction, explicit and context-invariant.  `d` (the ±1 sign
+  param) becomes derived: `d = sign(reduceSum(σ * p_mech, X))`.
+- **`C` — component index** `{x,y,z}`.  Lives on intrinsically
+  vector variables: `vx,vy,vz` fold to `v[C]`, `r_x,r_y,r_z` to
+  `r[C]` — component equations collapse to one `[C]`-indexed
+  equation (elementwise `*` handles components).
+- **Scalars stay scalar**: `m`, `n`, `U`, `T`, `p`, `μ`, `c`, `V`,
+  and all through-flows (`fmc`, `fhc`, `fnd`) keep no `C`.  A flow
+  rate through a transport is a scalar signed by `X`.
+- **Momentum becomes `[C]`-indexed**: momentum content `P[C]`,
+  momentum flows `fmom[C]`, forces `[C]` — the balance becomes three
+  per-component conservation laws (physically correct: momentum
+  conserves per component).  Convected momentum is `fmom = fmc·v`
+  elementwise over `C`.
+- **`F·f` balances unchanged** — `F_k` stays pure incidence; `σ[X]`
+  is its transport-row restriction generalised to a first-class
+  coordinate.  Arcs keep flows, coordinates keep efforts.
+
+### The X↔C seam
+
+A transport's `X` points somewhere in space.  For convection
+(drives `token_momentum`) the pressure-drop force lands on the
+momentum component matching the transport's spatial alignment —
+placement metadata: the transport instance declares which `C`
+direction its `X` is (direction cosines for diagonal cases,
+deferrable).
+
+### Ruled (2026-11-14)
+
+1. **σ is instantiation-derived** — like `F_k`: per-model, emitted
+   into `model_data` per transport scope.  Values = the transport's
+   per-contact orientation signs (= `F_k`'s row at the transport),
+   so `σ` reflects whatever orientation was assigned, not a fixed
+   `{+1,−1}`.
+2. **`X` elements are ordered contacts** — the order IS the
+   coordinate direction; n-port gets n elements.
+3. **Multi-port ruled now** — `σ` carries per-contact signs from the
+   orientation assignment; flows stay per-arc `{A_k}`.  No 2-port
+   special-casing.
+4. **Token layer unchanged** — `token_momentum` stays one token; the
+   `[C]`-indexed carrier suffices.  Token says WHAT flows, index
+   says its algebraic shape.
+5. **`X↔C` seam lands now** — transport instances carry placement
+   metadata declaring which `C` direction their `X` aligns to
+   (direction cosines deferred).
+6. **Equations rewritten via the editor**, not migrated — the
+   rewrite is semantic (new indices, σ), not mechanical; §40's
+   lesson is that mechanical migration pins the wrong context.
+
+### Mechanics (implemented 2026-11-14)
+
+- **`X` is one global index** (`idx_x`): `indexClass` `coordinate`,
+  `subIndexOf idx_arc` — arc-*like* through the sub-index chain, so
+  element resolution, bound ordering and gathers reuse the arc
+  machinery unchanged.  It carries **no `selector`** — its elements
+  are per-scope contacts, not a fixed model-wide membership, so it
+  never enters the resolved sub-index set (and selector-bearingness
+  is now the F-factor mechanism test in seed + persistence).
+- **`σ` is a scheme object** — `promo:Variable`
+  `internalID sigma`, `indexStructure idx_x`, constant+parameter,
+  dimensionless, token-neutral — same pattern as `F_k`.
+  `SEED_FLOOR 2026-11-14` seeds both records.
+- **No contact vars needed**: `p_mech`, `T`, `mu` keep `[N]`.
+  In an event-dynamic scope the §32 port swap now binds the
+  node-like declared index to `X` — `p_mech {X:[a1,a2]}` — the
+  contacts ARE the coordinate elements.  Capacity scopes keep
+  declared `{A_k}` bindings (upwind `F·c` contracts `A`
+  correctly).  This was simpler than the proposed `p_x`/`T_x`
+  retype — the same-IRI gather machinery is untouched.
+- **`σ` binds `direction`**: a constant var whose sole index is
+  `X` is the direction literal (parallel to arc+node constant →
+  `incidence`).  Plan computes the signs — the base-F entries at
+  each contact arc's in-scope end, in bound-element order — and
+  emits a `ParamSlot` into the `values` channel (1-D vector via
+  `_tab`; a sparse matrix would broadcast wrong).  `test_01`:
+  `sigma_convection_transport = [+1, −1]`.
+- **Laws contract `X`**: `fmc = k·A·reduceSum(σ * p_mech, X)` —
+  the drop is the coordinate contraction, signed by `σ`.  `d`
+  becomes derived: `d = sign(reduceSum(σ * p_mech, X))`.
+- **`F_k` keeps only the balance role**: `reduceSum(F_k * f_k, A_k)`
+  and the upwind `½(F − d|F|)·c` equations (lumped scope,
+  arc-indexed) are untouched — F never again stands in for a
+  reference direction.
+- New problem kind `direction-ambiguous` (arc touching the entity
+  at both/zero ends) — catalogued.
+
+### Equation rewrite map (editor)
+
+- `E_4`/fmc: `(kConvX*Ayz) * reduceSum((p_mech*F_conv), N)`
+  → `* reduceSum((sigma * p_mech), X)`
+- `E_11`/d: `sign(reduceSum((F_conv*p_mech), N))`
+  → `sign(reduceSum((sigma * p_mech), X))`
+- `fhc`, `fQx`: `reduceSum((F_heat*T), N)`
+  → `reduceSum((sigma * T), X)`
+- `fnd`: `reduceSum((F_diff*mu), N)`
+  → `reduceSum((sigma * mu), X)` — `mu` is `[N,S]`-declared,
+  binds `{X,S}` in the transport scope, contracts to `[S]`,
+  broadcasts onto `fnd`'s `[A_diff,S]`
+- `fhd`/radiation law: same `F_heat·T`-pattern
+  → `reduceSum((sigma * (T*T*T*T)), X)`
+- Balances + upwind pair: unchanged.
+
+### Deferred
+
+- Component fold: `vx,vy,vz`→`v[C]`, `r_x,r_y,r_z`→`r[C]` and the
+  elementwise collapse of their equations — independent of the `X`
+  work, same migration mechanics.
+- Tensors (stress, momentum-flux) stay out of scope — staged in §42.
+
+## 42. Tensor-index layer for sheet mechanics — DESIGN PROPOSAL (deferred)
+
+### Motivation
+
+A coming project — deforming sheets driven in a controlled way —
+needs mechanics: displacement/velocity fields, stress, strain,
+actuation forces, contact regimes.  These are genuinely
+*tensor-valued* quantities over the spatial basis `C`, and the
+expression language today has no frame semantics for them (§41
+deferred).  This proposal stages the work so it can start when the
+project does; until then the focus stays on mass and energy for
+reactive and passive systems.
+
+### Two senses of "tensor"
+
+- **Array sense — already present.**  Multi-index objects
+  (`F[N,A]`, `mu[N,S]`), Einstein-style contraction (implicit `*`
+  over shared indices), `reduceSum` traces.  A `σ_stress[C,C']`
+  would *store and contract* correctly today.
+- **Geometric sense — absent.**  Tensors are defined by their
+  transformation law under basis change (material frame vs lab
+  frame, anisotropy axes vs world).  ProMo's indices are discrete
+  label spaces; nothing enforces frame agreement — mismatched
+  frames would contract silently, the same class of bug the §41
+  `reduceSum(·,N)` anomaly was, one level deeper.
+
+The staged plan delivers the array layer now and gates the frame
+layer on actual physics need.
+
+### Stage A — index, mesh, stencil (reuses §41 machinery)
+
+- **`C` index**: seed `idx_component` `{x,y,z}` + the deferred
+  `C`-fold (`v[C]`, `r[C]`, `P[C]`, forces `[C]`) — already ruled
+  in §41, first consumer arrives with the project.
+- **Paired `[C,C]` self-indexing**: `reduceSum(·,C)` cannot
+  disambiguate two `C` slots.  Options: positional contraction
+  (`reduceSum(·,C@1)`-style) or primed label copies (`C` vs `C'`
+  as distinct index IRIs over the same elements).  Design work —
+  small, must be settled before stress/strain equations land.
+- **Mesh entities**: the FEM discretisation turns the sheet into
+  ProMo's native home — algebraic equations on a discrete
+  structure.  Elements/nodes become index-bearing occurrences;
+  element–node incidence `E[M,N]` is the same incidence trick as
+  `F[N,A]`, carrying assembly.
+- **Geometric stencils**: gradient `G`, divergence `D`,
+  strain–displacement `B` as *instantiation-computed structural
+  operators* — the `σ`/`F` emit-per-scope pattern applied to mesh
+  geometry instead of topology.  Operators live in the ontology,
+  values land in `model_data`.
+- **Physics scope for stage A**: small-strain linear elasticity in
+  a single (lab) frame — pure array algebra, no transformation
+  semantics required.  Double contraction `Cijkl·εkl` via nested
+  `reduceSum` if composable, else a `contract(·,[i,j])` primitive.
+- **Actuation & regimes**: `promo:drives` + actuation arcs already
+  seeded; contact/slip regimes map onto event-dynamic entities.
+
+### Stage B — frame semantics (gated on physics)
+
+- **Frame as a classification axis** on `[C]`-indexed variables —
+  ontology-declared (lab / material / crystal), checked at
+  contraction time: mismatched-frame products become checker
+  errors, not silent wrong answers.
+- **Finite kinematics**: deformation gradient `Fdx[C,C']`,
+  objective rates (Jaumann-type correction terms as ordinary
+  equation terms once frames exist).
+- **`X↔C` seam generalises**: a sheet's `X` (in-plane reference)
+  becomes tangent-plane placement metadata — the same seam §41
+  drew for transports, now orienting element-local frames.
+
+### Open for the project
+
+- Mesh representation: occurrence composition vs dedicated mesh
+  index; where element geometry (areas, edge vectors) lives.
+- `C'` naming/positional contraction mechanics.
+- Stencil storage format in `model_data` (sparse COO like `F`).
+- Whether `d()/dt` needs a material-derivative sibling operator.
+
+### Status
+
+PROPOSAL — not ruled.  Pick up when the sheet project starts;
+Stage A is designed against machinery §41 already landed, Stage B
+lands only when the physics (large rotation, anisotropy,
+material-frame constitutives) demands it.
+
+## 43. Flow classification grants port export — RULED & implemented (2026-11-15)
+
+### Problem
+
+Port semantics is declared twice: the `function:` axis *says* what
+a variable is (flow/effort/state/…), while `port_variable` +
+`hasPortVariable`/`stateVariable` *enforce* binding elsewhere.
+For flows the duplication was pure friction — flagging every
+through-flow by hand (and the flag is structural-locked once
+referenced, so fixing it needs an equation-detach dance).
+
+### Ruling
+
+- **`function:flow` ⇒ exportable.**  A through-flow lives on the
+  arc by nature — the arc IS the port.  `VarInfo.flow` is derived
+  from the classification and `exportable = port_variable or flow`
+  replaces the bare flag at every binding site: peer state-hiding,
+  candidate preference (`flagged or raw`), self-donation, and
+  phantom-boundary exports.
+- **`port_variable` shrinks to an override** — the exceptional
+  export: non-flow vars a peer must read (measurement/signal
+  style, or an unhidden state).  Flows no longer need it.
+- **`hasPortVariable` (the demand) is unchanged** — it is
+  genuinely per-entity-type information: which of several flows
+  the capacity reads is not derivable from the classification.
+- **Effort coupling is the precedent** — `function:effort` already
+  gated §38 pairing; this completes the pattern rather than
+  inventing it.
+
+### Caveat
+
+The label is now load-bearing: a wrong `function:flow` silently
+changes binding.  Acceptable under the same trust model as
+`function:effort` (classifications are structural-locked while
+referenced).
+
+### Migration & verification
+
+- All `function:flow` vars flagged via store mutation
+  (`fmc`/`fnd`/`fnc`/`pGain` were already flagged; `fhc`/`fhd`
+  were then unflagged — the flag is redundant *and* tripped the
+  `portVariable ⇒ carriesToken` data-consistency rule since they
+  carry no token).
+- `ahc`/`and`/`ahd` were found misclassified `function:flow` —
+  reclassified `function:state` (they are accumulations) and
+  unflagged; correct labelling, no machinery effect.
+- Regression: `test_exportable_flag_or_flow` + `J` fixture moved
+  to unflagged `flow=True` so every port-binding test exercises
+  the classification path.  560 backend tests pass.
+
+## 44. Balances specialize to connected ports — RULED & implemented (2026-11-15)
+
+### Problem
+
+A behaviour assignment written for all possibilities declares
+ports for every mechanism it *could* support (`fmc`, `fnd`,
+`fQx`, …).  Instantiated on a model that connects only some of
+them, the unused demands previously produced `unbound-port`
+problems — pushing toward either zero-instantiating missing
+ports (a physical lie: zero flow ≠ absent mechanism) or
+proliferating entity types per port configuration.
+
+### Ruling
+
+- **Declared flow port binding nothing ⇒ absent, no problem.**
+  No carrier-matching arcs, or arcs whose peers export no
+  comparable flow — either way the mechanism isn't connected,
+  and the balance simply has no term for it.  The var binds
+  its (possibly empty) member list like any other declared
+  index; `F·f` over an empty domain contributes nothing.
+- **Non-flow demands keep `unbound-port`.**  An unconnected
+  effort isn't "no mechanism" — it makes the law ill-posed
+  (a transport with no effort cannot compute a flow), so the
+  problem report is the intent check worth keeping.
+- **`hasPortVariable` stays the contract.**  The declaration
+  documents the interface and drives checking; the topology
+  decides which declared ports actually bind.
+
+### Implementation
+
+`builder.py` port loop: `var.flow` ports skip `emit_port` when
+`pb.status == "unbound"` (all three paths — arc-indexed,
+node-indexed, scalar) or when `carrier_ok`/`cands` is empty.
+`ambiguous` and `effort-unavailable` still report.
+
+### Verification
+
+`test_absent_flow_port_is_silent`: a declared energy-token flow
+port on a mass-only topology emits no `PortBinding` and no
+problem, while a non-flow twin on the same topology still
+reports `unbound-port`.  561 backend tests pass.

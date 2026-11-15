@@ -60,6 +60,18 @@ exports a `function:effort` variable carrying a token comparable to the
 mechanism's `promo:drives`. Missing effort reports
 `effort-unavailable`; the rule does not apply to non-effort ports.
 
+Amended 2026-11-15 (discussions §43, §44): **export is
+classification-driven** — a `function:flow` variable is peer-readable
+across a contact without `portVariable`; the flag stays as the
+explicit override for non-flow exports (§43).  **Demand stays
+declared** — `hasPortVariable` is the entity type's contract, and a
+declared flow port that binds nothing (no carrier-matching arcs, or
+contacts whose peers export no comparable flow) is *absent*, not
+unbound: balances specialize to the connected topology and emit no
+term for an absent mechanism (§44).  `unbound-port` still reports
+for non-flow demands — an unconnected effort makes the law ill-posed,
+not absent; `ambiguous` and `effort-unavailable` are unchanged.
+
 Manual `tokenVector` authoring, propagation, signature-driven membership,
 membership-to-vector defaults and token-signature advisories have been
 removed. Existing stored vectors are inactive metadata, retained without

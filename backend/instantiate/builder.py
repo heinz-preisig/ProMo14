@@ -89,6 +89,16 @@ class VarInfo:
     #: classified ``function:effort`` (§32 drives pairing) — an effort
     #: port reads the conjugate potential from the contact's peer.
     effort: bool = False
+    #: classified ``function:flow`` (§43) — a through-flow lives on
+    #: the arc by nature and is exportable across the contact without
+    #: an explicit flag; ``port_variable`` remains the override for
+    #: non-flow exports.
+    flow: bool = False
+
+    @property
+    def exportable(self) -> bool:
+        """Peer-readable across a contact: flagged or ``function:flow``."""
+        return self.port_variable or self.flow
 
 
 @dataclass
@@ -363,6 +373,13 @@ def build(nodes: Dict[str, NodeInfo],
     base_arc_index = next((i.iri for i in indices.values()
                            if i.source == "arc" and not i.sub_index_of),
                           None)
+    # §41: the reference coordinate — arc-*like* (sub_index_of the
+    # base arc index) but distinguished by its ``coordinate``
+    # source.  Port vars in an event-dynamic scope bind their
+    # node-like declared index to it rather than to a mechanism
+    # sub-index: the contacts ARE the coordinate elements.
+    coordinate_index = next((i.iri for i in indices.values()
+                             if i.source == "coordinate"), None)
     if node_index:
         report.indices[node_index] = node_set
     if base_arc_index:
@@ -650,11 +667,20 @@ def build(nodes: Dict[str, NodeInfo],
                             if _arc_like(indices.get(i), indices)), None)
             node_idx = next((i for i in idx_iris
                              if _node_like(indices.get(i), indices)), None)
+            coord_idx = next((i for i in idx_iris
+                              if i == coordinate_index), None)
             if v_iri in fixed_vars:
                 binding = "fixed"
                 role = "fixed"
             elif arc_idx and node_idx and var.var_class == "constant":
                 binding = "incidence"
+            elif idx_iris == [coordinate_index] \
+                    and var.var_class == "constant":
+                # §41 σ[X]: a constant var whose sole index is the
+                # reference coordinate binds the direction literal —
+                # per-contact signs of the entity's F row (plan.py
+                # computes them from the incidence report).
+                binding = "direction"
             elif var.value is not None:
                 binding = "constant"
             elif role == "parameter":
@@ -693,10 +719,13 @@ def build(nodes: Dict[str, NodeInfo],
                       and v_iri in asg.ports
                       and _node_like(indices.get(i), indices)):
                     # §32 B': the shared var stays itself — it is
-                    # bound-typed by the contact arcs under the
-                    # covering mechanism sub-index (or the base
-                    # arc index when nothing covers).
-                    idx_key = port_arc_index or base_arc_index
+                    # bound-typed by the contact arcs.  §41: the
+                    # bound index is the reference coordinate X
+                    # (the contacts ARE the coordinate elements);
+                    # the mechanism sub-index / base arc index is
+                    # only the fallback when no X exists.
+                    idx_key = (coordinate_index or port_arc_index
+                               or base_arc_index)
                     if idx_key is not None:
                         bound_indices[idx_key] = list(port_arcs)
                     else:
@@ -831,7 +860,7 @@ def build(nodes: Dict[str, NodeInfo],
                         if (w_iri == v_iri and _carried(var)
                                 and upstream != peer):
                             continue
-                        if w_iri == state and not w.port_variable:
+                        if w_iri == state and not w.exportable:
                             hidden = True   # accumulation stays internal
                             continue
                         # §38 effort coupling: an effort port reads a
@@ -848,11 +877,15 @@ def build(nodes: Dict[str, NodeInfo],
                             continue
                         raw.append((peer, w_iri))
                     flagged = [c for c in raw
-                               if variables[c[1]].port_variable]
+                               if variables[c[1]].exportable]
                     return (flagged or raw), hidden
 
                 if arc_indexed:
-                    if not carrier_ok:
+                    # §44: a declared flow port touching no arc of its
+                    # mechanism is absent — the balance simply has no
+                    # term for it; the var binds the empty member list.
+                    # Non-flow demands still report.
+                    if not carrier_ok and not var.flow:
                         emit_port(PortBinding(node=n, var=v_iri,
                                               status="unbound"), var)
                     for a_iri in carrier_ok:
@@ -876,6 +909,10 @@ def build(nodes: Dict[str, NodeInfo],
                             pb.status = "ambiguous"
                         elif var.effort:
                             pb.status = "effort-unavailable"
+                        # §44: a flow port binding nothing at this
+                        # contact is absent, not unbound.
+                        if pb.status == "unbound" and var.flow:
+                            continue
                         emit_port(pb, var, state_hidden=hidden)
                 else:
                     per_contact = [candidates_at(a_iri)
@@ -886,8 +923,9 @@ def build(nodes: Dict[str, NodeInfo],
                     if node_indexed:
                         # A node-indexed port reads a value at EACH
                         # contact — emit one binding per arc, like the
-                        # arc-indexed case above.
-                        if not carrier_ok:
+                        # arc-indexed case above.  §44: flow ports
+                        # absent silently like the arc-indexed case.
+                        if not carrier_ok and not var.flow:
                             emit_port(PortBinding(
                                 node=n, var=v_iri, status="unbound"), var)
                         for a_iri, (contact, hidden) in zip(
@@ -912,6 +950,10 @@ def build(nodes: Dict[str, NodeInfo],
                                 pb.status = "ambiguous"
                             elif var.effort:
                                 pb.status = "effort-unavailable"
+                            # §44: a flow port binding nothing at this
+                            # contact is absent, not unbound.
+                            if pb.status == "unbound" and var.flow:
+                                continue
                             emit_port(pb, var, state_hidden=hidden)
                         continue
                     cands = [
@@ -920,6 +962,11 @@ def build(nodes: Dict[str, NodeInfo],
                             carrier_ok, per_contact)
                         for peer, w_iri in contact]
                     hidden = any(h for _c, h in per_contact)
+                    # §44: a scalar flow port binding nothing — no
+                    # contacts or no comparable candidates — is absent
+                    # rather than unbound.
+                    if var.flow and not cands:
+                        continue
                     pb = PortBinding(node=n, var=v_iri,
                                      status="unbound", candidates=cands)
                     if len(cands) == 1:
@@ -981,7 +1028,7 @@ def build(nodes: Dict[str, NodeInfo],
         w = pb.var
         if (w not in readable_vars(asg, equations) or w not in variables
                 or (w == asg.state_variable
-                    and not variables[w].port_variable)):
+                    and not variables[w].exportable)):
             return None
         return w
 

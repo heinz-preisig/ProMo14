@@ -1,7 +1,7 @@
 # Behaviour Linker — Implementation Status
 
 **Last updated:** 2026-10-28 — **realigned to rulings through
-2026-11-10** (edit rules: `docs/README.md` tier map).
+2026-11-15** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
@@ -108,11 +108,16 @@ closure tests, full suite 524 green — amended 2026-11-10, was 421).  Design is
   `constant`, `parameter`, `port`, `local` with per-index element
   sets); per-contact port resolution across arcs — R3 rule: peer's
   defined vars with comparable token (`promo:parent` ancestry) minus
-  the unflagged state, `port_variable` preferred among candidates;
+  the unflagged state, **exportable** vars preferred among
+  candidates — §43: exportable = `port_variable` flag OR
+  `function:flow` classification;
   §39 effort coupling — a `function:effort` port binds only a
   `function:effort` peer carrying a token comparable to the
   mechanism's `promo:drives` (identity always couples);
-  `tokenKind` carrier pre-filter; problem report
+  `tokenKind` carrier pre-filter; §44: a declared flow port
+  binding nothing is absent, not unbound — balances specialize
+  to the connected topology (non-flow demands still report);
+  problem report
   (untyped nodes, missing/open assignments, unbound/ambiguous/
   effort-unavailable ports, unmarked inputs).
   `GET /api/instantiate/model?graph=&vars=`
@@ -145,7 +150,10 @@ closure tests, full suite 524 green — amended 2026-11-10, was 421).  Design is
 - **Codegen (2026-09-22):** `plan.py` lowers report+schedule into a
   target-agnostic `CodePlan` (state layout, port gathers as index
   maps, incidence matrices restricted to bound elements, param/input
-  slots, ordered blocks with rhs text, per-type emitted-name maps —
+  slots — incl. §41 `direction` slots carrying the σ[X] per-contact
+  orientation signs (`direction-ambiguous` reports a bound arc
+  touching the scope at ≠1 ends) — ordered blocks with rhs text,
+  per-type emitted-name maps —
   shared var IRIs get type-suffixed names).  `emit_python.py` is the
   first emitter: NumPy derivative function (state unpack, gathers,
   `np.tensordot` balances, `dy` slices).  Targets agreed: Julia

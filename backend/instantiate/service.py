@@ -419,8 +419,8 @@ def _phantom_overlay(model_graph,
                 reference_to=(anchor if ref_to_ext else peer)
                 if ref_to_ext is not None else None)
         # Boundary-condition provider: every port-relevant var of the
-        # imagined peer — its exports (port_variable-flagged LHS
-        # vars) and its consumed port demands — becomes fill-in.
+        # imagined peer — its exports (exportable LHS vars: flagged or
+        # function:flow) and its consumed port demands — becomes fill-in.
         fixes: List[str] = []
         asg = next((a for a in assignments if a.entity_type == pet),
                    None)
@@ -428,7 +428,7 @@ def _phantom_overlay(model_graph,
             fixes += [equations[e].lhs for e in asg.sequence
                       if e in equations
                       and variables.get(equations[e].lhs) is not None
-                      and variables[equations[e].lhs].port_variable]
+                      and variables[equations[e].lhs].exportable]
             fixes += [p for p in asg.ports if p not in fixes]
         nodes[peer] = NodeInfo(iri=peer, entity_type=pet, fixes=fixes)
         labels[peer] = f"phantom {_frag(pet)}"
@@ -837,6 +837,11 @@ def _vars_collect(store, vars_graph: Optional[str]):
             # mechanism's promo:drives pairing matches against.
             effort=any(
                 t.split("#")[-1] == "term_function_effort"
+                for t in getattr(v, "classifications", {}).values()),
+            # §43: function:flow — through-flows are contact quantities
+            # and export without an explicit port_variable flag.
+            flow=any(
+                t.split("#")[-1] == "term_function_flow"
                 for t in getattr(v, "classifications", {}).values()),
         )
         labels[iri] = v.label

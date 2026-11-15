@@ -130,6 +130,9 @@ INDICES = {
     _idx("idx_arc_diffusion"): IndexInfo(
         _idx("idx_arc_diffusion"), sub_index_of=_idx("idx_arc"),
         short_name="A_diff"),
+    _idx("idx_x"): IndexInfo(
+        _idx("idx_x"), source="coordinate",
+        sub_index_of=_idx("idx_arc"), short_name="X"),
     _idx("idx_species"): IndexInfo(_idx("idx_species"), source="token",
                                    short_name="S"),
     _idx("idx_reaction_q"): IndexInfo(_idx("idx_reaction_q"),
@@ -151,9 +154,11 @@ VARIABLES = {
     _var("p"): VarInfo(_var("p"), "pressure", "V_2",
                        index_structures=[_idx("idx_node")],
                        tokens=[_tok("mass")], port_variable=True),
+    # §43: unflagged function:flow — exportable by classification,
+    # so the flow-port tests exercise the new path without a flag.
     _var("J"): VarInfo(_var("J"), "diffusive flow", "V_3",
                        index_structures=[_idx("idx_arc_diffusion")],
-                       tokens=[_tok("mass")], port_variable=True),
+                       tokens=[_tok("mass")], flow=True),
     _var("F"): VarInfo(_var("F"), "F_diff", "V_4",
                        index_structures=[_idx("idx_node"),
                                          _idx("idx_arc_diffusion")],
@@ -163,6 +168,9 @@ VARIABLES = {
     _var("p_in"): VarInfo(_var("p_in"), "effort in", "V_6",
                           index_structures=[_idx("idx_arc_diffusion")],
                           tokens=[_tok("mass")]),
+    _var("sig"): VarInfo(_var("sig"), "sigma", "V_sig",
+                         index_structures=[_idx("idx_x")],
+                         var_class="constant"),
 }
 
 EQUATIONS = {
@@ -396,20 +404,22 @@ def test_arc_indexed_port_binds_per_contact():
 
 
 def test_event_dynamic_port_binds_contact_arcs():
-    """§32 B': a node-declared port var on an event-dynamic entity
-    binds the contact ARCS under the covering mechanism sub-index —
-    the shared var stays itself, bound-typed (no arc-typed
-    duplicate).  The plan carries the bound form to the emit-time
-    check: `reduceSum(p * F, A_diff)` contracts over A_diff leaving
-    [N] to broadcast to the lhs's [A_diff]; checked against the
-    DECLARED [N] it would contract N and green-light the wrong math."""
+    """§41: a node-declared port var on an event-dynamic entity
+    binds its contact arcs under the reference coordinate ``X`` —
+    the contacts ARE the coordinate elements.  The direction factor
+    σ binds the ``direction`` literal: the per-contact signs of the
+    transport's F row (+1 at the in-contact a1, −1 at the
+    out-contact a2), so ``reduceSum(σ * p, X)`` is the through-drop.
+    The plan carries the bound form to the emit-time check —
+    declared-space typing would green-light the wrong math."""
     equations = dict(EQUATIONS)
     equations[_eq("flow")] = EqInfo(
         _eq("flow"), _var("J"),
-        [_var("k"), _var("p"), _var("F")],
-        "E_3", rhs="V_5 * reduceSum(V_2 * V_4, A_diff)")
-    # J declared [N, A_diff] — the flow law produces a per-node rate
-    # that broadcasts onto the contact arcs (test_01's fmc shape).
+        [_var("k"), _var("sig"), _var("p")],
+        "E_3", rhs="V_5 * reduceSum(V_sig * V_2, X)")
+    # J declared [N, A_diff] — the flow law produces a scalar
+    # through-rate that broadcasts onto the contact arcs
+    # (test_01's fmc shape).
     variables = dict(VARIABLES)
     variables[_var("J")] = VarInfo(
         _var("J"), "diffusive flow", "V_3",
@@ -429,21 +439,36 @@ def test_event_dynamic_port_binds_contact_arcs():
                 temporal_types={_et("diffusion_transport"):
                                 "event-dynamic"},
                 parents=PARENTS)
-    p = _binding(_entity(rep, _et("diffusion_transport")), _var("p"))
-    assert p.indices == {_idx("idx_arc_diffusion"): ["a1", "a2"]}
+    ent = _entity(rep, _et("diffusion_transport"))
+    p = _binding(ent, _var("p"))
+    assert p.indices == {_idx("idx_x"): ["a1", "a2"]}
+    sig = _binding(ent, _var("sig"))
+    assert sig.binding == "direction"
+    assert sig.indices == {_idx("idx_x"): ["a1", "a2"]}
     cp = plan(rep, schedule(rep),
               fbuild(NODES, ARCS, memberships, SUB_INDICES),
               equations, INDICES, variables=variables)
     blk = next(b for lvl in cp.levels for b in lvl
                if b.entity_type == _et("diffusion_transport"))
-    assert blk.var_bound == {_var("p"): [_idx("idx_arc_diffusion")]}
+    assert blk.var_bound == {_var("p"): [_idx("idx_x")]}
+    sig_slot = next(s for s in cp.params if s.var == _var("sig"))
+    assert sig_slot.values == [1, -1]
     src = emit_python(cp, _emit_space())
     assert "broadcast" in src
 
 
+def test_exportable_flag_or_flow():
+    """§43: exportable = flagged override OR function:flow — an
+    unflagged non-flow stays internal, an unflagged flow exports."""
+    assert VarInfo(_var("x"), port_variable=True).exportable
+    assert VarInfo(_var("x"), flow=True).exportable
+    assert not VarInfo(_var("x")).exportable
+
+
 def test_flow_port_binds_at_arc_element():
     """Capacity's flow port binds to the transport's arc-indexed J —
-    the element is the arc itself."""
+    the element is the arc itself.  J is unflagged ``function:flow``
+    (§43): classification alone makes it exportable."""
     rep = _build()
     ports = [p for p in rep.ports if p.var == _var("J")]
     assert len(ports) == 2                       # c1 via a1, c2 via a2
@@ -452,6 +477,39 @@ def test_flow_port_binds_at_arc_element():
     assert by_node["c1"].peer_var == _var("J")
     assert by_node["c1"].element == "a1"         # J is arc-indexed
     assert by_node["c2"].element == "a2"
+
+
+def test_absent_flow_port_is_silent():
+    """§44: a declared flow port binding nothing — the contacts' peers
+    export no comparable flow — is absent, not unbound: no problem, so
+    the balance simply has no term for it.  A non-flow demand on the
+    same topology still reports, and an effort keeps its dedicated
+    status."""
+    variables = dict(VARIABLES)
+    variables[_var("f_heat")] = VarInfo(
+        _var("f_heat"), "heat flow", "V_h",
+        index_structures=[_idx("idx_arc")],
+        tokens=[_tok("energy")], flow=True)
+    variables[_var("q_heat")] = VarInfo(
+        _var("q_heat"), "heat-like demand", "V_q",
+        index_structures=[_idx("idx_arc")],
+        tokens=[_tok("energy")])
+    assignments = dict(ASSIGNMENTS)
+    lumped = assignments[_et("lumped_capacity")]
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=lumped.entity_type, sequence=lumped.sequence,
+        base_equation=lumped.base_equation,
+        state_variable=lumped.state_variable,
+        instantiated=list(lumped.instantiated),
+        ports=[_var("J"), _var("f_heat"), _var("q_heat")],
+        closed=True)
+    rep = _build(assignments=assignments, variables=variables)
+    # Absent: f_heat emits no PortBinding at all.
+    assert not any(p.var == _var("f_heat") for p in rep.ports)
+    # The non-flow twin on the same topology still reports unbound.
+    assert any(p.var == _var("q_heat") and p.status == "unbound"
+               for p in rep.ports)
+    assert any(p.kind == "unbound-port" for p in rep.problems)
 
 
 def test_unbound_and_ambiguous_ports():
