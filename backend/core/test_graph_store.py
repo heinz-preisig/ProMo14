@@ -322,6 +322,10 @@ def test_seed_incidence_factors(tmp_path):
     subs = sorted(ont.subjects(PROMO["subIndexOf"], arc))
     assert len(subs) >= 5
     for sub in subs:
+        if ont.value(sub, PROMO["selector"]) is None:
+            # §41: the coordinate index is arc-like but not a
+            # mechanism partition — no F factor.
+            continue
         mech = str(ont.value(sub, PROMO["shortName"]))[2:]
         f = URIRef(f"{PVAR}F_{mech}")
         assert (f, RDF.type, PROMO["Variable"]) in ont, mech

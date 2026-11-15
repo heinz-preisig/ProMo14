@@ -537,6 +537,10 @@ class PersistenceMixin:
         arc_iri = vocab_iri(base, "idx_arc")
         mechs = set()
         for sub in ont.subjects(PROMO["subIndexOf"], arc_iri):
+            if ont.value(sub, PROMO["selector"]) is None:
+                # §41: coordinate index — arc-like sub-index, not a
+                # mechanism; no F_<mech> factor corresponds.
+                continue
             short = str(ont.value(sub, PROMO["shortName"]) or "")
             if short.startswith("A_"):
                 mech = short[2:]

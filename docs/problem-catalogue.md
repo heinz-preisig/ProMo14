@@ -32,6 +32,7 @@ Emitted today by `backend/instantiate` (`/api/instantiate/model`, `/code`,
 | `port-coverage` | code plan |
 | `port-domain-unresolved` | port typing (§32) |
 | `port-domain-ambiguous` | port typing (§32) |
+| `direction-ambiguous` | port typing (§41) |
 | `species-port-mismatch` | occurrence composition |
 | `uncovered-override` | occurrence composition |
 | `reference-cycle` | occurrence composition |
@@ -295,6 +296,20 @@ sub-indices at equal depth — port vars need var↔mechanism pairing (§32)`
   `promo:Mechanism` `drives`/`carries` vocabulary (§32 stage 2) is
   the designed slot; until it lands, split the boundary so each arc
   carries one mechanism.
+
+### `direction-ambiguous`
+**Message:** `σ for <var>: arc <a> touches the entity at <n> ends —
+not a contact`
+
+- **Cause.** The σ[X] direction literal needs exactly one in-scope
+  end per contact arc — the F-row sign at the entity's end of the
+  contact.  An arc incident at both ends is internal to the entity
+  scope (not a contact); zero ends means a bound contact that never
+  touches the entity — either way the coordinate has no sign to
+  give.
+- **Remedy.** Check the arc's endpoints: a contact connects the
+  entity to a *peer*.  An arc internal to the entity's own nodes
+  does not belong on its reference coordinate.
 
 ## Occurrence-composition problems (§22/§33)
 

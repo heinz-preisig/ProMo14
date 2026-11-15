@@ -367,6 +367,17 @@ def plan(report: Instantiation, sched: Schedule,
                                         subsets), report.problems),
                     name=names[v.occurrence][e.entity_type][v.var],
                     occurrence=v.occurrence))
+            elif v.binding == "direction":
+                # §41 σ[X]: the per-contact orientation signs of
+                # this entity's F row, in bound-element order.
+                out.params.append(ParamSlot(
+                    var=v.var, instance=v.instance, kind="direction",
+                    indices=v.indices,
+                    values=_direction_signs(
+                        v, incidence, set(e.nodes), indices,
+                        report.problems),
+                    name=names[v.occurrence][e.entity_type][v.var],
+                    occurrence=v.occurrence))
 
     # -- gathers (bound ports → peer element positions) ----------------------
     # Port vars are instance-level: group a var's contacts across all
@@ -696,6 +707,32 @@ def _value_table(v: VarBinding,
                 message=("%d cell(s) covered by equal-specificity fill "
                          "patterns (first: %s) — resolve explicitly"
                          % (n_conflict, first_conflict))))
+    return out
+
+
+def _direction_signs(v: VarBinding, incidence: IncidenceReport,
+                     scope_nodes: set,
+                     indices: Dict[str, IndexInfo],
+                     problems: List[Problem]) -> List[int]:
+    """§41 σ[X] literal: the per-contact orientation sign — the
+    base-incidence entry at the arc's in-scope end, in bound-
+    element order.  An arc touching the scope at both ends is
+    internal, not a contact — reported, not guessed."""
+    sign_at = {(incidence.base.nodes[r], incidence.base.arcs[c]): s
+               for r, c, s in incidence.base.entries}
+    out: List[int] = []
+    for a in _bound_elements(v, indices, _arc_like):
+        ends = [n for n in scope_nodes if (n, a) in sign_at]
+        if len(ends) == 1:
+            out.append(sign_at[(ends[0], a)])
+        else:
+            problems.append(Problem(
+                kind="direction-ambiguous",
+                message=f"σ for {v.var.rsplit('#', 1)[-1]}: arc "
+                        f"{a.rsplit('#', 1)[-1]} touches the entity "
+                        f"at {len(ends)} ends — not a contact",
+                var=v.var))
+            out.append(0)
     return out
 
 

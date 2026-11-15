@@ -385,6 +385,7 @@ class SeedMixin:
         self._seed_capabilities(g, base)
         self._seed_rule_mechanism_flags(g, base)
         self._seed_actuation_target(g, base)
+        self._seed_coordinate(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
@@ -595,6 +596,11 @@ class SeedMixin:
         domain = self.mint_iri(base, "domain_physical")
 
         for sub in sorted(g.subjects(PROMO["subIndexOf"], arc_iri)):
+            if g.value(sub, PROMO["selector"]) is None:
+                # §41: the coordinate index is sub-indexed for
+                # arc-likeness, not a mechanism partition — no
+                # incidence factor for it.
+                continue
             short = str(g.value(sub, PROMO["shortName"]) or "")
             if short.startswith("A_"):
                 mech = short[2:]
@@ -655,6 +661,109 @@ class SeedMixin:
                 g.remove((iri, PROMO["carriesToken"], o))
             for _, _, o in g.triples((iri, PROMO["tokenVector"], None)):
                 g.remove((iri, PROMO["tokenVector"], o))
+
+    def _seed_coordinate(self, g: Graph, base: str) -> None:
+        """§41 reference coordinate ``X`` and direction factor
+        ``sigma``.
+
+        ``idx_x`` enumerates an entity's *contact* arcs — the
+        reference coordinate a flow system reads its efforts along.
+        ``indexClass`` is ``coordinate`` (the distinguishing
+        ``source`` at instantiation); ``subIndexOf`` the base arc
+        index makes it arc-*like* so element resolution, bound
+        ordering and gathers reuse the arc machinery.  It carries
+        **no** ``selector`` — its elements are per-scope contacts,
+        not a fixed model-wide membership, so it never enters the
+        resolved sub-index set.
+
+        ``sigma`` is the direction vector on ``X``: constant +
+        parameter, dimensionless, token-neutral like the incidence
+        factors — per-contact orientation signs emitted per entity
+        scope at instantiation.
+        """
+        arc_iri = self.mint_iri(base, "idx_arc")
+        if (arc_iri, RDF.type, PROMO["Index"]) not in g:
+            return
+        x_iri = self.mint_iri(base, "idx_x")
+        if (x_iri, RDF.type, PROMO["Index"]) not in g:
+            internal_id = self.next_internal_id("I")
+            self.add_index_dict(g, {
+                "iri": str(x_iri),
+                "label": "reference coordinate",
+                "short_name": "X",
+                "network": "physical",
+                "index_class": "coordinate",
+                "internal_id": internal_id,
+                "aliases": {"global_ID": internal_id,
+                            "internal_code": "X"},
+                "sub_index_of": str(arc_iri),
+                "doc": "§41 reference coordinate — an entity's "
+                       "contact arcs in canonical order (the "
+                       "through-direction a flow system reads "
+                       "efforts along).",
+            })
+
+        sigma_iri = self.mint_iri(base, "sigma")
+        domain = self.mint_iri(base, "domain_physical")
+        classifications = {}
+        for axis, term in (
+            ("axis_determination_physical",
+             "term_determination_constant"),
+            ("axis_function_physical", "term_function_parameter"),
+        ):
+            term_iri = self.mint_iri(base, term)
+            if (term_iri, None, None) in g:
+                classifications[str(self.mint_iri(base, axis))] = \
+                    str(term_iri)
+        self.add_variable_dict(g, {
+            "iri": str(sigma_iri),
+            "label": "sigma",
+            "network": "physical",
+            "domain_iri": str(domain),
+            # §26: deterministic ID — ``{graph}#sigma``.
+            "internal_id": "sigma",
+            "units": [0, 0, 0, 0, 0, 0, 0, 0],
+            "index_structures": [str(x_iri)],
+            "port_variable": False,
+            "classifications": classifications,
+            "aliases": {"latex": "\\sigma", "global_ID": str(sigma_iri)},
+            "doc": "§41 — the direction vector on the reference "
+                   "coordinate X: one signed entry per contact of "
+                   "the entity the law belongs to.  "
+                   "Use it wherever a transfer law must know which "
+                   "way is 'along' the coordinate — the "
+                   "driving-force drop across a transport is "
+                   "reduceSum(σ · effort, X), e.g. "
+                   "fmc = k·A·reduceSum(σ·p_mech, X).  Each entry "
+                   "converts a contact's effort into a "
+                   "coordinate-directed contribution, so the sum "
+                   "IS the through-drop (p_in − p_out for a "
+                   "2-port).  "
+                   "σ's values are computed at instantiation from "
+                   "the model's arc orientations: +1 where the "
+                   "contact's reference direction enters this "
+                   "entity, −1 where it leaves — the entity's own "
+                   "row of the incidence matrix F, taken in "
+                   "contact order.  A 2-port on a through-path "
+                   "therefore carries σ = [+1, −1]; an n-port "
+                   "carries one sign per contact.  Flipping an "
+                   "arc's reference direction flips its σ entry — "
+                   "σ is derived, never user-set.  "
+                   "Like the incidence factors F_k, σ is a "
+                   "structural operator: dimensionless, "
+                   "token-neutral, constant+parameter.",
+        })
+        # Exact-set enforcement + token neutrality (F_k precedent):
+        # stale index members and any token declarations are
+        # normalised on load.
+        for o in set(g.objects(sigma_iri, PROMO["indexStructure"])) \
+                - {x_iri}:
+            g.remove((sigma_iri, PROMO["indexStructure"], o))
+        for o in set(g.objects(sigma_iri, PROMO["carriesToken"])):
+            g.remove((sigma_iri, PROMO["carriesToken"], o))
+        for _, _, o in g.triples((sigma_iri, PROMO["tokenVector"],
+                                  None)):
+            g.remove((sigma_iri, PROMO["tokenVector"], o))
 
     def _seed_capabilities(self, g: Graph, base: str) -> None:
         """Seed entity-type capabilities (§20): which types may inject
