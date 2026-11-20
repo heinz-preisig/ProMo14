@@ -622,6 +622,43 @@ def build(nodes: Dict[str, NodeInfo],
                 constraint=(eq.iri == asg.base_equation
                             and eq.lhs in asg.instantiated)))
 
+        # §30 continuity completeness (advisory): the balance's cone
+        # must touch every incident token-flow arc — a flow that never
+        # enters the state equation is silently unconserved.  Coverage
+        # is element-level: any cone input bound over the arc counts
+        # (per-mechanism F·f terms, union-index flows, coordinate
+        # ports), so alternative balance forms are not flagged.
+        base_eq = equations.get(asg.base_equation or "")
+        if base_eq is not None \
+                and any(q.iri == base_eq.iri for q in eq_seq):
+            lhs_of = {q.lhs: q for q in eq_seq}
+            cone: Set[str] = {base_eq.iri}
+            frontier = list(base_eq.inputs)
+            while frontier:
+                q = lhs_of.get(frontier.pop())
+                if q is not None and q.iri not in cone:
+                    cone.add(q.iri)
+                    frontier.extend(q.inputs)
+            covered: Set[str] = set()
+            for qi in cone:
+                for v in equations[qi].inputs:
+                    var = variables.get(v)
+                    if var is None:
+                        continue
+                    for i in var.index_structures:
+                        els = arc_elements(i, t_set)
+                        if els:
+                            covered.update(els)
+            contact = ({a for n in t_nodes for a in incident.get(n, [])}
+                       & set(token_flow_arcs))
+            for a in sorted(contact - covered):
+                problems.append(Problem(
+                    kind="flow-uncovered",
+                    message=f"{_frag(a)}'s flow never reaches "
+                            f"{_frag(et)}'s state equation — "
+                            f"unconserved (§30)",
+                    node=a, entity_type=et))
+
         # Variable discovery order: sequence lhs/inputs, then role lists.
         seen: Set[str] = set()
         ordered_vars: List[str] = []

@@ -221,6 +221,28 @@ def _binding(entity, var):
     return next(v for v in entity.variables if v.var == var)
 
 
+def test_uncovered_flow_mechanism_flagged():
+    """§30 continuity completeness (advisory): an incident arc whose
+    mechanism no equation in the balance's cone touches conserves
+    nothing — flagged, not gated."""
+    nodes = {**NODES, "t4": NodeInfo("t4", _et("convection_transport"))}
+    arcs = {**ARCS, "a4": ArcInfo("a4", "c1", "t4", "token-flow")}
+    sub = {**SUB_INDICES,
+           _idx("idx_arc_convection"): SubIndexInfo(
+               _idx("idx_arc_convection"), _idx("idx_arc"),
+               _et("convection_transport"), "A_conv")}
+    parents = {**PARENTS,
+               _et("convection_transport"): _et("mass_transport")}
+    memberships = resolve(nodes, arcs, sub, parents)
+    rep = build(nodes, arcs, memberships, sub, INDICES,
+                ASSIGNMENTS, VARIABLES, EQUATIONS,
+                TOKEN_PARENTS, TOKEN_KINDS)
+    hits = [p for p in rep.problems if p.kind == "flow-uncovered"]
+    assert len(hits) == 1
+    assert "a4" in hits[0].message
+    assert hits[0].entity_type == _et("lumped_capacity")
+
+
 # ---------------------------------------------------------------------------
 # Index element sets
 # ---------------------------------------------------------------------------

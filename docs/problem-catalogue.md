@@ -21,6 +21,7 @@ Emitted today by `backend/instantiate` (`/api/instantiate/model`, `/code`,
 | `assignment-open` | behaviour binding |
 | `missing-equation` | behaviour binding |
 | `missing-variable` | behaviour binding |
+| `flow-uncovered` | behaviour binding |
 | `unmarked-input` | variable binding |
 | `unbound-port` | port resolution |
 | `ambiguous-port` | port resolution |
@@ -92,6 +93,22 @@ Emitted today by `backend/instantiate` (`/api/instantiate/model`, `/code`,
   exists (or lives in a different var/expr version than the one loaded).
 - **Remedy.** As above: repair the assignment against the current
   var/expr artefact.
+
+### `flow-uncovered`
+**Message:** `<arc>'s flow never reaches <entity type>'s state equation
+— unconserved (§30)`
+
+- **Cause.** A token-flow arc is incident on the entity's nodes, but no
+  equation in the state equation's cone binds over it — no input
+  variable is indexed to the arc's mechanism sub-index, a covering
+  union index, or the reference coordinate.  The entity accumulates
+  without accounting for that flow: conservation is silently violated.
+  (§30 — the balance is a sum of per-mechanism terms, so every incident
+  mechanism needs one.)
+- **Remedy.** Extend the state equation with the missing mechanism's
+  term (`reduceSum(F_k * f_k, A_k)` or the union/coordinate
+  equivalent), bind the flow as an external input if it is truly a
+  boundary flux, or remove the arc if it is not meant to carry a flow.
 
 ## Variable-binding problems
 
