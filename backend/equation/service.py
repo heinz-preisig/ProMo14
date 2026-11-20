@@ -27,6 +27,7 @@ from rdflib.namespace import RDF, RDFS
 
 from backend.core.graph_store import PROMO, get_store
 from backend.core.iri import (
+    canonical_graph_iri,
     equation_iri,
     expression_iri,
     is_absolute,
@@ -546,13 +547,19 @@ def _proto_iri(graph, label: str, network: Optional[str]) -> Optional[URIRef]:
     return candidates[0]
 
 
-def _link_instances(graph, var_iri: URIRef, protos: List[str],
-                    network: str) -> None:
+def _link_instances(store, graph, scope_graph, var_iri: URIRef,
+                    protos: List[str], network: str) -> None:
     """Write ``promo:instanceOf`` links from the new variable to each
-    prototype it instantiates (ADR-008)."""
+    prototype it instantiates (ADR-008).  Prototypes resolve in the
+    write graph first, then the request scope — a proto may live on
+    either side when the two differ."""
     for name in protos:
         qnet, _, qlabel = name.partition("!")
         proto = _proto_iri(graph, qlabel or name, qnet or network)
+        if (proto is None
+                and scope_graph.identifier != graph.identifier):
+            proto = _proto_iri(
+                scope_graph, qlabel or name, qnet or network)
         if proto is not None:
             graph.add((var_iri, PROMO["instanceOf"], proto))
 
@@ -673,7 +680,7 @@ def create_variable(
     store = get_store()
     _resolve_record_domains(store, graph_iri, record)
     _guard_token_consistency(record)
-    graph = resolve_graph(store, graph_iri)
+    scope_graph = resolve_graph(store, graph_iri)
 
     # §26: the store owns minting — a new variable gets
     # ``{graph}#{internal_id}`` so identity survives renames (labels
@@ -682,11 +689,19 @@ def create_variable(
     # ``#V_n`` subject and overwrite it under replace-semantics.
     if not record.iri:
         record.internal_id = store.next_internal_id("V")
-        record.iri = str(variable_iri(graph.identifier,
+        record.iri = str(variable_iri(scope_graph.identifier,
                                       record.internal_id))
     elif not record.internal_id:
         record.internal_id = store.next_internal_id("V")
     _assert_absolute_iri(record.iri)
+
+    # A record lives in exactly one artefact graph — the ``{graph}#``
+    # prefix of its IRI names home.  Reads resolve across the artefact's
+    # pin scope, so a save scoped to another artefact must still reach
+    # the owning graph; writing into scope instead shadow-copied the
+    # record (the V_10/V_23 duplicate incident).
+    graph = _write_graph(store, URIRef(record.iri), scope_graph)
+    _assert_editable_graph(store, graph)
 
     # POST doubles as the editor's update path (the frontend never PUTs):
     # enforce the mutability guard and replace — not merge — when the
@@ -705,7 +720,8 @@ def create_variable(
     _remove_variable(graph, URIRef(record.iri))
     var_iri = store.add_variable_dict(graph, record.model_dump())
     _attach_canonical_equations(graph, canonical)
-    _link_instances(graph, var_iri, protos, record.network)
+    _link_instances(store, graph, scope_graph, var_iri, protos,
+                    record.network)
     _apply_domain_move(graph, move_plan)
     return record
 
@@ -726,11 +742,13 @@ def update_variable(
     store = get_store()
     _resolve_record_domains(store, graph_iri, record)
     _guard_token_consistency(record)
-    graph = resolve_graph(store, graph_iri)
+    scope_graph = resolve_graph(store, graph_iri)
 
     subject = URIRef(iri)
+    graph = _write_graph(store, subject, scope_graph)
     if (subject, None, None) not in graph:
         raise HTTPException(status_code=404, detail="Variable not found")
+    _assert_editable_graph(store, graph)
 
     move_plan = _plan_domain_move(store, graph, iri, record, graph_iri)
     _guard_structural_edit(store, graph, iri, record, graph_iri,
@@ -747,7 +765,8 @@ def update_variable(
     _remove_variable(graph, subject)
     var_iri = store.add_variable_dict(graph, record.model_dump())
     _attach_canonical_equations(graph, canonical)
-    _link_instances(graph, var_iri, protos, record.network)
+    _link_instances(store, graph, scope_graph, var_iri, protos,
+                    record.network)
     _apply_domain_move(graph, move_plan)
     return record
 
@@ -1003,6 +1022,55 @@ def _remove_variable(graph, subject: URIRef) -> None:
     graph.remove((subject, None, None))
 
 
+def _owning_graphs(store, subject: URIRef) -> List[Graph]:
+    """Graphs currently holding triples on ``subject``."""
+    return [g for g in store.dataset.graphs()
+            if (subject, None, None) in g]
+
+
+def _home_graph(store, iri: str) -> Optional[Graph]:
+    """The artefact graph an IRI's ``{graph}#`` prefix names as home —
+    ``None`` when the prefix names no existing graph."""
+    base = iri.split("#", 1)[0] if "#" in iri else iri.rsplit("/", 1)[0]
+    ident = URIRef(canonical_graph_iri(base))
+    return next((g for g in store.dataset.graphs()
+                 if g.identifier == ident), None)
+
+
+def _write_graph(store, subject: URIRef, scope_graph: Graph) -> Graph:
+    """The graph a write to ``subject`` must land in.
+
+    A variable/equation record lives in exactly one artefact graph —
+    reads resolve across the artefact's pin scope, so a save scoped to
+    another artefact must still reach the owning graph; writing into
+    the scope graph instead silently shadow-copies the record (the
+    V_10/V_23 duplicate incident).  The IRI-home graph wins among
+    editable owners; for a record that exists nowhere yet, the
+    IRI-home graph or ``scope_graph``.
+    """
+    owners = _owning_graphs(store, subject)
+    home = _home_graph(store, str(subject))
+    if owners:
+        editable = [g for g in owners if not store.is_frozen(g)]
+        if home is not None and any(
+                g.identifier == home.identifier for g in editable):
+            return home
+        if editable:
+            return editable[0]
+        return owners[0]  # all frozen — the editable guard rejects
+    return home if home is not None else scope_graph
+
+
+def _assert_editable_graph(store, graph: Graph) -> None:
+    """403 when the resolved write graph is a frozen version —
+    ``editable_param`` guards the scope graph; the owning graph needs
+    the same check when the two differ."""
+    try:
+        store.assert_editable(graph)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+
 def _guard_structural_edit(store, graph, iri: str,
                            record: VariableRecord,
                            graph_iri: Optional[str] = None,
@@ -1165,7 +1233,12 @@ def delete_variable(
     subject = URIRef(iri)
     owners = [g for g in store.dataset.graphs()
               if (subject, None, None) in g]
-    graph = next((g for g in owners if not store.is_frozen(g)), None)
+    # ``?graph=`` targets one copy when a subject is duplicated across
+    # graphs (the repair path); otherwise the first editable owner
+    # keeps the lenient-scope behaviour.
+    requested = store.graph(URIRef(graph_iri))
+    graph = (requested if (subject, None, None) in requested
+             else next((g for g in owners if not store.is_frozen(g)), None))
     if graph is None:
         if owners:
             raise HTTPException(status_code=409, detail={
@@ -1178,9 +1251,14 @@ def delete_variable(
             "message": "Variable is frozen (proven) — unfreeze it first",
             "frozen": True,
         })
+    # Removing one copy while another editable graph still owns the
+    # subject cannot dangle references — the variable survives there.
+    other_live = [g for g in owners
+                  if g.identifier != graph.identifier
+                  and not store.is_frozen(g)]
     refs = [r for r in _variable_references(store, iri)
             if r["via"] != "lhs"]
-    if refs and not cascade:
+    if refs and not cascade and not other_live:
         raise HTTPException(status_code=409, detail={
             "message": (
                 "Variable is referenced by %d equation(s) — remove the "

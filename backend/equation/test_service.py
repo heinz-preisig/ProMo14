@@ -9,8 +9,11 @@ accepted the kwargs — every call returned 500.  Unit tests of
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
+from rdflib import Literal, URIRef
+from rdflib.namespace import RDF, RDFS
 
 from backend.core import graph_store
 from backend.main import app
@@ -131,3 +134,67 @@ def test_units_still_reject_incompatible_signal_sum(client):
     assert r.status_code == 200
     assert r.json()["ok"] is False
     assert r.json()["error_kind"] == "UnitError"
+
+
+def _make_artefact(store, iri="https://w3id.org/promo/library"):
+    store.create_artefact_graph(iri, "library", uses=[BASE])
+    return iri
+
+
+def test_save_scoped_to_other_artefact_writes_home(client):
+    """A POST scoped to artefact B for a subject homed in A updates
+    A's record — it must not shadow-copy into B (the V_10/V_23
+    duplicate incident)."""
+    LIB = _make_artefact(graph_store.get_store())
+    v = {"iri": f"{BASE}#V_home", "label": "h", "internal_id": "V_home",
+         "network": "root", "units": [0] * 8, "index_structures": [],
+         "equations": {}}
+    r = client.post("/api/equation/variables", json=v)
+    assert r.status_code == 200, r.text
+
+    r = client.post("/api/equation/variables", json=v,
+                    params={"graph": LIB})
+    assert r.status_code == 200, r.text
+
+    store = graph_store.get_store()
+    s = URIRef(v["iri"])
+    assert (s, None, None) in store.graph(BASE)
+    assert (s, None, None) not in store.graph(LIB)
+
+
+def test_delete_targets_named_graph_copy(client):
+    """``?graph=`` on DELETE removes only that graph's copy of a
+    duplicated subject; deleting the last surviving copy is still
+    reference-guarded."""
+    LIB = _make_artefact(graph_store.get_store())
+    v_dup = {"iri": f"{BASE}#V_dup", "label": "d",
+             "internal_id": "V_dup", "network": "root",
+             "units": [0] * 8, "index_structures": [], "equations": {}}
+    eq = {"iri": f"{BASE}#E_user", "lhs": f"{BASE}#V_user", "rhs": "d",
+          "network": "root"}
+    v_user = {"iri": f"{BASE}#V_user", "label": "u",
+              "internal_id": "V_user", "network": "root",
+              "units": [0] * 8, "index_structures": [],
+              "equations": {"root": eq}}
+    for v in (v_dup, v_user):
+        r = client.post("/api/equation/variables", json=v)
+        assert r.status_code == 200, r.text
+    store = graph_store.get_store()
+    s = URIRef(v_dup["iri"])
+    store.graph(LIB).add((s, RDF.type, graph_store.PROMO["Variable"]))
+    store.graph(LIB).add((s, RDFS.label, Literal("d")))
+
+    # The stray copy goes; the referenced original survives — another
+    # editable owner keeps every reference satisfied.
+    r = client.delete(
+        "/api/equation/variables/" + quote(v_dup["iri"], safe=""),
+        params={"graph": LIB})
+    assert r.status_code == 200, r.text
+    assert (s, None, None) not in store.graph(LIB)
+    assert (s, None, None) in store.graph(BASE)
+
+    # Now the ontology copy is the only owner — the guard returns.
+    r = client.delete(
+        "/api/equation/variables/" + quote(v_dup["iri"], safe=""),
+        params={"graph": BASE})
+    assert r.status_code == 409
