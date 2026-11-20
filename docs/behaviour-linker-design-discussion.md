@@ -4266,16 +4266,102 @@ layer on actual physics need.
 
 - Mesh representation: occurrence composition vs dedicated mesh
   index; where element geometry (areas, edge vectors) lives.
-- `C'` naming/positional contraction mechanics.
+- `C'` naming/positional contraction mechanics — leaning primed
+  copies; settle the convention (`C', C'', C'''` vs `C1..C4`)
+  before the first stiffness equation (rank-4 needs four).
+- `same-element-space` predicate declaring `C'` a copy of `C`
+  (ontology data; instantiation binds elements through it).
+- `C` fold is prerequisite: seed `idx_component`, fold
+  `vx,vy,vz→v[C]`, `r_x,r_y,r_z→r[C]` — do before the project's
+  first equations, since `ParDiff(v[C], r[C'])` needs `r[C]`.
+- Seeded scheme objects `δ[C,C']` (Kronecker; trace/divergence)
+  and `ε[C,C',C'']` (Levi-Civita; curl) — `sigma`/`F_k` pattern.
 - Stencil storage format in `model_data` (sparse COO like `F`).
 - Whether `d()/dt` needs a material-derivative sibling operator.
+
+### Duplicate slots — analysis (2026-11-20)
+
+The two mathematical grounds for distinguishing same-set index
+occurrences:
+
+- **Occurrence (name/position).**  Slots of a multilinear map are
+  distinct *arguments*; notation distinguishes them by letter
+  (`σ_ij`, i vs j) or prime (`i, i'`).  Necessary but semantically
+  empty — the names range over the same space.
+- **Variance (co-/contravariant).**  `u^i` vs `v_j`; contraction
+  pairs opposite variances.  Real checker-gate material, but it
+  presupposes metric + frame semantics (Stage B) — and it never
+  disambiguates `[C,C]` anyway: `σ^{ij}`, `ε_{kl}`, `C_{ijkl}`
+  are symmetric-variance, so occurrence naming is unavoidable
+  regardless.
+
+Precedent: the control case already solved this — `A[dx, x]` uses
+distinct IRIs over the same element set (differential index ↔
+integral index, §11.5 of the math-language comparison).  `C`/`C'`
+is the same mechanism verbatim and composes with §40:
+`σ[C,C'] * ε[C,C']` is elementwise over both shared indices, then
+`reduceSum(·,C)` then `reduceSum(·,C')` = the double contraction —
+zero new machinery.  The only new *data* is a predicate declaring
+`C'` "same element space as `C`" so instantiation binds elements
+(ontology data, not code).
+
+Positional `C@1` is weaker: symmetric tensors make positions
+interchangeable, permutations renumber tags, and it must relax
+the unique-IRI invariant (§11.6 — the invariant that keeps
+`ReduceProduct` binary and contraction unambiguous) with
+IRI+occurrence equality through checker, binder, emitter.
+
+**Leaning: primed copies** (user-agreed 2026-11-20).  Rank-4
+(`C_{ijkl}`) needs four — `C, C', C'', C'''`; the naming
+convention should be settled before the first stiffness equation.
+
+### Spatial operators — discussion (2026-11-20)
+
+Question raised for fluid mechanics (Navier–Stokes): introduce
+named operators (`grad`, `div`, `curl`, `lap`, `D/Dt`), or stay
+with `ParDiff` + contraction?
+
+- **Leaning: no named spatial operators** (user's instinct,
+  agreed).  They are composite.  `ParDiff` w.r.t. an indexed
+  coordinate naturally mints the second copy: the Jacobian
+  `J = ParDiff(v[C], r[C'])` is `[C,C']` — field slot vs
+  coordinate slot.  Divergence is then the trace, expressible
+  with today's machinery plus one seeded scheme object: the
+  Kronecker `δ[C,C']` (identity across same-element copies —
+  the `σ`/`F` pattern applied to index copies):
+  `div v = reduceSum(reduceSum(δ * J, C'), C)`.  The elementwise
+  product selects the diagonal; two `reduceSum`s contract.
+  Laplacian = `ParDiff∘ParDiff` over the same copies;
+  `curl` = Levi-Civita `ε[C,C',C'']` contraction — which needs
+  the primed-index machinery anyway.
+- **On a mesh the operators are stencils, not expressions** —
+  Stage A's `G`, `D`, `B` are instantiation-computed matrices in
+  `model_data` (the `σ`/`F` emit-per-scope pattern).  The
+  symbolic layer needs no operator vocabulary for them at all:
+  the equation says `reduceSum(G * u, M)`, the mesh transform
+  computes `G`.
+- **Hidden-slot argument.**  Named operators conceal exactly the
+  index pairing the checker needs — `∇·v` vs `v·∇` vs tensor
+  `div σ` are three different contractions under one glyph; the
+  §40 lesson (explicit `reduceSum` pins the context) applies one
+  level up.
+- **The one real candidate is `D/Dt`** — the material derivative
+  is a *different time-derivative semantics* (Eulerian vs
+  Lagrangian), not a spatial operator.  Stays in "Open for the
+  project"; expressible meanwhile as
+  `TotalDiff(u,t) + reduceSum(ParDiff(u,r[C']) * v[C], C')` —
+  the advection term stays visible, arguably the more honest
+  physics.
 
 ### Status
 
 PROPOSAL — not ruled.  Pick up when the sheet project starts;
 Stage A is designed against machinery §41 already landed, Stage B
 lands only when the physics (large rotation, anisotropy,
-material-frame constitutives) demands it.
+material-frame constitutives) demands it.  Leanings recorded
+2026-11-20: primed index copies over positional tags; no named
+spatial operators — `ParDiff` + contraction (+ seeded `δ`/`ε`
+scheme objects) suffices.
 
 ## 43. Flow classification grants port export — RULED & implemented (2026-11-15)
 
