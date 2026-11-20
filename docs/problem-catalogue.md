@@ -25,6 +25,7 @@ Emitted today by `backend/instantiate` (`/api/instantiate/model`, `/code`,
 | `unmarked-input` | variable binding |
 | `unbound-port` | port resolution |
 | `ambiguous-port` | port resolution |
+| `effort-unavailable-port` | port resolution |
 | `algebraic-loop` | scheduling |
 | `inadmissible-gesture` | artefact validity |
 | `unfilled-cells` | value binding |
@@ -157,6 +158,28 @@ or add a measurement variable)`)
   (`port_variable`/state flag on the peer), or rename so only one
   comparable variable exists across the arc. The model should say which
   peer supplies the value, not leave it to inference.
+
+### `effort-unavailable-port`
+**Message:** `port <var> on <entity type> at node <id> is
+effort-unavailable — peer exports no function:effort var carrying the
+mechanism's drive token`
+
+- **Cause.** The demand variable is classified `function:effort`, so
+  §38 effort coupling applies: it couples only to a peer variable that
+  is *also* `function:effort` **and** carries a token comparable to the
+  demand-side mechanism's `promo:drives` (unioned up the `promo:parent`
+  chain).  Across the arc no such export exists — the peer may not
+  define an effort var at all, or defines one that is not exported
+  (`port_variable`/`function:flow`), or carries the wrong token.
+  Distinct from `unbound-port`: the candidate pool is not empty, it
+  just holds no *driving* effort.
+- **Remedy.** Supply the conjugate effort on the peer — mark the
+  mechanism's effort variable exportable, or add a measurement
+  variable carrying the drive token.  If the port was wrongly
+  classified (the demand isn't an effort), drop `function:effort`
+  from it and it binds by plain comparability.  A mechanism declaring
+  no `promo:drives` skips the token half of the rule — re-check its
+  ontology record if the filter looks wrong.
 
 ## Fix-marking problems (ADR-008 layer 2)
 
