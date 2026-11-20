@@ -4191,6 +4191,18 @@ deferrable).
 - Component fold: `vx,vy,vz`→`v[C]`, `r_x,r_y,r_z`→`r[C]` and the
   elementwise collapse of their equations — independent of the `X`
   work, same migration mechanics.
+  **Machinery landed (2026-11-20):** `idx_component` floor-seeded as
+  `C` with literal elements `{x,y,z}` via new predicate
+  `promo:elements` (fixed indices declare their element set on the
+  record; instantiation binds it directly — `index_source`
+  `component`).  **Open before the fold:** the language has no
+  component selection — `E_12`/`E_15`/`E_23` consume `vx` scalar-wise
+  and `E_26`/`E_27` (`Axz`/`Ayz`) multiply *distinct* components, so
+  `v[C]`/`r[C]` cannot spell them.  Options: seeded basis vectors
+  `e_x[C]` (`reduceSum(e_x * v, C)` — the σ/`F_k` scheme-object
+  pattern, needs element-keyed literal values bound on the var) vs a
+  selection construct vs re-authoring those equations in the
+  `[C]`/`[C,C']` view.
 - Tensors (stress, momentum-flux) stay out of scope — staged in §42.
 
 ## 42. Tensor-index layer for sheet mechanics — DESIGN PROPOSAL (deferred)

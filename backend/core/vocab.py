@@ -39,6 +39,12 @@ VOCAB_DOCS = {
         "Variable → promo:ValueCell: the variable's value table — ν "
         "parameter tables and initial-condition pins.  See "
         "docs/value-cells.md.",
+    "elements":
+        "On a promo:Index: JSON list of literal element names for a "
+        "fixed index (component axis {x,y,z}).  Topological indices "
+        "leave it unset — their elements are resolved per model at "
+        "instantiation; fixed indices bind the declared names "
+        "directly.",
     "coordinate":
         "On a promo:ValueCell: JSON list of index-element IRIs ordered "
         "by the variable's indexStructure — the authoritative cell "
@@ -100,7 +106,7 @@ SEED_CONSTANTS = (
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-11-14"
+SEED_FLOOR = "2026-11-20"
 
 # Top-level equation-class hierarchy, seeded by
 # ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for

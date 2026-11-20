@@ -10,6 +10,7 @@ back together.
 
 from __future__ import annotations
 
+import json
 from typing import Dict, List, Optional
 
 from rdflib import Graph, Literal, Namespace, URIRef
@@ -386,6 +387,7 @@ class SeedMixin:
         self._seed_rule_mechanism_flags(g, base)
         self._seed_actuation_target(g, base)
         self._seed_coordinate(g, base)
+        self._seed_component(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
@@ -764,6 +766,44 @@ class SeedMixin:
         for _, _, o in g.triples((sigma_iri, PROMO["tokenVector"],
                                   None)):
             g.remove((sigma_iri, PROMO["tokenVector"], o))
+
+    def _seed_component(self, g: Graph, base: str) -> None:
+        """§41 component index ``C`` — the spatial basis ``{x,y,z}``.
+
+        ``idx_component`` is a *fixed* index: its element set is
+        declared literally via ``promo:elements`` and instantiation
+        binds the declared names directly — no topology resolution,
+        no ``selector``, no ``subIndexOf``.  ``indexClass``
+        ``component`` survives as the ``index_source`` alias so
+        instantiation can distinguish it from topological indices;
+        the checker sees a plain index.
+
+        Idempotent floor: the element set is fixed by the scheme —
+        re-seeding rewrites it exactly (``sigma``/``F_k`` precedent),
+        so user edits to the element list do not drift.
+        """
+        iri = self.mint_iri(base, "idx_component")
+        if (iri, RDF.type, PROMO["Index"]) not in g:
+            internal_id = self.next_internal_id("I")
+            self.add_index_dict(g, {
+                "iri": str(iri),
+                "label": "component",
+                "short_name": "C",
+                "network": "physical",
+                "index_class": "component",
+                "internal_id": internal_id,
+                "aliases": {"global_ID": internal_id,
+                            "internal_code": "C"},
+                "elements": ["x", "y", "z"],
+                "doc": "§41 component index — the spatial basis "
+                       "{x,y,z} for intrinsically vector variables "
+                       "(v[C], r[C], momentum P[C]).  Elements are "
+                       "literal, declared on the record "
+                       "(promo:elements), not derived from model "
+                       "topology.",
+            })
+        g.set((iri, PROMO["elements"],
+               Literal(json.dumps(["x", "y", "z"]))))
 
     def _seed_capabilities(self, g: Graph, base: str) -> None:
         """Seed entity-type capabilities (§20): which types may inject

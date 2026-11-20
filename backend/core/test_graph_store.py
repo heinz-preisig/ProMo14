@@ -309,6 +309,27 @@ def test_seed_mechanism_drives(tmp_path):
         f"{ONTO}#token_momentum", f"{ONTO}#token_energy"}
 
 
+def test_seed_component_index(tmp_path):
+    """§41: the component index ``C`` is floor-seeded with a literal
+    element set — ``promo:elements`` ``[x,y,z]`` — no selector, no
+    subIndexOf.  The element list is enforced exactly on re-seed."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    c = URIRef(f"{ONTO}#idx_component")
+    assert (c, RDF.type, PROMO["Index"]) in ont
+    assert str(ont.value(c, PROMO["shortName"])) == "C"
+    assert json.loads(str(ont.value(c, PROMO["elements"]))) == \
+        ["x", "y", "z"]
+    assert (c, PROMO["selector"], None) not in ont
+    assert (c, PROMO["subIndexOf"], None) not in ont
+    # Floor: user edits to the element set do not drift.
+    ont.set((c, PROMO["elements"], Literal('["x"]')))
+    store._seed_component(ont, ONTO)
+    assert json.loads(str(ont.value(c, PROMO["elements"]))) == \
+        ["x", "y", "z"]
+
+
 def test_seed_incidence_factors(tmp_path):
     """§25: one canonical F_<mech> variable per arc sub-index — fixed
     [A_k, N] shape, constant+parameter, dimensionless.  §4 neutrality:
