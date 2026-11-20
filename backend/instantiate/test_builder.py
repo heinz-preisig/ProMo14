@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import zipfile
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -219,6 +219,31 @@ def _entity(rep, et):
 
 def _binding(entity, var):
     return next(v for v in entity.variables if v.var == var)
+
+
+def test_literal_element_index_binds_declared_elements():
+    """``promo:elements`` declares a fixed element set (e.g. the
+    component axis ``{x,y,z}``) — bound to every var indexing it and
+    published in ``report.indices`` (§41 fold dependency)."""
+    c = _idx("idx_component")
+    indices = {**INDICES,
+               c: IndexInfo(c, source="component",
+                            short_name="C", elements=["x", "y", "z"])}
+    variables = {**VARIABLES,
+                 _var("vcomp"): VarInfo(_var("vcomp"), "vel", "V_c",
+                                        index_structures=[c],
+                                        tokens=[_tok("mass")])}
+    asg = {**ASSIGNMENTS,
+           _et("lumped_capacity"): replace(
+               ASSIGNMENTS[_et("lumped_capacity")],
+               instantiated=[_var("vcomp")])}
+    memberships = resolve(NODES, ARCS, SUB_INDICES, PARENTS)
+    rep = build(NODES, ARCS, memberships, SUB_INDICES, indices,
+                asg, variables, EQUATIONS,
+                TOKEN_PARENTS, TOKEN_KINDS)
+    assert rep.indices[c] == ["x", "y", "z"]
+    cap = _entity(rep, _et("lumped_capacity"))
+    assert _binding(cap, _var("vcomp")).indices[c] == ["x", "y", "z"]
 
 
 def test_uncovered_flow_mechanism_flagged():

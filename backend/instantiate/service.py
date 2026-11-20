@@ -861,6 +861,7 @@ def _vars_collect(store, vars_graph: Optional[str]):
             source=idx.aliases.get("index_source", ""),
             sub_index_of=idx.sub_index_of,
             short_name=idx.aliases.get("internal_code", ""),
+            elements=list(getattr(idx, "elements", []) or []),
         )
         labels[iri] = idx.aliases.get("internal_code", idx.label)
     # Canonical RHS trees for IC-need derivation.  rdf_context drops

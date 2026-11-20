@@ -135,6 +135,9 @@ class IndexInfo:
     source: str = ""                    # "node" | "arc" | "token" | …
     sub_index_of: Optional[str] = None
     short_name: str = ""
+    #: ``promo:elements`` — literal element set on fixed indices
+    #: (component axis ``{x,y,z}``); topological indices leave empty.
+    elements: List[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -386,6 +389,11 @@ def build(nodes: Dict[str, NodeInfo],
         report.indices[base_arc_index] = token_flow_arcs
     for si in sorted(sub_indices.values(), key=lambda s: s.iri):
         report.indices[si.iri] = members.get(si.iri, [])
+    # Fixed indices declare their element set on the record
+    # (``promo:elements``) — e.g. the component axis {x,y,z}.
+    for i in indices.values():
+        if i.elements:
+            report.indices[i.iri] = list(i.elements)
 
     # -- group nodes by (entity type, occurrence) ---------------------------
     # §22 Option A: a node's owning occurrence is the longest path
@@ -430,6 +438,10 @@ def build(nodes: Dict[str, NodeInfo],
     def index_elements(idx_iri: str, type_node_set: Set[str],
                        t_nodes: List[str]) -> Optional[List[str]]:
         idx = indices.get(idx_iri)
+        if idx is not None and idx.elements:
+            # Literal element set (``promo:elements``) — fixed axes
+            # bind their declared elements regardless of topology.
+            return list(idx.elements)
         if _node_like(idx, indices):
             return list(t_nodes)
         return arc_elements(idx_iri, type_node_set)

@@ -85,6 +85,11 @@ class Index:
     # subset of, and IRI of the entity type/term selecting membership.
     sub_index_of: Optional[str] = None
     selector: Optional[str] = None
+    #: Literal element set declared on the record (``promo:elements``
+    #: JSON) — fixed indices like the component axis ``{x,y,z}``.
+    #: Topological indices leave it empty; their elements come from
+    #: the model at instantiation.
+    elements: List[str] = field(default_factory=list)
 
     def alias(self, language: str = "internal_code") -> str:
         return self.aliases.get(language, self.label)

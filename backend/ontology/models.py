@@ -154,6 +154,9 @@ class IndexRecord(BaseModel):
     internal_id: Optional[str] = None
     aliases: Dict[str, str] = Field(default_factory=dict)
     token: Optional[str] = None
+    #: Literal element set (``promo:elements``) for fixed indices —
+    #: e.g. the component axis ``["x", "y", "z"]``.
+    elements: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

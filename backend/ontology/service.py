@@ -159,6 +159,7 @@ def _index_to_record(i) -> Dict[str, Any]:
         "short_name": i.aliases.get("internal_code") or i.label[0]
         if i.label
         else None,
+        "elements": list(getattr(i, "elements", []) or []),
     }
 
 

@@ -416,6 +416,19 @@ class RdfContext(EquationContext):
         if raw_class != index_class:
             aliases.setdefault("index_source", raw_class)
 
+        # ``promo:elements`` — JSON list declaring a literal element set
+        # (fixed axes like the component index ``{x,y,z}``).  Absent on
+        # topological indices, whose elements are derived per model.
+        elements: List[str] = []
+        raw_elements = _one_literal(graph, s, PROMO["elements"])
+        if raw_elements:
+            try:
+                parsed = json.loads(raw_elements)
+                if isinstance(parsed, list):
+                    elements = [str(e) for e in parsed]
+            except (ValueError, TypeError):
+                pass
+
         return Index(
             iri=iri,
             label=label,
@@ -429,6 +442,7 @@ class RdfContext(EquationContext):
             or iri,
             sub_index_of=_one_literal(graph, s, PROMO["subIndexOf"]) or None,
             selector=_one_literal(graph, s, PROMO["selector"]) or None,
+            elements=elements,
         )
 
     def _load_network_tree(self) -> "tuple[Dict[str, List[str]], Dict[str, str]]":

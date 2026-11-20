@@ -614,6 +614,13 @@ class RdfStore(PersistenceMixin, SeedMixin):
         if idx.get("selector"):
             graph.set((iri, PROMO["selector"], URIRef(idx["selector"])))
 
+        # ``promo:elements`` — JSON list of literal element names for
+        # fixed indices (component axis ``{x,y,z}``); topological
+        # indices leave it unset and derive elements per model.
+        if idx.get("elements"):
+            graph.set((iri, PROMO["elements"],
+                       Literal(json.dumps(idx["elements"]))))
+
         if idx.get("aliases"):
             self._add_aliases(graph, iri, idx["aliases"])
 
