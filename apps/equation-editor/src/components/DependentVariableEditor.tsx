@@ -730,12 +730,14 @@ export default function DependentVariableEditor({
 
               {applicableAxes(axes, domain, domains).length ? (
                 <>
+                  {/* §18 exemption: classifications stay editable on
+                      referenced variables — kind is derived metadata
+                      (backend ``allowed`` set); the check re-runs. */}
                   <AxisClassifications
                     axes={axes}
                     domain={domain}
                     domains={domains}
                     value={classifications}
-                    disabled={structuralLocked}
                     onChange={setClassifications}
                   />
                   <span style={{ fontSize: 12, color: '#555' }}>
