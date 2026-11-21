@@ -12,7 +12,7 @@ const row = (variable: string, operands: string[]): ConsistencyRow => ({
 describe('consistency report', () => {
   it('finds transitive consumers independent of report order and handles cycles', () => {
     const report: ConsistencyReport = {
-      graph: 'g', revision: 'r', summary: { consistent: 4, error: 0 },
+      graph: 'g', revision: 'r', summary: { consistent: 4, error: 0, 'bound-scope': 0 },
       equations: [row('c', ['b']), row('b', ['a']), row('a', ['c']), row('other', [])],
     }
     expect(affectedEquations(report, 'a').map((r) => r.variable)).toEqual(['c', 'b', 'a'])

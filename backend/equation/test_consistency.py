@@ -59,7 +59,7 @@ def test_report_classifies_structural_errors_and_is_read_only(client):
     before = set(store.dataset.quads())
     store.dirty = False
     out = report(client)
-    assert out['summary'] == dict(consistent=3, error=3)
+    assert out['summary'] == {'consistent': 3, 'error': 3, 'bound-scope': 0}
     assert row(out, 'different_metadata')['status'] == 'consistent'
     assert row(out, 'no_signature')['status'] == 'consistent'
     assert row(out, 'broken')['status'] == 'error'
@@ -92,6 +92,31 @@ def test_reordered_indices_not_a_structural_mismatch(client):
     add(client, 'a', index_structures=indices)
     add(client, 'permuted', 'a', index_structures=indices[::-1])
     assert row(report(client), 'permuted')['status'] == 'consistent'
+
+
+def test_coordinate_operand_rows_are_bound_scope(client):
+    """§41 σ-laws: expressions over a coordinate-class index (X binds
+    the entity's contact arcs at instantiation) cannot reproduce the
+    declared LHS signature in declared space — they report
+    ``bound-scope``, not error.  Units are still compared."""
+    x = f'{BASE}#idx_x'
+    add(client, 'dirvec', index_structures=[x])
+    add(client, 'peff', index_structures=[f'{BASE}#idx_node'])
+    # Derived [N] vs declared [A_conv] — normally indices_mismatch.
+    add(client, 'dirflow', 'reduceSum( ( dirvec * peff ), X )',
+        index_structures=[f'{BASE}#idx_arc_convection'])
+    # Bound-scope rows are still unit-checked.
+    add(client, 'dirflow_bad', 'reduceSum( ( dirvec * peff ), X )',
+        index_structures=[f'{BASE}#idx_arc_convection'],
+        units=[1, 0, 0, 0, 0, 0, 0, 0])
+    out = report(client)
+    r = row(out, 'dirflow')
+    assert r['status'] == 'bound-scope'
+    assert [f['code'] for f in r['findings']] == ['bound_scope']
+    rb = row(out, 'dirflow_bad')
+    assert rb['status'] == 'error'
+    assert rb['findings'][0]['code'] == 'units_mismatch'
+    assert out['summary']['bound-scope'] == 1
 
 
 def test_token_signature_fix_endpoint_removed(client):

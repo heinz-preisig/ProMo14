@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void
 }
 
-const colors = { error: '#b71c1c', consistent: '#24733e' }
+const colors = { error: '#b71c1c', 'bound-scope': '#8d6e00', consistent: '#24733e' }
 const local = (iri: string) => iri.split('#').pop() ?? iri
 
 export default function ConsistencyPanel({ open, contextKey, variables, onRefresh, onVariable, onEquation, onClose }: Props) {
@@ -68,7 +68,7 @@ export default function ConsistencyPanel({ open, contextKey, variables, onRefres
           {Object.entries(report.summary).map(([s, n]) => <span key={s} style={{ color: colors[s as ConsistencyRow['status']] }}>{s}: {n}</span>)}
           <span>Total: {report.equations.length}</span>
           <select aria-label="Filter consistency results" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            {['issues', 'all', 'error', 'consistent'].map((s) => <option key={s}>{s}</option>)}
+            {['issues', 'all', 'error', 'bound-scope', 'consistent'].map((s) => <option key={s}>{s}</option>)}
           </select>
         </div>
         <div style={{ maxHeight: '55vh', overflowY: 'auto', marginTop: 12 }}>

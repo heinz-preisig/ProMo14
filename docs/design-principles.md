@@ -177,7 +177,12 @@ index-preserving product — elementwise over shared indices, ordered
 union otherwise; `.` is retired and contractions are always explicit
 (`reduceSum(body, K)` / `Product(body, K)` name the index to
 eliminate — `E_42`: `reduceSum(F_diff * fnd, A_diff)` reduces
-`A_diff` while `N,S` survive).
+`A_diff` while `N,S` survive).  The global consistency report marks
+equations over a coordinate-class index (`σ[X]` — `X` binds contact
+arcs only at instantiation) **bound-scope** rather than error: their
+declared index signature is unverifiable in declared space by
+construction, so only units are compared there and binding-scope
+typing is checked at instantiation.
 
 ## 9. Species distribution is computed, not declared
 

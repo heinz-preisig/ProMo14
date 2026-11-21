@@ -261,10 +261,17 @@ The frontend is a React + TypeScript + Vite app calling the FastAPI backend:
 
 Use **Check consistency…** to recheck all equations in the selected artefact
 and pinned scope for expression validity, units and index conformity. The
-read-only report separates **error** and **consistent** results. Expand a
-row to inspect units, indices and operand declarations; open the variable,
-equation or owning artefact to make an explicit correction. Edits mark the
-report stale; **Check / recheck** refreshes it.
+read-only report separates **error**, **bound-scope** and **consistent**
+results. Expand a row to inspect units, indices and operand declarations;
+open the variable, equation or owning artefact to make an explicit
+correction. Edits mark the report stale; **Check / recheck** refreshes it.
+
+**Bound-scope** marks equations using an operand declared over a
+coordinate-class index — `σ[X]` in the §41 transport laws. `X`'s
+elements only exist in binding scope (the entity's contact arcs), so the
+declared-space check cannot reproduce the declared index signature by
+construction; only units are compared on those rows and index typing is
+verified at instantiation in binding scope.
 
 There are no token-signature advisories, untracked-token categories or
 signature-fix writes. Structural consistency is not proof of physical

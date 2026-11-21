@@ -208,7 +208,7 @@ export interface ConsistencyRow {
   network: string
   graphs: string[]
   rhs: string
-  status: 'error' | 'consistent'
+  status: 'error' | 'bound-scope' | 'consistent'
   declared: { units: number[]; indices: string[] }
   derived: { units: number[]; indices: string[] } | null
   operands: ConsistencyOperand[]
