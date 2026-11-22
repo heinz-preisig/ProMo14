@@ -4550,3 +4550,49 @@ node contractions (`p*p` over `N`), and the upwind selector
 (`half*(F - d*abs(F))` over `N`) stay legal.  574 backend tests
 pass — no existing equation regressed, including the real library
 `cfV` upwind equation verified against the live store.
+
+## 46. Energy balances are separate objects; friction is a transfer term — CONVENTION (2026-11-22)
+
+### Context
+
+Completing the library energy balances (continuation of the enthalpy
+work): `dHdt` already held enthalpy transport + conductive heat + shaft
+work.  The question was how to treat work — the ruling, then the
+structure that fell out.
+
+### Rulings (library-model conventions)
+
+- **Flow work is inside enthalpy.**  `h = u + p/ρ` already carries
+  the `p·fw` volume work of crossing a boundary — no separate term
+  (user-ruled; `ah` unchanged).
+- **Balances are independent objects, never summed.**  `dHdt`
+  (thermal), `dEmdt` (mechanical), `dEtotdt` (total / 1st law) each
+  accumulate their own quantity.  The same physical input legitimately
+  appears in more than one — `aw` sits in all three — because each
+  statement sees the work, not because it is counted twice.  (User's
+  bio point: fermenter stirrer power can exceed reaction enthalpy, so
+  shaft work must be visible wherever the statement needs it.)
+- **Friction is a transfer term, not a sink.**  `fl [A_conv,N]` is an
+  *imposed boundary port* (like `fWs`) for transport friction; `al`
+  enters `−` in `dEmdt` and `+` in `dHdt` — dissipated mechanical
+  power *is* thermal input.  `fl` is defined as transport friction
+  only (a stirrer dissipates through `aw`), so nothing double counts.
+- **Shaft work is authored as an imposed boundary port** (`fWs
+  [A_work,N]`, no equation), not a σ-law transport — the mechanism
+  supplies it.
+- **Bernoulli-with-friction is a reading, not an equation.**  At
+  steady state (`dEmdt → 0`, divide by `fmc`) the balance reduces to
+  `Δv²/2 + g·Δz + Δp/ρ = w_s − l_w`; the library stores the balance.
+- **`dEtotdt` reuses the enthalpy transport** (`reduceSum(ah,S)` +
+  `akp` = the kin+pot leg) — no `h_spec`/`etot` vars.
+
+### Authored records
+
+`g` (ontology `const_g`, 9.81 m·s⁻² — first *physical* constant in the
+seed; `SEED_CONSTANTS` extended to 5-tuples carrying optional units).
+Library: `fKin`/`fPot`/`fPflow` `[A_conv,N]` advected flows
+(`fmc·v²/2`, `fmc·g·r_z`, `fmc·p/ρ`), `fl` `[A_conv,N]` port,
+`al`/`amech`/`akp` `[N]` aggregates (`balance` class), `dEmdt`,
+`dEtotdt`; `dHdt` gained `+ al`, `balance` class, eq key `E_dHdt`.
+Consistency 65/4 bound-scope/0.  Deferred: a λ·(L/d)·ṁ·v²/2
+constitutive law can later replace the imposed `fl`.
