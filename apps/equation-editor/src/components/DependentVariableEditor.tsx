@@ -546,6 +546,12 @@ export default function DependentVariableEditor({
             marginBottom: 16,
             paddingBottom: 12,
             borderBottom: '1px solid #ccc',
+            // Flex-column child: minHeight:0 lets it shrink below
+            // content size so a tall declaration block scrolls
+            // internally instead of squeezing the expression
+            // workspace to a thin slice on short viewports.
+            minHeight: 0,
+            overflowY: 'auto',
           }}
         >
           {/* Row 1: title + actions */}
@@ -890,7 +896,17 @@ export default function DependentVariableEditor({
         </div>
 
         {!isFoundation && (
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 16 }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            overflow: 'hidden',
+            gap: 16,
+            // Workspace floor: the expression input + Check must stay
+            // reachable even when the declaration block above is tall.
+            minHeight: 300,
+          }}
+        >
           <div
             style={{
               width: 220,
