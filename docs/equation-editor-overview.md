@@ -1,6 +1,6 @@
 # Equation Editor Overview
 
-Living — realigned to rulings through 2026-11-12.
+Living — realigned to rulings through 2026-11-22.
 
 ## Role in the suite
 
@@ -85,6 +85,15 @@ index-structured tensor operations.  Key characteristics:
 - Higher-order: `Integral`, `Product`, `Root` (implicit solve),
   `TotalDiff`, `ParDiff`, `reduceSum`, `MaxMin`.
 - Variable qualification: `network!label` for cross-network references.
+- Contraction restriction (§45, 2026-11-22): a **bare incidence factor**
+  (`F_*` — any variable carrying both a node index and an arc-source
+  index) may not have its node axis contracted as a linear factor.
+  `reduceSum(effort * F, N)` is rejected; the through-drop spelling is
+  `reduceSum(sigma * effort, X)` where `sigma` is the seeded
+  direction vector over the contact coordinate `X`.  Nonlinear forms
+  are exempt — the upwind selector `half * (F - d*abs(F))` contracts
+  `N` legitimately because `F` appears inside `Add`/`abs`, not as a
+  bare product factor.
 
 Full grammar and token table: see ADR-005.
 

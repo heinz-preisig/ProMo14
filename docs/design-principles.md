@@ -1,6 +1,6 @@
 # Design principles — ProMo14
 
-Living — realigned to rulings through 2026-11-12.
+Living — realigned to rulings through 2026-11-22.
 
 Curated record of the global ideas and the deliberate deviations from
 mainstream modelling of controlled physical systems.  Each entry states
@@ -183,6 +183,25 @@ arcs only at instantiation) **bound-scope** rather than error: their
 declared index signature is unverifiable in declared space by
 construction, so only units are compared there and binding-scope
 typing is checked at instantiation.
+
+Amended 2026-11-22 (§45, with same-day refinement): **a bare
+incidence factor's node axis is never a contraction index.**  A
+`reduceSum`/`Product` over a node-source index whose argument
+contains an `[node, arc]`-carrying variable *as a linear factor*
+(`effort * F`) is rejected — that form type-checks in declared
+space but evaluates the wrong contraction once the effort binds the
+contact coordinate `X` in bound scope (the §40 zero-flow
+incident).  The through-drop spelling is `reduceSum(σ * effort,
+X)`.  Incidence factors nested inside nonlinear forms are exempt:
+the upwind selector `half * (F - d*abs(F))` contracts `N`
+legitimately — there `F`'s node axis *must* contract to select
+the upstream node per arc, and `σ[X]` cannot express it.
+Detection is structural: the argument splits on top-level `Add`,
+and only `Var` leaves reachable through `IndexPreservingProduct`/
+`Group` count as linear factors.  Detection keys on the
+ontology-seeded `index_source` alias (`node`/`arc`/`coordinate`),
+never on `F_*` names; arc-like includes `subIndexOf` sub-indices.
+Bound-scope recheck at instantiation remains the backstop.
 
 ## 9. Species distribution is computed, not declared
 
@@ -387,6 +406,15 @@ memberships are not automatically migrated; user equations remain untouched.
   `idx_arc_mass`) — checker machinery gap; the current model avoids it
   (uses same-index `F_conv . fmc`).  Options recorded in the
   2026-11-03 handoff.
+- Component fold (§41/§42) — machinery **landed 2026-11-20**:
+  `promo:elements` literal element sets on index records plus
+  `idx_component` `C = {x,y,z}` (`index_class "component"`).  *Open*
+  gap: the component-selection convention — the language cannot
+  name one element of a `C`-indexed variable, so scalar consumers
+  of `v_x`-style components (`kConvX * Ayz`-laws) and the `[C,C']`
+  geometric folds (`Axz = r_x·r_z`) stay unfolded.  Options:
+  seeded basis vectors `e_x[C]`, a `select`/`left`-style builtin,
+  or `[C,C']` forms — §41 deferred bullet + 2026-11-20 handoff.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:
