@@ -509,7 +509,25 @@ def _flow_space():
         units=Units(),
         index_structures=[x_idx.iri],
     )
-    variables = {v.iri: v for v in [F, p, f, sig]}
+    half = Variable(
+        iri="http://promo.example/var/half",
+        internal_id="half",
+        label="half",
+        network="root",
+        type="constant",
+        units=Units(),
+        index_structures=[],
+    )
+    d = Variable(
+        iri="http://promo.example/var/d",
+        internal_id="d",
+        label="d",
+        network="physical",
+        type="constant",
+        units=Units(),
+        index_structures=[a_idx.iri],
+    )
+    variables = {v.iri: v for v in [F, p, f, sig, half, d]}
     indices = {i.iri: i for i in [n_idx, a_idx, x_idx]}
     return CompileSpace(
         variables,
@@ -568,6 +586,31 @@ def test_node_contraction_without_incidence_operand_legal():
     node = parse("reduceSum(p * p, N)")
     c = check(node, space)
     assert c.indices == []
+
+
+def test_upwind_selector_node_contraction_legal():
+    """§45 refinement: the upwind weight ``half * (F - d * abs(F))``
+    contracts F's node axis legitimately — F sits inside a nonlinear
+    selector (subtraction + abs), not as a bare linear factor.  Only
+    linear ``effort * F`` contractions are banned."""
+    space = _flow_space()
+    node = parse(
+        "reduceSum( half * (F_conv - d * abs(F_conv)) * p, N )"
+    )
+    c = check(node, space)
+    assert c.indices == ["http://promo.example/index/arc"]
+
+
+def test_banned_linear_factor_inside_sum_still_rejected():
+    """A ``p * F`` term keeps the ban even when other terms are added —
+    additive-term splitting happens before the linear-factor test."""
+    space = _flow_space()
+    node = parse("reduceSum( p * F_conv + F_conv * p, N )")
+    try:
+        check(node, space)
+    except IndexStructureError:
+        return
+    raise AssertionError("expected IndexStructureError")
 
 
 if __name__ == "__main__":

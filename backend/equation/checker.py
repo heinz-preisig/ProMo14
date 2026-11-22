@@ -90,31 +90,61 @@ def _arc_space_indices(space: CompileSpace) -> Set[str]:
     return out
 
 
-def _vars(tree: "Checked") -> List["Checked"]:
-    """Every ``Var`` leaf in a checked tree."""
-    out: List[Checked] = []
+def _terms(tree: "Checked") -> List["Checked"]:
+    """Top-level additive terms of a checked expression."""
+    if isinstance(tree.node, Group):
+        return _terms(tree.children[0])
+    if isinstance(tree.node, Add):
+        out: List[Checked] = []
+        for child in tree.children:
+            out.extend(_terms(child))
+        return out
+    return [tree]
+
+
+def _factor_vars(tree: "Checked") -> List["Checked"]:
+    """``Var`` leaves that are pure multiplicative factors of a term —
+    reachable through ``IndexPreservingProduct`` / ``Group`` only.  A var
+    nested under ``Add``, ``abs``, ``Power`` or any other node is part of
+    a nonlinear form — e.g. the upwind selector
+    ``half * (F - d * abs(F))`` — not a linear factor.
+    """
     if isinstance(tree.node, Var):
-        out.append(tree)
-    for child in tree.children:
-        out.extend(_vars(child))
+        return [tree]
+    if isinstance(tree.node, (IndexPreservingProduct, Group)):
+        out: List[Checked] = []
+        for child in tree.children:
+            out.extend(_factor_vars(child))
+        return out
+    return []
+
+
+def _linear_factor_vars(tree: "Checked") -> List["Checked"]:
+    out: List[Checked] = []
+    for term in _terms(tree):
+        out.extend(_factor_vars(term))
     return out
 
 
 def _check_contraction_index(space: CompileSpace, index_iri: str,
                              arg: "Checked") -> None:
-    """An incidence factor's node axis is never a contraction index.
+    """A bare incidence factor's node axis is never a contraction index.
 
     ``reduceSum(F * f, A)`` contracts the arc axis (a balance); the
     through-drop is spelled ``reduceSum(sigma * effort, X)`` (§41).
-    Contracting the *node* axis of an incidence-shaped operand —
-    e.g. ``reduceSum(effort * F, N)`` — type-checks in declared space
-    but evaluates the wrong contraction once the effort's index binds
-    the contact coordinate ``X`` at instantiation (the §40 incident).
+    Contracting the *node* axis of an incidence factor appearing as a
+    linear factor — e.g. ``reduceSum(effort * F, N)`` — type-checks in
+    declared space but evaluates the wrong contraction once the effort's
+    index binds the contact coordinate ``X`` at instantiation
+    (the §40 incident).  Incidence factors inside nonlinear selectors
+    (upwind weights like ``half * (F - d * abs(F))``) legitimately
+    contract the node axis: they select a node per arc, not a
+    through-drop (§45).
     """
     if _index_source(space, index_iri) != "node":
         return
     arc_like = _arc_space_indices(space)
-    for var in _vars(arg):
+    for var in _linear_factor_vars(arg):
         s = var.index_set()
         if index_iri in s and s & arc_like:
             raise IndexStructureError(

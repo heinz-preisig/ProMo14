@@ -4467,7 +4467,7 @@ port on a mass-only topology emits no `PortBinding` and no
 problem, while a non-flow twin on the same topology still
 reports `unbound-port`.  561 backend tests pass.
 
-## 45. The incidence factor's node axis is never a contraction index — RULED & implemented (2026-11-22)
+## 45. A bare incidence factor's node axis is never a contraction index — RULED & implemented (2026-11-22; narrowed same day for the upwind selector)
 
 ### Problem
 
@@ -4487,17 +4487,26 @@ decidable from declared data alone.
 ### Ruling
 
 - **An incidence factor's node axis is never a legal contraction
-  index.**  Balances contract the arc axis (`reduceSum(F*f, A)`);
-  through-drops go through the direction vector
-  (`reduceSum(σ*effort, X)`, §41).  No legal equation reduces an
-  incidence-shaped operand over a node-source index.
-- **Detection is structural, not semantic.**  The operand is
-  incidence-shaped iff a `Var` leaf's index structure contains both a
-  `node`-source index and an arc-source index (arc-like includes
-  declared sub-indices via `subIndexOf`).  Index *source* is already
-  ontology data (`indexClass` → `index_source` alias); the rule keys
-  on the class, never on `F_*` IRIs — semantics in the ontology,
-  enforcement in the checker.
+  index when the factor appears as a bare linear factor.**  Balances
+  contract the arc axis (`reduceSum(F*f, A)`); through-drops go
+  through the direction vector (`reduceSum(σ*effort, X)`, §41).
+- **Refinement (same day): the ban is the linear factor, not the
+  axis.**  The first cut rejected *any* `Var` leaf carrying
+  `[node, arc]` inside an `N`-contraction — which broke the upwind
+  weight `half * (F - d*abs(F))`: there `F`'s node axis *must*
+  contract, because the weight selects the upstream node per arc and
+  `σ` cannot express it (`σ[X]` has no node axis).  The distinguishing
+  shape is linear-vs-nonlinear use of `F`: `effort * F` (bare factor)
+  is the §40 bug; `F` nested under `Add`, `abs`, `Power`, … is a
+  selector, not a through-drop.  The rule therefore flags only `Var`
+  leaves reaching a top-level additive term through
+  `IndexPreservingProduct`/`Group` alone.
+- **Detection is structural, not semantic.**  The flagged leaf's index
+  structure contains both a `node`-source index and an arc-source
+  index (arc-like includes declared sub-indices via `subIndexOf`).
+  Index *source* is already ontology data (`indexClass` →
+  `index_source` alias); the rule keys on the class, never on `F_*`
+  IRIs — semantics in the ontology, enforcement in the checker.
 - **Both contraction surfaces covered**: `reduceSum(…, I)` and
   `Product(…, I)`.
 - **The checker is the teacher.**  The error names the user's own
@@ -4522,15 +4531,22 @@ rules of this family.
 ### Implementation
 
 `checker.py`: `_check_contraction_index` fires when the reduction
-index has `index_source == "node"` and a `Var` leaf of the argument
-carries both that index and an arc-like index (arc-source or
-`sub_index_of` an arc-source).  `IndexStructureError` with the σ
-hint.  No schema, vocabulary, or data change.
+index has `index_source == "node"` and a *linear-factor* `Var` leaf
+of the argument carries both that index and an arc-like index
+(arc-source or `sub_index_of` an arc-source).  Linearity is decided
+by `_terms`/`_factor_vars`: the argument splits on top-level `Add`
+(`Group` transparent), and within each term only leaves reachable
+through `IndexPreservingProduct`/`Group` count — a var nested under
+`Add`, `abs`, `Power`, … is a nonlinear form and exempt.
+`IndexStructureError` with the σ hint.  No schema, vocabulary, or
+data change.
 
 ### Verification
 
-`test_checker.py` `_flow_space` + five tests: the bad form errors on
-both `reduceSum` and `Product`; the balance (`F*f` over `A`), the σ
-law (`σ*p` over `X`), and plain node contractions (`p*p` over `N`)
-stay legal.  572 backend tests pass — no existing equation regressed,
-including the migrated library set.
+`test_checker.py` `_flow_space` + seven tests: the bad form errors on
+both `reduceSum` and `Product`, including a `p*F` term hidden in a
+sum; the balance (`F*f` over `A`), the σ law (`σ*p` over `X`), plain
+node contractions (`p*p` over `N`), and the upwind selector
+(`half*(F - d*abs(F))` over `N`) stay legal.  574 backend tests
+pass — no existing equation regressed, including the real library
+`cfV` upwind equation verified against the live store.
