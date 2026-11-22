@@ -1118,39 +1118,71 @@
         promo:hasArguments _:n3f682554056f4ead9b54b7fefb7a790fb54 ;
         promo:hasOperation promolg:PartialDerivative .
 
+    <https://w3id.org/promo/library#E_aw> a promo:Equation ;
+        promo:doc "" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_104\", \"https://w3id.org/promo/ontology#F_work\"]" ;
+        promo:lhs <https://w3id.org/promo/library#V_105> ;
+        promo:network "universe" ;
+        promo:rhs "reduceSum( ( F_work * macroscopic!fWs ), A_work )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_aw/expression> ;
+        promo:rhsLatex "\\sum_{A\\_work} \\left( {F}_{A\\_work,N} \\circ {fWs}_{A\\_work,N} \\right)" .
+
+    <https://w3id.org/promo/library#E_aw/expression> a promo:Expression ;
+        promo:hasArguments _:N45681309ef584e5db918fd84871ec4b8 ;
+        promo:hasOperation promolg:SumOverIndex .
+
     <https://w3id.org/promo/library#E_dUdt> a promo:Equation ;
         promo:doc "" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:incidenceList "[\"https://w3id.org/promo/library#V_101\", \"https://w3id.org/promo/library#V_102\"]" ;
-        promo:internalID "E_60" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_101\", \"https://w3id.org/promo/library#V_102\", \"https://w3id.org/promo/library#V_105\"]" ;
         promo:lhs <https://w3id.org/promo/library#V_103> ;
-        promo:network "macroscopic" ;
-        promo:rhs "( reduceSum( physical!ah, S ) + physical!ahq )" ;
+        promo:network "universe" ;
+        promo:rhs "( ( reduceSum( physical!ah, S ) + physical!ahq ) + physical!aw )" ;
         promo:rhsExpression <https://w3id.org/promo/library#E_dUdt/expression> ;
-        promo:rhsLatex "\\left( \\sum_{S} {\\dot{h}}_{N,S} + {\\dot{h}^q}_{N} \\right)" .
+        promo:rhsLatex "\\left( \\left( \\sum_{S} {\\dot{h}}_{N,S} + {\\dot{h}^q}_{N} \\right) + {aw}_{N} \\right)" .
 
     <https://w3id.org/promo/library#E_dUdt/expression> a promo:Expression ;
-        promo:hasArguments _:n3f682554056f4ead9b54b7fefb7a790fb55 ;
+        promo:hasArguments _:N091e38d704d54b1b9e4027c539d24724 ;
         promo:hasOperation promolg:Add .
 
     <https://w3id.org/promo/library#V_103> a promo:Variable ;
-        rdfs:label "dUdt" ;
-        promo:aliases "{\"latex\": \"{\\\\dot{U}}\", \"global_ID\": \"https://w3id.org/promo/library#V_103\"}" ;
+        rdfs:label "dHdt" ;
+        promo:aliases "{\"latex\": \"{\\\\dot{H}}\", \"global_ID\": \"https://w3id.org/promo/library#V_103\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
             <https://w3id.org/promo/ontology#term_function_state> ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
-        promo:doc "energy accumulation" ;
+        promo:doc "energy accumulation: convective+diffusive enthalpy (incl. flow work), conductive heat, shaft work" ;
         promo:frozen false ;
         promo:hasEquation <https://w3id.org/promo/library#E_dUdt> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_103" ;
-        promo:latex "{\\dot{U}}" ;
+        promo:latex "{\\dot{H}}" ;
         promo:network "macroscopic" ;
         promo:portVariable false ;
+        promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_104> a promo:Variable ;
+        rdfs:label "fWs" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_flow> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
+        promo:doc "imposed shaft power per work-arc/node contact (boundary work input)" ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_work>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_104" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:tokenVector "{\"energy\": 1}" ;
         promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_40> a promo:Variable ;
@@ -1570,6 +1602,22 @@
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
         promo:internalID "V_102" ;
         promo:latex "{\\dot{h}^q}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_105> a promo:Variable ;
+        rdfs:label "aw" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "shaft work rate into node (balance of imposed work flows)" ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_aw> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_105" ;
         promo:network "physical" ;
         promo:portVariable false ;
         promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
@@ -2348,6 +2396,48 @@
         promo:portVariable true ;
         promo:tokenVector "{}" ;
         promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
+
+    _:N06e49fae17ba4d3da21ae710b6f7f419 a promo:Expression ;
+        promo:hasArguments _:Ne151ce16c3894bf9a1daaa03eb461483 ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:N091e38d704d54b1b9e4027c539d24724 rdf:first _:N90f8f8d9285e4b489e1988cca0290287 ;
+        rdf:rest _:N092f7dcbece54a98bf09a6c3bfee4948 .
+
+    _:N092f7dcbece54a98bf09a6c3bfee4948 rdf:first <https://w3id.org/promo/library#V_105> ;
+        rdf:rest () .
+
+    _:N428493d938324ee88fd8a618f2e86fb4 rdf:first _:N06e49fae17ba4d3da21ae710b6f7f419 ;
+        rdf:rest _:Nd8c53e4d962147d2becab7f5b8f3ea8e .
+
+    _:N45681309ef584e5db918fd84871ec4b8 rdf:first _:Na000d6db1e18456b97dc32d5a26b1ef4 ;
+        rdf:rest _:N9b73dcb3f66f4db29fbf02915dca1212 .
+
+    _:N6e0117e14bb5460984c704d6365b2b08 rdf:first <https://w3id.org/promo/library#V_104> ;
+        rdf:rest () .
+
+    _:N7273fd7323074c559e1521bbb505a8f6 rdf:first <https://w3id.org/promo/ontology#idx_species> ;
+        rdf:rest () .
+
+    _:N90f8f8d9285e4b489e1988cca0290287 a promo:Expression ;
+        promo:hasArguments _:N428493d938324ee88fd8a618f2e86fb4 ;
+        promo:hasOperation promolg:Add .
+
+    _:N9b73dcb3f66f4db29fbf02915dca1212 rdf:first <https://w3id.org/promo/ontology#idx_arc_work> ;
+        rdf:rest () .
+
+    _:Na000d6db1e18456b97dc32d5a26b1ef4 a promo:Expression ;
+        promo:hasArguments _:Na098773d4ef142d2abca1431c63e5ce8 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Na098773d4ef142d2abca1431c63e5ce8 rdf:first <https://w3id.org/promo/ontology#F_work> ;
+        rdf:rest _:N6e0117e14bb5460984c704d6365b2b08 .
+
+    _:Nd8c53e4d962147d2becab7f5b8f3ea8e rdf:first <https://w3id.org/promo/library#V_102> ;
+        rdf:rest () .
+
+    _:Ne151ce16c3894bf9a1daaa03eb461483 rdf:first <https://w3id.org/promo/library#V_101> ;
+        rdf:rest _:N7273fd7323074c559e1521bbb505a8f6 .
 
     _:n3f682554056f4ead9b54b7fefb7a790fb1 rdf:first <https://w3id.org/promo/ontology#V_16> ;
         rdf:rest _:n3f682554056f4ead9b54b7fefb7a790fb65 .
@@ -3374,16 +3464,7 @@
     _:n3f682554056f4ead9b54b7fefb7a790fb54 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest _:n3f682554056f4ead9b54b7fefb7a790fb280 .
 
-    _:n3f682554056f4ead9b54b7fefb7a790fb55 rdf:first _:n3f682554056f4ead9b54b7fefb7a790fb61 ;
-        rdf:rest _:n3f682554056f4ead9b54b7fefb7a790fb57 .
-
     _:n3f682554056f4ead9b54b7fefb7a790fb56 rdf:first _:n3f682554056f4ead9b54b7fefb7a790fb281 ;
-        rdf:rest () .
-
-    _:n3f682554056f4ead9b54b7fefb7a790fb57 rdf:first <https://w3id.org/promo/library#V_102> ;
-        rdf:rest () .
-
-    _:n3f682554056f4ead9b54b7fefb7a790fb58 rdf:first <https://w3id.org/promo/ontology#idx_species> ;
         rdf:rest () .
 
     _:n3f682554056f4ead9b54b7fefb7a790fb59 rdf:first _:n3f682554056f4ead9b54b7fefb7a790fb63 ;
@@ -3394,13 +3475,6 @@
 
     _:n3f682554056f4ead9b54b7fefb7a790fb60 rdf:first <https://w3id.org/promo/library#V_23> ;
         rdf:rest () .
-
-    _:n3f682554056f4ead9b54b7fefb7a790fb61 a promo:Expression ;
-        promo:hasArguments _:n3f682554056f4ead9b54b7fefb7a790fb62 ;
-        promo:hasOperation promolg:SumOverIndex .
-
-    _:n3f682554056f4ead9b54b7fefb7a790fb62 rdf:first <https://w3id.org/promo/library#V_101> ;
-        rdf:rest _:n3f682554056f4ead9b54b7fefb7a790fb58 .
 
     _:n3f682554056f4ead9b54b7fefb7a790fb63 a promo:Expression ;
         promo:hasArguments _:n3f682554056f4ead9b54b7fefb7a790fb64 ;
