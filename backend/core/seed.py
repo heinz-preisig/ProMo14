@@ -398,7 +398,7 @@ class SeedMixin:
         pre-bound ``promo:value`` (permanent: fixed by mathematics) and a
         latex alias so documents render numerals, not labels.
         """
-        for frag, label, value, latex in SEED_CONSTANTS:
+        for frag, label, value, latex, units in SEED_CONSTANTS:
             iri = self.mint_iri(base, frag)
             if (iri, RDF.type, PROMO["Variable"]) in g:
                 # §26: converge a legacy V_n internalID onto the
@@ -407,7 +407,7 @@ class SeedMixin:
                 if str(g.value(iri, PROMO["internalID"])) != frag:
                     g.set((iri, PROMO["internalID"], Literal(frag)))
                 continue
-            self.add_variable_dict(g, {
+            rec = {
                 "iri": str(iri),
                 "label": label,
                 "network": "root",
@@ -416,7 +416,10 @@ class SeedMixin:
                 "aliases": {"global_ID": frag, "latex": latex},
                 "value": value,
                 "doc": "Universal constant",
-            })
+            }
+            if units is not None:
+                rec["units"] = units
+            self.add_variable_dict(g, rec)
 
     def _seed_equation_classes(self, g: Graph, base: str) -> None:
         """Add the top-level equation-class hierarchy.

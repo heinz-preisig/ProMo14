@@ -95,18 +95,21 @@ VOCAB_DOCS = {
 # value slots, class ``constant``, network ``root`` — visible from every
 # expression network via ancestor-chain resolution.  ``value`` is the
 # code-surface literal; ``latex`` is the document-surface alias.
-#   (fragment, label, value, latex alias)
+#   (fragment, label, value, latex alias, units — None = dimensionless)
 SEED_CONSTANTS = (
-    ("const_zero", "zero", "0", "0"),
-    ("const_one", "one", "1", "1"),
-    ("const_half", "half", "0.5", r"\frac{1}{2}"),
+    ("const_zero", "zero", "0", "0", None),
+    ("const_one", "one", "1", "1", None),
+    ("const_half", "half", "0.5", r"\frac{1}{2}", None),
+    # Physical constant — standard gravity m·s⁻² (Bernoulli / potential
+    # energy); units follow the SI vector [t, l, n, m, T, I, J, -].
+    ("const_g", "g", "9.81", "g", [-2, 1, 0, 0, 0, 0, 0, 0]),
 )
 
 # Seed-floor revision stamped as ``promo:seedFloor`` on every graph the
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-11-20"
+SEED_FLOOR = "2026-11-22"
 
 # Top-level equation-class hierarchy, seeded by
 # ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for
