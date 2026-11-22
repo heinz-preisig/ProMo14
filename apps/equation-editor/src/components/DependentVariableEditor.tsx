@@ -111,6 +111,11 @@ export default function DependentVariableEditor({
   // §34: port-ness is a declaration on the variable, not a separate
   // kind — a dependent variable may also be connectable.
   const [isPort, setIsPort] = useState(false)
+  // The declaration chrome (domain tree, classifications, tokens) is
+  // secondary when editing/attaching an equation on an existing
+  // variable — collapse it behind a summary line; new variables get
+  // the full form.
+  const [showDecl, setShowDecl] = useState(false)
   // Creation mode (new variables only — editing forces dependent):
   // ``foundation`` = declared signature, no expression column.
   const [mode, setMode] = useState<VariableMode>(initialMode)
@@ -157,6 +162,7 @@ export default function DependentVariableEditor({
       setLoading(false)
       setGenCode(null)
       setGenLoading(false)
+      setShowDecl(false)
     }
     // Keyed on identity, not object: a mid-session variable save
     // (e.g. a token-advisory fix) replaces `editing` with a fresh
@@ -657,7 +663,39 @@ export default function DependentVariableEditor({
             </div>
           )}
 
-          {/* Row 2: domain tree + stacked classification/name fields */}
+          {/* Row 2: domain tree + stacked classification/name fields.
+               Editing an existing variable collapses this to a
+               summary line — the equation work is below, and the
+               declaration fields are secondary. */}
+          {editing && !showDecl && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                fontSize: 12,
+                color: '#555',
+                padding: '4px 0',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowDecl(true)}
+                style={{ fontSize: 11, padding: '2px 8px' }}
+              >
+                Variable details ▸
+              </button>
+              <span>
+                <strong>{editing.label}</strong>
+                {' · '}
+                {domain}
+                {' · '}
+                kind: {kindTag(axes, classifications) || 'unclassified'}
+                {isPort ? ' · port' : ''}
+              </span>
+            </div>
+          )}
+          {(!editing || showDecl) && (
           <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
@@ -837,8 +875,18 @@ export default function DependentVariableEditor({
                 carriesTokens={carriesTokens}
                 onToggleToken={toggleToken}
               />
+              {editing && showDecl && (
+                <button
+                  type="button"
+                  onClick={() => setShowDecl(false)}
+                  style={{ fontSize: 11, padding: '2px 8px', alignSelf: 'flex-start' }}
+                >
+                  Hide variable details ▾
+                </button>
+              )}
             </div>
           </div>
+          )}
         </div>
 
         {!isFoundation && (
