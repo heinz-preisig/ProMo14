@@ -69,6 +69,68 @@ def _without(indices: List[str], iri: str) -> List[str]:
     return [i for i in indices if i != iri]
 
 
+def _index_source(space: CompileSpace, iri: str) -> Optional[str]:
+    """The ontology's index *source* (node/arc/token/coordinate/…) kept
+    in ``aliases['index_source']`` by the context builder."""
+    idx = space.indices.get(iri)
+    return idx.aliases.get("index_source") if idx else None
+
+
+def _arc_space_indices(space: CompileSpace) -> Set[str]:
+    """Arc-source indices plus their declared sub-indices (``A_conv``
+    and friends are arc-like through ``sub_index_of``)."""
+    out = {
+        iri
+        for iri, idx in space.indices.items()
+        if idx.aliases.get("index_source") == "arc"
+    }
+    for iri, idx in space.indices.items():
+        if idx.sub_index_of in out:
+            out.add(iri)
+    return out
+
+
+def _vars(tree: "Checked") -> List["Checked"]:
+    """Every ``Var`` leaf in a checked tree."""
+    out: List[Checked] = []
+    if isinstance(tree.node, Var):
+        out.append(tree)
+    for child in tree.children:
+        out.extend(_vars(child))
+    return out
+
+
+def _check_contraction_index(space: CompileSpace, index_iri: str,
+                             arg: "Checked") -> None:
+    """An incidence factor's node axis is never a contraction index.
+
+    ``reduceSum(F * f, A)`` contracts the arc axis (a balance); the
+    through-drop is spelled ``reduceSum(sigma * effort, X)`` (§41).
+    Contracting the *node* axis of an incidence-shaped operand —
+    e.g. ``reduceSum(effort * F, N)`` — type-checks in declared space
+    but evaluates the wrong contraction once the effort's index binds
+    the contact coordinate ``X`` at instantiation (the §40 incident).
+    """
+    if _index_source(space, index_iri) != "node":
+        return
+    arc_like = _arc_space_indices(space)
+    for var in _vars(arg):
+        s = var.index_set()
+        if index_iri in s and s & arc_like:
+            raise IndexStructureError(
+                "the node axis of an incidence factor cannot be "
+                "contracted: %s carries [%s, N] — write the "
+                "through-drop as reduceSum(sigma * effort, X) "
+                "(§41), not a contraction over %s"
+                % (
+                    var.node.name,
+                    ", ".join(space.index_alias(i)
+                              for i in var.indices if i in arc_like),
+                    space.index_alias(index_iri),
+                )
+            )
+
+
 @dataclass
 class Checked:
     """A type-checked / unit-checked subexpression."""
@@ -331,6 +393,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             raise VarError(
                 "no such index %s defined" % node.index.name
             )
+        _check_contraction_index(space, index_iri, arg)
         if index_iri not in arg.index_set():
             raise IndexStructureError(
                 "Product -- index %s not in argument indices %s"
@@ -400,6 +463,7 @@ def check(node: Node, space: CompileSpace, lhs: Optional[Var] = None) -> Checked
             raise VarError(
                 "no such index %s defined" % node.index.name
             )
+        _check_contraction_index(space, index_iri, arg)
         return Checked(
             node=node,
             units=arg.units,

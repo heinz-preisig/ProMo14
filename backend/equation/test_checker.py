@@ -448,6 +448,128 @@ def test_add_different_set_rejected():
     raise AssertionError("expected IndexStructureError")
 
 
+def _flow_space():
+    """A minimal flow-system space: node/arc/coordinate indices, an
+    incidence factor F[N,A], an effort p[N], a flow f[A] and sigma[X]."""
+    n_idx = Index(
+        iri="http://promo.example/index/node",
+        label="node",
+        network="physical",
+        index_class="index",
+        aliases={"internal_code": "N", "index_source": "node"},
+    )
+    a_idx = Index(
+        iri="http://promo.example/index/arc",
+        label="arc",
+        network="physical",
+        index_class="index",
+        aliases={"internal_code": "A", "index_source": "arc"},
+    )
+    x_idx = Index(
+        iri="http://promo.example/index/x",
+        label="reference coordinate",
+        network="physical",
+        index_class="index",
+        aliases={"internal_code": "X", "index_source": "coordinate"},
+        sub_index_of=a_idx.iri,
+    )
+    F = Variable(
+        iri="http://promo.example/var/F",
+        internal_id="F_conv",
+        label="F_conv",
+        network="root",
+        type="constant",
+        units=Units(),
+        index_structures=[a_idx.iri, n_idx.iri],
+    )
+    p = Variable(
+        iri="http://promo.example/var/p",
+        internal_id="V_10",
+        label="p",
+        network="physical",
+        type="state",
+        units=Units(mass=1, length=-1, time=-2),
+        index_structures=[n_idx.iri],
+    )
+    f = Variable(
+        iri="http://promo.example/var/f",
+        internal_id="V_11",
+        label="f",
+        network="physical",
+        type="state",
+        units=Units(mass=1, time=-1),
+        index_structures=[a_idx.iri],
+    )
+    sig = Variable(
+        iri="http://promo.example/var/sigma",
+        internal_id="sigma",
+        label="sigma",
+        network="root",
+        type="constant",
+        units=Units(),
+        index_structures=[x_idx.iri],
+    )
+    variables = {v.iri: v for v in [F, p, f, sig]}
+    indices = {i.iri: i for i in [n_idx, a_idx, x_idx]}
+    return CompileSpace(
+        variables,
+        indices,
+        variable_definition_network="physical",
+        expression_definition_network="physical",
+    )
+
+
+def test_incidence_node_axis_not_contractable():
+    """§41: ``reduceSum(p * F, N)`` — contracting an incidence factor's
+    node axis type-checks in declared space but evaluates the wrong
+    contraction once the effort binds X at instantiation."""
+    space = _flow_space()
+    node = parse("reduceSum(p * F_conv, N)")
+    try:
+        check(node, space)
+    except IndexStructureError as e:
+        assert "incidence" in str(e) or "through-drop" in str(e)
+        return
+    raise AssertionError("expected IndexStructureError")
+
+
+def test_incidence_node_axis_product_form_also_rejected():
+    """Same rule on the ``Product`` contraction form (its body must be
+    dimensionless — ``F * F`` qualifies and is incidence-shaped)."""
+    space = _flow_space()
+    node = parse("Product(F_conv * F_conv, N)")
+    try:
+        check(node, space)
+    except IndexStructureError:
+        return
+    raise AssertionError("expected IndexStructureError")
+
+
+def test_balance_arc_contraction_still_legal():
+    """``reduceSum(F * f, A)`` contracts the arc axis — the balance."""
+    space = _flow_space()
+    node = parse("reduceSum(F_conv * f, A)")
+    c = check(node, space)
+    assert c.indices == ["http://promo.example/index/node"]
+
+
+def test_sigma_law_still_legal():
+    """``reduceSum(sigma * p, X)`` — the §41 through-drop spelling."""
+    space = _flow_space()
+    node = parse("reduceSum(sigma * p, X)")
+    c = check(node, space)
+    assert c.indices == ["http://promo.example/index/node"]
+
+
+def test_node_contraction_without_incidence_operand_legal():
+    """Reducing a plain node-indexed expression over N stays legal —
+    the rule only fires on incidence-shaped operands."""
+    space = _flow_space()
+    node = parse("reduceSum(p * p, N)")
+    c = check(node, space)
+    assert c.indices == []
+
+
 if __name__ == "__main__":
     import sys
 

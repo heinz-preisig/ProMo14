@@ -4466,3 +4466,71 @@ node-indexed, scalar) or when `carrier_ok`/`cands` is empty.
 port on a mass-only topology emits no `PortBinding` and no
 problem, while a non-flow twin on the same topology still
 reports `unbound-port`.  561 backend tests pass.
+
+## 45. The incidence factor's node axis is never a contraction index — RULED & implemented (2026-11-22)
+
+### Problem
+
+`reduceSum(p_mech * F_conv, N)` — the pre-§41 through-drop spelling —
+*type-checks* in declared space: `[N]*[A,N] → [A,N]`, contract `N` →
+`[A]`, units clean.  It only becomes wrong in bound scope, where the
+effort's declared `N` is replaced by the contact coordinate `X` — the
+contraction then sums the wrong axis pair and drives the flow to zero
+(the §40 incident).  The user meets σ only in the library; nothing
+stopped them from re-deriving the broken form, and the failure mode is
+silent wrong math, the exact class of mistake the checker exists for.
+
+A check-time gate seemed to need binding knowledge the checker lacks —
+whether `p_mech` rebinds is a builder fact.  But the bad *shape* is
+decidable from declared data alone.
+
+### Ruling
+
+- **An incidence factor's node axis is never a legal contraction
+  index.**  Balances contract the arc axis (`reduceSum(F*f, A)`);
+  through-drops go through the direction vector
+  (`reduceSum(σ*effort, X)`, §41).  No legal equation reduces an
+  incidence-shaped operand over a node-source index.
+- **Detection is structural, not semantic.**  The operand is
+  incidence-shaped iff a `Var` leaf's index structure contains both a
+  `node`-source index and an arc-source index (arc-like includes
+  declared sub-indices via `subIndexOf`).  Index *source* is already
+  ontology data (`indexClass` → `index_source` alias); the rule keys
+  on the class, never on `F_*` IRIs — semantics in the ontology,
+  enforcement in the checker.
+- **Both contraction surfaces covered**: `reduceSum(…, I)` and
+  `Product(…, I)`.
+- **The checker is the teacher.**  The error names the user's own
+  symbols and the correct spelling
+  (`reduceSum(sigma * effort, X)`), so violating the rule *is* the
+  lesson — no prior knowledge of binding scope required.
+- **Bound-scope recheck stays the backstop** (`var_bound` →
+  re-check in binding context at instantiation).  The two layers:
+  authoring catches the shape, instantiation catches the signature.
+
+### The generic class (recorded for the contract vocabulary)
+
+One instance of *declared-space typing is symbolic; element space only
+exists in binding scope*.  Siblings: species `S` (fixpoint elements),
+mechanism sub-indices (selector membership), the port-var index swap
+itself (§32 — currently implicit, could become declared), and the
+blocked `C`/`C'` component folds (§42).  The general mechanism —
+declare binding contracts on indices/vars, enforce contract-shaped
+rules keyed on index class — is the candidate home for any further
+rules of this family.
+
+### Implementation
+
+`checker.py`: `_check_contraction_index` fires when the reduction
+index has `index_source == "node"` and a `Var` leaf of the argument
+carries both that index and an arc-like index (arc-source or
+`sub_index_of` an arc-source).  `IndexStructureError` with the σ
+hint.  No schema, vocabulary, or data change.
+
+### Verification
+
+`test_checker.py` `_flow_space` + five tests: the bad form errors on
+both `reduceSum` and `Product`; the balance (`F*f` over `A`), the σ
+law (`σ*p` over `X`), and plain node contractions (`p*p` over `N`)
+stay legal.  572 backend tests pass — no existing equation regressed,
+including the migrated library set.
