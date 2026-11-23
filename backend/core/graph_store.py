@@ -679,7 +679,7 @@ class RdfStore(PersistenceMixin, SeedMixin):
                 graph.set((fill, PROMO["fillPattern"],
                            Literal(json.dumps(elements))))
                 for el in elements:
-                    if el != "*":
+                    if el != "*" and (":" in el or "/" in el):
                         graph.add((fill, PROMO["atIndexElement"],
                                    URIRef(el)))
                 graph.set((fill, PROMO["value"], _as_literal(value)))
@@ -690,7 +690,13 @@ class RdfStore(PersistenceMixin, SeedMixin):
             graph.set((cell, PROMO["coordinate"],
                        Literal(json.dumps(elements))))
             for el in elements:
-                graph.add((cell, PROMO["atIndexElement"], URIRef(el)))
+                # Literal element names (fixed indices like C's
+                # "x"/"y"/"z") are not resources — a relative URIRef
+                # would corrupt on TriG round-trip.  The coordinate
+                # literal stays the authoritative key.
+                if ":" in el or "/" in el:
+                    graph.add((cell, PROMO["atIndexElement"],
+                               URIRef(el)))
             graph.set((cell, PROMO["value"], _as_literal(value)))
 
     def value_cells(

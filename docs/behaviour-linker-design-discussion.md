@@ -4203,6 +4203,18 @@ deferrable).
   pattern, needs element-keyed literal values bound on the var) vs a
   selection construct vs re-authoring those equations in the
   `[C]`/`[C,C']` view.
+  **Selection ruled (2026-11-23) — seeded basis vectors.**  `e_x`/
+  `e_y`/`e_z` are floor-seeded `[C]`-indexed constant+parameter
+  variables (dimensionless, token-neutral) carrying the first
+  seeded value-cell tables (`{x:1, y:0, z:0}` &c., keyed on the
+  index's literal element names — no `atIndexElement` links).
+  Value cells now resolve through the artefact's pin scope
+  (`_binding_cells` scope walk, least→most specific), so the floor
+  tables reach every pinning artefact.  `v_i ≡ reduceSum(e_i * v,
+  C)` extracts, `e_x*vx + e_y*vy + e_z*vz` injects,
+  `reduceSum(e_x*r,C)·reduceSum(e_z*r,C)` covers `E_26`/`E_27` —
+  no `[C,C']` needed for the current equations.  *Remaining:* the
+  `v[C]`/`r[C]` consumer rewrites themselves.
 - Tensors (stress, momentum-flux) stay out of scope — staged in §42.
 
 ## 42. Tensor-index layer for sheet mechanics — DESIGN PROPOSAL (deferred)

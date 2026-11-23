@@ -1115,11 +1115,17 @@ def _binding_cells(store, model_graph,
                    cell_source: Dict[Tuple[str, str], Any],
                    occurrence: str, var: str) -> Dict[str, Any]:
     """The effective value-cell table for one (occurrence, var)
-    binding: the occurrence's own value source (submodel or its
-    ``values`` override) with the host artefact's cells overlaid —
-    host pins win on exact coordinates, which never collide since
-    qualified and unqualified element IRIs differ."""
+    binding: the artefact's pin scope (ontology floor tables like
+    the §41 e_i basis vectors, library constants) first — least
+    specific wins first, so the artefact's own cells always
+    overwrite on the same coordinate — then the occurrence's own
+    value source (submodel or its ``values`` override) and finally
+    the host artefact's cells.  Host pins win on exact
+    coordinates, which never collide since qualified and
+    unqualified element IRIs differ."""
     cells: Dict[str, Any] = {}
+    for gi in reversed(store.resolution_scope(model_graph.identifier)):
+        cells.update(store.value_cells(store.dataset.graph(gi), var))
     src = cell_source.get((occurrence, var))
     if src is not None:
         cells.update(store.value_cells(src, var))

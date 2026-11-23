@@ -388,6 +388,7 @@ class SeedMixin:
         self._seed_actuation_target(g, base)
         self._seed_coordinate(g, base)
         self._seed_component(g, base)
+        self._seed_basis(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
@@ -807,6 +808,84 @@ class SeedMixin:
             })
         g.set((iri, PROMO["elements"],
                Literal(json.dumps(["x", "y", "z"]))))
+
+    def _seed_basis(self, g: Graph, base: str) -> None:
+        """§41 Cartesian basis vectors ``e_x``, ``e_y``, ``e_z`` on
+        ``C``.
+
+        Each ``e_i`` is the component selector for the ``C`` fold:
+        ``v_i ≡ reduceSum(e_i * v, C)`` extracts component ``i`` of
+        a ``C``-indexed variable — the ``sigma``/``F_k``
+        scheme-object pattern, no new syntax.  Injection runs the
+        other way (``e_x*vx + e_y*vy + e_z*vz``) and cross-component
+        products are ``reduceSum(e_x*r,C) * reduceSum(e_z*r,C)``.
+
+        constant+parameter, dimensionless, token-neutral — the
+        bound-kind leaf of the §4 ruling gives verified-empty for
+        free.  Values are literals fixed by definition — the first
+        seeded value cells: ``promo:coordinate`` keys name
+        ``idx_component``'s literal elements (``x``/``y``/``z``), not
+        element IRIs, so cells carry no ``atIndexElement`` links.
+        The tables resolve through the artefact's resolution scope
+        at instantiation (``_binding_cells`` scope walk) and are
+        rewritten exactly on re-seed — floor semantics like the
+        element set itself.
+        """
+        c_iri = self.mint_iri(base, "idx_component")
+        if (c_iri, RDF.type, PROMO["Index"]) not in g:
+            return
+        domain = self.mint_iri(base, "domain_physical")
+        classifications = {}
+        for axis, term in (
+            ("axis_determination_physical",
+             "term_determination_constant"),
+            ("axis_function_physical", "term_function_parameter"),
+        ):
+            term_iri = self.mint_iri(base, term)
+            if (term_iri, None, None) in g:
+                classifications[str(self.mint_iri(base, axis))] = \
+                    str(term_iri)
+        for el in ("x", "y", "z"):
+            iri = self.mint_iri(base, f"e_{el}")
+            self.add_variable_dict(g, {
+                "iri": str(iri),
+                "label": f"e_{el}",
+                "network": "physical",
+                "domain_iri": str(domain),
+                # §26: deterministic ID — ``{graph}#e_x``.
+                "internal_id": f"e_{el}",
+                "units": [0, 0, 0, 0, 0, 0, 0, 0],
+                "index_structures": [str(c_iri)],
+                "port_variable": False,
+                "classifications": classifications,
+                "aliases": {"latex": f"e_{el}",
+                            "global_ID": str(iri)},
+                "doc": "§41 Cartesian basis vector on C — the "
+                       "component selector: reduceSum(e_i * v, C) "
+                       "extracts component i of a C-indexed "
+                       "variable; e_i's own values are 1 at its "
+                       "element, 0 elsewhere (seeded literal "
+                       "cells).  Rebuild a vector from scalars "
+                       "with e_x*vx + e_y*vy + e_z*vz; "
+                       "cross-component products contract each "
+                       "factor against its own e_i.  "
+                       "constant+parameter, dimensionless, "
+                       "token-neutral like sigma and the F_k "
+                       "factors.",
+            })
+            # Exact-set enforcement + token neutrality (F_k/sigma
+            # precedent): index membership and declarations are
+            # normalised on load; the cell table is scheme-fixed.
+            for o in set(g.objects(iri, PROMO["indexStructure"])) \
+                    - {c_iri}:
+                g.remove((iri, PROMO["indexStructure"], o))
+            for o in set(g.objects(iri, PROMO["carriesToken"])):
+                g.remove((iri, PROMO["carriesToken"], o))
+            for _, _, o in g.triples((iri, PROMO["tokenVector"],
+                                      None)):
+                g.remove((iri, PROMO["tokenVector"], o))
+            self.set_value_cells(g, iri, {
+                ax: (1 if ax == el else 0) for ax in ("x", "y", "z")})
 
     def _seed_capabilities(self, g: Graph, base: str) -> None:
         """Seed entity-type capabilities (§20): which types may inject

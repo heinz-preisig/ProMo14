@@ -330,6 +330,54 @@ def test_seed_component_index(tmp_path):
         ["x", "y", "z"]
 
 
+def test_seed_basis_vectors(tmp_path):
+    """§41: the Cartesian basis ``e_x``/``e_y``/``e_z`` is floor-seeded
+    on ``C`` — constant+parameter, dimensionless, token-neutral —
+    each carrying a literal cell table (the component selectors).
+    Element keys are literal names, not IRIs: no ``atIndexElement``
+    links, and the tables re-seed exactly."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+    c = URIRef(f"{ONTO}#idx_component")
+    for el in ("x", "y", "z"):
+        e = URIRef(f"{PVAR}e_{el}")
+        assert (e, RDF.type, PROMO["Variable"]) in ont
+        assert set(ont.objects(e, PROMO["indexStructure"])) == {c}
+        assert set(ont.objects(e, PROMO["carriesToken"])) == set()
+        assert (e, PROMO["tokenVector"], None) not in ont
+        assert store.value_cells(ont, e) == {
+            ax: (1 if ax == el else 0) for ax in ("x", "y", "z")}
+        for cell in ont.objects(e, PROMO["valueCell"]):
+            assert (cell, PROMO["atIndexElement"], None) not in ont
+    # Floor: a doctored table is rewritten exactly on re-seed.
+    ex = URIRef(f"{PVAR}e_x")
+    store.set_value_cells(ont, ex, {"x": 7})
+    store._seed_basis(ont, ONTO)
+    assert store.value_cells(ont, ex) == {"x": 1, "y": 0, "z": 0}
+
+
+def test_binding_cells_resolve_pin_scope(tmp_path):
+    """Value cells seeded on a pinned artefact (the ontology floor's
+    ``e_i`` basis vectors) reach a binding through the artefact's
+    resolution scope; the artefact's own cells win on the same
+    coordinate."""
+    from backend.instantiate.service import _binding_cells
+    store = RdfStore(tmp_path)
+    store.load()
+    model = "https://example.org/m_scope"
+    store.create_artefact_graph(
+        model, "Model", uses=[str(store.ONTOLOGY_GRAPH_IRI)])
+    mg = store.dataset.graph(URIRef(model))
+    ex = URIRef(f"{PVAR}e_x")
+    assert _binding_cells(store, mg, {}, "", str(ex)) == \
+        {"x": 1, "y": 0, "z": 0}
+    # A local pin overrides the floor table on that coordinate only.
+    store.set_value_cells(mg, ex, {"x": 5})
+    assert _binding_cells(store, mg, {}, "", str(ex)) == \
+        {"x": 5, "y": 0, "z": 0}
+
+
 def test_seed_incidence_factors(tmp_path):
     """§25: one canonical F_<mech> variable per arc sub-index — fixed
     [A_k, N] shape, constant+parameter, dimensionless.  §4 neutrality:

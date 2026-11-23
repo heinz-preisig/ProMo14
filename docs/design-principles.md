@@ -408,13 +408,19 @@ memberships are not automatically migrated; user equations remain untouched.
   2026-11-03 handoff.
 - Component fold (§41/§42) — machinery **landed 2026-11-20**:
   `promo:elements` literal element sets on index records plus
-  `idx_component` `C = {x,y,z}` (`index_class "component"`).  *Open*
-  gap: the component-selection convention — the language cannot
-  name one element of a `C`-indexed variable, so scalar consumers
-  of `v_x`-style components (`kConvX * Ayz`-laws) and the `[C,C']`
-  geometric folds (`Axz = r_x·r_z`) stay unfolded.  Options:
-  seeded basis vectors `e_x[C]`, a `select`/`left`-style builtin,
-  or `[C,C']` forms — §41 deferred bullet + 2026-11-20 handoff.
+  `idx_component` `C = {x,y,z}` (`index_class "component"`).
+  Component selection **ruled 2026-11-23 — seeded basis vectors**:
+  `e_x`/`e_y`/`e_z` are `[C]`-indexed constant+parameter scheme
+  objects (the σ/`F_k` pattern — dimensionless, token-neutral)
+  carrying the first floor-seeded value-cell tables, keyed on the
+  index's literal element names.  `v_i ≡ reduceSum(e_i * v, C)`
+  extracts, `e_x*vx + e_y*vy + e_z*vz` injects, cross-component
+  products contract each factor against its own `e_i` — so
+  `E_26`/`E_27`-style terms need no `[C,C']` machinery.  Value
+  cells resolve through the artefact's pin scope
+  (`_binding_cells`, least→most specific — artefact's own cells
+  win).  *Remaining:* the `v[C]`/`r[C]` consumer rewrites; genuine
+  tensor objects (`r:r'`, stress) stay §42.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:

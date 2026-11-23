@@ -35,6 +35,23 @@ projections, never stored meaning in themselves.
   information is in-graph.  No external schema, no imported tables.
 - **Replace semantics** — `set_value_cells` wipes the variable's
   existing cells first; a PUT sends the whole intended table.
+- **Literal element names** — cells keyed on a fixed index's
+  `promo:elements` names (`C`'s `x`/`y`/`z`) carry **no**
+  `promo:atIndexElement` links: the names are not resources and a
+  relative URIRef would corrupt on TriG round-trip.  The
+  `coordinate` literal stays the authoritative key.
+
+## Scope resolution
+
+A binding's effective table (`_binding_cells`) unions cells across
+the artefact's **resolution scope** — its own graph plus the
+transitive `promo:usesOntology`/`promo:usesLibrary` closure —
+least specific first, so more-local cells overwrite on the same
+coordinate: pin tables < occurrence's own value source < host
+artefact.  Seed-floor tables (the §41 `e_i` basis vectors, ruled
+2026-11-23) live on the ontology and reach every pinning artefact
+this way; an artefact may still pin a local cell over the floor
+value.
 
 ## Coordinate keys
 
