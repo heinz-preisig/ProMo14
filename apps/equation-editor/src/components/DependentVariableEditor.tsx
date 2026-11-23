@@ -8,7 +8,7 @@ import AxisClassifications, {
   FIELD_LABEL_STYLE,
   findTermIri,
 } from '../axisClassifications'
-import { nextEquationId, nextInternalId, referenceDisplay, signatureMismatch } from '../variableUtils'
+import { nextEquationId, nextInternalId, referenceDisplay, signatureMismatch, unitsToLatex } from '../variableUtils'
 import { useVariableLock } from '../useVariableLock'
 import ExpressionInput, { type ExpressionInputHandle } from './ExpressionInput'
 import LaTeXPreview from './LaTeXPreview'
@@ -20,7 +20,7 @@ import {
   isValidVariableName,
   VARIABLE_NAME_HINT,
 } from '../validation'
-import { indexShortLabel, suggestLatexAlias, validateLatexAlias } from '../latex'
+import { astToLatex, indexShortLabel, renderLatex, suggestLatexAlias, validateLatexAlias } from '../latex'
 
 /** Bound-value kinds allowed on the LHS of ``Instantiate(proto)`` — an
  *  instance is a bound-value slot, not a computed quantity (§24). */
@@ -111,10 +111,10 @@ export default function DependentVariableEditor({
   // §34: port-ness is a declaration on the variable, not a separate
   // kind — a dependent variable may also be connectable.
   const [isPort, setIsPort] = useState(false)
-  // The declaration chrome (domain tree, classifications, tokens) is
-  // secondary when editing/attaching an equation on an existing
-  // variable — collapse it behind a summary line; new variables get
-  // the full form.
+  // Declaration chrome (domain tree, classifications, tokens) collapses
+  // behind a summary line (rendered symbol + name/domain/kind) —
+  // collapsed by default when editing an existing variable, expanded
+  // for new ones.
   const [showDecl, setShowDecl] = useState(false)
   // Creation mode (new variables only — editing forces dependent):
   // ``foundation`` = declared signature, no expression column.
@@ -162,7 +162,7 @@ export default function DependentVariableEditor({
       setLoading(false)
       setGenCode(null)
       setGenLoading(false)
-      setShowDecl(false)
+      setShowDecl(!editing)
     }
     // Keyed on identity, not object: a mid-session variable save
     // (e.g. a token-advisory fix) replaces `editing` with a fresh
@@ -391,6 +391,39 @@ export default function DependentVariableEditor({
     }
   }, [buildRequest, genTarget])
 
+  // Variable-only edits (LaTeX symbol, doc, domain, classifications) vs
+  // the attached record — enables "Save variable" without an equation.
+  const variableDirty = !!editing && (
+    name.trim() !== editing.label ||
+    domain !== (editing.network ?? '') ||
+    doc !== (editing.doc ?? '') ||
+    latexSym !== (editing.aliases?.latex ?? '') ||
+    JSON.stringify(classifications) !== JSON.stringify(editing.classifications ?? {}) ||
+    isPort !== (editing.port_variable ?? false) ||
+    JSON.stringify(units) !== JSON.stringify(editing.units ?? [0, 0, 0, 0, 0, 0, 0, 0]) ||
+    JSON.stringify(Array.from(selectedIndices)) !==
+      JSON.stringify(editing.index_structures ?? []) ||
+    JSON.stringify([...carriesTokens].sort()) !==
+      JSON.stringify([...(editing.tokens ?? [])].sort())
+  )
+
+  // A stored class may persist as a label or an IRI — resolve both
+  // sides to an IRI before comparing.
+  const resolveClassIri = (ref?: string | null) =>
+    equationClasses.find((c) => c.iri === ref || c.label === ref)?.iri ?? ref ?? ''
+
+  // Edit-equation dirty check: the stored rhs text or its class must
+  // differ — an empty picked class means "keep stored", so it can't
+  // dirty the record on its own.
+  const storedEq = editingEquation
+    ? editing?.equations?.[editingEquation.id]
+    : undefined
+  const equationDirty = !!storedEq && (
+    text.trim() !== (storedEq.rhs ?? '').trim() ||
+    (!!effectiveEqClass &&
+      resolveClassIri(effectiveEqClass) !== resolveClassIri(storedEq.equation_class))
+  )
+
   /** Why Accept is disabled — surfaced inline next to the button,
    *  because title tooltips don't reliably fire on disabled elements. */
   const acceptBlockReason = !nameValid
@@ -399,15 +432,20 @@ export default function DependentVariableEditor({
       ? 'Select a domain in the tree'
       : latexError
         ? `Invalid LaTeX symbol — ${latexError}`
-        : !checkResult?.ok
-          ? 'Run Check on the expression first'
-          : signatureClash.length
-            ? `Signature fixed — ${editing?.label ?? 'the variable'} is referenced; the expression derives different ${signatureClash.join(' and ')}`
-            : null
+        : editingEquation && !equationDirty && !variableDirty
+          ? 'Nothing changed to save'
+          : !checkResult?.ok
+            ? 'Run Check on the expression first'
+            : signatureClash.length
+              ? `Signature fixed — ${editing?.label ?? 'the variable'} is referenced; the expression derives different ${signatureClash.join(' and ')}`
+              : null
 
   const handleAccept = () => {
     const lhs = name.trim()
-    if (!lhs || !domain || latexError || !checkResult?.ok || signatureClash.length) return
+    if (
+      !lhs || !domain || latexError || !checkResult?.ok || signatureClash.length ||
+      (editingEquation && !equationDirty && !variableDirty)
+    ) return
 
     const draft = draftVariable()
 
@@ -476,20 +514,23 @@ export default function DependentVariableEditor({
 
   const latexSuggestion = name.trim() ? suggestLatexAlias(name) : ''
 
-  // Variable-only edits (LaTeX symbol, doc, domain, classifications) vs
-  // the attached record — enables "Save variable" without an equation.
-  const variableDirty = !!editing && (
-    name.trim() !== editing.label ||
-    domain !== (editing.network ?? '') ||
-    doc !== (editing.doc ?? '') ||
-    latexSym !== (editing.aliases?.latex ?? '') ||
-    JSON.stringify(classifications) !== JSON.stringify(editing.classifications ?? {}) ||
-    isPort !== (editing.port_variable ?? false) ||
-    JSON.stringify(units) !== JSON.stringify(editing.units ?? [0, 0, 0, 0, 0, 0, 0, 0]) ||
-    JSON.stringify(Array.from(selectedIndices)) !==
-      JSON.stringify(editing.index_structures ?? []) ||
-    JSON.stringify([...carriesTokens].sort()) !==
-      JSON.stringify([...(editing.tokens ?? [])].sort())
+  // Collapsed-declaration symbol: the variable's rendered LaTeX (alias
+  // + derived/declared index subscripts), inline — not the raw alias.
+  const symbolHtml = nameValid
+    ? renderLatex(
+        astToLatex(
+          { type: 'Var', name: name.trim() } as AstNode,
+          { variables: contextVariables(), indices, expressionNetwork: domain },
+        ),
+        false,
+      )
+    : ''
+
+  // Effective units as they'll persist (locked > checker > manual),
+  // rendered inline — ``—`` when dimensionless/undeclared.
+  const unitsHtml = renderLatex(
+    `\\left[ ${unitsToLatex(draftVariable().units) || '\\text{—}'} \\right]`,
+    false,
   )
 
   // A new variable with an empty RHS is equation-less by intent —
@@ -563,54 +604,12 @@ export default function DependentVariableEditor({
                   ? `Add equation — ${editing.label}`
                   : 'New variable'}
             </h3>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ marginLeft: 'auto' }}>
               <button type="button" onClick={onClose}>
                 Cancel
               </button>
-              {onSaveVariable && (editing || isFoundation) && (
-                <button
-                  type="button"
-                  onClick={handleSaveVariable}
-                  disabled={
-                    editing
-                      ? !variableDirty || !!latexError || !name.trim()
-                      : !nameValid || !domain || !!latexError
-                  }
-                  title={
-                    editing
-                      ? 'Save variable changes (name, LaTeX symbol, domain, classifications) without adding an equation'
-                      : 'Create the variable without an equation (parameters, constants)'
-                  }
-                >
-                  Save variable
-                </button>
-              )}
-              {!isFoundation && (
-                <button
-                  type="button"
-                  onClick={handleAccept}
-                  disabled={!!acceptBlockReason}
-                  title={acceptBlockReason ?? undefined}
-                >
-                  {editingEquation ? 'Save equation' : editing ? 'Add equation' : 'Accept'}
-                </button>
-              )}
             </div>
           </div>
-
-          {/* Row 1a: blocked-state reason — its own line, loud. */}
-          {!isFoundation && acceptBlockReason && (
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 'bold',
-                color: '#b8860b',
-                marginBottom: 10,
-              }}
-            >
-              {acceptBlockReason}
-            </div>
-          )}
 
           {/* Row 1b: creation-mode switch — decides which panels the
                dialog offers (new variables only; attaching an equation
@@ -669,39 +668,43 @@ export default function DependentVariableEditor({
             </div>
           )}
 
-          {/* Row 2: domain tree + stacked classification/name fields.
-               Editing an existing variable collapses this to a
-               summary line — the equation work is below, and the
-               declaration fields are secondary. */}
-          {editing && !showDecl && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                fontSize: 12,
-                color: '#555',
-                padding: '4px 0',
-              }}
+          {/* Row 2: identity + declaration toggle.  The summary line
+               is always visible — rendered symbol, name, domain, kind,
+               rendered units — so the single ▸/▾ control stays in one
+               place whether the fields below are open or closed. */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              fontSize: 12,
+              color: '#555',
+              padding: '4px 0',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowDecl((prev) => !prev)}
+              style={{ fontSize: 11, padding: '2px 8px' }}
             >
-              <button
-                type="button"
-                onClick={() => setShowDecl(true)}
-                style={{ fontSize: 11, padding: '2px 8px' }}
-              >
-                Variable details ▸
-              </button>
-              <span>
-                <strong>{editing.label}</strong>
-                {' · '}
-                {domain}
-                {' · '}
-                kind: {kindTag(axes, classifications) || 'unclassified'}
-                {isPort ? ' · port' : ''}
-              </span>
-            </div>
-          )}
-          {(!editing || showDecl) && (
+              {showDecl ? 'Hide variable details ▾' : 'Variable details ▸'}
+            </button>
+            {symbolHtml && (
+              <span
+                style={{ fontSize: 15 }}
+                dangerouslySetInnerHTML={{ __html: symbolHtml }}
+              />
+            )}
+            <span>
+              <strong>{name.trim() || '(unnamed)'}</strong>
+              {domain ? ` · ${domain}` : ''}
+              {' · '}
+              kind: {kindTag(axes, classifications) || 'unclassified'}
+              {isPort ? ' · port' : ''}
+            </span>
+            <span dangerouslySetInnerHTML={{ __html: unitsHtml }} />
+          </div>
+          {showDecl && (
           <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
@@ -881,15 +884,6 @@ export default function DependentVariableEditor({
                 carriesTokens={carriesTokens}
                 onToggleToken={toggleToken}
               />
-              {editing && showDecl && (
-                <button
-                  type="button"
-                  onClick={() => setShowDecl(false)}
-                  style={{ fontSize: 11, padding: '2px 8px', alignSelf: 'flex-start' }}
-                >
-                  Hide variable details ▾
-                </button>
-              )}
             </div>
           </div>
           )}
@@ -1072,6 +1066,57 @@ export default function DependentVariableEditor({
             </label>
           </div>
         )}
+
+        {/* Footer: commit row.  The blocked reason sits next to the
+             action it disables — tooltips don't fire on disabled
+             buttons, and the workspace above ends in Check/Result. */}
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid #ccc',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
+          {!isFoundation && acceptBlockReason && (
+            <span style={{ fontSize: 13, fontWeight: 'bold', color: '#b8860b' }}>
+              {acceptBlockReason}
+            </span>
+          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            {onSaveVariable && (editing || isFoundation) && (
+              <button
+                type="button"
+                onClick={handleSaveVariable}
+                disabled={
+                  editing
+                    ? !variableDirty || !!latexError || !name.trim()
+                    : !nameValid || !domain || !!latexError
+                }
+                title={
+                  editing
+                    ? 'Save variable changes (name, LaTeX symbol, domain, classifications) without adding an equation'
+                    : 'Create the variable without an equation (parameters, constants)'
+                }
+              >
+                Save variable
+              </button>
+            )}
+            {!isFoundation && (
+              <button
+                type="button"
+                onClick={handleAccept}
+                disabled={!!acceptBlockReason}
+                title={acceptBlockReason ?? undefined}
+              >
+                {editingEquation ? 'Save equation' : editing ? 'Add equation' : 'Accept'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

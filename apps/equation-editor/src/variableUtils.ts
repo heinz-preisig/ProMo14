@@ -14,6 +14,19 @@ export function formatUnits(units?: number[] | null): string {
     .join('·')
 }
 
+/** KaTeX-source sibling of {@link formatUnits} — exponents become real
+ *  superscripts (``\mathrm{kg}\cdot\mathrm{m}^{2}``); empty string when
+ *  dimensionless.  Same exponent order. */
+export function unitsToLatex(units?: number[] | null): string {
+  if (!units || units.every((e) => !e)) return ''
+  return units
+    .map((e, i) =>
+      e ? `\\mathrm{${UNIT_SYMBOLS[i]}}${e !== 1 ? `^{${e}}` : ''}` : '',
+    )
+    .filter(Boolean)
+    .join(' \\cdot ')
+}
+
 /** Compact hover card for a variable.
  *  Line 1 = identity: ``network!label · internal_id · owning-graph``.
  *  Line 2 = semantics: kind, doc, units, index list (or ``scalar``),
