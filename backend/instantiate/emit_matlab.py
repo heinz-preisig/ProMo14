@@ -217,6 +217,18 @@ class _Matlab(Dialect):
 
     # -- dialect hooks ---------------------------------------------------
 
+    def permute(self, src: str, perm: List[int],
+                indices=None, space=None) -> str:
+        if len(perm) <= 1:
+            return src
+        # MultiDimVar's own label bookkeeping doesn't reorder axes on
+        # assignment — permute the value into the lhs's declared order
+        # and re-wrap with the target labels.
+        return self._mdv(
+            dict(indices or {}), space,
+            "permute((%s).value, [%s])"
+            % (src, " ".join(str(p + 1) for p in perm)))
+
     def broadcast(self, src: str, mapped: List[int],
                   dims: List[int], lhs_indices=None,
                   space=None) -> str:

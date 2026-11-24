@@ -133,7 +133,8 @@ class _Python(Dialect):
                else "def derivative(t, y, par):")
         return [sig, "    dy = np.zeros(%d)" % total]
 
-    def permute(self, src: str, perm: List[int]) -> str:
+    def permute(self, src: str, perm: List[int],
+                indices=None, space=None) -> str:
         if len(perm) <= 1:
             return src
         return "(%s).transpose((%s))" % (

@@ -153,7 +153,8 @@ class _Julia(Dialect):
                     "outs=nothing)"]
         return ["function derivative!(dy, y, par, t)"]
 
-    def permute(self, src: str, perm: List[int]) -> str:
+    def permute(self, src: str, perm: List[int],
+                indices=None, space=None) -> str:
         if len(perm) <= 1:
             return src
         return "permutedims(%s, (%s))" % (

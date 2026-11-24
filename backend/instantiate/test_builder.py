@@ -1469,6 +1469,26 @@ def test_emit_python_lhs_index_conformity():
     assert "V_2 = V_4" in emit_python(legacy, _emit_space())
 
 
+def test_emit_matlab_lhs_index_conformity():
+    """Same declared-order rule on the Matlab dialect: a permuted
+    rhs unwraps ``.value``, ``permute``s into the lhs order and
+    re-wraps with the lhs's index labels (MultiDimVar doesn't
+    reorder axes on assignment)."""
+    na = {_idx("idx_node"): ["c1", "c2"],
+          _idx("idx_arc_diffusion"): ["a1", "a2"]}
+    perm = CodePlan(
+        names={"et": {}},
+        levels=[[PlanBlock(
+            entity_type="et", equation="e_x", lhs=_var("F"),
+            lhs_instance="V_4@et", lhs_name="V_4", lhs_indices=na,
+            bound=dict(na), rhs="V_3 * V_2")]],
+    )
+    src = emit_matlab(perm, _emit_space())
+    assert ("V_4 = MultiDimVar({'N', 'A_diff'}, [2 2], "
+            "{'N', 'A_diff'}, permute((einsum(V_3, V_2)).value, "
+            "[2 1]));" in src)
+
+
 def _loop_plan() -> CodePlan:
     """A hand-built 2-cycle plan: V_2 = V_3, V_3 = V_2 (loop 0)."""
     n2 = {_idx("idx_node"): ["c1", "c2"]}

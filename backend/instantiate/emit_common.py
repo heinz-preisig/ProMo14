@@ -384,7 +384,8 @@ class Dialect:
         if checked.indices != want:
             if set(checked.indices) == set(want):
                 src = self.permute(
-                    src, [checked.indices.index(i) for i in want])
+                    src, [checked.indices.index(i) for i in want],
+                    block.lhs_indices, space)
             elif (block.bound
                     and set(checked.indices) < set(want)
                     and all((block.bound.get(i) or None)
@@ -400,7 +401,9 @@ class Dialect:
                 if list(checked.indices) != shared_in_want:
                     src = self.permute(
                         src, [checked.indices.index(i)
-                              for i in shared_in_want])
+                              for i in shared_in_want],
+                        {i: block.lhs_indices[i]
+                         for i in shared_in_want}, space)
                 mapped = [len(block.lhs_indices[i])
                           if i in checked.indices else 1
                           for i in want]
@@ -436,10 +439,13 @@ class Dialect:
                            space.pretty_index_list(want), want_size))
         return src
 
-    def permute(self, src: str, perm: List[int]) -> str:
+    def permute(self, src: str, perm: List[int],
+                indices=None, space=None) -> str:
         """Re-order a rendered expression's axes into the lhs
         variable's declared index order — ``perm`` gives each
-        wanted axis's position inside the expression (0-based)."""
+        wanted axis's position inside the expression (0-based);
+        ``indices`` is the resulting bound index map (dialects whose
+        values carry axis labels need it to re-wrap the result)."""
         raise VarError("index-order transpose is not supported for "
                        + self.target)
 
