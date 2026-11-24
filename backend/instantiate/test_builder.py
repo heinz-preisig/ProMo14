@@ -1137,6 +1137,60 @@ def test_qss_assignment_emits_balance_algebraically():
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
 
 
+def test_integral_of_state_emits_slot_alias():
+    """§48 content-of-state alias — ``lhs := Integral(s :: t in
+    [to, t])`` over a declared state emits the accumulator slot
+    (the ODE integrator already carries that integral), not a
+    quadrature; the equation record stays dimensionally honest
+    (kg·s⁻¹·s = kg) where the ``m := dmdt`` pun was not."""
+    variables = dict(VARIABLES)
+    variables[_var("Mc")] = VarInfo(_var("Mc"), "content", "V_9",
+                                    index_structures=[_idx("idx_node")],
+                                    tokens=[_tok("mass")])
+    equations = dict(EQUATIONS)
+    equations[_eq("mint")] = EqInfo(
+        _eq("mint"), _var("Mc"), [_var("m")], "E_9",
+        rhs="Integral( m :: t in [ to, t ] )")
+    assignments = dict(ASSIGNMENTS)
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=_et("lumped_capacity"),
+        sequence=[_eq("bal"), _eq("prop"), _eq("mint")],
+        base_equation=_eq("bal"),
+        state_variables=[_var("m")],
+        ports=[_var("J")],
+        closed=True)
+    canonicals = {
+        _eq("mint"): Expression(
+            DEFINITE_INTEGRAL,
+            (VariableReference(_var("m")),
+             VariableReference(_var("t")),
+             VariableReference(_var("to")),
+             VariableReference(_var("t")))),
+    }
+    cp = _plan(_build(assignments=assignments, variables=variables,
+                      equations=equations),
+               equations=equations, canonicals=canonicals)
+    block = next(b for lvl in cp.levels for b in lvl
+                 if b.equation == _eq("mint"))
+    assert block.alias_of == _var("m")
+    src = emit_python(cp, _emit_space())
+    assert "V_9 = V_1" in src                   # slot alias
+    assert "quad_vec" not in src                # no quadrature
+    # horizon form [to, te] is NOT an alias — var != upper
+    canonicals[_eq("mint")] = Expression(
+        DEFINITE_INTEGRAL,
+        (VariableReference(_var("m")),
+         VariableReference(_var("t")),
+         VariableReference(_var("to")),
+         VariableReference(_var("te"))))
+    cp = _plan(_build(assignments=assignments, variables=variables,
+                      equations=equations),
+               equations=equations, canonicals=canonicals)
+    block = next(b for lvl in cp.levels for b in lvl
+                 if b.equation == _eq("mint"))
+    assert block.alias_of is None
+
+
 def test_emit_julia():
     """The Julia emitter: in-place OrdinaryDiffEq signature, 1-based
     slices/maps, sparse F literal, broadcast Hadamard, plain ``*``

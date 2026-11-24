@@ -4726,3 +4726,59 @@ scheduled block (`V_P = …`), with no state unpack, no `dy` slot, and
 the §21 output tap preserved.  Live round-trip: the assignment
 reports `closed=True` and `reaction_host` inherits via `parent`.
 581 backend tests pass.
+
+## 48. Contents bind rate-named state slots through a running Integral, not a rate alias — RULED & implemented (2026-11-24)
+
+### Problem
+
+The library's balances are written as rate equalities
+(`dmdt := ΣF·f` — dimensionally true), and the assignment declares
+the *rate* var as the state.  Emission's slot pun — "the slot named
+`dmdt` carries `∫dmdt = m`" — is correct in generated code but left
+no honest way to bind the *content* var.  `E_m_def` asserted
+`m := dmdt`: right at runtime, false as a recorded relation — the
+consistency checker correctly errored (kg ≠ kg·s⁻¹).
+
+### Ruling
+
+- **The honest record is the running integral.**
+  `m := Integral(dmdt :: t in [to, t])` — kg·s⁻¹·s = kg, physically
+  true, checker-green.  `E_75` rewritten to this form (class
+  `eqclass_generic`; it is a definition, not a constitutive law).
+- **Inside an ODE rhs, a `DefInt` over `t` has exactly one
+  reading.**  The integrator already accumulates the state's rate —
+  `Integral(x :: t in [to, t])` with `x` a declared state IS the
+  slot's content.  `plan()` marks such blocks `alias_of` (marker:
+  `DefInt` + `VariableReference` body ∈ state_vars + integration
+  var == upper bound); `render_rhs` emits the slot name — the pun
+  lives in emitted code, not the record.
+- **Horizon forms are not aliases.**  `Integral(x :: t in [to, te])`
+  (the archival `E_30`) keeps quadrature — var ≠ upper is the
+  structural distinction.
+- **Non-state integrands are not covered.**  `Integral(y :: t in
+  [to, t])` with `y` algebraic would need its own accumulator — no
+  machinery; it still emits quadrature (wrong in a derivative body).
+  Surface as a plan problem when needed.
+
+### Consequence already visible
+
+`ic_targets` binds the `DefInt` lhs as an accumulator, so `m` now
+appears as an IC need — physically correct (`m(t0)` is required; it
+equals the `dmdt` slot's `y0`), though reporting it on both vars is
+mild noise until the t0 UI learns the alias.
+
+### Implementation
+
+`PlanBlock.alias_of` + `plan._integral_alias` (canonical-gated, so
+the `.trig` `rhsExpression` is load-bearing — text-only equations
+never alias); `emit_common.render_rhs` short-circuits to the
+instance name.  `E_75` rewritten via `PUT /variables` (re-derives
+incidence `[dmdt, t, to]`, `rhsExpression` is a
+`promolg:DefiniteIntegral`).
+
+### Verification
+
+`test_integral_of_state_emits_slot_alias`: alias block emits
+`V_9 = V_1`, no `quad_vec`; `[to, te]` variant stays non-alias.
+Library consistency: 0 errors / 69 consistent / 6 bound-scope
+(E_75 was the sole error).  582 backend tests pass.

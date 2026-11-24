@@ -59,10 +59,27 @@ node `etype_lumped_qss` where the fast mechanical mode doesn't
 matter.  Upgrade path once `fl` lands: `ΣF(v)=0` can determine `v`
 (algebraic-loop solver exists).
 
+### §48 content-of-state alias — `m := Integral(dmdt :: t in [to, t])` LANDED
+
+The consistency report's lone error (`E_75: m := dmdt`, kg ≠ kg·s⁻¹)
+was a deliberate-but-false record: the rate-named state slot carries
+the content, so the runtime alias was right and the equation was not.
+Fixed root-cause: `E_75` now records the running integral
+(`eqclass_generic`; canonical is a `promolg:DefiniteIntegral`), and
+`plan()` marks `DefInt(state :: t in [to, t])` blocks `alias_of` →
+`render_rhs` emits the slot name instead of `quad_vec`.  Horizon
+forms (`[to, te]`, archival `E_30`) keep quadrature.  Side effect:
+`ic_targets` now surfaces `m` as an IC need — physically right
+(`m(t0)` = the slot's `y0`), mild report noise until the t0 UI learns
+the alias.  Consistency now **0 errors / 69 consistent /
+6 bound-scope** (75 equations — the user authored ~8 since morning).
+Regression: `test_integral_of_state_emits_slot_alias`.  Ruling:
+BL §48 + design-principles §2 corollary.
+
 ## State
 
-- **581 backend tests pass**; consistency report 0 errors /
-  63 consistent / 4 bound-scope on the library.
+- **582 backend tests pass**; consistency report 0 errors /
+  69 consistent / 6 bound-scope on the library.
 - `./dev.sh save` persisted — `data/library.trig` and
   `data/ontology.trig` carry the fold (git-diff ~1.7k lines,
   mostly serializer churn).

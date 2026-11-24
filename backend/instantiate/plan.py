@@ -171,6 +171,12 @@ class PlanBlock:
     #: The lhs needs an initial guess (a ``SolveRoot`` body in the
     #: canonical RHS) — emitters seed the nested solve with it.
     guess: bool = False
+    #: §48 content-of-state alias: the canonical rhs is
+    #: ``Integral(x :: t in [to, t])`` with ``x`` a declared state —
+    #: the ODE accumulator slot already IS that integral, so the
+    #: block emits ``lhs = <state name>`` instead of a quadrature.
+    #: Holds the integrand var IRI when set.
+    alias_of: Optional[str] = None
     #: §22 occurrence path this block lives in — `""` = the host
     #: artefact's own content; non-empty = a `comp/inner` instance
     #: path.  Emission grouping only — scheduling stays global.
@@ -214,6 +220,30 @@ def name_map(cp: "CodePlan", occurrence: str,
     own (occurrence, entity type) context.
     """
     return cp.names.get(occurrence, {}).get(entity_type, {})
+
+
+def _integral_alias(canon, state_vars) -> Optional[str]:
+    """§48 content-of-state alias — the integrand var IRI or ``None``.
+
+    ``lhs := Integral(x :: t in [to, t])`` with ``x`` a declared
+    state binds the ODE accumulator slot: the integrator already
+    carries ``∫x·dt``, so the block emits ``lhs = <state name>`` —
+    the pun lives in emitted code, not in the equation record.
+    The running-bound shape is ``var == upper``; horizon forms
+    (``[to, te]``, e.g. the archival ``m := ∫dmdt`` of E_30) keep
+    genuine quadrature.
+    """
+    from backend.equation.canonical import (DEFINITE_INTEGRAL,
+                                            Expression,
+                                            VariableReference)
+    if (not isinstance(canon, Expression)
+            or canon.operation_iri != DEFINITE_INTEGRAL):
+        return None
+    body, var, _lo, hi = canon.arguments
+    if (isinstance(body, VariableReference)
+            and body.iri in state_vars and var == hi):
+        return body.iri
+    return None
 
 
 def plan(report: Instantiation, sched: Schedule,
@@ -546,6 +576,8 @@ def plan(report: Instantiation, sched: Schedule,
     prescribed = {(e.occurrence, e.entity_type, q.equation)
                   for e in report.entity_types
                   for q in e.equations if q.constraint}
+    state_vars = {(e.occurrence, e.entity_type): set(e.state_variables)
+                  for e in report.entity_types}
     for lvl in sched.levels:
         out_lvl: List[PlanBlock] = []
         for b in lvl:
@@ -554,6 +586,9 @@ def plan(report: Instantiation, sched: Schedule,
             canon = canonicals.get(b.equation)
             needs_guess = canon is not None and any(
                 kind == "guess" for _, kind in ic_targets(canon, b.lhs))
+            alias_of = _integral_alias(
+                canon, state_vars.get((b.occurrence, b.entity_type),
+                                      ()))
             out_lvl.append(PlanBlock(
                 entity_type=b.entity_type,
                 equation=b.equation,
@@ -570,6 +605,7 @@ def plan(report: Instantiation, sched: Schedule,
                 var_bound=et_var_bound.get(
                     (b.occurrence, b.entity_type), {}),
                 guess=needs_guess,
+                alias_of=alias_of,
                 # §22 Option A: ownership is the instantiation's, not
                 # element-inferred — a bound boundary arc (host-IRI)
                 # stays inside the occurrence's extent.

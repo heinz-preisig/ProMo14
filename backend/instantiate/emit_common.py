@@ -339,6 +339,16 @@ class Dialect:
         type's instance-name map as the override."""
         if not block.rhs:
             return self.no_rhs
+        if block.alias_of:
+            # §48 content-of-state alias: the ODE slot already
+            # carries Integral(state :: t in [to, t]) — bind it
+            # instead of emitting a quadrature.
+            name = names.get(block.alias_of)
+            if name is None:
+                v = space.variables.get(block.alias_of)
+                name = v.internal_id if v is not None \
+                    else block.alias_of
+            return name
         lhs = Var(inst_name(block.lhs_instance))
         check_space = space
         if block.var_bound:

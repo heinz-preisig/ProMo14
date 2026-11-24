@@ -34,6 +34,15 @@ equations, never expression-valued cells.
 *Decision:* user-ruled 2026-10-28 (`docs/value-expression.md` records the
 rejection after an implemented-then-reverted attempt).  Do not re-propose.
 
+- **Corollary (ruled 2026-11-24, BL §48): a recorded equation must be
+  a true relation.**  `m := dmdt` was runtime-correct only because the
+  emitted slot named `dmdt` carries `∫dmdt` — as a flat equation it
+  was false and the consistency checker rightly errored.  The honest
+  record is `m := Integral(dmdt :: t in [to, t])`; emit interprets a
+  `DefInt` over a declared state to the running bound as the
+  accumulator slot (`PlanBlock.alias_of`), so the pun lives in
+  generated code, never in the artefact.
+
 ## 3. Tokens describe semantic connectivity, not a second equation algebra
 
 Amended 2026-11-12 (discussion §38): token declarations answer which
