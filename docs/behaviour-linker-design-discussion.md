@@ -4847,3 +4847,40 @@ velocity-dependent force enters the momentum balance.
   already existed).  `permute`'s dialect signature gained
   `(indices, space)` for the label re-wrap.
   Regression: `test_emit_matlab_lhs_index_conformity`.
+
+## 50. Mechanical balance wired — `fl` gets its consumer — implemented (2026-11-24 PM)
+
+### Ruling
+
+With `fl` computed (§49), the §46 mechanical balance wires into the
+dynamic lumped assignment.  `dEmdt := amech + aw − al` is a
+**diagnostic output, not a new state** — §46 already ruled balances
+are independent objects, never summed; mass+momentum remain the
+integrated contents.  The thermal/total balances stay unwired: their
+enthalpy leg (`reduceSum(ah, S)`, `ah [N,S]`) pulls the species
+layer — separate work item.
+
+### Two gaps the wiring exposed
+
+- **`P` had no content-of-state alias.**  `v := P·inv(m)` (the
+  mechanics reading `fKin` needs) requires `P`, whose only equation
+  was the definitional `P := m·v` — a loop against `E_v_fromP`.
+  `E_P_int` applies the §48 pattern verbatim: `P := Integral(dPdt
+  :: t in [to, t])` — the dPdt slot carries P, the alias emits the
+  slot name.  `E_P_def` stays for models that *compute* P.
+- **`r` is instantiation data on the lump.**  `fPot` reads node
+  position; `V_115` joins `instantiated` — geometric datum like the
+  arc-bound `lam`/`Lp`/`dp`, per-element value cells.
+
+### Authored
+
+`etype_lumped`: sequence += `E_P_int`, `E_v_fromP`, `E_fKin`,
+`E_fPot`, `E_fPflow`, `E_aw`, `E_al`, `E_amech`, `E_dEmdt`
+(`E_29` still closes); ports += `fl`, `fWs`; instantiated += `r`;
+outputs += `dEmdt`.  `closed=True`.  Consistency 0 err / 71 ok /
+6 bound-scope (77 eqs).  Author: `scripts/author_energy_wiring.py`.
+
+`etype_lumped_qss` deliberately untouched — no `dPdt` state means no
+`P` slot, so `v := P/m` cannot fire; the quasi-steady energy path
+waits on `ΣF(v)=0` determining `v` (the §47 upgrade `fl` now
+unblocks on the energy side).

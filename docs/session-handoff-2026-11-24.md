@@ -148,6 +148,15 @@ BL §48 + design-principles §2 corollary.
   labels.  `Dialect.permute(src, perm, indices, space)` — the
   new args feed the label re-wrap.  Regression:
   `test_emit_matlab_lhs_index_conformity`.  584 tests.
+- **§50 mechanical balance wired** — `etype_lumped` gathers `fl`
+  (+ `fWs`) and reads `dEmdt := amech + aw − al` as a diagnostic
+  output (balances are readings, no new state).  New `E_P_int`
+  on V_119 (`P := Integral(dPdt :: t in [to, t])` — §48 slot
+  alias for P, needed by `v := P·inv(m)` for `fKin`); `r`
+  (V_115) joined `instantiated` for `fPot`.  `closed=True`,
+  77 eqs consistent.  Author: `scripts/author_energy_wiring.py`.
+  `etype_lumped_qss` untouched — no P slot without the dPdt
+  state; the QSS energy path waits on `ΣF(v)=0`.
 
 ### Repairs
 
@@ -171,7 +180,8 @@ BL §48 + design-principles §2 corollary.
 ### Queue (revised)
 
 §32 pairing resolver + `promo:Mechanism`; §33 submodel reuse;
-§21 closure-moves; **energy-balance wiring** (`al`/`dEmdt`/`dHdt`
-into a lumped assignment — now the visible consumer for `fl`);
-radiation `fRx`/`ahr`; QSS `ΣF(v)=0` upgrade (unblocked by `fl`);
-cross-artefact consistency review; §42 tensors.
+§21 closure-moves; **thermal/total balances** (`dHdt`/`dEtotdt`
+wiring — their `reduceSum(ah, S)` leg needs the species layer);
+radiation `fRx`/`ahr`; QSS `ΣF(v)=0` upgrade (v determined
+algebraically — now that `fl`/`v_str` exist); cross-artefact
+consistency review; §42 tensors.

@@ -500,12 +500,16 @@ memberships are not automatically migrated; user equations remain untouched.
   *Same-day addenda:* runtime-supplied universe variables are
   `instantiated` — `t` (`V_11`) joined `instantiated` on both
   lumped assignments after §48's `E_m_def` integral bound it and
-  broke closure; and §49 landed the queued Darcy law — `fl`
+  broke closure; §49 landed the queued Darcy law — `fl`
   keeps `port_variable` but computes via
   `E_fl = λ·(L/d)·ṁ·v²/2` (`v_str`, not `v`; `lam`/`Lp`/`dp`
   arc-bound `[A_conv]` instantiation params), upgrading it from
   imposed boundary port to computed export without changing the
-  gather semantics for the lump.
+  gather semantics for the lump; and §50 wired the mechanical
+  balance into `etype_lumped` — `dEmdt` as diagnostic output
+  (balances are readings), `E_P_int` replicating the §48
+  slot-alias for `P`, `r` joining `instantiated` as per-node
+  geometric datum.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:
