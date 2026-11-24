@@ -4255,10 +4255,29 @@ Lessons worth keeping:
 `test_01`: the transport's sequence is `[E_4, E_v_str, E_fmom, E_fP,
 E_29]` with `v_str`/`fmom`/`fP` outputs; `Node_2` declares
 `alignedComponent=x`; `alignment-undeclared` fired on demand and
-cleared on declaration; generated python emits all three.  The
-lumped-side balance (`dPdt`, `P`, `F_g` + the capacity-side port
-list) is authored but **unwired** — same posture as the energy-flow
-vars (`fKin`/`fPot`/`fFlowWork`).
+cleared on declaration; generated python emits all three.  **The
+lumped balance is wired** (landed same day): `etype_lumped` carries
+`state_variables=[dmdt, dPdt]`, ports `fmc`/`fP`/`fmom`, sequence
+`[E_m_def, E_F_g, E_dPdt, E_29]` (base `E_29`), `dPdt` marked
+output; `dPdt` emits as the second u-state and `fmom`/`fP` gather
+the transport's `[C]`-rows.  Three structural changes landed for
+it:
+
+- **`state_variables` is set-valued** — `AssignmentOut`,
+  `SelectionIn`, `AssignmentInfo`, `EntityInstantiation(Out)` all
+  carry lists; `promo:hasStateVariable` writes multi-valued.
+  Declared states win on PUT; the base equation's lhs is the
+  derived fallback.  `E_m_def` (`m := dmdt`) binds the live mass
+  state for `F_g`/`P` instead of instantiating a shadow datum.
+- **Identity pairing at ports** (`builder.candidates_at`) — a
+  same-IRI donor beats token-comparable substitutes; ambiguity is
+  only among substitutes.  Three momentum-tokened exports made
+  `fmom`/`fP` ambiguous without it.
+- **Vector port gathers** — `Gather.map` is positions along the
+  peer's contact axis (`map_index`, `peer_indices` on the slot);
+  emitters do axis-takes (`np.take`, `selectdim`, subscripted
+  `MultiDimVar.value`) + reshape, so `[C]`-rows gather whole.
+  Coverage counts rows × span.
 
 ## 42. Tensor-index layer for sheet mechanics — DESIGN PROPOSAL (deferred)
 

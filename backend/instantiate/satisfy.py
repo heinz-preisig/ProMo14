@@ -73,7 +73,7 @@ def _adjudicate(asg: AssignmentInfo, peer_asg: Optional[AssignmentInfo],
     if peer_asg is None:
         side.has_assignment = False
     supply = readable_vars(peer_asg, equations) if peer_asg else set()
-    peer_state = peer_asg.state_variable if peer_asg else None
+    peer_state = peer_asg.state_variables if peer_asg else []
     # §38: the demand side's mechanism drives — the effort tokens an
     # effort-role port must find on the peer.
     drive_tokens = drives.get(asg.entity_type, set())
@@ -109,7 +109,7 @@ def _adjudicate(asg: AssignmentInfo, peer_asg: Optional[AssignmentInfo],
                     _comparable(t, wt, token_parents)
                     for t in var.tokens for wt in w.tokens):
                 continue
-            if w_iri == peer_state and not w.port_variable:
+            if w_iri in peer_state and not w.port_variable:
                 hidden = True    # accumulation stays internal
                 continue
             # §38 effort coupling: an effort port reads a

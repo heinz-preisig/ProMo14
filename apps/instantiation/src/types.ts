@@ -24,7 +24,7 @@ export interface EntityInstantiation {
   nodes: string[]
   has_assignment: boolean
   closed: boolean
-  state_variable: string | null
+  state_variables: string[]
   variables: VarBinding[]
   equations: EqBinding[]
   initial_equations: EqBinding[]

@@ -41,6 +41,9 @@ export interface Selection {
   entity_type: string
   sequence: string[]
   base_equation: string | null
+  /** Declared state vars — one per conserved content; empty means
+   *  derive from the base equation's lhs. */
+  state_variables: string[]
   instantiated: string[]
   ports: string[]
   /** Declared outputs — external sinks; their definers are
@@ -117,7 +120,7 @@ export interface Assignment {
   entity_type: string
   sequence: string[]
   base_equation: string | null
-  state_variable: string | null
+  state_variables: string[]
   instantiated: string[]
   ports: string[]
   outputs: string[]

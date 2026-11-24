@@ -60,14 +60,19 @@ migration — §41 ruling 6).
   `v_str := e_align·kConvX·inv(ρ)·Σσp,X`, `fmom := fmc·v_str`).
   Mechanics (lump scope): `P`/`F_g`/`dPdt` + `v := P·inv(m)`,
   `P := m·v`.  `test_01` transport wired (5-eq sequence), `Node_2`
-  declares `x`, python emit verified.  Lumped-side balance authored
-  but **unwired** (same posture as `fKin`/`fPot`).
+  declares `x`, python emit verified.  **Lumped balance landed:**
+  `etype_lumped` carries `state_variables=[dmdt, dPdt]` (the slot
+  is set-valued now), ports `fmc`/`fP`/`fmom`, sequence
+  `E_m_def → E_F_g → E_dPdt → E_29`, `dPdt` marked output.
   Author record: `scripts/author_momentum_slice.py`.
-  Lessons logged in §41's new "Momentum slice" section: emit pairs
+  Lessons logged in §41's "Momentum slice" section: emit pairs
   axes by index **name** (X↔A_conv outer-product trap — `e_align`
   consumers stay X-typed), `v` can't go port (§18 lock → `v_str`),
   export `carriesToken` scopes port candidacy (`v_str` is
   momentum-only — mass-tokened it collided with the `fmc` port).
+  Structural work that landed with it (§41 record): multi-state
+  `state_variables`, identity-pairing at ports, vector port
+  gathers as axis-takes (`Gather.map_index`/`peer_indices`).
 - **`uvicorn --reload` footgun** — the backend watches the tree;
   `pytest`'s `.pyc` writes triggered a reload mid-session and wiped
   all unsaved authoring.  `./dev.sh save` after each meaningful

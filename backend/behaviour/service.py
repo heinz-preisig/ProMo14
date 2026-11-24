@@ -104,6 +104,9 @@ class SelectionIn(BaseModel):
     entity_type: str
     sequence: List[str] = Field(default_factory=list)
     base_equation: Optional[str] = None
+    #: declared state vars — one per conserved content; empty means
+    #: "derive from base_equation's lhs" (single-state legacy)
+    state_variables: List[str] = Field(default_factory=list)
     instantiated: List[str] = Field(default_factory=list)
     ports: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
@@ -122,7 +125,10 @@ class AssignmentOut(BaseModel):
     entity_type: str
     sequence: List[str] = Field(default_factory=list)
     base_equation: Optional[str] = None
-    state_variable: Optional[str] = None
+    #: state vars — one per conserved content on the entity
+    #: (mass, momentum, energy…).  Multi-valued; the base equation's
+    #: lhs is the primary state, extras are declared explicitly.
+    state_variables: List[str] = Field(default_factory=list)
     instantiated: List[str] = Field(default_factory=list)
     ports: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
@@ -230,13 +236,14 @@ def _read_assignment(graph, res: URIRef) -> Optional[AssignmentOut]:
     head = graph.value(res, PROMO["hasEquationSequence"])
     sequence = [str(i) for i in Collection(graph, head)] if head else []
     base = graph.value(res, PROMO["hasBaseEquation"])
-    state = graph.value(res, PROMO["hasStateVariable"])
+    states = [str(s) for s in
+              graph.objects(res, PROMO["hasStateVariable"])]
     closed = graph.value(res, PROMO["closed"])
     return AssignmentOut(
         entity_type=str(graph.value(res, PROMO["forEntityType"]) or ""),
         sequence=sequence,
         base_equation=str(base) if base else None,
-        state_variable=str(state) if state else None,
+        state_variables=states,
         instantiated=[str(v) for v in
                       graph.objects(res, PROMO["hasInstantiatedVariable"])],
         ports=[str(v) for v in
@@ -314,13 +321,13 @@ def _to_engine(selection: SelectionIn) -> Selection:
 
 
 def _from_engine(sel: Selection, entity_type: str,
-                 state_variable: Optional[str] = None,
+                 state_variables: Optional[List[str]] = None,
                  closed: bool = False) -> AssignmentOut:
     return AssignmentOut(
         entity_type=entity_type,
         sequence=list(sel.sequence),
         base_equation=sel.base_equation,
-        state_variable=state_variable,
+        state_variables=list(state_variables or []),
         instantiated=sorted(sel.instantiated),
         ports=sorted(sel.ports),
         outputs=sorted(sel.outputs),
@@ -379,7 +386,9 @@ def move_endpoint(
     return {
         "selection": _from_engine(
             sel, body.entity_type,
-            state_variable=report.state_variable,
+            state_variables=(body.state_variables
+                             or ([report.state_variable]
+                                 if report.state_variable else [])),
             closed=report.closed).model_dump(),
         "report": out,
         "pulled": result["pulled"],
@@ -462,9 +471,13 @@ def put_assignment(
     if sel.base_equation:
         g.add((res, PROMO["hasBaseEquation"],
                URIRef(sel.base_equation)))
-    if report.state_variable:
-        g.add((res, PROMO["hasStateVariable"],
-               URIRef(report.state_variable)))
+    # declared state vars (request body) win; the closure engine's
+    # derived state (the base equation's lhs) is the fallback so a
+    # body that only sets base_equation still round-trips.
+    for sv in (selection.state_variables
+               or ([report.state_variable]
+                   if report.state_variable else [])):
+        g.add((res, PROMO["hasStateVariable"], URIRef(sv)))
     head = BNode()
     Collection(g, head, [URIRef(e) for e in sel.sequence])
     g.add((res, PROMO["hasEquationSequence"], head))
@@ -479,7 +492,10 @@ def put_assignment(
     store.declare_vocabulary(g)
 
     return _from_engine(sel, selection.entity_type,
-                        state_variable=report.state_variable,
+                        state_variables=(selection.state_variables
+                                         or ([report.state_variable]
+                                             if report.state_variable
+                                             else [])),
                         closed=report.closed)
 
 

@@ -188,7 +188,7 @@ ASSIGNMENTS = {
         entity_type=_et("lumped_capacity"),
         sequence=[_eq("bal"), _eq("prop")],
         base_equation=_eq("bal"),
-        state_variable=_var("m"),
+        state_variables=[_var("m")],
         ports=[_var("J")],
         closed=True),
     _et("diffusion_transport"): AssignmentInfo(
@@ -654,7 +654,7 @@ def test_absent_flow_port_is_silent():
     assignments[_et("lumped_capacity")] = AssignmentInfo(
         entity_type=lumped.entity_type, sequence=lumped.sequence,
         base_equation=lumped.base_equation,
-        state_variable=lumped.state_variable,
+        state_variables=list(lumped.state_variables),
         instantiated=list(lumped.instantiated),
         ports=[_var("J"), _var("f_heat"), _var("q_heat")],
         closed=True)
@@ -744,7 +744,7 @@ def test_flag_disambiguates_same_token_vars():
         entity_type=_et("lumped_capacity"),
         sequence=[_eq("bal"), _eq("prop"), _eq("prop2")],
         base_equation=_eq("bal"),
-        state_variable=_var("m"),
+        state_variables=[_var("m")],
         ports=[_var("J")],
         closed=True)
 
@@ -848,7 +848,7 @@ def test_signal_token_comparability():
         entity_type=_et("lumped_capacity"),
         sequence=[_eq("bal"), _eq("prop"), _eq("sense")],
         base_equation=_eq("bal"),
-        state_variable=_var("m"),
+        state_variables=[_var("m")],
         ports=[_var("J")],
         closed=True)
     assignments[_et("diffusion_transport")] = AssignmentInfo(
@@ -979,6 +979,25 @@ def test_plan_states_and_matrices():
     assert cp.inputs == []
 
 
+def test_plan_multiple_states():
+    """state_variables is set-valued — a capacity conserving several
+    contents (mass AND momentum) gets one StateSlot per state var,
+    laid out consecutively."""
+    assignments = dict(ASSIGNMENTS)
+    a = assignments[_et("lumped_capacity")]
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=a.entity_type,
+        sequence=list(a.sequence),
+        base_equation=a.base_equation,
+        state_variables=[_var("m"), _var("p")],
+        ports=list(a.ports),
+        closed=True)
+    cp = _plan(_build(assignments=assignments))
+    assert [st.var for st in cp.states] == [_var("m"), _var("p")]
+    assert (cp.states[0].offset, cp.states[0].size) == (0, 2)
+    assert (cp.states[1].offset, cp.states[1].size) == (2, 2)
+
+
 def test_plan_gathers():
     """Both ports become index maps over their bound arc elements:
     p_in gathers p at the arc's peer node; J is identity (the peer
@@ -993,6 +1012,12 @@ def test_plan_gathers():
     assert j.elements == ["a1", "a2"]
     assert j.map == [0, 1]            # identity over A_diff
     assert j.peer_instance == "V_3@etype_diffusion_transport"
+    # map positions index the peer bound axis carrying the contact
+    # elements — for a vector peer the whole row is taken at emit.
+    for g in (pin, j):
+        assert g.map_index in g.peer_indices
+        els = g.peer_indices[g.map_index]
+        assert all(-1 <= m < len(els) for m in g.map)
 
 
 def test_plan_blocks_carry_rhs_and_indices():
@@ -1068,10 +1093,11 @@ def test_emit_python():
     # level 0: p = m
     assert "V_2 = V_1" in src
     # level 1: p_in gathers p at peer nodes; J = k ⊙ p_in
-    assert "V_6 = V_2[[0, 1]]" in src
+    assert "V_6 = np.take(V_2, [0, 1], axis=0)" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     # level 2: J gather (identity over A_diff); dm = F·J
-    assert ("V_3_lumped_capacity = V_3_diffusion_transport[[0, 1]]"
+    assert ("V_3_lumped_capacity = "
+            "np.take(V_3_diffusion_transport, [0, 1], axis=0)"
             in src)
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
     assert "return dy" in src
@@ -1088,10 +1114,11 @@ def test_emit_julia():
     assert "V_1 = @view y[1:2]" in src
     assert "V_5 = par.V_5" in src
     assert "V_2 = V_1" in src
-    assert "V_6 = V_2[[1, 2]]" in src
+    assert ("V_6 = reshape(selectdim(V_2, 1, [1, 2]), (2))" in src)
     assert "V_3_diffusion_transport = V_5 .* V_6" in src
-    assert ("V_3_lumped_capacity = V_3_diffusion_transport[[1, 2]]"
-            in src)
+    assert ("V_3_lumped_capacity = "
+            "reshape(selectdim(V_3_diffusion_transport, 1, [1, 2]), "
+            "(2))" in src)
     assert "dy[1:2] = V_4 * V_3_lumped_capacity" in src
     assert "return nothing" in src
 
@@ -1857,7 +1884,7 @@ def test_emit_python_instantiated_pressure():
         entity_type=_et("lumped_capacity"),
         sequence=[_eq("bal")],
         base_equation=_eq("bal"),
-        state_variable=_var("m"),
+        state_variables=[_var("m")],
         instantiated=[_var("p")],
         ports=[_var("J")],
         closed=True)
@@ -1868,7 +1895,7 @@ def test_emit_python_instantiated_pressure():
     src = emit_python(cp, _emit_space())
     assert 'V_2 = par["V_2"]' in src      # p is a parameter now
     assert "V_2 = V_1" not in src         # no prop block
-    assert "V_6 = V_2[[0, 1]]" in src
+    assert "V_6 = np.take(V_2, [0, 1], axis=0)" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
 
@@ -1892,7 +1919,7 @@ def test_open_assignment_flagged():
     assignments[_et("lumped_capacity")] = AssignmentInfo(
         entity_type=_et("lumped_capacity"),
         sequence=[_eq("bal")], base_equation=_eq("bal"),
-        state_variable=_var("m"), ports=[_var("J")], closed=False)
+        state_variables=[_var("m")], ports=[_var("J")], closed=False)
     rep = _build(assignments=assignments)
     cap = _entity(rep, _et("lumped_capacity"))
     assert cap.has_assignment and not cap.closed
@@ -2065,7 +2092,7 @@ def test_model_endpoint(client):
     tr = ets[_et("diffusion_transport")]
     assert cap["has_assignment"] and tr["has_assignment"]
     assert len(cap["nodes"]) == 2 and len(tr["nodes"]) == 1
-    assert cap["state_variable"] == ids["m"]
+    assert ids["m"] in cap["state_variables"]
 
     cap_vars = {v["var"]: v for v in cap["variables"]}
     assert cap_vars[ids["f"]]["binding"] == "incidence"
@@ -2155,7 +2182,7 @@ def test_code_endpoint(client):
     assert "def derivative(t, y, par, out=None):" in src
     assert "V_1 = y[0:2]" in src
     assert 'V_5 = par["V_5"]' in src
-    assert "V_6 = V_2[[0, 1]]" in src
+    assert "V_6 = np.take(V_2, [0, 1], axis=0)" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
     # §21 outputs — p (lumped, V_2) and j (transport export,

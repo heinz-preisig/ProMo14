@@ -72,7 +72,7 @@ def schedule(report: Instantiation) -> Schedule:
         for q in e.equations:
             node = (e.occurrence, e.entity_type, q.equation)
             lhs_of[node] = q.lhs
-            if q.lhs != e.state_variable and not q.constraint:
+            if q.lhs not in e.state_variables and not q.constraint:
                 defines[(e.occurrence, e.entity_type, q.lhs)] = q.equation
 
     # Bound ports: (node, port var) → (peer node, peer var).

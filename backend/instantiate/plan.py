@@ -77,7 +77,16 @@ class Gather:
     name: str = ""                      # emitted identifier
     peer_name: str = ""
     elements: List[str] = field(default_factory=list)   # port elems
+    #: positions along the peer's map axis — the bound axis carrying
+    #: the contact elements.  One position per contact; the emit
+    #: takes the peer's whole row at each position, so vector-valued
+    #: ports gather [C]-rows rather than scalars.
     map: List[int] = field(default_factory=list)        # peer pos.
+    #: the peer bound axis the map indexes (contact axis).
+    map_index: str = ""
+    #: the peer's bound index→elements — resolves the map axis
+    #: position and the per-contact row span at emit.
+    peer_indices: Dict[str, List[str]] = field(default_factory=dict)
     scalar: bool = False                # no bound indices → select
     indices: Dict[str, List[str]] = field(default_factory=dict)
     #: §22 owning occurrence path (``""`` = host).
@@ -289,31 +298,29 @@ def plan(report: Instantiation, sched: Schedule,
     # -- states -------------------------------------------------------------
     offset = 0
     for e in report.entity_types:
-        if not e.state_variable:
-            continue
-        vb = bindings.get((e.occurrence, e.entity_type,
-                           e.state_variable))
-        if vb is None:
-            continue
-        size = 1
-        for els in vb.indices.values():
-            size *= max(1, len(els or []))
-        ic_values = _value_table(vb, values or {}, report.problems,
-                                 subsets)
-        ic_values = _filled_table(vb, ic_values, report.problems,
-                                  "IC")
-        init_lhs = {q.lhs for q in e.initial_equations}
-        ic_source = ("cells" if ic_values is not None
-                     else "initialise" if vb.var in init_lhs
-                     else "par")
-        out.states.append(StateSlot(
-            var=vb.var, instance=vb.instance,
-            entity_type=e.entity_type, indices=vb.indices,
-            name=names[e.occurrence][e.entity_type][vb.var],
-            offset=offset, size=size,
-            ic_source=ic_source, ic_values=ic_values,
-            occurrence=e.occurrence))
-        offset += size
+        for sv in e.state_variables:
+            vb = bindings.get((e.occurrence, e.entity_type, sv))
+            if vb is None:
+                continue
+            size = 1
+            for els in vb.indices.values():
+                size *= max(1, len(els or []))
+            ic_values = _value_table(vb, values or {}, report.problems,
+                                     subsets)
+            ic_values = _filled_table(vb, ic_values, report.problems,
+                                      "IC")
+            init_lhs = {q.lhs for q in e.initial_equations}
+            ic_source = ("cells" if ic_values is not None
+                         else "initialise" if vb.var in init_lhs
+                         else "par")
+            out.states.append(StateSlot(
+                var=vb.var, instance=vb.instance,
+                entity_type=e.entity_type, indices=vb.indices,
+                name=names[e.occurrence][e.entity_type][vb.var],
+                offset=offset, size=size,
+                ic_source=ic_source, ic_values=ic_values,
+                occurrence=e.occurrence))
+            offset += size
 
     # -- matrices (incidence bindings, restricted to bound elements) --------
     matrices_by_index = {incidence.base.index: incidence.base}
@@ -423,8 +430,16 @@ def plan(report: Instantiation, sched: Schedule,
             if not run:
                 return
             (peer_occ, peer_type), peer_vb = run_peer
-            pos = {el: i for i, el in
-                   enumerate(_all_elements(peer_vb))}
+            # the map axis is the peer bound axis carrying the
+            # contact elements (the arc index for arc-indexed peers,
+            # the node index for contact-referenced ones); positions
+            # within it select the peer's rows at emit.
+            axis_pos = {i: {el: j for j, el in enumerate(els or [])}
+                        for i, els in peer_vb.indices.items()}
+            map_index = next(
+                (i for b in run for i, pm in axis_pos.items()
+                 if (b.element or "") in pm), None)
+            mp = axis_pos.get(map_index, {})
             out.gathers.append(Gather(
                 var=var, instance=vb.instance,
                 peer_instance=peer_vb.instance,
@@ -434,7 +449,10 @@ def plan(report: Instantiation, sched: Schedule,
                     run[0].peer_var or "", peer_vb.instance),
                 elements=[b.arc if arc_elements else (b.element or "")
                           for b in run],
-                map=[pos.get(b.element or "", -1) for b in run],
+                map=[mp.get(b.element or "", -1) for b in run],
+                map_index=map_index or "",
+                peer_indices={i: list(els or [])
+                              for i, els in peer_vb.indices.items()},
                 scalar=not vb.indices, indices=vb.indices,
                 occurrence=occ))
             run.clear()
@@ -461,8 +479,18 @@ def plan(report: Instantiation, sched: Schedule,
     gname: Dict[str, str] = {}
     gvar: Dict[str, str] = {}
     for g in out.gathers:
+        # each contact supplies the peer's whole row — the flat
+        # peer size minus the map axis — so a vector port's coverage
+        # counts rows × span, not contacts.
+        flat, axis_len = 1, 1
+        for i, els in (g.peer_indices or {}).items():
+            n_el = max(1, len(els or []))
+            flat *= n_el
+            if i == g.map_index:
+                axis_len = n_el
+        row = flat // axis_len if axis_len else flat
         supplied[g.instance] = (supplied.get(g.instance, 0)
-                                + len(g.elements))
+                                + len(g.map) * row)
         gname[g.instance] = g.name or g.instance
         gvar[g.instance] = g.var
         n = 1

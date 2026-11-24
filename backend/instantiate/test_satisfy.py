@@ -82,7 +82,7 @@ def test_unflagged_state_is_hidden_with_hint():
         "v_n": _v("v_n", [MASS]),          # peer state, unflagged
     }
     src = _asg("et_a", ports=["v_p"])
-    tgt = _asg("et_b", state_variable="v_n")
+    tgt = _asg("et_b", state_variables=["v_n"])
     src_side, _ = _run(src, tgt, variables, matched_tokens={MASS})
     p = src_side.ports[0]
     assert p.status == "unbound" and p.state_hidden
@@ -96,7 +96,7 @@ def test_flagged_state_exports_and_preferred():
         "v_m": _v("v_m", [MASS]),
     }
     src = _asg("et_a", ports=["v_p"])
-    tgt = _asg("et_b", state_variable="v_n", sequence=["e1"])
+    tgt = _asg("et_b", state_variables=["v_n"], sequence=["e1"])
     src_side, _ = _run(
         src, tgt, variables, {"e1": _eq("e1", "v_m")},
         matched_tokens={MASS})

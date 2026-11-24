@@ -453,9 +453,31 @@ memberships are not automatically migrated; user equations remain untouched.
   stream-velocity role, token-scoped to `momentum` so it never
   candidates a mass-flow port.  `test_01`: transport wired
   (5-eq sequence), `Node_2` declares `x`; emit verified.
-  *Remaining:* genuine tensor objects (`r:r'`, stress) stay §42;
-  the lumped-side momentum balance (`dPdt` + gathers) is authored
-  but not yet wired into an assignment.
+  *Remaining:* genuine tensor objects (`r:r'`, stress) stay §42.
+
+  **Lumped balance landed 2026-11-24** — `etype_lumped` conserves
+  two contents at once (`dmdt` + `dPdt`), which forced three
+  rulings:
+  - **`state_variables` is set-valued.**  A lumped entity
+    conserves several contents simultaneously; the assignment
+    carries a *list* (promo:hasStateVariable multi-valued), the
+    closure engine still derives the primary state from the base
+    equation's lhs, extras are declared.  `m` binds the live mass
+    state through the `E_m_def` alias (`m := dmdt`), not a shadow
+    datum — `dPdt` is marked an output so the closure counts it
+    consumed.
+  - **Identity pairing wins at a port.**  A port var takes its
+    own kind from the peer when the peer supplies it; ambiguity
+    is only among token-comparable *substitutes* (`fP`/`fmom`/
+    `v_str` are all momentum-tokened — identity disambiguates).
+  - **Port gathers are axis-takes, not flat picks.**  `Gather.map`
+    holds positions along the peer bound axis carrying the
+    contact elements (`map_index`, `peer_indices`); each dialect
+    emits a native axis-take (`np.take`/`selectdim`/subscripted
+    `value`) so vector ports gather whole `[C]`-rows.  Coverage
+    counts rows × span.
+  `test_01` emits: `dPdt` is the second u-state, `fmom`/`fP`
+  gather the transport's `[C]`-rows, balance residual verified.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:

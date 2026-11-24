@@ -609,7 +609,7 @@ def test_assignment_roundtrip(client):
     body = r.json()
     assert body["sequence"] == payload["sequence"]
     assert body["base_equation"] == payload["base_equation"]
-    assert body["state_variable"].endswith("#var_s")
+    assert any(v.endswith("#var_s") for v in body["state_variables"])
     assert body["closed"]
 
     r = client.delete("/api/behaviour/assignment",

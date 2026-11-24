@@ -162,7 +162,7 @@ class EntityInstantiationOut(BaseModel):
     occurrence: str = ""
     has_assignment: bool = False
     closed: bool = False
-    state_variable: Optional[str] = None
+    state_variables: List[str] = Field(default_factory=list)
     #: §21 output sinks from the behaviour assignment.
     outputs: List[str] = Field(default_factory=list)
     variables: List[VarBindingOut] = Field(default_factory=list)
@@ -935,7 +935,7 @@ def _assignments_collect(store, assignment_graph: Optional[str],
             entity_type=a.entity_type,
             sequence=list(a.sequence),
             base_equation=a.base_equation,
-            state_variable=a.state_variable,
+            state_variables=list(a.state_variables),
             instantiated=list(a.instantiated),
             ports=list(a.ports),
             outputs=list(a.outputs),
@@ -1310,7 +1310,7 @@ def model_instantiation(
             occurrence=e.occurrence,
             has_assignment=e.has_assignment,
             closed=e.closed,
-            state_variable=e.state_variable,
+            state_variables=list(e.state_variables),
             outputs=e.outputs,
             variables=[VarBindingOut(
                 var=v.var, role=v.role, binding=v.binding,
@@ -1989,7 +1989,8 @@ def entity_variables(
         _add(eq.lhs, "defined", roles)
         for v in eq.inputs:
             _add(v, "input", roles)
-    _add(asg.state_variable, "state", roles)
+    for sv in asg.state_variables:
+        _add(sv, "state", roles)
     for v in asg.instantiated:
         roles[v] = "instantiated"
         if v not in seen:

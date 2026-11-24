@@ -32,6 +32,8 @@
 
     promo:Version a rdfs:Class .
 
+    promo:alignedComponent a rdf:Property .
+
     promo:arcCounter a rdf:Property .
 
     promo:arcType a rdf:Property .

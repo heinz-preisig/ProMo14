@@ -184,11 +184,38 @@ class _Julia(Dialect):
         if g.scalar:
             return "    %s = %s[%d]  # port gather" % (gn, pn,
                                                        g.map[0] + 1)
+        if g.map_index and g.peer_indices:
+            # axis take — one map position per contact supplies the
+            # peer's whole row; vector ports gather [C]-rows.
+            axes = list(g.peer_indices)
+            ax = (axes.index(g.map_index) + 1
+                  if g.map_index in axes else 1)
+            sel = "selectdim(%s, %d, [%s])" % (
+                pn, ax, ", ".join(str(i + 1) for i in g.map))
+            dims = ", ".join(
+                str(len(e or [])) for e in g.indices.values())
+            return "    %s = reshape(%s, (%s))  # port gather" % (
+                gn, sel, dims)
         return "    %s = %s[%s]  # port gather" % (
             gn, pn, [i + 1 for i in g.map])
 
     def gather_multi(self, pieces, space: CompileSpace) -> str:
         gn = pieces[0].name or inst_name(pieces[0].instance)
+        if pieces[0].map_index and pieces[0].peer_indices:
+            sels = []
+            for s in pieces:
+                axes = list(s.peer_indices)
+                ax = (axes.index(s.map_index) + 1
+                      if s.map_index in axes else 1)
+                sels.append((ax, "selectdim(%s, %d, [%s])" % (
+                    s.peer_name or inst_name(s.peer_instance), ax,
+                    ", ".join(str(i + 1) for i in s.map))))
+            dims = ", ".join(
+                str(len(e or [])) for e in pieces[0].indices.values())
+            return "    %s = reshape(cat(%s; dims=%d), (%s))  " \
+                   "# port gather" % (
+                       gn, ", ".join(t for _, t in sels), sels[0][0],
+                       dims)
         sel = ", ".join(
             "%s[[%s]]" % (
                 s.peer_name or inst_name(s.peer_instance),

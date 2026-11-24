@@ -281,6 +281,14 @@ class _Matlab(Dialect):
         pn = g.peer_name or inst_name(g.peer_instance)
         if g.scalar:
             val = "%s.value(%d)" % (pn, g.map[0] + 1)
+        elif g.map_index and g.peer_indices:
+            # axis take — one map position per contact supplies the
+            # peer's whole row; vector ports gather [C]-rows.
+            axes = list(g.peer_indices)
+            ax = axes.index(g.map_index) if g.map_index in axes else 0
+            subs = [":"] * len(axes)
+            subs[ax] = "[%s]" % " ".join(str(i + 1) for i in g.map)
+            val = "%s.value(%s)" % (pn, ", ".join(subs))
         else:
             val = "%s.value([%s])" % (
                 pn, " ".join(str(i + 1) for i in g.map))
@@ -289,11 +297,26 @@ class _Matlab(Dialect):
 
     def gather_multi(self, pieces, space: CompileSpace) -> str:
         gn = pieces[0].name or inst_name(pieces[0].instance)
-        val = "vertcat(%s)" % ", ".join(
-            "%s.value([%s])" % (
-                s.peer_name or inst_name(s.peer_instance),
-                " ".join(str(i + 1) for i in s.map))
-            for s in pieces)
+        if pieces[0].map_index and pieces[0].peer_indices:
+            vals = []
+            for s in pieces:
+                axes = list(s.peer_indices)
+                ax = (axes.index(s.map_index)
+                      if s.map_index in axes else 0)
+                subs = [":"] * len(axes)
+                subs[ax] = "[%s]" % " ".join(
+                    str(i + 1) for i in s.map)
+                vals.append((ax, "%s.value(%s)" % (
+                    s.peer_name or inst_name(s.peer_instance),
+                    ", ".join(subs))))
+            val = "cat(%d, %s)" % (
+                vals[0][0] + 1, ", ".join(v for _, v in vals))
+        else:
+            val = "vertcat(%s)" % ", ".join(
+                "%s.value([%s])" % (
+                    s.peer_name or inst_name(s.peer_instance),
+                    " ".join(str(i + 1) for i in s.map))
+                for s in pieces)
         return "  %s = %s;  %% port gather" % (
             gn, self._mdv(pieces[0].indices, space, val))
 

@@ -197,6 +197,25 @@ class _Python(Dialect):
         if g.scalar:
             return "    %s = %s[%d]  # port gather" % (gn, pn, g.map[0])
         size = _flat_size(g.indices)
+        if g.map_index and g.peer_indices:
+            # axis take — one map position per contact supplies the
+            # peer's whole row; vector ports gather [C]-rows.
+            axes = list(g.peer_indices)
+            ax = axes.index(g.map_index) if g.map_index in axes else 0
+            take = "np.take(%s, %s, axis=%d)" % (pn, g.map, ax)
+            port_axes = list(g.indices.values())
+            pax = next(
+                (i for i, els in enumerate(port_axes)
+                 if all(el in (els or []) for el in g.elements)), 0)
+            slots = max(1, len(port_axes[pax] or []))
+            if len(g.map) != slots:
+                take = "np.pad(%s, [%s])" % (
+                    take, ", ".join(
+                        "(0, %d)" % (slots - len(g.map))
+                        if i == pax else "(0, 0)"
+                        for i in range(len(port_axes))))
+            return "    %s = %s%s  # port gather" % (
+                gn, take, self._shape(g.indices))
         if len(g.map) != size:
             return "    %s = %s  # port gather" % (
                 gn, self._fill([(pn, m) for m in g.map], size,
@@ -206,6 +225,21 @@ class _Python(Dialect):
     def gather_multi(self, pieces, space: CompileSpace) -> str:
         gn = pieces[0].name or inst_name(pieces[0].instance)
         size = _flat_size(pieces[0].indices)
+        if pieces[0].map_index and pieces[0].peer_indices:
+            # per-piece axis takes, concatenated along the map axis
+            # (each contact supplies the peer's whole row).
+            sels = []
+            for s in pieces:
+                axes = list(s.peer_indices)
+                ax = (axes.index(s.map_index)
+                      if s.map_index in axes else 0)
+                sels.append((ax, "np.take(%s, %s, axis=%d)" % (
+                    s.peer_name or inst_name(s.peer_instance),
+                    s.map, ax)))
+            return "    %s = np.concatenate([%s], axis=%d)%s  " \
+                   "# port gather" % (
+                       gn, ", ".join(t for _, t in sels), sels[0][0],
+                       self._shape(pieces[0].indices))
         pairs = [(s.peer_name or inst_name(s.peer_instance), m)
                  for s in pieces for m in s.map]
         if len(pairs) != size:

@@ -120,7 +120,10 @@ class AssignmentInfo:
     entity_type: str
     sequence: List[str] = field(default_factory=list)   # equation IRIs
     base_equation: Optional[str] = None
-    state_variable: Optional[str] = None
+    #: state vars — one per conserved content on the entity
+    #: (mass, momentum, energy…); multi-valued since a lumped
+    #: entity conserves several at once
+    state_variables: List[str] = field(default_factory=list)
     instantiated: List[str] = field(default_factory=list)
     ports: List[str] = field(default_factory=list)
     outputs: List[str] = field(default_factory=list)    # §21 sinks
@@ -187,7 +190,7 @@ class EntityInstantiation:
     occurrence: str = ""
     has_assignment: bool = False
     closed: bool = False
-    state_variable: Optional[str] = None
+    state_variables: List[str] = field(default_factory=list)
     #: §21 output sinks — defined vars computed for observation;
     #: codegen exposes them on the output channel.
     outputs: List[str] = field(default_factory=list)
@@ -285,8 +288,8 @@ def readable_vars(asg: AssignmentInfo,
     hidden internal).  Shared by the builder's peer resolution and the
     connect-time port-satisfaction adjudicator."""
     out: Set[str] = set()
-    if asg.state_variable:
-        out.add(asg.state_variable)
+    if asg.state_variables:
+        out.update(asg.state_variables)
     out.update(asg.instantiated)
     for eq_iri in asg.sequence:
         eq = equations.get(eq_iri)
@@ -556,7 +559,7 @@ def build(nodes: Dict[str, NodeInfo],
             continue
         inst.has_assignment = True
         inst.closed = asg.closed
-        inst.state_variable = asg.state_variable
+        inst.state_variables = list(asg.state_variables)
         inst.outputs = list(asg.outputs)
         if not asg.closed:
             problems.append(Problem(
@@ -613,8 +616,8 @@ def build(nodes: Dict[str, NodeInfo],
                     var=v_iri, entity_type=et))
 
         defined: Set[str] = set()
-        if asg.state_variable:
-            defined.add(asg.state_variable)
+        if asg.state_variables:
+            defined.update(asg.state_variables)
         eq_seq: List[EqInfo] = []
         # LHSs of equations dropped by a fix — the var is bound, not
         # computed, but must still enter discovery (its only link to
@@ -693,8 +696,8 @@ def build(nodes: Dict[str, NodeInfo],
                 if v not in seen:
                     seen.add(v)
                     ordered_vars.append(v)
-        for v in ([asg.state_variable] if asg.state_variable else []
-                  ) + list(asg.instantiated) + list(asg.ports) \
+        for v in list(asg.state_variables) \
+                + list(asg.instantiated) + list(asg.ports) \
                 + fixed_lhs:
             if v not in seen:
                 seen.add(v)
@@ -711,7 +714,7 @@ def build(nodes: Dict[str, NodeInfo],
                 continue
 
             # Role within this entity type's assignment.
-            if v_iri == asg.state_variable:
+            if v_iri in asg.state_variables:
                 role = "state"
             elif v_iri in asg.ports:
                 role = "port"
@@ -906,8 +909,8 @@ def build(nodes: Dict[str, NodeInfo],
                         return [], False
                     peer_asg = assignments.get(
                         nodes[peer].entity_type or "")
-                    state = (peer_asg.state_variable
-                             if peer_asg else None)
+                    state = (peer_asg.state_variables
+                             if peer_asg else [])
                     upstream = (arcs[a_iri].reference_from
                                 or arcs[a_iri].source)
                     raw: List[Tuple[str, str]] = []
@@ -931,7 +934,7 @@ def build(nodes: Dict[str, NodeInfo],
                         if (w_iri == v_iri and _carried(var)
                                 and upstream != peer):
                             continue
-                        if w_iri == state and not w.exportable:
+                        if w_iri in state and not w.exportable:
                             hidden = True   # accumulation stays internal
                             continue
                         # §38 effort coupling: an effort port reads a
@@ -949,7 +952,13 @@ def build(nodes: Dict[str, NodeInfo],
                         raw.append((peer, w_iri))
                     flagged = [c for c in raw
                                if variables[c[1]].exportable]
-                    return (flagged or raw), hidden
+                    chosen = flagged or raw
+                    # identity pairing — a port var takes its own kind
+                    # from the peer when the peer supplies it; mere
+                    # token-comparable substitutes must not render an
+                    # identity match ambiguous.
+                    identity = [c for c in chosen if c[1] == v_iri]
+                    return (identity or chosen), hidden
 
                 if arc_indexed:
                     # §44: a declared flow port touching no arc of its
@@ -1098,7 +1107,7 @@ def build(nodes: Dict[str, NodeInfo],
             return None
         w = pb.var
         if (w not in readable_vars(asg, equations) or w not in variables
-                or (w == asg.state_variable
+                or (w in asg.state_variables
                     and not variables[w].exportable)):
             return None
         return w

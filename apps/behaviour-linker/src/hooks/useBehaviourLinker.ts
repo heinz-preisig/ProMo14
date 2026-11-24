@@ -81,6 +81,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
   const [instantiated, setInstantiated] = useState<string[]>([])
   const [ports, setPorts] = useState<string[]>([])
   const [outputs, setOutputs] = useState<string[]>([])
+  const [stateVariables, setStateVariables] = useState<string[]>([])
   const [report, setReport] = useState<EvaluateReport | null>(null)
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [saveMsg, setSaveMsg] = useState('')
@@ -118,6 +119,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     entity_type: '',
     sequence: [],
     base_equation: null,
+    state_variables: [],
     instantiated: [],
     ports: [],
     outputs: [],
@@ -126,6 +128,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     entity_type: entityType ?? '',
     sequence,
     base_equation: baseEquation,
+    state_variables: stateVariables,
     instantiated,
     ports,
     outputs,
@@ -143,6 +146,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
       setInstantiated(a.instantiated)
       setPorts(a.ports)
       setOutputs(a.outputs ?? [])
+      setStateVariables(a.state_variables ?? [])
     },
     [],
   )
@@ -166,7 +170,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
         entity_type: entityType,
         sequence: [],
         base_equation: null,
-        state_variable: null,
+        state_variables: [],
         instantiated: [],
         ports: [],
         outputs: [],
@@ -189,6 +193,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
                   ...a,
                   sequence: r.selection.sequence,
                   base_equation: r.selection.base_equation,
+                  state_variables: r.selection.state_variables,
                   instantiated: r.selection.instantiated,
                   ports: r.selection.ports,
                   outputs: r.selection.outputs,
@@ -297,6 +302,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
         entity_type: entityType,
         sequence,
         base_equation: baseEquation,
+        state_variables: stateVariables,
         instantiated,
         ports,
         outputs,
@@ -321,6 +327,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     setInstantiated([])
     setPorts([])
     setOutputs([])
+    setStateVariables([])
     setLastSaved(null)
     listAssignments().then(setAssignments).catch(() => {})
     refresh()
