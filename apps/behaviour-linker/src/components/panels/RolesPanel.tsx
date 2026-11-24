@@ -8,6 +8,9 @@ interface RolesPanelProps {
   instantiated: string[]
   ports: string[]
   outputs: string[]
+  /** Declared state vars — derived primary plus any extras (a
+   *  lumped entity conserves several contents at once). */
+  stateVariables: string[]
   variables: Variable[]
   lab: (iri: string | null | undefined) => string
   onUnmark: (varIri: string) => void
@@ -24,12 +27,19 @@ export function RolesPanel({
   instantiated,
   ports,
   outputs,
+  stateVariables,
   variables,
   lab,
   onUnmark,
   onMark,
   onResolve,
 }: RolesPanelProps) {
+  const derived = report?.state_variable
+  const shown = stateVariables.length
+    ? stateVariables
+    : derived
+      ? [derived]
+      : []
   return (
     <div style={card}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
@@ -37,7 +47,10 @@ export function RolesPanel({
       </div>
       <div style={{ fontSize: 13 }}>
         <div>
-          <b>state:</b> {lab(report?.state_variable)}
+          <b>states:</b>{' '}
+          {shown.length
+            ? shown.map(lab).join(', ')
+            : lab(derived)}
         </div>
         <div>
           <b>ports:</b>{' '}

@@ -88,6 +88,7 @@ export default function App() {
                 instantiated={bl.instantiated}
                 ports={bl.ports}
                 outputs={bl.outputs}
+                stateVariables={bl.stateVariables}
                 variables={bl.ctx?.variables ?? []}
                 lab={bl.lab}
                 onUnmark={bl.unmark}

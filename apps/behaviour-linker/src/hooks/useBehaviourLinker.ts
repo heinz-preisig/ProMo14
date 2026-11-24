@@ -34,6 +34,7 @@ export interface BehaviourLinkerState {
   instantiated: string[]
   ports: string[]
   outputs: string[]
+  stateVariables: string[]
   report: EvaluateReport | null
   saveMsg: string
   copied: boolean
@@ -363,6 +364,8 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     if (!eqSet(lastSaved.instantiated, instantiated)) return true
     if (!eqSet(lastSaved.ports, ports)) return true
     if (!eqSet(lastSaved.outputs ?? [], outputs)) return true
+    if (!eqSet(lastSaved.state_variables ?? [], stateVariables))
+      return true
     return false
   }, [
     entityType,
@@ -372,6 +375,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     instantiated,
     ports,
     outputs,
+    stateVariables,
   ])
 
   const selectedType = ctx?.entity_types.find((t) => t.iri === entityType)
@@ -495,6 +499,7 @@ export function useBehaviourLinker(): BehaviourLinkerState {
     instantiated,
     ports,
     outputs,
+    stateVariables,
     report,
     saveMsg,
     copied,
