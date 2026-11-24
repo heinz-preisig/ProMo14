@@ -42,9 +42,26 @@ migration — §41 ruling 6).
 - `PUT /variables/{iri}` is full replace: fetch the record from
   `/context`, mutate, resend.
 
+### §47 quasi-steady lumped capacity — sibling etype + assignment LANDED
+
+Both momentum regimes now live side by side (user ruling: stiff
+integration is too costly on large models).  `etype_lumped_qss`
+(`promo:parent etype_lumped` → `reaction_host` inherits) keeps the
+same scale composition — mass/energy still integrate — but its
+assignment drops `V_121` from `state_variables`.  `E_dPdt` stays in
+the sequence and emits as an algebraic net-force block (support
+reaction) with the §21 output tap.  Sequence/ports/instantiated
+identical to the dynamic assignment; `closed=true`.  Author record:
+`scripts/author_lumped_qss.py`.  Regression:
+`test_qss_assignment_emits_balance_algebraically`.  Ruling: BL §47 +
+design-principles §14 amendment.  Per-node mixing is free — type a
+node `etype_lumped_qss` where the fast mechanical mode doesn't
+matter.  Upgrade path once `fl` lands: `ΣF(v)=0` can determine `v`
+(algebraic-loop solver exists).
+
 ## State
 
-- **576 backend tests pass**; consistency report 0 errors /
+- **581 backend tests pass**; consistency report 0 errors /
   63 consistent / 4 bound-scope on the library.
 - `./dev.sh save` persisted — `data/library.trig` and
   `data/ontology.trig` carry the fold (git-diff ~1.7k lines,

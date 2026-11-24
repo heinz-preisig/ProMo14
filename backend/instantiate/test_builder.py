@@ -1103,6 +1103,40 @@ def test_emit_python():
     assert "return dy" in src
 
 
+def test_qss_assignment_emits_balance_algebraically():
+    """§47 quasi-steady regime: the same balance equation emits as a
+    plain scheduled block when its lhs leaves ``state_variables``.
+    The sibling assignment integrates only mass; the net-force block
+    is an algebraic diagnostic (support reaction), not a second
+    state — the non-stiff alternative for large models."""
+    variables = dict(VARIABLES)
+    variables[_var("P")] = VarInfo(_var("P"), "net force", "V_P",
+                                   index_structures=[_idx("idx_node")],
+                                   tokens=[_tok("mass")])
+    equations = dict(EQUATIONS)
+    equations[_eq("mom")] = EqInfo(
+        _eq("mom"), _var("P"), [_var("F"), _var("J")], "E_5",
+        rhs="reduceSum(V_4 * V_3, A_diff)")
+    assignments = dict(ASSIGNMENTS)
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=_et("lumped_capacity"),
+        sequence=[_eq("bal"), _eq("mom"), _eq("prop")],
+        base_equation=_eq("bal"),
+        state_variables=[_var("m")],            # P dropped — QSS
+        ports=[_var("J")],
+        outputs=[_var("P")],
+        closed=True)
+    cp = _plan(_build(assignments=assignments,
+                      variables=variables, equations=equations))
+    assert len(cp.states) == 1                  # only m integrates
+    src = emit_python(cp, _emit_space())
+    assert "V_P = y[" not in src                # no state unpack
+    assert "dy[2:" not in src                   # no second dy slot
+    assert "V_P = " in src                      # algebraic block
+    assert 'out["V_P"]' in src                  # §21 output tap
+    assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
+
+
 def test_emit_julia():
     """The Julia emitter: in-place OrdinaryDiffEq signature, 1-based
     slices/maps, sparse F literal, broadcast Hadamard, plain ``*``

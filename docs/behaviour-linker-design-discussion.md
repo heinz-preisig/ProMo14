@@ -4670,3 +4670,59 @@ Library: `fKin`/`fPot`/`fPflow` `[A_conv,N]` advected flows
 `dEtotdt`; `dHdt` gained `+ al`, `balance` class, eq key `E_dHdt`.
 Consistency 65/4 bound-scope/0.  Deferred: a λ·(L/d)·ṁ·v²/2
 constitutive law can later replace the imposed `fl`.
+
+## 47. Quasi-steady regimes are sibling entity types, not runtime flags — RULED & implemented (2026-11-24)
+
+### Problem
+
+`dPdt` integrated on `etype_lumped` is the correct general model —
+explosions and fast transients genuinely integrate momentum alongside
+mass/energy.  But in most engineering applications the mechanical DOF
+relaxes orders of magnitude faster than the conserved contents, and
+integrating it forces a stiff solver — too costly on large models.
+Both regimes are legitimate; the choice is per application, not a rule.
+
+### Ruling
+
+- **Regime is assignment-level.**  `state_variables` decides which
+  DOFs integrate.  Quasi-steady momentum = `dPdt` leaves
+  `state_variables` while `E_dPdt` stays in the sequence — the balance
+  emits as a plain scheduled block, an algebraic net-force output that
+  *is* the support reaction.  No new backend machinery: the scheduler
+  already excludes state LHSs from `defines`, so the same equation
+  plays integrated in one assignment and algebraic in the other.
+- **Sibling entity type, not a variant flag.**  `etype_lumped_qss`
+  (`promo:parent etype_lumped` — capability inheritance carries
+  `cap_reaction_host`) keeps the same scale composition
+  (uniform/finite, macro dynamic — mass and energy still integrate)
+  and binds its own assignment.  Per-node mixing inside one model
+  comes free: the fast region keeps the dynamic lump, the bulk takes
+  the quasi-steady one.  Mirrors the CWA dynamic/event-dynamic split
+  the transport side already expresses.
+- **Not a runtime flag.**  The regime changes emitted code shape (the
+  state count), so it binds at modelling time — unlike `steady_state`,
+  which only re-points the emitted `initial()` t0 solve (`der = 0`
+  residuals) and remains available on both variants.
+- **What the algebraic balance determines is future work.**  Today the
+  net force is a diagnostic (the supports absorb it).  Once a
+  velocity-dependent force law lands (the queued `fl` constitutive),
+  `ΣF(v) = 0` can instead determine `v` — the algebraic-loop solver
+  already exists.
+
+### Implementation
+
+`etype_lumped_qss` via `POST /api/ontology/entity-types`
+(`parent=etype_lumped`); its assignment via
+`PUT /api/behaviour/assignment` on `…/library/assignments`:
+`state_variables=[V_57]`, sequence `[E_m_def, E_F_g, E_dPdt, E_29]`,
+ports `fmc`/`fP`/`fmom`, `instantiated=[V_34]`, `outputs=[V_121]`,
+`closed=true`.  Author record: `scripts/author_lumped_qss.py`.
+
+### Verification
+
+`test_qss_assignment_emits_balance_algebraically`: a balance equation
+kept in sequence but dropped from `state_variables` emits as a
+scheduled block (`V_P = …`), with no state unpack, no `dy` slot, and
+the §21 output tap preserved.  Live round-trip: the assignment
+reports `closed=True` and `reaction_host` inherits via `parent`.
+581 backend tests pass.

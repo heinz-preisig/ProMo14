@@ -320,6 +320,16 @@ unphysical, whatever the capacities' sizes.
   - *engineering simplification* — `temporalType: event-dynamic`:
     capacity-free, a time-scale assumption collapsing the
     transport's dynamics.
+- **Regime is per-assignment, inside the capacity too (ruled
+  2026-11-24, BL §47):** the time-scale assumption isn't only a
+  transport property.  `etype_lumped_qss` — a `promo:parent` child of
+  `etype_lumped`, same scale composition — binds an assignment that
+  drops `dPdt` from `state_variables`; the balance stays in sequence
+  as an algebraic net-force output (support reaction).  Sibling
+  etype, not a runtime flag: emitted state count differs, so the
+  binding is modelling-time and per-node mixing comes free.  Use the
+  quasi-steady lump on large models; keep the dynamic one where the
+  fast mechanical mode matters.
 - **Licensing consequence (enforced 2026-11-10):** the domain+token
   rules (`physical↔physical` + `sharedToken`) alone were too
   permissive — they licensed capacity↔capacity arcs.  `physical-same`
