@@ -57,11 +57,17 @@ migration — §41 ruling 6).
 - **Momentum `P[C]`** — the natural §41 follow-on (§41 ruled:
   momentum is `[C]`-indexed, per-component conservation).  No
   momentum balance is authored yet; `fmom = fmc·v` elementwise
-  over `C` is now spellable.
-- **`X↔C` placement metadata** — transport instances declaring
-  which `C` direction their `X` aligns to (ruled 2026-11-14,
-  item 5; direction cosines deferrable).  Needed before the
-  pressure-drop force can land on the right momentum component.
+  over `C` is now spellable, and the X↔C seam below supplies the
+  component landing for forces.
+- ~~**`X↔C` placement metadata**~~ — **landed same day**:
+  `promo:alignedComponent` literal on `ModelNode` (element name,
+  e.g. `"x"`), seeded `e_align [X,C]` binding `alignment` (the
+  σ/`direction` pattern), `node_alignments` surfaced on
+  `/api/instantiate/model`, problems `alignment-undeclared`/
+  `-invalid`/`-ambiguous`, modeller doc round-trips the field.
+  The pressure-drop force `reduceSum(σ·p_mech, X)` can now land
+  on a `C` component — remaining gap is the modeller UI affordance
+  for declaring placement (field persists via `PUT /model`).
 - **Dialog UX** — working per user, pending confirmation.
 - **Standing queue** — §32 stage-2 pairing resolver +
   `promo:Mechanism` layer; §33 submodel reuse; §21 closure-moves;

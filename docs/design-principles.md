@@ -425,8 +425,19 @@ memberships are not automatically migrated; user equations remain untouched.
   `E_6`/`E_9`/`E_10`; the coefficient triples extract components
   (`kConvX := …·reduceSum(e_x·v,C)` &c.); `Axy`/`Axz`/`Ayz`,
   `fKin` and `fPot` contract `e_i·r` / `v·v`; `vx`/`vy`/`vz` and
-  `r_x`/`r_y`/`r_z` deleted.  *Remaining:* genuine tensor objects
-  (`r:r'`, stress) stay §42.
+  `r_x`/`r_y`/`r_z` deleted.  **X↔C seam landed 2026-11-24** —
+  `promo:alignedComponent` literal on `ModelNode` declares which
+  `C` element a transport's `X` aligns to (element *name*;
+  direction cosines deferrable to a richer value).  Seeded
+  `e_align [X,C]` (constant+parameter, dimensionless,
+  token-neutral) binds it via the new `alignment` binding — the
+  σ/`direction` pattern with a component axis: per contact, the
+  touched node's unit `C` vector, demand-driven
+  (`alignment-undeclared`/`-invalid`/`-ambiguous` problems only
+  fire once a consumer binds).  `fP[C] := reduceSum(e_align *
+  σ*p_mech, X)` lands a scalar `X` force on the right momentum
+  component — the prerequisite for `P[C]` is in place.
+  *Remaining:* genuine tensor objects (`r:r'`, stress) stay §42.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:

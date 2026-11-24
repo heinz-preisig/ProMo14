@@ -351,6 +351,43 @@ not a contact`
   entity to a *peer*.  An arc internal to the entity's own nodes
   does not belong on its reference coordinate.
 
+### `alignment-undeclared`
+**Message:** `e_align for <var>: node <n> declares no
+promo:alignedComponent — the contact's component row is zero`
+
+- **Cause.** A constant `[X,C]` variable (`e_align`) binds in the
+  entity's set, so every contact node needs its §41 placement — the
+  `C` element its `X` aligns to.  The contact's node carries no
+  `promo:alignedComponent` literal.
+- **Remedy.** Declare the placement on the transport node in the
+  modeller (`promo:alignedComponent` = `x`/`y`/`z`).  Undeclared
+  alignment is inert until an `e_align` consumer exists — this
+  problem only appears once one does.
+
+### `alignment-invalid`
+**Message:** `e_align for <var>: node <n> declares alignedComponent
+<name> — not a component element <elements>`
+
+- **Cause.** The node's `promo:alignedComponent` literal isn't one
+  of the component axis's declared elements (`promo:elements` on
+  `idx_component`, currently `{x,y,z}`) — a typo or a stale name.
+- **Remedy.** Set the literal to one of the listed elements.
+  Alignment values are literal element *names*, not resource IRIs —
+  the same convention as `promo:coordinate` keys on value cells.
+
+### `alignment-ambiguous`
+**Message:** `e_align for <var>: arc <a> touches the entity at <n>
+ends — not a contact`
+
+- **Cause.** The alignment literal needs exactly one in-scope end
+  per contact arc — the aligned node is the entity side of the
+  contact.  An arc touching the entity at both ends is internal
+  (two same-type transports could legitimately share one, but each
+  may declare a different `X` alignment, so no row can be derived).
+- **Remedy.** Same topology rule as `direction-ambiguous`: a
+  contact connects the entity to a *peer* — an internal arc does
+  not belong on its reference coordinate.
+
 ## Occurrence-composition problems (§22/§33)
 
 Referenced submodels (`refersTo`) merge their content into the host at
