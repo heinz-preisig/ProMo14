@@ -76,13 +76,13 @@ the alias.  Consistency now **0 errors / 69 consistent /
 Regression: `test_integral_of_state_emits_slot_alias`.  Ruling:
 BL §48 + design-principles §2 corollary.
 
-## State
+## State (end of day)
 
-- **582 backend tests pass**; consistency report 0 errors /
-  69 consistent / 6 bound-scope on the library.
-- `./dev.sh save` persisted — `data/library.trig` and
-  `data/ontology.trig` carry the fold (git-diff ~1.7k lines,
-  mostly serializer churn).
+- **585 backend tests pass**; consistency report 0 errors /
+  71 consistent / 6 bound-scope (77 equations) on the library.
+- Store clean — `./dev.sh save` persisted; working tree clean.
+- **20 commits today**, `af68707`…`6933dbe`; branch ahead of
+  origin by 11 (unpushed).
 - `design-principles.md` open-gaps bullet realigned (fold landed);
   header bumped to 2026-11-24.
 
