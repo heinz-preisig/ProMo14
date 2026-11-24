@@ -80,10 +80,10 @@
 {% raw %}
 \renewcommand{\arraystretch}{1.5}
 
-\begin{longtable}{|p{1cm}|p{2.5cm}|p{4.5cm}|p{8cm}|p{3.0cm}|p{3cm}|p{1cm}|}\hline
- &var & \text{symbol} &documentation &type &units &eqs \\\hline\hline
+\begin{longtable}{|p{1cm}|p{2.5cm}|p{3.5cm}|p{6.5cm}|p{2.5cm}|p{2.2cm}|p{2.5cm}|p{1cm}|}\hline
+ &var & \text{symbol} &documentation &type &sig &units &eqs \\\hline\hline
 \endhead
-\hline \multicolumn{4}{r}{\textit{Continued on next page}} \\
+\hline \multicolumn{8}{r}{\textit{Continued on next page}} \\
 \endfoot
 \hline
 \endlastfoot
@@ -94,6 +94,7 @@
              & \verb|{{ v.label }}|
              & {{ v.doc|texdoc }}
              & \begin{lay}{{ v.type }}\end{lay}
+             & \begin{lay}{{ v.sig|tex }}\end{lay}
              & $ {{ v.units }} $
              & {% for e in v.eq_ids -%}
                 \hyperlink{"e:{{e}}"}{ {{e|tex}} }
@@ -114,10 +115,10 @@
 {% raw %}
 \renewcommand{\arraystretch}{2}
 
-\begin{longtable}{|p{1cm}|p{15cm}|p{6cm}|p{3cm}|}\hline
-no & equation &documentation &layer \\\hline\hline
+\begin{longtable}{|p{1cm}|p{13cm}|p{6cm}|p{2.2cm}|p{3cm}|}\hline
+no & equation &documentation &class &layer \\\hline\hline
 \endhead
-\hline \multicolumn{4}{r}{\textit{Continued on next page}} \\
+\hline \multicolumn{5}{r}{\textit{Continued on next page}} \\
 \endfoot
 \hline
 \endlastfoot
@@ -126,6 +127,7 @@ no & equation &documentation &layer \\\hline\hline
     \hyperlink{"v:{{ e.var_num }}"}{ {{e.num|tex}} }\hypertarget{"e:{{e.num}}"}{ {{""}} } &
     \begin{eq}{{ e.lhs }} := {{ e.rhs }}\end{eq} &
     \begin{lay}{{ e.doc|texdoc }}\end{lay} &
+    \begin{lay}{{ e.eqclass }}\end{lay} &
     \begin{lay}{{ e.network }}\end{lay} \\
 {% endfor -%}
 {% raw %}

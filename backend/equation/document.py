@@ -210,16 +210,27 @@ def compile_pdf(tex: str) -> bytes:
                 proc = subprocess.run(
                     [pdflatex, "-interaction=nonstopmode", "-halt-on-error",
                      "-no-shell-escape", "document.tex"],
-                    cwd=work, capture_output=True, text=True, timeout=90,
+                    # bytes, not text=True: the log can carry raw
+                    # font bytes that crash utf-8 decoding
+                    cwd=work, capture_output=True, timeout=90,
                 )
             except subprocess.TimeoutExpired:
                 raise PdfCompileError("pdflatex timed out after 90 s")
             if proc.returncode != 0:
-                raise PdfCompileError(_log_tail(work, proc.stdout))
+                raise PdfCompileError(_log_tail(
+                    work, proc.stdout.decode("utf-8", "replace")))
         pdf = work / "document.pdf"
         if not pdf.exists():
             raise PdfCompileError("pdflatex produced no PDF")
         return pdf.read_bytes()
+
+
+def _eq_class_label(eq: Any) -> str:
+    """Equation-class IRI → readable label — ``eqclass_generic`` →
+    ``generic``, ``constitutive_law`` → ``constitutive law``."""
+    iri = _get(eq, "equation_class") or ""
+    frag = iri.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+    return frag.replace("eqclass_", "").replace("_", " ") or "-"
 
 
 def build_document(ctx: Any) -> str:
@@ -256,7 +267,9 @@ def build_document(ctx: Any) -> str:
             "label": var.label or var.iri,
             "doc": (var.doc or "").replace("_", " "),
             "type": var.type or "",
-            "units": var.units.pretty(),
+            "sig": space.pretty_index_list(
+                list(var.index_structures or [])),
+            "units": var.units.latex(),
             "eq_ids": [e for e in eq_ids if e],
         })
 
@@ -268,6 +281,7 @@ def build_document(ctx: Any) -> str:
                 "lhs": _var_symbol(var, space),
                 "rhs": _rhs_latex(eq, var, ctx),
                 "doc": (_get(eq, "doc", "") or "").replace("_", " "),
+                "eqclass": _eq_class_label(eq),
                 "network": net.replace(">>>", "-->"),
             })
 

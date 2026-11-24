@@ -161,6 +161,18 @@ class Units:
             parts.append(_SYMBOLS[f] if e == 1 else "%s^%s" % (_SYMBOLS[f], e))
         return " ".join(parts) if parts else "1"
 
+    def latex(self) -> str:
+        """Math-mode unit string — ``kg\\,m^2\\,s^{-3}`` — for document
+        cells (``pretty`` is the plain-text twin for error messages)."""
+        parts = []
+        for f in _DISPLAY_ORDER:
+            e = getattr(self, f)
+            if e == 0:
+                continue
+            parts.append(_SYMBOLS[f] if e == 1
+                         else "%s^{%s}" % (_SYMBOLS[f], e))
+        return r"\,".join(parts) if parts else "1"
+
     def __str__(self) -> str:
         return str(self.as_list())
 
