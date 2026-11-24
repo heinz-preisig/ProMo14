@@ -230,6 +230,10 @@ class Instantiation:
     entity_types: List[EntityInstantiation] = field(default_factory=list)
     ports: List[PortBinding] = field(default_factory=list)
     problems: List[Problem] = field(default_factory=list)
+    #: §41 X↔C — node IRI → declared ``promo:alignedComponent`` (a
+    #: component-axis element name).  plan.py reads it when filling
+    #: ``e_align`` tables; empty when nothing declares placement.
+    node_alignments: Dict[str, str] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +387,10 @@ def build(nodes: Dict[str, NodeInfo],
     # sub-index: the contacts ARE the coordinate elements.
     coordinate_index = next((i.iri for i in indices.values()
                              if i.source == "coordinate"), None)
+    # §41: the component axis — a *fixed* index whose literal element
+    # set (promo:elements) names the spatial basis {x,y,z}.
+    component_index = next((i.iri for i in indices.values()
+                            if i.source == "component"), None)
     if node_index:
         report.indices[node_index] = node_set
     if base_arc_index:
@@ -394,6 +402,12 @@ def build(nodes: Dict[str, NodeInfo],
     for i in indices.values():
         if i.elements:
             report.indices[i.iri] = list(i.elements)
+
+    # §41 X↔C placement: pass through declared alignments for the
+    # e_align binding (demand-driven — an absent declaration is inert
+    # until a constant [X,C] var binds in the entity's set).
+    report.node_alignments = {
+        n: nodes[n].alignment for n in node_set if nodes[n].alignment}
 
     # -- group nodes by (entity type, occurrence) ---------------------------
     # §22 Option A: a node's owning occurrence is the longest path
@@ -730,6 +744,14 @@ def build(nodes: Dict[str, NodeInfo],
                 # per-contact signs of the entity's F row (plan.py
                 # computes them from the incidence report).
                 binding = "direction"
+            elif coord_idx is not None and component_index is not None \
+                    and component_index in idx_iris \
+                    and var.var_class == "constant":
+                # §41 X↔C seam: a constant var indexed [X,C] is the
+                # alignment vector — per-contact unit component of the
+                # entity's declared promo:alignedComponent (plan.py
+                # reads the node's literal via node_alignments).
+                binding = "alignment"
             elif var.value is not None:
                 binding = "constant"
             elif role == "parameter":

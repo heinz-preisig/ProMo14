@@ -31,6 +31,12 @@ class NodeInfo:
     #: values *at this node* (per-occurrence override of the variable's
     #: class regime).  Read by the §19 builder, not the resolver itself.
     fixes: List[str] = field(default_factory=list)
+    #: §41 X↔C seam — ``promo:alignedComponent``: which ``idx_component``
+    #: element the node's reference coordinate ``X`` aligns to (literal
+    #: element name, e.g. ``"x"`` — direction cosines deferrable to a
+    #: richer value).  Consumed by ``e_align`` bindings, not the
+    #: resolver.
+    alignment: Optional[str] = None
 
 
 @dataclass

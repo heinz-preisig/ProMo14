@@ -389,6 +389,7 @@ class SeedMixin:
         self._seed_coordinate(g, base)
         self._seed_component(g, base)
         self._seed_basis(g, base)
+        self._seed_alignment(g, base)
         g.set((g.identifier, PROMO["seedFloor"], Literal(SEED_FLOOR)))
 
     def _seed_constants(self, g: Graph, base: str) -> None:
@@ -886,6 +887,70 @@ class SeedMixin:
                 g.remove((iri, PROMO["tokenVector"], o))
             self.set_value_cells(g, iri, {
                 ax: (1 if ax == el else 0) for ax in ("x", "y", "z")})
+
+    def _seed_alignment(self, g: Graph, base: str) -> None:
+        """§41 X↔C seam — ``e_align`` [X,C]: the per-contact component
+        unit vector.
+
+        A transport instance declares which ``C`` element its ``X``
+        aligns to via ``promo:alignedComponent`` on the ``ModelNode``
+        (literal element name — direction cosines deferrable to a
+        richer value).  ``e_align`` binds that declaration per
+        contact: ``fP[C] := reduceSum(e_align * (sigma * p_mech), X)``
+        lands the pressure-drop force on the right momentum
+        component.  Per-contact rows because bindings are per
+        entity-type while alignment is per-node.
+
+        constant+parameter, dimensionless, token-neutral — the
+        sigma/``e_i`` scheme-object pattern.  Index membership and
+        token declarations are normalised on load (exact-set floor)."""
+        x_iri = self.mint_iri(base, "idx_x")
+        c_iri = self.mint_iri(base, "idx_component")
+        for iri in (x_iri, c_iri):
+            if (iri, RDF.type, PROMO["Index"]) not in g:
+                return
+        domain = self.mint_iri(base, "domain_physical")
+        classifications = {}
+        for axis, term in (
+            ("axis_determination_physical",
+             "term_determination_constant"),
+            ("axis_function_physical", "term_function_parameter"),
+        ):
+            term_iri = self.mint_iri(base, term)
+            if (term_iri, None, None) in g:
+                classifications[str(self.mint_iri(base, axis))] = \
+                    str(term_iri)
+        iri = self.mint_iri(base, "e_align")
+        self.add_variable_dict(g, {
+            "iri": str(iri),
+            "label": "e_align",
+            "network": "physical",
+            "domain_iri": str(domain),
+            # §26: deterministic ID — ``{graph}#e_align``.
+            "internal_id": "e_align",
+            "units": [0, 0, 0, 0, 0, 0, 0, 0],
+            "index_structures": [str(x_iri), str(c_iri)],
+            "port_variable": False,
+            "classifications": classifications,
+            "aliases": {"latex": "e_a", "global_ID": str(iri)},
+            "doc": "§41 X↔C alignment vector [X,C] — per contact, "
+                   "the unit component of the entity's declared "
+                   "promo:alignedComponent; binds instantiation-"
+                   "derived like sigma (values filled by plan.py "
+                   "from the node's literal, no seeded table).  "
+                   "reduceSum(e_align * (sigma * p_mech), X) lands "
+                   "a transport's scalar X force on a C component "
+                   "of momentum.  constant+parameter, "
+                   "dimensionless, token-neutral.",
+        })
+        for o in set(g.objects(iri, PROMO["indexStructure"])) \
+                - {x_iri, c_iri}:
+            g.remove((iri, PROMO["indexStructure"], o))
+        for o in set(g.objects(iri, PROMO["carriesToken"])):
+            g.remove((iri, PROMO["carriesToken"], o))
+        for _, _, o in g.triples((iri, PROMO["tokenVector"],
+                                  None)):
+            g.remove((iri, PROMO["tokenVector"], o))
 
     def _seed_capabilities(self, g: Graph, base: str) -> None:
         """Seed entity-type capabilities (§20): which types may inject

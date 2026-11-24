@@ -504,6 +504,114 @@ def test_event_dynamic_port_binds_contact_arcs():
     assert "broadcast" in src
 
 
+_COMPONENT_INDICES = {
+    **INDICES,
+    _idx("idx_component"): IndexInfo(
+        _idx("idx_component"), source="component",
+        short_name="C", elements=["x", "y", "z"]),
+}
+
+
+def _alignment_setup(nodes=None, arcs=None):
+    """c1—a1—t1—a2—c2 with an e_align [X,C] consumer on the
+    transport's law — the §41 X↔C seam fixture."""
+    nodes = nodes or NODES
+    arcs = arcs or ARCS
+    variables = dict(VARIABLES)
+    variables[_var("eal")] = VarInfo(
+        _var("eal"), "e_align", "V_ea",
+        index_structures=[_idx("idx_x"), _idx("idx_component")],
+        var_class="constant")
+    equations = dict(EQUATIONS)
+    equations[_eq("flow")] = EqInfo(
+        _eq("flow"), _var("J"),
+        [_var("k"), _var("sig"), _var("eal")],
+        "E_3", rhs="V_5 * reduceSum(V_ea * V_sig * V_2, X)")
+    assignments = dict(ASSIGNMENTS)
+    assignments[_et("diffusion_transport")] = AssignmentInfo(
+        entity_type=_et("diffusion_transport"),
+        sequence=[_eq("flow")],
+        instantiated=[_var("k")],
+        closed=True)
+    memberships = resolve(nodes, arcs, SUB_INDICES, PARENTS)
+    rep = build(nodes, arcs, memberships, SUB_INDICES,
+                _COMPONENT_INDICES, assignments, variables, equations,
+                TOKEN_PARENTS, TOKEN_KINDS,
+                temporal_types={_et("diffusion_transport"):
+                                "event-dynamic"},
+                parents=PARENTS)
+    cp = plan(rep, schedule(rep),
+              fbuild(nodes, arcs, memberships, SUB_INDICES),
+              equations, _COMPONENT_INDICES, variables=variables)
+    return rep, cp
+
+
+def test_aligned_component_binds_e_align_table():
+    """§41 X↔C: a constant [X,C] var binds the ``alignment`` literal —
+    per contact (bound X order), the unit component vector of the
+    touched node's declared ``promo:alignedComponent``.  t1 aligned
+    to ``x`` → both its contacts emit the x row."""
+    nodes = {**NODES,
+             "t1": NodeInfo("t1", _et("diffusion_transport"),
+                            alignment="x")}
+    rep, cp = _alignment_setup(nodes=nodes)
+    assert rep.node_alignments == {"t1": "x"}
+    ent = _entity(rep, _et("diffusion_transport"))
+    ea = _binding(ent, _var("eal"))
+    assert ea.binding == "alignment"
+    assert ea.indices == {_idx("idx_x"): ["a1", "a2"],
+                          _idx("idx_component"): ["x", "y", "z"]}
+    slot = next(s for s in cp.params if s.var == _var("eal"))
+    assert slot.kind == "alignment"
+    assert slot.values == [1, 0, 0, 1, 0, 0]
+
+
+def test_alignment_problems_for_missing_and_bad_literals():
+    """Undeclared and invalid placement literals surface as problems
+    and emit zero rows — placement is inert until an e_align
+    consumer binds (demand-driven)."""
+    rep, cp = _alignment_setup()                     # t1: no literal
+    slot = next(s for s in cp.params if s.var == _var("eal"))
+    assert slot.values == [0] * 6
+    hits = [p for p in rep.problems if p.kind == "alignment-undeclared"]
+    assert len(hits) == 2                            # one per contact
+
+    nodes = {**NODES,
+             "t1": NodeInfo("t1", _et("diffusion_transport"),
+                            alignment="w")}
+    rep, cp = _alignment_setup(nodes=nodes)
+    slot = next(s for s in cp.params if s.var == _var("eal"))
+    assert slot.values == [0] * 6
+    hits = [p for p in rep.problems if p.kind == "alignment-invalid"]
+    assert len(hits) == 2
+
+
+def test_alignment_per_node_and_ambiguous_contact():
+    """Two same-type transports with different placements: each
+    contact row carries its own node's component; an arc internal
+    to the entity (two ends in scope) reports
+    ``alignment-ambiguous`` — which side's X is it?"""
+    nodes = {**NODES,
+             "t1": NodeInfo("t1", _et("diffusion_transport"),
+                            alignment="x"),
+             "t2": NodeInfo("t2", _et("diffusion_transport"),
+                            alignment="z"),
+             "c3": NodeInfo("c3", _et("lumped_capacity"))}
+    arcs = {**ARCS,
+            "a3": ArcInfo("a3", "t1", "t2", "token-flow"),
+            "a4": ArcInfo("a4", "t2", "c3", "token-flow")}
+    rep, cp = _alignment_setup(nodes=nodes, arcs=arcs)
+    ent = _entity(rep, _et("diffusion_transport"))
+    ea = _binding(ent, _var("eal"))
+    assert ea.indices[_idx("idx_x")] == ["a1", "a2", "a3", "a4"]
+    slot = next(s for s in cp.params if s.var == _var("eal"))
+    # a1→t1 (x), a2→t1 (x), a3 touches the entity at both ends → 0,
+    # a4→t2 (z) — per-node alignment, one row per contact.
+    assert slot.values == [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]
+    hits = [p for p in rep.problems if p.kind == "alignment-ambiguous"]
+    assert len(hits) == 1 and "a3" in hits[0].message
+
+
 def test_exportable_flag_or_flow():
     """§43: exportable = flagged override OR function:flow — an
     unflagged non-flow stays internal, an unflagged flow exports."""

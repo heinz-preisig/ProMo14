@@ -10,7 +10,11 @@ RDF shape (see docs/ADR-007-model-persistence.md):
 - ``promo:Model`` — one per graph: ``rootComposite``, ``nextTreeId``,
   ``arcCounter``.
 - ``promo:ModelNode`` — ``entityType`` → entity-type IRI, label,
-  ``internalID``.
+  ``internalID``.  Optional ``promo:alignedComponent`` literal — §41
+  X↔C placement: which component-axis element (``x``/``y``/``z``) the
+  node's reference coordinate ``X`` aligns to; literal element name,
+  not a resource IRI (direction cosines deferrable to a richer
+  value).
 - ``promo:ModelArc`` — ``source``/``target`` → ModelNode IRI,
   ``arcType`` → arc-type IRI, ``internalID``, and for token-flow arcs
   ``referenceFrom``/``referenceTo`` → ModelNode IRI: the §15 semantic
@@ -81,6 +85,8 @@ class ModelNodeDoc(BaseModel):
     # ADR-008 layer 2: promo:fix marks — variable IRIs bound to values
     # at this node occurrence.
     fixes: List[str] = Field(default_factory=list)
+    # §41 X↔C placement: the C element the node's X aligns to.
+    alignedComponent: Optional[str] = None
 
 
 class ModelArcDoc(BaseModel):
@@ -361,6 +367,7 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
                              graph.objects(s, PROMO["hostsReaction"])),
             fixes=sorted(str(f) for f in
                          graph.objects(s, PROMO["fix"])),
+            alignedComponent=_one(graph, s, PROMO["alignedComponent"]),
         ))
 
     for s in graph.subjects(RDF.type, PROMO["ModelArc"]):
@@ -475,6 +482,9 @@ def put_model(
             graph.add((s, PROMO["hostsReaction"], URIRef(r)))
         for f in n.fixes:
             graph.add((s, PROMO["fix"], URIRef(f)))
+        if n.alignedComponent:
+            graph.set((s, PROMO["alignedComponent"],
+                       Literal(n.alignedComponent)))
         graph.set((s, PROMO["internalID"],
                    Literal(local_name(n.iri))))
 

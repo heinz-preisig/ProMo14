@@ -227,7 +227,7 @@
     promo:versionOf a rdf:Property .
 
     <https://w3id.org/promo/ontology> a promo:Ontology ;
-        promo:seedFloor "2026-11-23" .
+        promo:seedFloor "2026-11-24" .
 
     <https://w3id.org/promo/ontology#F_conv> a promo:Variable ;
         rdfs:label "F_conv" ;
@@ -442,6 +442,23 @@
         promo:branch "physical" ;
         promo:name "transport" ;
         promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
+    <https://w3id.org/promo/ontology#e_align> a promo:Variable ;
+        rdfs:label "e_align" ;
+        promo:aliases "{\"latex\": \"e_a\", \"global_ID\": \"https://w3id.org/promo/ontology#e_align\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter> ;
+        promo:doc "§41 X↔C alignment vector [X,C] — per contact, the unit component of the entity's declared promo:alignedComponent; binds instantiation-derived like sigma (values filled by plan.py from the node's literal, no seeded table).  reduceSum(e_align * (sigma * p_mech), X) lands a transport's scalar X force on a C component of momentum.  constant+parameter, dimensionless, token-neutral." ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_component>,
+            <https://w3id.org/promo/ontology#idx_x> ;
+        promo:internalID "e_align" ;
+        promo:latex "e_a" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#e_z> a promo:Variable ;
         rdfs:label "e_z" ;
@@ -786,7 +803,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:n92056b03ebb2443a91e9efa38c83e7a0b1 ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -804,7 +821,7 @@
         promo:rhsLatex "\\left( \\sum_{C} \\left( e_{x,C} \\circ {r}_{C,N} \\right) \\circ \\sum_{C} \\left( e_{y,C} \\circ {r}_{C,N} \\right) \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:Nfc4f93cd8fc344b181d2b0ce21df1107 ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db2 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -822,7 +839,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:n92056b03ebb2443a91e9efa38c83e7a0b3 ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db3 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -840,7 +857,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:n92056b03ebb2443a91e9efa38c83e7a0b4 ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#V_17> a promo:Variable ;
@@ -1176,17 +1193,6 @@
         promo:shortName "S" ;
         promo:token <https://w3id.org/promo/ontology#token_component_mass> .
 
-    <https://w3id.org/promo/ontology#idx_x> a promo:Index ;
-        rdfs:label "reference coordinate" ;
-        promo:aliases "{\"global_ID\": \"I_12\", \"internal_code\": \"X\"}" ;
-        promo:doc "§41 reference coordinate — an entity's contact arcs in canonical order (the through-direction a flow system reads efforts along)." ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexClass "coordinate" ;
-        promo:internalID "I_12" ;
-        promo:network "physical" ;
-        promo:shortName "X" ;
-        promo:subIndexOf <https://w3id.org/promo/ontology#idx_arc> .
-
     <https://w3id.org/promo/ontology#sval_length_infinite> a promo:ScaleValue ;
         rdfs:label "infinite" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
@@ -1271,6 +1277,17 @@
         promo:branch "physical" ;
         promo:name "geometry" ;
         promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
+    <https://w3id.org/promo/ontology#idx_x> a promo:Index ;
+        rdfs:label "reference coordinate" ;
+        promo:aliases "{\"global_ID\": \"I_12\", \"internal_code\": \"X\"}" ;
+        promo:doc "§41 reference coordinate — an entity's contact arcs in canonical order (the through-direction a flow system reads efforts along)." ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexClass "coordinate" ;
+        promo:internalID "I_12" ;
+        promo:network "physical" ;
+        promo:shortName "X" ;
+        promo:subIndexOf <https://w3id.org/promo/ontology#idx_arc> .
 
     <https://w3id.org/promo/ontology#sval_length_infinitesimal> a promo:ScaleValue ;
         rdfs:label "infinitesimal" ;
@@ -1434,6 +1451,11 @@
         promo:name "information" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
+    <https://w3id.org/promo/ontology#sval_length_microscopic_distributed> a promo:ScaleValue ;
+        rdfs:label "distributed" ;
+        promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
+        promo:parent <https://w3id.org/promo/ontology#sval_length_microscopic> .
+
     <https://w3id.org/promo/ontology#idx_component> a promo:Index ;
         rdfs:label "component" ;
         promo:aliases "{\"global_ID\": \"I_13\", \"internal_code\": \"C\"}" ;
@@ -1444,11 +1466,6 @@
         promo:internalID "I_13" ;
         promo:network "physical" ;
         promo:shortName "C" .
-
-    <https://w3id.org/promo/ontology#sval_length_microscopic_distributed> a promo:ScaleValue ;
-        rdfs:label "distributed" ;
-        promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
-        promo:parent <https://w3id.org/promo/ontology#sval_length_microscopic> .
 
     <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> a promo:ScaleValue ;
         rdfs:label "event-dynamic" ;
@@ -1485,14 +1502,14 @@
         promo:network "physical" ;
         promo:shortName "N" .
 
-    <https://w3id.org/promo/ontology#term_determination_constant> a promo:AxisTerm ;
-        rdfs:label "constant" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_determination_physical> .
-
     <https://w3id.org/promo/ontology#scale_length> a promo:ScaleDimension ;
         promo:dimensionKind "structural" ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:name "length" .
+
+    <https://w3id.org/promo/ontology#term_determination_constant> a promo:AxisTerm ;
+        rdfs:label "constant" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_determination_physical> .
 
     <https://w3id.org/promo/ontology#term_function_parameter> a promo:AxisTerm ;
         rdfs:label "parameter" ;
@@ -1514,62 +1531,62 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:N02d46e13d63d40c5970966e779427d88 rdf:first <https://w3id.org/promo/ontology#e_y> ;
-        rdf:rest _:N2290d0d5bb5d4ae38b5e7df9243e575a .
+    _:n64689718177548e3be8ee1a05ad61a1db1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n64689718177548e3be8ee1a05ad61a1db18 .
 
-    _:N05d5121c5fbc463d89176e5d8a144bc9 rdf:first _:N549da6753f374d84bf86285190dcf439 ;
-        rdf:rest _:N6142305a9dbc40f59f59e295e59da265 .
+    _:n64689718177548e3be8ee1a05ad61a1db10 rdf:first _:n64689718177548e3be8ee1a05ad61a1db11 ;
+        rdf:rest _:n64689718177548e3be8ee1a05ad61a1db12 .
 
-    _:N1925c92089194b539fb035bbfda6291d rdf:first _:N77213419f2004799ba64912238575373 ;
-        rdf:rest _:Nc07cfbb6a8b447f9b1f53cde2b60abba .
-
-    _:N2290d0d5bb5d4ae38b5e7df9243e575a rdf:first <https://w3id.org/promo/ontology#V_115> ;
-        rdf:rest () .
-
-    _:N3b1d090057f447ab884f0fffc3166f1d a promo:Expression ;
-        promo:hasArguments _:N1925c92089194b539fb035bbfda6291d ;
-        promo:hasOperation promolg:SumOverIndex .
-
-    _:N4cdda6e93d544f58adad7c47b96be097 rdf:first _:Nb1dade6d38f446d7b0adf2d37f96167c ;
-        rdf:rest () .
-
-    _:N549da6753f374d84bf86285190dcf439 a promo:Expression ;
-        promo:hasArguments _:N02d46e13d63d40c5970966e779427d88 ;
+    _:n64689718177548e3be8ee1a05ad61a1db11 a promo:Expression ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db16 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:N6142305a9dbc40f59f59e295e59da265 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+    _:n64689718177548e3be8ee1a05ad61a1db12 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
 
-    _:N7352371cc614494b820e4ea59b898093 rdf:first <https://w3id.org/promo/ontology#e_x> ;
-        rdf:rest _:Ncc43032558dd44499285e0c0e7c72179 .
-
-    _:N77213419f2004799ba64912238575373 a promo:Expression ;
-        promo:hasArguments _:N7352371cc614494b820e4ea59b898093 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:Nb1dade6d38f446d7b0adf2d37f96167c a promo:Expression ;
-        promo:hasArguments _:N05d5121c5fbc463d89176e5d8a144bc9 ;
+    _:n64689718177548e3be8ee1a05ad61a1db13 a promo:Expression ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db10 ;
         promo:hasOperation promolg:SumOverIndex .
 
-    _:Nc07cfbb6a8b447f9b1f53cde2b60abba rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+    _:n64689718177548e3be8ee1a05ad61a1db14 rdf:first _:n64689718177548e3be8ee1a05ad61a1db15 ;
         rdf:rest () .
 
-    _:Ncc43032558dd44499285e0c0e7c72179 rdf:first <https://w3id.org/promo/ontology#V_115> ;
+    _:n64689718177548e3be8ee1a05ad61a1db15 a promo:Expression ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db7 ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:n64689718177548e3be8ee1a05ad61a1db16 rdf:first <https://w3id.org/promo/ontology#e_x> ;
+        rdf:rest _:n64689718177548e3be8ee1a05ad61a1db17 .
+
+    _:n64689718177548e3be8ee1a05ad61a1db17 rdf:first <https://w3id.org/promo/ontology#V_115> ;
         rdf:rest () .
 
-    _:Nfc4f93cd8fc344b181d2b0ce21df1107 rdf:first _:N3b1d090057f447ab884f0fffc3166f1d ;
-        rdf:rest _:N4cdda6e93d544f58adad7c47b96be097 .
-
-    _:n92056b03ebb2443a91e9efa38c83e7a0b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:n92056b03ebb2443a91e9efa38c83e7a0b5 .
-
-    _:n92056b03ebb2443a91e9efa38c83e7a0b3 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n64689718177548e3be8ee1a05ad61a1db18 rdf:first <https://w3id.org/promo/ontology#V_7> ;
         rdf:rest () .
 
-    _:n92056b03ebb2443a91e9efa38c83e7a0b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n64689718177548e3be8ee1a05ad61a1db2 rdf:first _:n64689718177548e3be8ee1a05ad61a1db13 ;
+        rdf:rest _:n64689718177548e3be8ee1a05ad61a1db14 .
+
+    _:n64689718177548e3be8ee1a05ad61a1db3 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
 
-    _:n92056b03ebb2443a91e9efa38c83e7a0b5 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+    _:n64689718177548e3be8ee1a05ad61a1db4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:n64689718177548e3be8ee1a05ad61a1db5 rdf:first <https://w3id.org/promo/ontology#e_y> ;
+        rdf:rest _:n64689718177548e3be8ee1a05ad61a1db6 .
+
+    _:n64689718177548e3be8ee1a05ad61a1db6 rdf:first <https://w3id.org/promo/ontology#V_115> ;
+        rdf:rest () .
+
+    _:n64689718177548e3be8ee1a05ad61a1db7 rdf:first _:n64689718177548e3be8ee1a05ad61a1db8 ;
+        rdf:rest _:n64689718177548e3be8ee1a05ad61a1db9 .
+
+    _:n64689718177548e3be8ee1a05ad61a1db8 a promo:Expression ;
+        promo:hasArguments _:n64689718177548e3be8ee1a05ad61a1db5 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:n64689718177548e3be8ee1a05ad61a1db9 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
 }
 

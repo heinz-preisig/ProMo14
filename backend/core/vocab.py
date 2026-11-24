@@ -109,7 +109,7 @@ SEED_CONSTANTS = (
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-11-23"
+SEED_FLOOR = "2026-11-24"
 
 # Top-level equation-class hierarchy, seeded by
 # ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for

@@ -378,6 +378,19 @@ def plan(report: Instantiation, sched: Schedule,
                         report.problems),
                     name=names[v.occurrence][e.entity_type][v.var],
                     occurrence=v.occurrence))
+            elif v.binding == "alignment":
+                # §41 X↔C e_align[X,C]: the per-contact unit component
+                # vector — the touched node's declared
+                # promo:alignedComponent rendered over the bound
+                # component elements, in contact order.
+                out.params.append(ParamSlot(
+                    var=v.var, instance=v.instance, kind="alignment",
+                    indices=v.indices,
+                    values=_alignment_table(
+                        v, incidence, set(e.nodes), indices,
+                        report.node_alignments, report.problems),
+                    name=names[v.occurrence][e.entity_type][v.var],
+                    occurrence=v.occurrence))
 
     # -- gathers (bound ports → peer element positions) ----------------------
     # Port vars are instance-level: group a var's contacts across all
@@ -733,6 +746,64 @@ def _direction_signs(v: VarBinding, incidence: IncidenceReport,
                         f"at {len(ends)} ends — not a contact",
                 var=v.var))
             out.append(0)
+    return out
+
+
+def _alignment_table(v: VarBinding, incidence: IncidenceReport,
+                     scope_nodes: set,
+                     indices: Dict[str, IndexInfo],
+                     alignments: Dict[str, str],
+                     problems: List[Problem]) -> List[int]:
+    """§41 e_align[X,C] literal: per contact (bound ``X`` elements,
+    in order) the unit component vector of the touched node's
+    declared ``promo:alignedComponent`` — the seam that lands a
+    transport's scalar ``X`` force on a ``C`` component.
+
+    Flat row-major over [contact, component]: each bound contact
+    contributes one ``len(components)`` row.  Missing or bad
+    declarations surface as problems and emit a zero row — absent
+    placement is inert until a consumer binds this var (demand-
+    driven, like ``direction-ambiguous``)."""
+    contact_at = {(incidence.base.nodes[r], incidence.base.arcs[c])
+                  for r, c, _ in incidence.base.entries}
+    components = _bound_elements(
+        v, indices,
+        lambda idx, idxs: (idx or IndexInfo("")).source == "component")
+    zero = [0] * len(components)
+    out: List[int] = []
+    for a in _bound_elements(v, indices, _arc_like):
+        ends = [n for n in scope_nodes if (n, a) in contact_at]
+        if len(ends) != 1:
+            problems.append(Problem(
+                kind="alignment-ambiguous",
+                message=f"e_align for {v.var.rsplit('#', 1)[-1]}: arc "
+                        f"{a.rsplit('#', 1)[-1]} touches the entity "
+                        f"at {len(ends)} ends — not a contact",
+                var=v.var))
+            out += zero
+            continue
+        declared = alignments.get(ends[0])
+        if declared is None:
+            problems.append(Problem(
+                kind="alignment-undeclared",
+                message=f"e_align for {v.var.rsplit('#', 1)[-1]}: node "
+                        f"{ends[0].rsplit('#', 1)[-1]} declares no "
+                        "promo:alignedComponent — the contact's "
+                        "component row is zero",
+                var=v.var, node=ends[0]))
+            out += zero
+            continue
+        if declared not in components:
+            problems.append(Problem(
+                kind="alignment-invalid",
+                message=f"e_align for {v.var.rsplit('#', 1)[-1]}: node "
+                        f"{ends[0].rsplit('#', 1)[-1]} declares "
+                        f"alignedComponent {declared!r} — not a "
+                        f"component element {components}",
+                var=v.var, node=ends[0]))
+            out += zero
+            continue
+        out += [1 if c == declared else 0 for c in components]
     return out
 
 

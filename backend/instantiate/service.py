@@ -335,6 +335,9 @@ class InstantiationReportOut(BaseModel):
     model: str
     vars_graph: Optional[str] = None
     indices: Dict[str, List[str]] = Field(default_factory=dict)
+    #: §41 X↔C — node IRI → declared ``promo:alignedComponent``;
+    #: inspected by the modeller's placement UI and e_align tooling.
+    node_alignments: Dict[str, str] = Field(default_factory=dict)
     entity_types: List[EntityInstantiationOut] = Field(default_factory=list)
     ports: List[PortBindingOut] = Field(default_factory=list)
     boundary: List[BoundaryPortOut] = Field(default_factory=list)
@@ -459,10 +462,12 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
     occurrences: List[Dict[str, Any]] = []
     for s in model_graph.subjects(RDF.type, PROMO["ModelNode"]):
         et = model_graph.value(s, PROMO["entityType"])
+        align = model_graph.value(s, PROMO["alignedComponent"])
         nodes[str(s)] = NodeInfo(
             iri=str(s), entity_type=str(et) if et else None,
             fixes=[str(f) for f in
-                   model_graph.objects(s, PROMO["fix"])])
+                   model_graph.objects(s, PROMO["fix"])],
+            alignment=str(align) if align is not None else None)
         lbl = model_graph.value(s, RDFS.label)
         if lbl is not None:
             labels[str(s)] = str(lbl)
@@ -565,7 +570,7 @@ def _collect(store, model_graph, _seen: Tuple[str, ...] = ()):
         for iri, n in sub_nodes.items():
             nodes[prefix + iri] = NodeInfo(
                 iri=prefix + iri, entity_type=n.entity_type,
-                fixes=n.fixes)
+                fixes=n.fixes, alignment=n.alignment)
             if iri in sub_lbl:
                 labels[prefix + iri] = sub_lbl[iri]
         for iri, a in sub_arcs.items():
@@ -1298,6 +1303,7 @@ def model_instantiation(
         model=str(model_graph.identifier),
         vars_graph=library,
         indices=report.indices,
+        node_alignments=report.node_alignments,
         entity_types=[EntityInstantiationOut(
             entity_type=e.entity_type,
             nodes=e.nodes,
