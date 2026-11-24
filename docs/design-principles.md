@@ -1,6 +1,6 @@
 # Design principles — ProMo14
 
-Living — realigned to rulings through 2026-11-22.
+Living — realigned to rulings through 2026-11-24.
 
 Curated record of the global ideas and the deliberate deviations from
 mainstream modelling of controlled physical systems.  Each entry states
@@ -419,8 +419,14 @@ memberships are not automatically migrated; user equations remain untouched.
   `E_26`/`E_27`-style terms need no `[C,C']` machinery.  Value
   cells resolve through the artefact's pin scope
   (`_binding_cells`, least→most specific — artefact's own cells
-  win).  *Remaining:* the `v[C]`/`r[C]` consumer rewrites; genuine
-  tensor objects (`r:r'`, stress) stay §42.
+  win).  **Consumer fold landed 2026-11-24** — `r` (ontology
+  `V_115`, physical, `[N,C]`, frame) and `v` (library `V_116`,
+  macroscopic, `[N,C]`) declared; `v := ParDiff(r,t)` replaces
+  `E_6`/`E_9`/`E_10`; the coefficient triples extract components
+  (`kConvX := …·reduceSum(e_x·v,C)` &c.); `Axy`/`Axz`/`Ayz`,
+  `fKin` and `fPot` contract `e_i·r` / `v·v`; `vx`/`vy`/`vz` and
+  `r_x`/`r_y`/`r_z` deleted.  *Remaining:* genuine tensor objects
+  (`r:r'`, stress) stay §42.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:
