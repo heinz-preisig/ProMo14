@@ -4217,6 +4217,49 @@ deferrable).
   `v[C]`/`r[C]` consumer rewrites themselves.
 - Tensors (stress, momentum-flux) stay out of scope — staged in §42.
 
+### Momentum slice (implemented 2026-11-24)
+
+The `[C]`-fold ruling ("momentum content `P[C]`, momentum flows
+`fmom[C]`, forces `[C]`") landed as two authored subjects:
+
+- **Fluid mechanics — convection-transport scope.**  Three per-contact
+  exports declared `[A_conv,C,N]` (the `fmc` pattern — the arc slot
+  binds the transport's own contacts, the node slot is what the peer
+  gathers):
+  `fP := e_align * σ*p_mech * Ayz` (pressure force landed on the
+  aligned component), `v_str := e_align * kConvX*inv(ρ) *
+  reduceSum(σ*p_mech, X)` (stream speed `u = k·Δp/ρ ≡ fmc/(ρ·A)`
+  projected onto `C`), `fmom := fmc * v_str` (convected momentum).
+- **Mechanics — lumped-capacity scope.**  `P [C,N]` content
+  (`P := m·v` definitional), `F_g := m·g·e_z` body force,
+  `dPdt := reduceSum(F_conv * (fmom + fP), A_conv) + F_g` per-component
+  conservation, `v := P·inv(m)` for the state-formulated regime.
+
+Lessons worth keeping:
+
+- **Emit pairs elementwise axes by index *name*, not bound elements** —
+  `e_align{X,C} × fmc{A_conv,N}` produced an outer product even though
+  `X` and `A_conv` bind to the same contact arcs.  `e_align` consumers
+  must stay `X`-typed; an `A_conv` factor needs an `X`-view alias or a
+  `reduceSum`/`F`-contraction.  (`E_v_str`'s first spelling
+  `e_align·fmc·inv(ρ·Ayz)` was rejected by the emit — the X-typed
+  `kConvX·inv(ρ)·Σσp,X` form is identical via `E_4`.)
+- **`v` could not go `port_variable`** — §18 structural lock (12
+  referencing equations).  `v_str` carries the stream-velocity role
+  instead — the semantically better split anyway (transport stream
+  velocity ≠ lump bulk velocity).
+- **Export `carriesToken` scopes candidacy** — `v_str` with a mass
+  token made it a second candidate for the lumped `fmc` port
+  (`ambiguous-port`); momentum-only resolves it.
+
+`test_01`: the transport's sequence is `[E_4, E_v_str, E_fmom, E_fP,
+E_29]` with `v_str`/`fmom`/`fP` outputs; `Node_2` declares
+`alignedComponent=x`; `alignment-undeclared` fired on demand and
+cleared on declaration; generated python emits all three.  The
+lumped-side balance (`dPdt`, `P`, `F_g` + the capacity-side port
+list) is authored but **unwired** — same posture as the energy-flow
+vars (`fKin`/`fPot`/`fFlowWork`).
+
 ## 42. Tensor-index layer for sheet mechanics — DESIGN PROPOSAL (deferred)
 
 ### Motivation

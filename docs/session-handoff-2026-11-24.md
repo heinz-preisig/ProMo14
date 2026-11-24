@@ -54,11 +54,24 @@ migration — §41 ruling 6).
 
 ## Open for next session
 
-- **Momentum `P[C]`** — the natural §41 follow-on (§41 ruled:
-  momentum is `[C]`-indexed, per-component conservation).  No
-  momentum balance is authored yet; `fmom = fmc·v` elementwise
-  over `C` is now spellable, and the X↔C seam below supplies the
-  component landing for forces.
+- ~~**Momentum `P[C]`**~~ — **landed same day**, two subjects per
+  ruling.  Fluid mechanics (transport scope): `fP`/`v_str`/`fmom`
+  `[A_conv,C,N]` port exports (`fP := e_align·σ·p·Ayz`,
+  `v_str := e_align·kConvX·inv(ρ)·Σσp,X`, `fmom := fmc·v_str`).
+  Mechanics (lump scope): `P`/`F_g`/`dPdt` + `v := P·inv(m)`,
+  `P := m·v`.  `test_01` transport wired (5-eq sequence), `Node_2`
+  declares `x`, python emit verified.  Lumped-side balance authored
+  but **unwired** (same posture as `fKin`/`fPot`).
+  Author record: `scripts/author_momentum_slice.py`.
+  Lessons logged in §41's new "Momentum slice" section: emit pairs
+  axes by index **name** (X↔A_conv outer-product trap — `e_align`
+  consumers stay X-typed), `v` can't go port (§18 lock → `v_str`),
+  export `carriesToken` scopes port candidacy (`v_str` is
+  momentum-only — mass-tokened it collided with the `fmc` port).
+- **`uvicorn --reload` footgun** — the backend watches the tree;
+  `pytest`'s `.pyc` writes triggered a reload mid-session and wiped
+  all unsaved authoring.  `./dev.sh save` after each meaningful
+  store mutation, before running the suite.
 - ~~**`X↔C` placement metadata**~~ — **landed same day**:
   `promo:alignedComponent` literal on `ModelNode` (element name,
   e.g. `"x"`), seeded `e_align [X,C]` binding `alignment` (the

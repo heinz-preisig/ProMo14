@@ -437,7 +437,25 @@ memberships are not automatically migrated; user equations remain untouched.
   fire once a consumer binds).  `fP[C] := reduceSum(e_align *
   σ*p_mech, X)` lands a scalar `X` force on the right momentum
   component — the prerequisite for `P[C]` is in place.
-  *Remaining:* genuine tensor objects (`r:r'`, stress) stay §42.
+  **Momentum slice landed 2026-11-24** — two subjects, per ruling:
+  fluid-mechanics contact exports on the convection transport
+  (`fP := e_align·σ·p_mech·Ayz`, `v_str := e_align·kConvX·inv(ρ)·Σσp,X`,
+  `fmom := fmc·v_str`), mechanics content/balance on the lump
+  (`P`, `F_g := m·g·e_z`, `dPdt := F_conv·(fmom+fP) + F_g`,
+  `v := P·inv(m)`, `P := m·v`).  Per-contact exports declare the
+  mechanism's arc index (`[A_conv,C,N]` — the `fmc` pattern): the
+  node slot is what the peer gathers on, and the emit pairs
+  elementwise axes **by index name**, not bound elements —
+  `e_align{X,C} × fmc{A_conv,N}` is an outer product, so an
+  `e_align` consumer may only multiply `X`-typed operands (an
+  `A_conv` factor needs an `X`-view alias or a contraction).
+  `v` could not go port (§18 lock) — `v_str` carries the
+  stream-velocity role, token-scoped to `momentum` so it never
+  candidates a mass-flow port.  `test_01`: transport wired
+  (5-eq sequence), `Node_2` declares `x`; emit verified.
+  *Remaining:* genuine tensor objects (`r:r'`, stress) stay §42;
+  the lumped-side momentum balance (`dPdt` + gathers) is authored
+  but not yet wired into an assignment.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:
