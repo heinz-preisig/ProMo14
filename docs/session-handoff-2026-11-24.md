@@ -66,8 +66,10 @@ migration — §41 ruling 6).
   `/api/instantiate/model`, problems `alignment-undeclared`/
   `-invalid`/`-ambiguous`, modeller doc round-trips the field.
   The pressure-drop force `reduceSum(σ·p_mech, X)` can now land
-  on a `C` component — remaining gap is the modeller UI affordance
-  for declaring placement (field persists via `PUT /model`).
+  on a `C` component.  Modeller affordance added same session:
+  a `component_alignment` capability on `transport_system`
+  (inherited by all transport types) gates a "Placement (X↔C)"
+  selector in the Properties panel — `X ∥ x/y/z` or undeclared.
 - **Dialog UX** — working per user, pending confirmation.
 - **Standing queue** — §32 stage-2 pairing resolver +
   `promo:Mechanism` layer; §33 submodel reuse; §21 closure-moves;
