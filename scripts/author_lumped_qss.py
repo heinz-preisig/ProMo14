@@ -17,6 +17,15 @@ is per-node via entity type.
   outputs as the dynamic assignment; state_variables=[V_57 dmdt]
   only (V_121 dPdt removed).
 
+2026-11-24 PM repair: the original authoring was lost to the
+uvicorn-reload wipe before it ever reached .trig (the §47 commit's
+data diff contains no lumped_qss triples).  Re-running this script
+restored it — and exposed a second gap: §48's E_m_def integral
+binds universe!t (V_11), which no assignment instantiated, so BOTH
+lumped assignments now evaluate unclosed.  `t` is the solver's
+integration variable — runtime-supplied like p_mech — so it joins
+`instantiated` here and on the dynamic assignment.
+
 Idempotent: PUT semantics on both endpoints.
 """
 import json
@@ -86,7 +95,7 @@ def main():
                      f"{LIB}#E_dPdt", f"{LIB}#E_29"],
         "base_equation": f"{LIB}#E_29",
         "state_variables": [f"{LIB}#V_57"],          # dmdt only
-        "instantiated": [f"{ONT}#V_34"],
+        "instantiated": [f"{ONT}#V_34", f"{ONT}#V_11"],  # p_mech + t
         "ports": [f"{LIB}#V_117", f"{LIB}#V_118", f"{LIB}#V_56"],
         "outputs": [f"{LIB}#V_121"],                 # dPdt: algebraic
     }

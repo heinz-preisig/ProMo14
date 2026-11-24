@@ -4782,3 +4782,68 @@ incidence `[dmdt, t, to]`, `rhsExpression` is a
 `V_9 = V_1`, no `quad_vec`; `[to, te]` variant stays non-alias.
 Library consistency: 0 errors / 69 consistent / 6 bound-scope
 (E_75 was the sole error).  582 backend tests pass.
+
+## 49. Darcy friction law — `fl` goes from imposed port to computed export — RULED & implemented (2026-11-24 PM)
+
+### Ruling
+
+The constitutive law §46 queued lands on `fl` itself: the variable
+keeps `port_variable` (the lump still gathers it via `al`/`E_63`) but
+gains `E_fl`.  An *imposed* boundary port and a *computed* export are
+the same graph shape — the port flag declares gathering, the equation
+declares how the value arises.
+
+- **Law**: `fl := (half·lam) · ((Lp·inv(dp)) · (fmc·reduceSum(v_str·v_str, C)))`
+  — the Darcy-Weisbach dissipated power λ·(L/d)·ṁ·v²/2 per contact.
+- **`v_str`, not `v`** — dissipation lives in the pipe (the
+  transport's stream velocity); the lump's bulk velocity would be the
+  wrong physics.  v² folds `reduceSum(v_str·v_str, C)` per §41.
+- **λ, L, d stay separate symbols** — no folded `λL/d` parameter.
+  λ is a distinct physics (eventually Re/roughness-dependent) and `dp`
+  can later constrain `Ayz`; the law must stay legible.
+- **Arc-bound parameters.**  `lam`/`Lp`/`dp` bind `[A_conv]` — the
+  arc *is* the pipe — following the `d` (V_26) precedent for
+  arc-local quantities; instantiation fills them via
+  `instantiated` + value cells.
+- **`dp`, not `d`** — the `d` label is taken (V_26, the flow
+  direction sign).  Pipe diameter is `dp`.
+
+### Authored records
+
+`V_123 lam` (dimensionless), `V_124 Lp`/`V_125 dp` (m), all
+`{det: variable, fun: parameter}` class, token-neutral, `[A_conv]`.
+`E_fl` on `V_109` (eqclass_generic); doc updated from "imposed".
+`etype_convection_transport` assignment: `E_fl` sequenced after
+`E_fP`, `fl` joined `outputs` (same role as `fP`/`fmom`/`v_str`/
+`fmc`), `lam`/`Lp`/`dp` joined `instantiated`.  `closed=True`.
+Consistency: 0 errors / 70 consistent / 6 bound-scope (76 equations).
+Author record: `scripts/author_friction_law.py`.
+
+Still open: the lump-side consumption path (`al`/`dEmdt`/`dHdt` into
+an assignment — the energy-balance wiring), and the §47 upgrade this
+enables — `ΣF(v)=0` determining `v` on `etype_lumped_qss` once a
+velocity-dependent force enters the momentum balance.
+
+### Repairs landed the same session
+
+- **§47 records restored.**  `etype_lumped_qss` + its assignment were
+  authored in memory but wiped by a `uvicorn --reload` *before* the
+  first save — the `e46d98f` data diff carries no `lumped_qss`
+  triples.  Re-ran `scripts/author_lumped_qss.py` and saved.  Lesson
+  sharpened: **scripts/ is inside the watched tree** — any source
+  edit (including author scripts) reloads and drops unsaved
+  mutations; batch mutations and save in one step.
+- **Runtime variables are `instantiated`.**  §48's `E_m_def`
+  (`Integral(dmdt :: t in [to, t])`) binds `universe!t`, which no
+  assignment declared — *both* lumped assignments evaluated
+  unclosed (the stored `closed=true` flags predated §48).
+  `t` is the solver's integration variable — supplied at runtime
+  like `p_mech` — so `V_11` joined `instantiated` on
+  `etype_lumped` and `etype_lumped_qss`; both now `closed=True`.
+- **`_Matlab.permute` implemented** — the last dialect gap: a rhs
+  whose checked index order differs from the lhs declaration now
+  emits `permute((…).value, [p])` re-wrapped in the lhs's
+  MultiDimVar labels (`.transpose()`/`permutedims` equivalents
+  already existed).  `permute`'s dialect signature gained
+  `(indices, space)` for the label re-wrap.
+  Regression: `test_emit_matlab_lhs_index_conformity`.

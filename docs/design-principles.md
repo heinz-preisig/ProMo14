@@ -497,6 +497,15 @@ memberships are not automatically migrated; user equations remain untouched.
     counts rows × span.
   `test_01` emits: `dPdt` is the second u-state, `fmom`/`fP`
   gather the transport's `[C]`-rows, balance residual verified.
+  *Same-day addenda:* runtime-supplied universe variables are
+  `instantiated` — `t` (`V_11`) joined `instantiated` on both
+  lumped assignments after §48's `E_m_def` integral bound it and
+  broke closure; and §49 landed the queued Darcy law — `fl`
+  keeps `port_variable` but computes via
+  `E_fl = λ·(L/d)·ṁ·v²/2` (`v_str`, not `v`; `lam`/`Lp`/`dp`
+  arc-bound `[A_conv]` instantiation params), upgrading it from
+  imposed boundary port to computed export without changing the
+  gather semantics for the lump.
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:

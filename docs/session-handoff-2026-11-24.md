@@ -128,3 +128,50 @@ BL §48 + design-principles §2 corollary.
   friction `fl` constitutive law (λ·(L/d)·ṁ·v²/2 now folds v² =
   `reduceSum(v*v,C)`); radiation `fRx`/`ahr`; cross-artefact
   consistency review; tensors `r:r'`/stress stay §42.
+
+## PM addendum (2026-11-24)
+
+### Landed
+
+- **§49 Darcy friction law** — `fl` (V_109) keeps `port_variable`
+  but computes: `E_fl = (half·lam)·((Lp·inv(dp))·(fmc·
+  reduceSum(v_str·v_str, C)))`.  New `[A_conv]` instantiation
+  params `V_123 lam` / `V_124 Lp` / `V_125 dp`; `E_fl` sequenced
+  on the convection-transport assignment, `fl` joined `outputs`,
+  params joined `instantiated`; `closed=True`.  Record:
+  BL §49, `scripts/author_friction_law.py`.  Consistency
+  0 err / 70 ok / 6 bound-scope (76 eqs).  The lump-side
+  consumption (`al`/`dEmdt`/`dHdt` into an assignment) and the
+  QSS `ΣF(v)=0` upgrade remain open.
+- **`_Matlab.permute`** — last dialect gap closed; emits
+  `permute((…).value, [p])` re-wrapped in the lhs's MultiDimVar
+  labels.  `Dialect.permute(src, perm, indices, space)` — the
+  new args feed the label re-wrap.  Regression:
+  `test_emit_matlab_lhs_index_conformity`.  584 tests.
+
+### Repairs
+
+- **§47 records had never persisted.**  The `e46d98f` data diff
+  carries no `lumped_qss` triples — authored in memory, wiped by
+  a `uvicorn --reload` before the first save.  Re-ran
+  `scripts/author_lumped_qss.py` and saved; verified in
+  `data/ontology.trig`/`assignments.trig`.
+- **Sharper reload lesson:** `scripts/` is *inside* the watched
+  tree — editing an author script itself reloads and drops
+  unsaved store mutations (burned again this session, self-
+  inflicted).  Batch mutations + save in one step, no source
+  edits in between.
+- **§48 fallout:** `E_m_def`'s integral binds `universe!t`
+  (`V_11`), which no assignment instantiated — *both* lumped
+  assignments evaluated unclosed (stored `closed` flags predated
+  §48).  `t` is the solver's runtime integration variable →
+  joined `instantiated` on `etype_lumped` and
+  `etype_lumped_qss`; both `closed=True` now.
+
+### Queue (revised)
+
+§32 pairing resolver + `promo:Mechanism`; §33 submodel reuse;
+§21 closure-moves; **energy-balance wiring** (`al`/`dEmdt`/`dHdt`
+into a lumped assignment — now the visible consumer for `fl`);
+radiation `fRx`/`ahr`; QSS `ΣF(v)=0` upgrade (unblocked by `fl`);
+cross-artefact consistency review; §42 tensors.

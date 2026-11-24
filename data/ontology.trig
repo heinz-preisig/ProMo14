@@ -531,13 +531,13 @@
         promo:doc "Event-dynamic information capacity (instantaneous I/O)" ;
         promo:temporalType "event-dynamic" .
 
-    <https://w3id.org/promo/ontology#etype_lumped> a promo:EntityType ;
-        rdfs:label "Lumped" ;
+    <https://w3id.org/promo/ontology#etype_lumped_qss> a promo:EntityType ;
+        rdfs:label "Lumped QSS" ;
         promo:branch "physical" ;
-        promo:capability <https://w3id.org/promo/ontology#cap_reaction_host> ;
-        promo:doc "Dynamic/uniform/finite — lumped ODE" ;
+        promo:doc "Quasi-steady-momentum lumped capacity — dPdt not integrated; momentum balance algebraic (net force = support reaction). Per-node regime choice for non-stiff large models." ;
         promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform>,
             <https://w3id.org/promo/ontology#sval_time_macro_dynamic> ;
+        promo:parent <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:spatialSize "finite" ;
         promo:spatialType "uniform" ;
         promo:temporalType "dynamic" .
@@ -800,7 +800,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:N545dd5c7d7a04403b1b5442ee44c0486 ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -818,7 +818,7 @@
         promo:rhsLatex "\\left( \\sum_{C} \\left( e_{x,C} \\circ {r}_{C,N} \\right) \\circ \\sum_{C} \\left( e_{y,C} \\circ {r}_{C,N} \\right) \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:N3070e9fa7c6a42dfbb78d3fe936d354a ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb2 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -835,7 +835,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:Ncc343567c62c4f50afc43125252da8f6 ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb3 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -852,7 +852,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:N322661bca12446c29e055879130ca61e ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#V_17> a promo:Variable ;
@@ -1084,6 +1084,17 @@
         promo:spatialType "distributed" ;
         promo:temporalType "event-dynamic" .
 
+    <https://w3id.org/promo/ontology#etype_lumped> a promo:EntityType ;
+        rdfs:label "Lumped" ;
+        promo:branch "physical" ;
+        promo:capability <https://w3id.org/promo/ontology#cap_reaction_host> ;
+        promo:doc "Dynamic/uniform/finite — lumped ODE" ;
+        promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform>,
+            <https://w3id.org/promo/ontology#sval_time_macro_dynamic> ;
+        promo:spatialSize "finite" ;
+        promo:spatialType "uniform" ;
+        promo:temporalType "dynamic" .
+
     <https://w3id.org/promo/ontology#etype_radiation_transport> a promo:EntityType ;
         rdfs:label "Radiation Transport" ;
         promo:branch "physical" ;
@@ -1210,11 +1221,6 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
         promo:parent <https://w3id.org/promo/ontology#sval_length_infinitesimal> .
 
-    <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform> a promo:ScaleValue ;
-        rdfs:label "uniform" ;
-        promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
-        promo:parent <https://w3id.org/promo/ontology#sval_length_macroscopic> .
-
     <https://w3id.org/promo/ontology#sval_length_particulate> a promo:ScaleValue ;
         rdfs:label "particulate" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> .
@@ -1312,6 +1318,11 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
         promo:parent <https://w3id.org/promo/ontology#sval_length_macroscopic> .
 
+    <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform> a promo:ScaleValue ;
+        rdfs:label "uniform" ;
+        promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
+        promo:parent <https://w3id.org/promo/ontology#sval_length_macroscopic> .
+
     <https://w3id.org/promo/ontology#sval_length_microscopic> a promo:ScaleValue ;
         rdfs:label "microscopic" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
@@ -1325,11 +1336,6 @@
     <https://w3id.org/promo/ontology#sval_phase_fluid> a promo:ScaleValue ;
         rdfs:label "fluid" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_phase> .
-
-    <https://w3id.org/promo/ontology#sval_time_macro_dynamic> a promo:ScaleValue ;
-        rdfs:label "dynamic" ;
-        promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
-        promo:parent <https://w3id.org/promo/ontology#sval_time_macro> .
 
     <https://w3id.org/promo/ontology#term_function_effort> a promo:AxisTerm ;
         rdfs:label "effort" ;
@@ -1378,6 +1384,11 @@
         rdfs:label "macro" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
         promo:parent <https://w3id.org/promo/ontology#sval_time_continuum> .
+
+    <https://w3id.org/promo/ontology#sval_time_macro_dynamic> a promo:ScaleValue ;
+        rdfs:label "dynamic" ;
+        promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
+        promo:parent <https://w3id.org/promo/ontology#sval_time_macro> .
 
     <https://w3id.org/promo/ontology#sval_time_milli> a promo:ScaleValue ;
         rdfs:label "milli" ;
@@ -1540,62 +1551,62 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:N0032c9836e4d4d84930e281ad067207e a promo:Expression ;
-        promo:hasArguments _:N57f9d88f863b421a824a4704f4eab06b ;
-        promo:hasOperation promolg:SumOverIndex .
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n136ab47b882d4d059ffdccbf3e7bfcafb5 .
 
-    _:N03be3ee25f7d4d95a93de7d8f713f5ee rdf:first <https://w3id.org/promo/ontology#V_115> ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb10 rdf:first <https://w3id.org/promo/ontology#e_y> ;
+        rdf:rest _:n136ab47b882d4d059ffdccbf3e7bfcafb11 .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb11 rdf:first <https://w3id.org/promo/ontology#V_115> ;
         rdf:rest () .
 
-    _:N0e24ce0c740f4848965223e860489c81 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb12 rdf:first <https://w3id.org/promo/ontology#e_x> ;
+        rdf:rest _:n136ab47b882d4d059ffdccbf3e7bfcafb13 .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb13 rdf:first <https://w3id.org/promo/ontology#V_115> ;
         rdf:rest () .
 
-    _:N1d234e3a4d8b46cd92e981f0cbce253e rdf:first <https://w3id.org/promo/ontology#V_7> ;
-        rdf:rest () .
-
-    _:N2b59b7bd81784ed3930786fd41a2cb8e rdf:first _:Nb68232dd172449599f5e85c55d34784a ;
-        rdf:rest () .
-
-    _:N3070e9fa7c6a42dfbb78d3fe936d354a rdf:first _:N0032c9836e4d4d84930e281ad067207e ;
-        rdf:rest _:N2b59b7bd81784ed3930786fd41a2cb8e .
-
-    _:N322661bca12446c29e055879130ca61e rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest () .
-
-    _:N32b0c0487e0647ecbd4b1f289610fbb8 a promo:Expression ;
-        promo:hasArguments _:N942844f4f3454d7da6570d455ee5f632 ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb14 a promo:Expression ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb12 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:N32bb9ad052cf4146a2069116fed8eafe rdf:first <https://w3id.org/promo/ontology#e_x> ;
-        rdf:rest _:N45b67e8a619d41639fab8412677a2641 .
-
-    _:N45b67e8a619d41639fab8412677a2641 rdf:first <https://w3id.org/promo/ontology#V_115> ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb15 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
 
-    _:N545dd5c7d7a04403b1b5442ee44c0486 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:N1d234e3a4d8b46cd92e981f0cbce253e .
-
-    _:N57f9d88f863b421a824a4704f4eab06b rdf:first _:Nfd665d2d96864c7d8c9111af24fbe1a6 ;
-        rdf:rest _:N0e24ce0c740f4848965223e860489c81 .
-
-    _:N5899cc14719347afaaa24379c6ecfe0d rdf:first <https://w3id.org/promo/ontology#idx_component> ;
-        rdf:rest () .
-
-    _:N7928670b3a2c4c9ea19e59081416e4d2 rdf:first _:N32b0c0487e0647ecbd4b1f289610fbb8 ;
-        rdf:rest _:N5899cc14719347afaaa24379c6ecfe0d .
-
-    _:N942844f4f3454d7da6570d455ee5f632 rdf:first <https://w3id.org/promo/ontology#e_y> ;
-        rdf:rest _:N03be3ee25f7d4d95a93de7d8f713f5ee .
-
-    _:Nb68232dd172449599f5e85c55d34784a a promo:Expression ;
-        promo:hasArguments _:N7928670b3a2c4c9ea19e59081416e4d2 ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb16 a promo:Expression ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb17 ;
         promo:hasOperation promolg:SumOverIndex .
 
-    _:Ncc343567c62c4f50afc43125252da8f6 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb17 rdf:first _:n136ab47b882d4d059ffdccbf3e7bfcafb14 ;
+        rdf:rest _:n136ab47b882d4d059ffdccbf3e7bfcafb18 .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb18 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
 
-    _:Nfd665d2d96864c7d8c9111af24fbe1a6 a promo:Expression ;
-        promo:hasArguments _:N32bb9ad052cf4146a2069116fed8eafe ;
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb2 rdf:first _:n136ab47b882d4d059ffdccbf3e7bfcafb16 ;
+        rdf:rest _:n136ab47b882d4d059ffdccbf3e7bfcafb6 .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb3 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb5 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+        rdf:rest () .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb6 rdf:first _:n136ab47b882d4d059ffdccbf3e7bfcafb7 ;
+        rdf:rest () .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb7 a promo:Expression ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb8 ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb8 rdf:first _:n136ab47b882d4d059ffdccbf3e7bfcafb9 ;
+        rdf:rest _:n136ab47b882d4d059ffdccbf3e7bfcafb15 .
+
+    _:n136ab47b882d4d059ffdccbf3e7bfcafb9 a promo:Expression ;
+        promo:hasArguments _:n136ab47b882d4d059ffdccbf3e7bfcafb10 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 }
 
@@ -1856,16 +1867,6 @@
         promo:doc "Event-dynamic information capacity (instantaneous I/O)" ;
         promo:temporalType "event-dynamic" .
 
-    <https://w3id.org/promo/ontology#etype_lumped> a promo:EntityType ;
-        rdfs:label "Lumped" ;
-        promo:branch "physical" ;
-        promo:doc "Dynamic/uniform/finite — lumped ODE" ;
-        promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform>,
-            <https://w3id.org/promo/ontology#sval_time_macro_dynamic> ;
-        promo:spatialSize "finite" ;
-        promo:spatialType "uniform" ;
-        promo:temporalType "dynamic" .
-
     <https://w3id.org/promo/ontology#etype_point> a promo:EntityType ;
         rdfs:label "Point" ;
         promo:branch "physical" ;
@@ -2073,6 +2074,16 @@
         promo:name "properties" ;
         promo:parent <https://w3id.org/promo/ontology#domain_physical> .
 
+    <https://w3id.org/promo/ontology#etype_lumped> a promo:EntityType ;
+        rdfs:label "Lumped" ;
+        promo:branch "physical" ;
+        promo:doc "Dynamic/uniform/finite — lumped ODE" ;
+        promo:hasScaleValue <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform>,
+            <https://w3id.org/promo/ontology#sval_time_macro_dynamic> ;
+        promo:spatialSize "finite" ;
+        promo:spatialType "uniform" ;
+        promo:temporalType "dynamic" .
+
     <https://w3id.org/promo/ontology#idx_arc_convection> a promo:Index ;
         rdfs:label "convection arc" ;
         promo:aliases "{\"global_ID\": \"I_7\", \"internal_code\": \"A_conv\"}" ;
@@ -2250,11 +2261,6 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
         promo:parent <https://w3id.org/promo/ontology#sval_length_infinitesimal> .
 
-    <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform> a promo:ScaleValue ;
-        rdfs:label "uniform" ;
-        promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
-        promo:parent <https://w3id.org/promo/ontology#sval_length_macroscopic> .
-
     <https://w3id.org/promo/ontology#sval_length_particulate> a promo:ScaleValue ;
         rdfs:label "particulate" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> .
@@ -2277,6 +2283,11 @@
         rdfs:label "Observation" ;
         promo:parent <https://w3id.org/promo/ontology#token_signal> ;
         promo:tokenKind "reference" .
+
+    <https://w3id.org/promo/ontology#sval_length_macroscopic_uniform> a promo:ScaleValue ;
+        rdfs:label "uniform" ;
+        promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
+        promo:parent <https://w3id.org/promo/ontology#sval_length_macroscopic> .
 
     <https://w3id.org/promo/ontology#axis_extensity> a promo:ClassificationAxis ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
@@ -2311,11 +2322,6 @@
         rdfs:label "fluid" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_phase> .
 
-    <https://w3id.org/promo/ontology#sval_time_macro_dynamic> a promo:ScaleValue ;
-        rdfs:label "dynamic" ;
-        promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
-        promo:parent <https://w3id.org/promo/ontology#sval_time_macro> .
-
     <https://w3id.org/promo/ontology#token_charge> a promo:Token ;
         rdfs:label "Charge" ;
         promo:tokenKind "conserved" .
@@ -2330,6 +2336,11 @@
         promo:spatialSize "finite" ;
         promo:spatialType "distributed" ;
         promo:temporalType "event-dynamic" .
+
+    <https://w3id.org/promo/ontology#sval_time_macro_dynamic> a promo:ScaleValue ;
+        rdfs:label "dynamic" ;
+        promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
+        promo:parent <https://w3id.org/promo/ontology#sval_time_macro> .
 
     <https://w3id.org/promo/ontology#token_entropy> a promo:Token ;
         rdfs:label "Entropy" ;
