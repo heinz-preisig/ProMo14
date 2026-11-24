@@ -158,6 +158,33 @@ BL §48 + design-principles §2 corollary.
   `etype_lumped_qss` untouched — no P slot without the dPdt
   state; the QSS energy path waits on `ΣF(v)=0`.
 
+- **§51 thermal/total balances wired** — `dHdt`/`dEtotdt` joined
+  `etype_lumped` as diagnostic outputs (§50 pattern).  The feared
+  "species layer" dependency dissolves at the port boundary:
+  `fnc`/`fnd`/`fQx` are all `port_variable`, so the lump computes
+  only `fhc`/`fhd`, the `F`-gathers `ahc`/`ahd`/`ahq`/`akp`, and the
+  two readings — the species layer needed is the S-index *extent*
+  (§20 distribution), not the species equations.  `h` (V_96) is
+  `instantiated` property data — the EOS closure stays out.  Root-
+  cause fix: `E_53` was `h := H·inv(n)` (dimensionally clean,
+  physically wrong — `[N]` lump total ÷ per-species moles); now
+  `h := ParDiff(H, n)`, matching `mu`/`Cp`.  `closed=True`,
+  0 err / 71 ok / 6 bound-scope (77 eqs).  Author:
+  `scripts/author_thermal_wiring.py`.  Regression:
+  `test_thermal_balance_wires_species_legs_as_readings`
+  (585 tests).  `etype_lumped_qss` untouched — `dEtotdt → akp →
+  fKin → v → P` needs the absent P slot.
+- **`ambiguous-port` on `fnc`/`fnd`** — the convection peer exports
+  five flow-typed port vars, none declared as the species-flow
+  pair: the §32 var↔mechanism pairing gap surfacing as designed.
+  Resolution needs transport-side `fnc` export (`cac`'s upwind-`c`
+  gather — §32 territory) or the pairing resolver itself.
+- **Sequence IRIs ≠ dict keys** — assignment `sequence` matches
+  equation *IRIs*: `E_61`→`#E_dHdt`, `E_62`→`#E_akp`,
+  `E_66`→`#E_dEtotdt`.  Unknown IRIs silently drop the whole
+  sequence field while ports/outputs/instantiated still apply —
+  always verify `closed` after an assignment PUT.
+
 ### Repairs
 
 - **§47 records had never persisted.**  The `e46d98f` data diff
@@ -179,9 +206,10 @@ BL §48 + design-principles §2 corollary.
 
 ### Queue (revised)
 
-§32 pairing resolver + `promo:Mechanism`; §33 submodel reuse;
-§21 closure-moves; **thermal/total balances** (`dHdt`/`dEtotdt`
-wiring — their `reduceSum(ah, S)` leg needs the species layer);
-radiation `fRx`/`ahr`; QSS `ΣF(v)=0` upgrade (v determined
-algebraically — now that `fl`/`v_str` exist); cross-artefact
-consistency review; §42 tensors.
+§32 pairing resolver + `promo:Mechanism` (now blocking `fnc`/`fnd`
+port resolution — see §51 note); **transport-side species-flow
+export** (`fnc := cac·fV` on `etype_convection_transport` —
+`cac`'s upwind-`c` gather is §32 territory); §33 submodel reuse;
+§21 closure-moves; radiation `fRx`/`ahr`; QSS `ΣF(v)=0` upgrade
+(v determined algebraically — now that `fl`/`v_str` exist);
+cross-artefact consistency review; §42 tensors.

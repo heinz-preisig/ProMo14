@@ -43,6 +43,14 @@ rejection after an implemented-then-reverted attempt).  Do not re-propose.
   accumulator slot (`PlanBlock.alias_of`), so the pun lives in
   generated code, never in the artefact.
 
+- **Corollary (ruled 2026-11-24, BL §51): a derivable property may
+  still be instantiation data.**  `h := ParDiff(H, n)` is the true
+  relation and stays in the library — but a scope that does not
+  carry the EOS layer cannot sequence it, so `etype_lumped` takes
+  `h` as `instantiated` property data (the `Mm`/`N` pattern).  The
+  choice is per-assignment, never per-variable: both the equation
+  and the instantiation channel coexist.
+
 ## 3. Tokens describe semantic connectivity, not a second equation algebra
 
 Amended 2026-11-12 (discussion §38): token declarations answer which

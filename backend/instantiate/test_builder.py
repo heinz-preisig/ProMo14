@@ -1191,6 +1191,100 @@ def test_integral_of_state_emits_slot_alias():
     assert block.alias_of is None
 
 
+def test_thermal_balance_wires_species_legs_as_readings():
+    """§51 thermal balances: ``dHdt``-style balances wire into a
+    capacity as diagnostic *outputs*, not states — the species-
+    carried flows enter as ports and the properties-layer ``h``
+    (``ParDiff(H, n)`` on the EOS side) enters as instantiation
+    data, so the un-emittable EOS closure stays out of the plan.
+    The [A,N,S] gather × [N,S] param broadcast feeds the arc and
+    species contractions; only ``m`` integrates."""
+    from backend.instantiate.distribute import SpeciesDistribution
+    variables = dict(VARIABLES)
+    variables[_var("Js")] = VarInfo(
+        _var("Js"), "species flow", "V_7",
+        index_structures=[_idx("idx_arc_diffusion"), _idx("idx_node"),
+                          _idx("idx_species")],
+        tokens=[_tok("mass")], flow=True)
+    variables[_var("h")] = VarInfo(
+        _var("h"), "partial molar enthalpy", "V_8",
+        index_structures=[_idx("idx_node"), _idx("idx_species")],
+        var_class="parameter")
+    variables[_var("fhd")] = VarInfo(
+        _var("fhd"), "enthalpy flow", "V_9",
+        index_structures=[_idx("idx_arc_diffusion"), _idx("idx_node"),
+                          _idx("idx_species")],
+        tokens=[_tok("mass")])
+    variables[_var("ahd")] = VarInfo(
+        _var("ahd"), "enthalpy inflow", "V_10",
+        index_structures=[_idx("idx_node"), _idx("idx_species")],
+        tokens=[_tok("mass")])
+    variables[_var("dH")] = VarInfo(
+        _var("dH"), "enthalpy rate", "V_11",
+        index_structures=[_idx("idx_node")],
+        tokens=[_tok("mass")])
+    equations = dict(EQUATIONS)
+    equations[_eq("js")] = EqInfo(_eq("js"), _var("Js"), [_var("J")],
+                                  "E_8", rhs="V_3")
+    equations[_eq("fhd")] = EqInfo(
+        _eq("fhd"), _var("fhd"), [_var("Js"), _var("h")], "E_4",
+        rhs="V_7 * V_8")
+    equations[_eq("ahd")] = EqInfo(
+        _eq("ahd"), _var("ahd"), [_var("F"), _var("fhd")], "E_5",
+        rhs="reduceSum(V_4 * V_9, A_diff)")
+    equations[_eq("dH")] = EqInfo(
+        _eq("dH"), _var("dH"), [_var("ahd")], "E_6",
+        rhs="reduceSum(V_10, S)")
+    assignments = dict(ASSIGNMENTS)
+    t = assignments[_et("diffusion_transport")]
+    assignments[_et("diffusion_transport")] = AssignmentInfo(
+        entity_type=t.entity_type,
+        sequence=[_eq("flow"), _eq("js")],
+        ports=list(t.ports),
+        instantiated=list(t.instantiated),
+        closed=True)
+    assignments[_et("lumped_capacity")] = AssignmentInfo(
+        entity_type=_et("lumped_capacity"),
+        sequence=[_eq("bal"), _eq("prop"), _eq("fhd"), _eq("ahd"),
+                  _eq("dH")],
+        base_equation=_eq("bal"),
+        state_variables=[_var("m")],
+        ports=[_var("J"), _var("Js")],
+        instantiated=[_var("h")],
+        outputs=[_var("dH")],
+        closed=True)
+    dist = SpeciesDistribution(
+        nodes={"c1": {"A", "B"}, "c2": {"B", "C"}, "t1": {"A", "C"}},
+        arcs={})
+    rep = _build(assignments=assignments, variables=variables,
+                 equations=equations,
+                 species=dist, species_index=_idx("idx_species"))
+    cap = _entity(rep, _et("lumped_capacity"))
+    assert _binding(cap, _var("Js")).binding == "port"
+    assert _binding(cap, _var("h")).binding == "parameter"
+    assert (_binding(cap, _var("h"))
+            .indices[_idx("idx_species")] == ["A", "B", "C"])
+    cp = _plan(rep, equations=equations)
+    assert len(cp.states) == 1                    # only m integrates
+    space = CompileSpace(
+        {iri: Variable(iri=iri, internal_id=v.internal_id,
+                       label=v.label, network="", type=v.var_class,
+                       units=Units(), index_structures=v.index_structures,
+                       value=v.value)
+         for iri, v in variables.items()},
+        {iri: Index(iri=iri, label=idx.short_name, network="",
+                    index_class="index",
+                    aliases={"internal_code": idx.short_name},
+                    sub_index_of=idx.sub_index_of)
+         for iri, idx in INDICES.items()},
+        variable_definition_network="", expression_definition_network="")
+    src = emit_python(cp, space)
+    assert "V_9 = " in src                        # fhd computed
+    assert "broadcast_to" in src                  # h [N,S] over A_diff
+    assert 'out["V_11"]' in src                   # balance is a reading
+    assert "dy[0:2]" in src and "dy[2" not in src
+
+
 def test_emit_julia():
     """The Julia emitter: in-place OrdinaryDiffEq signature, 1-based
     slices/maps, sparse F literal, broadcast Hadamard, plain ``*``

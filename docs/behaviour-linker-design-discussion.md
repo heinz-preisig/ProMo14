@@ -4884,3 +4884,58 @@ outputs += `dEmdt`.  `closed=True`.  Consistency 0 err / 71 ok /
 `P` slot, so `v := P/m` cannot fire; the quasi-steady energy path
 waits on `ΣF(v)=0` determining `v` (the §47 upgrade `fl` now
 unblocks on the energy side).
+
+## 51. Thermal/total balances wired — ports cut the species chain — implemented (2026-11-24 PM)
+
+### Ruling
+
+`dHdt`/`dEtotdt` wire into the dynamic lumped assignment on the
+§50 pattern — **diagnostic outputs, not states**.  The feared
+"species layer" dependency dissolves at the port boundary: every
+species-carried flow (`fnc`, `fnd`, `fQx`) is port-carried, so the
+convective/diffusive/heat legs gather boundary values and the
+reaction/EOS stack behind them never enters the lump's closure.
+What the lump actually computes is only `fhc := fnc·h`,
+`fhd := fnd·h`, the `F`-gathers `ahc`/`ahd`/`ahq`, and the two
+balance readings — the species layer it needs is the **S-index
+extent** from §20 distribution, not the species equations.
+
+- **`h` is instantiation data on the lump** (like `Mm`, `N`):
+  partial-molar-enthalpy values are property data at this scale.
+  The EOS derivation stays in the library for scopes that carry a
+  fundamental relation.
+- **`E_53` fixed root-cause**: `h := H·inv(n)` divided the `[N]`
+  lump total by per-species moles — dimensionally clean,
+  physically wrong.  Now `h := ParDiff(H, n)`, the formalism's
+  n-conjugate effort of `H` — same pattern as `mu := ParDiff(U,n)`
+  and `Cp := ParDiff(H,T)` (precedent for differentiating a
+  *defined* potential already existed).
+
+### Authored
+
+`etype_lumped`: sequence += `E_54`, `E_55`, `E_56`, `E_57`, `E_58`,
+`E_59`, `E_akp`, `E_dHdt`, `E_dEtotdt` (before `E_29`); ports +=
+`fnc`, `fnd`, `fQx`; instantiated += `h`; outputs += `dHdt`,
+`dEtotdt`.  `closed=True`; consistency 0 err / 71 ok / 6 bound-scope
+(77 eqs).  Author: `scripts/author_thermal_wiring.py`.  Regression:
+`test_thermal_balance_wires_species_legs_as_readings`.
+
+`etype_lumped_qss` still untouched — `dEtotdt → akp → fKin → v → P`
+needs the absent `P` slot (same §50 deferral).
+
+### Consequences / open
+
+- **`fnc`/`fnd` report `ambiguous-port` on test_01** — the
+  convection peer exports five flow-typed port vars, none declared
+  as the species-flow pair.  This is the §32 var↔mechanism
+  pairing gap surfacing as designed (empty `A_diff`/`S` extents
+  still bind the port type-level).  Resolution: transport-side
+  species-flow export (needs `cac`'s upwind-`c` gather — §32
+  pairing territory), or the §32 resolver itself.
+- **`h` needs value cells on species-bearing models** —
+  `[N,S]` instantiation data; empty-S models (test_01) need none.
+- Mechanical note: assignment `sequence` matches equation **IRIs**,
+  not dict keys — `E_61`→`#E_dHdt`, `E_62`→`#E_akp`,
+  `E_66`→`#E_dEtotdt`.  Unknown IRIs drop the whole sequence field
+  silently (other selection fields still apply) — verify `closed`
+  after every assignment PUT.
