@@ -363,19 +363,6 @@
         promo:tokenVector "{\"token_mass\": 1, \"token_component_mass\": -1}" ;
         promo:unitVector "[0, 0, -1, 1, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/ontology#V_16> a promo:Variable ;
-        rdfs:label "r_z" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> ;
-        promo:doc "z-coordinate" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_16" ;
-        promo:latex "r_z" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
-
     <https://w3id.org/promo/ontology#V_34> a promo:Variable ;
         rdfs:label "p_mech" ;
         promo:aliases "{\"latex\": \"p_{\\mathrm{m}}\", \"global_ID\": \"https://w3id.org/promo/ontology#V_34\"}" ;
@@ -455,44 +442,6 @@
         promo:branch "physical" ;
         promo:name "transport" ;
         promo:parent <https://w3id.org/promo/ontology#domain_physical> .
-
-    <https://w3id.org/promo/ontology#e_x> a promo:Variable ;
-        rdfs:label "e_x" ;
-        promo:aliases "{\"latex\": \"e_x\", \"global_ID\": \"https://w3id.org/promo/ontology#e_x\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:doc "§41 Cartesian basis vector on C — the component selector: reduceSum(e_i * v, C) extracts component i of a C-indexed variable; e_i's own values are 1 at its element, 0 elsewhere (seeded literal cells).  Rebuild a vector from scalars with e_x*vx + e_y*vy + e_z*vz; cross-component products contract each factor against its own e_i.  constant+parameter, dimensionless, token-neutral like sigma and the F_k factors." ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_component> ;
-        promo:internalID "e_x" ;
-        promo:latex "e_x" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:valueCell <https://w3id.org/promo/ontology#cell_2bdba6d8bb87>,
-            <https://w3id.org/promo/ontology#cell_c46c51371599>,
-            <https://w3id.org/promo/ontology#cell_d0336911bc7a> .
-
-    <https://w3id.org/promo/ontology#e_y> a promo:Variable ;
-        rdfs:label "e_y" ;
-        promo:aliases "{\"latex\": \"e_y\", \"global_ID\": \"https://w3id.org/promo/ontology#e_y\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_parameter> ;
-        promo:doc "§41 Cartesian basis vector on C — the component selector: reduceSum(e_i * v, C) extracts component i of a C-indexed variable; e_i's own values are 1 at its element, 0 elsewhere (seeded literal cells).  Rebuild a vector from scalars with e_x*vx + e_y*vy + e_z*vz; cross-component products contract each factor against its own e_i.  constant+parameter, dimensionless, token-neutral like sigma and the F_k factors." ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_component> ;
-        promo:internalID "e_y" ;
-        promo:latex "e_y" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
-        promo:valueCell <https://w3id.org/promo/ontology#cell_4ee338cd993f>,
-            <https://w3id.org/promo/ontology#cell_a8479eea42d0>,
-            <https://w3id.org/promo/ontology#cell_f0b94bcc99ab> .
 
     <https://w3id.org/promo/ontology#e_z> a promo:Variable ;
         rdfs:label "e_z" ;
@@ -845,17 +794,17 @@
         promo:doc "" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_geometry> ;
-        promo:incidenceList "[\"https://w3id.org/promo/ontology#V_14\", \"https://w3id.org/promo/ontology#V_15\"]" ;
+        promo:incidenceList "[\"https://w3id.org/promo/ontology#V_115\", \"https://w3id.org/promo/ontology#e_x\", \"https://w3id.org/promo/ontology#e_y\"]" ;
         promo:internalID "E_3" ;
         promo:lhs <https://w3id.org/promo/ontology#V_17> ;
         promo:modified "2026-09-21T12:53:55.689Z" ;
         promo:network "geometry" ;
-        promo:rhs "( physical!r_x * physical!r_y )" ;
+        promo:rhs "( reduceSum( ( physical!e_x * physical!r ), C ) * reduceSum( ( physical!e_y * physical!r ), C ) )" ;
         promo:rhsExpression <https://w3id.org/promo/ontology#E_3/expression> ;
-        promo:rhsLatex "\\left( r_{x,N} \\circ r_{y,N} \\right)" .
+        promo:rhsLatex "\\left( \\sum_{C} \\left( e_{x,C} \\circ {r}_{C,N} \\right) \\circ \\sum_{C} \\left( e_{y,C} \\circ {r}_{C,N} \\right) \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:n92056b03ebb2443a91e9efa38c83e7a0b2 ;
+        promo:hasArguments _:Nfc4f93cd8fc344b181d2b0ce21df1107 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -893,34 +842,6 @@
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
         promo:hasArguments _:n92056b03ebb2443a91e9efa38c83e7a0b4 ;
         promo:hasOperation promolg:Instantiate .
-
-    <https://w3id.org/promo/ontology#V_14> a promo:Variable ;
-        rdfs:label "r_x" ;
-        promo:aliases "{\"latex\": \"{r_x}\", \"global_ID\": \"https://w3id.org/promo/ontology#V_14\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> ;
-        promo:doc "x-coordinate" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_14" ;
-        promo:latex "{r_x}" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
-
-    <https://w3id.org/promo/ontology#V_15> a promo:Variable ;
-        rdfs:label "r_y" ;
-        promo:aliases "{\"latex\": \"{r_y}\", \"global_ID\": \"https://w3id.org/promo/ontology#V_15\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> ;
-        promo:doc "y-coordinate" ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_15" ;
-        promo:latex "{r_y}" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/ontology#V_17> a promo:Variable ;
         rdfs:label "Axy" ;
@@ -1066,6 +987,44 @@
         promo:branch "physical" ;
         promo:name "reactions" ;
         promo:parent <https://w3id.org/promo/ontology#domain_physical> .
+
+    <https://w3id.org/promo/ontology#e_x> a promo:Variable ;
+        rdfs:label "e_x" ;
+        promo:aliases "{\"latex\": \"e_x\", \"global_ID\": \"https://w3id.org/promo/ontology#e_x\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter> ;
+        promo:doc "§41 Cartesian basis vector on C — the component selector: reduceSum(e_i * v, C) extracts component i of a C-indexed variable; e_i's own values are 1 at its element, 0 elsewhere (seeded literal cells).  Rebuild a vector from scalars with e_x*vx + e_y*vy + e_z*vz; cross-component products contract each factor against its own e_i.  constant+parameter, dimensionless, token-neutral like sigma and the F_k factors." ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_component> ;
+        promo:internalID "e_x" ;
+        promo:latex "e_x" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
+        promo:valueCell <https://w3id.org/promo/ontology#cell_2bdba6d8bb87>,
+            <https://w3id.org/promo/ontology#cell_c46c51371599>,
+            <https://w3id.org/promo/ontology#cell_d0336911bc7a> .
+
+    <https://w3id.org/promo/ontology#e_y> a promo:Variable ;
+        rdfs:label "e_y" ;
+        promo:aliases "{\"latex\": \"e_y\", \"global_ID\": \"https://w3id.org/promo/ontology#e_y\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter> ;
+        promo:doc "§41 Cartesian basis vector on C — the component selector: reduceSum(e_i * v, C) extracts component i of a C-indexed variable; e_i's own values are 1 at its element, 0 elsewhere (seeded literal cells).  Rebuild a vector from scalars with e_x*vx + e_y*vy + e_z*vz; cross-component products contract each factor against its own e_i.  constant+parameter, dimensionless, token-neutral like sigma and the F_k factors." ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_component> ;
+        promo:internalID "e_y" ;
+        promo:latex "e_y" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" ;
+        promo:valueCell <https://w3id.org/promo/ontology#cell_4ee338cd993f>,
+            <https://w3id.org/promo/ontology#cell_a8479eea42d0>,
+            <https://w3id.org/promo/ontology#cell_f0b94bcc99ab> .
 
     <https://w3id.org/promo/ontology#eqclass_generic> a promo:EquationClass ;
         rdfs:label "generic" .
@@ -1285,6 +1244,21 @@
         promo:parent <https://w3id.org/promo/ontology#token_signal> ;
         promo:tokenKind "reference" .
 
+    <https://w3id.org/promo/ontology#V_115> a promo:Variable ;
+        rdfs:label "r" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_frame> ;
+        promo:doc "position vector — folds r_x/r_y/r_z per §41 component index C={x,y,z}; component extraction via reduceSum(e_i*r, C)" ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_component>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_115" ;
+        promo:latex "{r}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
+
     <https://w3id.org/promo/ontology#axis_determination_physical> a promo:ClassificationAxis ;
         promo:hasDomain <https://w3id.org/promo/ontology#domain_physical> ;
         promo:name "determination" .
@@ -1336,6 +1310,10 @@
         rdfs:label "effort" ;
         promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
 
+    <https://w3id.org/promo/ontology#term_function_frame> a promo:AxisTerm ;
+        rdfs:label "frame" ;
+        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
+
     <https://w3id.org/promo/ontology#token_charge> a promo:Token ;
         rdfs:label "Charge" ;
         promo:tokenKind "conserved" .
@@ -1365,17 +1343,6 @@
         promo:spatialSize "finite" ;
         promo:spatialType "distributed" ;
         promo:temporalType "event-dynamic" .
-
-    <https://w3id.org/promo/ontology#idx_component> a promo:Index ;
-        rdfs:label "component" ;
-        promo:aliases "{\"global_ID\": \"I_13\", \"internal_code\": \"C\"}" ;
-        promo:doc "§41 component index — the spatial basis {x,y,z} for intrinsically vector variables (v[C], r[C], momentum P[C]).  Elements are literal, declared on the record (promo:elements), not derived from model topology." ;
-        promo:elements "[\"x\", \"y\", \"z\"]" ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexClass "component" ;
-        promo:internalID "I_13" ;
-        promo:network "physical" ;
-        promo:shortName "C" .
 
     <https://w3id.org/promo/ontology#sval_time_continuum> a promo:ScaleValue ;
         rdfs:label "continuum" ;
@@ -1436,10 +1403,6 @@
         rdfs:label "continuum" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> .
 
-    <https://w3id.org/promo/ontology#term_function_frame> a promo:AxisTerm ;
-        rdfs:label "frame" ;
-        promo:hasAxis <https://w3id.org/promo/ontology#axis_function_physical> .
-
     <https://w3id.org/promo/ontology#token_mass> a promo:Token ;
         rdfs:label "Mass" ;
         promo:tokenKind "conserved" .
@@ -1470,6 +1433,17 @@
         promo:branch "information" ;
         promo:name "information" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
+
+    <https://w3id.org/promo/ontology#idx_component> a promo:Index ;
+        rdfs:label "component" ;
+        promo:aliases "{\"global_ID\": \"I_13\", \"internal_code\": \"C\"}" ;
+        promo:doc "§41 component index — the spatial basis {x,y,z} for intrinsically vector variables (v[C], r[C], momentum P[C]).  Elements are literal, declared on the record (promo:elements), not derived from model topology." ;
+        promo:elements "[\"x\", \"y\", \"z\"]" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexClass "component" ;
+        promo:internalID "I_13" ;
+        promo:network "physical" ;
+        promo:shortName "C" .
 
     <https://w3id.org/promo/ontology#sval_length_microscopic_distributed> a promo:ScaleValue ;
         rdfs:label "distributed" ;
@@ -1540,11 +1514,54 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
+    _:N02d46e13d63d40c5970966e779427d88 rdf:first <https://w3id.org/promo/ontology#e_y> ;
+        rdf:rest _:N2290d0d5bb5d4ae38b5e7df9243e575a .
+
+    _:N05d5121c5fbc463d89176e5d8a144bc9 rdf:first _:N549da6753f374d84bf86285190dcf439 ;
+        rdf:rest _:N6142305a9dbc40f59f59e295e59da265 .
+
+    _:N1925c92089194b539fb035bbfda6291d rdf:first _:N77213419f2004799ba64912238575373 ;
+        rdf:rest _:Nc07cfbb6a8b447f9b1f53cde2b60abba .
+
+    _:N2290d0d5bb5d4ae38b5e7df9243e575a rdf:first <https://w3id.org/promo/ontology#V_115> ;
+        rdf:rest () .
+
+    _:N3b1d090057f447ab884f0fffc3166f1d a promo:Expression ;
+        promo:hasArguments _:N1925c92089194b539fb035bbfda6291d ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:N4cdda6e93d544f58adad7c47b96be097 rdf:first _:Nb1dade6d38f446d7b0adf2d37f96167c ;
+        rdf:rest () .
+
+    _:N549da6753f374d84bf86285190dcf439 a promo:Expression ;
+        promo:hasArguments _:N02d46e13d63d40c5970966e779427d88 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N6142305a9dbc40f59f59e295e59da265 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+        rdf:rest () .
+
+    _:N7352371cc614494b820e4ea59b898093 rdf:first <https://w3id.org/promo/ontology#e_x> ;
+        rdf:rest _:Ncc43032558dd44499285e0c0e7c72179 .
+
+    _:N77213419f2004799ba64912238575373 a promo:Expression ;
+        promo:hasArguments _:N7352371cc614494b820e4ea59b898093 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Nb1dade6d38f446d7b0adf2d37f96167c a promo:Expression ;
+        promo:hasArguments _:N05d5121c5fbc463d89176e5d8a144bc9 ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:Nc07cfbb6a8b447f9b1f53cde2b60abba rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+        rdf:rest () .
+
+    _:Ncc43032558dd44499285e0c0e7c72179 rdf:first <https://w3id.org/promo/ontology#V_115> ;
+        rdf:rest () .
+
+    _:Nfc4f93cd8fc344b181d2b0ce21df1107 rdf:first _:N3b1d090057f447ab884f0fffc3166f1d ;
+        rdf:rest _:N4cdda6e93d544f58adad7c47b96be097 .
+
     _:n92056b03ebb2443a91e9efa38c83e7a0b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
         rdf:rest _:n92056b03ebb2443a91e9efa38c83e7a0b5 .
-
-    _:n92056b03ebb2443a91e9efa38c83e7a0b2 rdf:first <https://w3id.org/promo/ontology#V_14> ;
-        rdf:rest _:n92056b03ebb2443a91e9efa38c83e7a0b6 .
 
     _:n92056b03ebb2443a91e9efa38c83e7a0b3 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
@@ -1553,9 +1570,6 @@
         rdf:rest () .
 
     _:n92056b03ebb2443a91e9efa38c83e7a0b5 rdf:first <https://w3id.org/promo/ontology#V_7> ;
-        rdf:rest () .
-
-    _:n92056b03ebb2443a91e9efa38c83e7a0b6 rdf:first <https://w3id.org/promo/ontology#V_15> ;
         rdf:rest () .
 }
 
@@ -2385,6 +2399,15 @@
         promo:hasScale <https://w3id.org/promo/ontology#scale_length> ;
         promo:parent <https://w3id.org/promo/ontology#sval_length_microscopic> .
 
+    <https://w3id.org/promo/ontology#idx_node> a promo:Index ;
+        rdfs:label "node" ;
+        promo:aliases "{\"global_ID\": \"I_2\", \"internal_code\": \"N\"}" ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexClass "node" ;
+        promo:internalID "I_2" ;
+        promo:network "physical" ;
+        promo:shortName "N" .
+
     <https://w3id.org/promo/ontology#sval_time_macro_event_dynamic> a promo:ScaleValue ;
         rdfs:label "event-dynamic" ;
         promo:hasScale <https://w3id.org/promo/ontology#scale_time> ;
@@ -2398,15 +2421,6 @@
         promo:internalID "I_3" ;
         promo:network "physical" ;
         promo:shortName "A" .
-
-    <https://w3id.org/promo/ontology#idx_node> a promo:Index ;
-        rdfs:label "node" ;
-        promo:aliases "{\"global_ID\": \"I_2\", \"internal_code\": \"N\"}" ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexClass "node" ;
-        promo:internalID "I_2" ;
-        promo:network "physical" ;
-        promo:shortName "N" .
 
     <https://w3id.org/promo/ontology#domain_universe> a promo:Domain ;
         promo:hasToken <https://w3id.org/promo/ontology#token_signal> ;
