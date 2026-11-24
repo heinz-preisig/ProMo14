@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional
 import jinja2
 
 from .checker import check
-from .codegen import Renderer, tex_append_subscripts, tex_brace_subscripts, tex_escape, tex_suggest_alias
+from .codegen import Renderer, tex_append_subscripts, tex_brace_subscripts, tex_doc, tex_escape, tex_suggest_alias
 from .compile_space import CompileSpace
 from .parser import parse
 from .syntax import Instantiate, Var
@@ -42,6 +42,9 @@ _env = jinja2.Environment(
 # ``{{ name|tex }}`` — escape surface names (networks, labels) that land in
 # LaTeX mode without a catcode safety net (e.g. \subsection titles).
 _env.filters["tex"] = tex_escape
+# ``{{ doc|texdoc }}`` — prose cells: full text-mode escaping,
+# $...$ spans pass through so authored inline math still works.
+_env.filters["texdoc"] = tex_doc
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:

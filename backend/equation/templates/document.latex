@@ -92,7 +92,7 @@
     {{ v.num|tex }}
              & \hypertarget{"v:{{v.num}}"}{ $ {{ v.symbol }} $}
              & \verb|{{ v.label }}|
-             & {{ v.doc }}
+             & {{ v.doc|texdoc }}
              & \begin{lay}{{ v.type }}\end{lay}
              & $ {{ v.units }} $
              & {% for e in v.eq_ids -%}
@@ -125,7 +125,7 @@ no & equation &documentation &layer \\\hline\hline
 {% for e in eq_groups[net] -%}
     \hyperlink{"v:{{ e.var_num }}"}{ {{e.num|tex}} }\hypertarget{"e:{{e.num}}"}{ {{""}} } &
     \begin{eq}{{ e.lhs }} := {{ e.rhs }}\end{eq} &
-    \begin{lay}{{ e.doc }}\end{lay} &
+    \begin{lay}{{ e.doc|texdoc }}\end{lay} &
     \begin{lay}{{ e.network }}\end{lay} \\
 {% endfor -%}
 {% raw %}

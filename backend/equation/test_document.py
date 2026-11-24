@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from backend.core import graph_store
 from backend.main import app
 
+from .codegen import tex_doc
 from .compile_space import Index, Variable
 from .document import (
     PdfCompileError,
@@ -177,6 +178,25 @@ def test_non_v_prefixed_id_escaped_in_num_column():
     assert r'\hypertarget{"v:F_conv"}' in tex
     # First cell of the row: escaped id followed by the target/symbol.
     assert "F\\_conv\n" in tex
+
+
+def test_tex_doc_escapes_prose_and_keeps_latex_markup():
+    """Doc cells are LaTeX-aware prose: catcode-dangerous specials
+    escape, unicode translates, and authored ``\\{`` / ``$...$``
+    markup passes through — the ``fKin`` doc ``v^2/2`` was the
+    reported compile failure."""
+    out = tex_doc("advected flow (fmc . v^2/2); σ·p — e_align")
+    assert r"v\^{}2/2" in out
+    assert r"$\sigma$$\cdot$p" in out
+    assert r"e\_align" in out
+    assert "---" in out                          # em dash
+    assert "σ" not in out and "·" not in out     # no unicode left
+    assert "^" not in out.replace(r"\^{}", "")   # no raw caret
+    # authored latex-aware markup survives untouched
+    assert tex_doc(r"C=\{x,y,z\}") == r"C=\{x,y,z\}"
+    assert tex_doc("$E=mc^{2}$") == "$E=mc^{2}$"
+    # unicode inside a math span becomes a bare command
+    assert tex_doc("$E=σv$") == r"$E=\sigma v$"
 
 
 @pytest.mark.skipif(shutil.which("pdflatex") is None,

@@ -109,6 +109,76 @@ def tex_escape(name: str) -> str:
     return name.replace("_", r"\_")
 
 
+_DOC_ESCAPES = {
+    "_": r"\_",
+    "^": r"\^{}",
+    "~": r"\~{}",
+    "%": r"\%",
+    "#": r"\#",
+    "&": r"\&",
+}
+
+#: Unicode → LaTeX, valid inside math spans (bare) and — wrapped in
+#: ``$...$`` — in text spans.  Doc strings carry authored physics
+#: prose (``v²``, ``σ·p``, ``Δp/ρ``) that pdfLaTeX cannot typeset raw.
+_DOC_UNICODE_MATH = {
+    "α": r"\alpha", "β": r"\beta", "γ": r"\gamma", "δ": r"\delta",
+    "ε": r"\epsilon", "ζ": r"\zeta", "η": r"\eta", "θ": r"\theta",
+    "κ": r"\kappa", "λ": r"\lambda", "μ": r"\mu", "ν": r"\nu",
+    "π": r"\pi", "ρ": r"\rho", "σ": r"\sigma", "τ": r"\tau",
+    "φ": r"\phi", "χ": r"\chi", "ψ": r"\psi", "ω": r"\omega",
+    "Γ": r"\Gamma", "Δ": r"\Delta", "Θ": r"\Theta", "Λ": r"\Lambda",
+    "Π": r"\Pi", "Σ": r"\Sigma", "Φ": r"\Phi", "Ω": r"\Omega",
+    "∂": r"\partial", "∇": r"\nabla", "∫": r"\int",
+    "·": r"\cdot", "×": r"\times", "−": "-",
+    "≤": r"\leq", "≥": r"\geq", "≠": r"\neq", "≈": r"\approx",
+    "→": r"\to", "←": r"\leftarrow", "↔": r"\leftrightarrow",
+    "—": "---", "–": "--", "§": r"\text{\S}", "¶": r"\text{\P}",
+    "°": r"^{\circ}",
+}
+
+#: Overrides for TEXT spans where the math replacement is wrong —
+#: everything else in ``_DOC_UNICODE_MATH`` wraps as ``$cmd$``.
+_DOC_UNICODE_TEXT = {
+    "§": r"\S",
+    "¶": r"\P",
+    "°": r"\textdegree",
+    "²": r"\textsuperscript{2}",
+    "³": r"\textsuperscript{3}",
+}
+
+#: Superscript digits are text-only — in math spans they map below.
+_DOC_UNICODE_MATH.update({"²": "^{2}", "³": "^{3}"})
+
+
+def tex_doc(text: str) -> str:
+    """Escape a free-text ``doc`` string for LaTeX text mode.
+
+    Docs are *LaTeX-aware* prose — they may already contain ``\\{``
+    — so ``\\`` and braces stay untouched; ``^ _ ~ % # &`` are
+    catcode-dangerous and always literal in prose, unicode translates
+    to LaTeX (``σ`` → ``$\\sigma$`` in text, ``\\sigma`` inside math),
+    and ``$...$`` spans pass through so authored inline math works.
+    """
+    parts = text.split("$")
+    for i, part in enumerate(parts):
+        if i % 2:                                  # math span
+            for char, repl in _DOC_UNICODE_MATH.items():
+                # a control sequence before a letter merges into an
+                # undefined command (\sigmav) — terminate it
+                if repl.startswith("\\"):
+                    repl = repl + " "
+                part = part.replace(char, repl)
+        else:                                      # text span
+            for char, repl in _DOC_ESCAPES.items():
+                part = part.replace(char, repl)
+            for char, repl in _DOC_UNICODE_MATH.items():
+                part = part.replace(
+                    char, _DOC_UNICODE_TEXT.get(char, "$%s$" % repl))
+        parts[i] = part
+    return "$".join(parts)
+
+
 def tex_append_subscripts(base: str, subs: List[str]) -> str:
     if not subs:
         return base
