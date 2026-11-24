@@ -220,6 +220,7 @@
 
     <https://w3id.org/promo/model/Node_2> a promo:ModelNode ;
         rdfs:label "Node 2" ;
+        promo:alignedComponent "x" ;
         promo:entityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:internalID "Node_2" .
 }
