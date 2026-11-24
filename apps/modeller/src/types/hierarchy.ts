@@ -25,6 +25,10 @@ export interface ModelNode {
   /** ADR-008 layer 2 — promo:fix marks: variable IRIs bound to values
    *  at this node occurrence. */
   fixes?: string[]
+  /** §41 X↔C placement — the idx_component element (x/y/z) this
+   *  node's reference coordinate X aligns to; the declaration
+   *  e_align binds per contact (capability: component_alignment). */
+  alignedComponent?: string
   // No layout data — purely semantic
 }
 

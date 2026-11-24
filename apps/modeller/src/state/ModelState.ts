@@ -94,6 +94,7 @@ export type Command =
   | { type: 'addKnot'; arcIri: string; x: number; y: number }
   | { type: 'removeKnot'; arcIri: string; knotIndex: number }
   | { type: 'setNodeSpecies'; iri: string; speciesAllocation?: string; reactions?: string[] }
+  | { type: 'setNodeAlignment'; iri: string; alignedComponent?: string }
   | { type: 'setArcPermeable'; iri: string; permeable?: string[] }
   | { type: 'setSpeciesAlias'; componentIri: string; alias: string }
   | { type: 'setSpeciesPin'; iri: string | null }
@@ -517,6 +518,18 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
       return { ...state, modelNodes }
     }
 
+    case 'setNodeAlignment': {
+      const modelNodes = new Map(state.modelNodes)
+      const n = modelNodes.get(cmd.iri)
+      if (n) {
+        modelNodes.set(cmd.iri, {
+          ...n,
+          alignedComponent: cmd.alignedComponent,
+        })
+      }
+      return { ...state, modelNodes }
+    }
+
     case 'setArcPermeable': {
       const modelArcs = new Map(state.modelArcs)
       const a = modelArcs.get(cmd.iri)
@@ -658,6 +671,7 @@ export function applyCommand(state: AppState, cmd: Command): AppState {
           node.speciesAllocation = mn.speciesAllocation
           node.reactions = mn.reactions
           node.fixes = mn.fixes
+          node.alignedComponent = mn.alignedComponent
         }
       }
 

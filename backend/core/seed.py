@@ -963,11 +963,15 @@ class SeedMixin:
         through ``promo:parent`` ancestry (the modeller checks the
         ancestor chain).  ``species_transport`` sits on the
         ``mass_transport`` grouping so diffusion/convection inherit it
-        while energy transport does not.
+        while energy transport does not.  §41 adds
+        ``component_alignment`` on ``transport_system``: which types
+        may declare ``promo:alignedComponent`` — every transport has
+        an ``X`` to place.
+
+        Additive-idempotent: each capability is created only when
+        absent and grants are re-asserted unconditionally, so a floor
+        bump lands new capabilities on stores that predate them.
         """
-        anchor = self.mint_iri(base, "cap_species_source")
-        if (anchor, RDF.type, PROMO["Capability"]) in g:
-            return
         caps = {
             "species_source":
                 "Species Source — may inject a species allocation",
@@ -975,14 +979,19 @@ class SeedMixin:
                 "Reaction Host — may host reactions",
             "species_transport":
                 "Species Transport — carries species (permeability)",
+            "component_alignment":
+                "Component Alignment — may declare the C element its "
+                "X aligns to (§41 X↔C placement)",
         }
         cap_iris = {}
         for frag, desc in caps.items():
             iri = self.mint_iri(base, f"cap_{frag}")
             cap_iris[frag] = iri
-            g.add((iri, RDF.type, PROMO["Capability"]))
-            g.add((iri, RDFS.label, Literal(frag.replace("_", " "))))
-            g.add((iri, PROMO["doc"], Literal(desc)))
+            if (iri, RDF.type, PROMO["Capability"]) not in g:
+                g.add((iri, RDF.type, PROMO["Capability"]))
+                g.add((iri, RDFS.label,
+                       Literal(frag.replace("_", " "))))
+                g.add((iri, PROMO["doc"], Literal(desc)))
         # entity-type frag → capability frags it grants
         grants = {
             "environment": ["species_source"],
@@ -990,6 +999,7 @@ class SeedMixin:
             "distributed": ["reaction_host"],
             "point": ["reaction_host"],
             "mass_transport": ["species_transport"],
+            "transport_system": ["component_alignment"],
         }
         for et_frag, cap_frags in grants.items():
             et = self.mint_iri(base, f"etype_{et_frag}")

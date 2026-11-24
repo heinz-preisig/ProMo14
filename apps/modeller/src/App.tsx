@@ -1052,6 +1052,33 @@ export default function App() {
               </div>
             )
           })()}
+          {/* §41 X↔C placement — which C element the node's X aligns
+              to; e_align binds it per contact.  Element names are the
+              floor-fixed idx_component literal set ({x,y,z}). */}
+          {selectedVisibleNode?.modelNodeIri && (() => {
+            const selNode = state.modelNodes.get(selectedVisibleNode.modelNodeIri!)
+            const caps = capabilities.get(selNode?.entityType ?? '') ?? []
+            if (!selNode || !caps.includes('component_alignment')) return null
+            return (
+              <div style={{ fontSize: 11, borderTop: '1px solid #ccc', paddingTop: 6 }}>
+                <strong style={{ fontSize: 12 }}>Placement (X↔C)</strong>
+                <select
+                  style={{ width: '100%', fontSize: 11, padding: '2px 4px', marginTop: 4 }}
+                  value={selNode.alignedComponent ?? ''}
+                  onChange={(e) => dispatch({
+                    type: 'setNodeAlignment',
+                    iri: selNode.iri,
+                    alignedComponent: e.target.value || undefined,
+                  })}
+                >
+                  <option value="">— no alignment declared —</option>
+                  {['x', 'y', 'z'].map((c) => (
+                    <option key={c} value={c}>X ∥ {c}</option>
+                  ))}
+                </select>
+              </div>
+            )
+          })()}
           {selectedVisibleNode?.type === 'leaf' &&
             !!selectedVisibleNode.modelNodeIri && (() => {
             const sel = state.modelNodes.get(selectedVisibleNode.modelNodeIri!)

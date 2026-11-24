@@ -15,6 +15,8 @@ export interface ModelNodeDoc {
   reactions?: string[]
   /** ADR-008 layer 2 — promo:fix marks (variable IRIs). */
   fixes?: string[]
+  /** §41 X↔C placement — component-axis element X aligns to. */
+  alignedComponent?: string
 }
 
 export interface ModelArcDoc {
@@ -79,6 +81,7 @@ export function serializeState(state: AppState): ModelDocument {
     speciesAllocation: n.speciesAllocation,
     reactions: n.reactions,
     fixes: n.fixes,
+    alignedComponent: n.alignedComponent,
   }))
 
   const arcs: ModelArcDoc[] = [...state.modelArcs.values()].map((a) => ({
@@ -133,6 +136,7 @@ export function deserializeState(doc: ModelDocument): AppState {
         speciesAllocation: n.speciesAllocation,
         reactions: n.reactions,
         fixes: n.fixes,
+        alignedComponent: n.alignedComponent,
       },
     ]),
   )
