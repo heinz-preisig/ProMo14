@@ -5307,3 +5307,114 @@ no `incidenceList` — which surfaces downstream as §30
 `flow-uncovered` problems and empty cone inputs.  The script now
 re-PUTs every equation-bearing var in a second pass once all
 references exist.
+
+## 57. Electrochemistry from the fundamental relation — DERIVED + var/expr landed (2026-11-25)
+
+### The question
+
+Stage 2's starting point: what does adding charge to the
+fundamental equation — `U(S,V,n,qel)` — actually *derive*, and
+what remains declared data or axiom?  Answer: most of
+electrochemistry's scaffolding falls out; what stays are the
+species data, the universal constant, and the interfacial rate
+laws.
+
+### Derivation chain
+
+- `dU = T·dS − p·dV + μ·dn + Ue·dqel` — charge is the fourth
+  conjugate pair.  `Ue = ∂U/∂qel` is therefore not an authored
+  convenience but *the* effort conjugate to charge content —
+  exactly the conjugate-pair structure the effort/content
+  machinery assumes everywhere.  Stage-1's `qel`/`Ue`/`fe`
+  triangle is already this shape; `Ue := inv(Cel)·qel` is
+  `∂U/∂qel` for a quadratic storage term `U = qel²/(2·Cel)`.
+  (Old ProMo's `Ue := inv(C)·U` is the same relation in Euler
+  form — `U = Ue·qel` for a purely charge-storing lump.)
+- **Electrochemical potential is derived, not declared.**  For
+  ions, charge is not independent of species — each mole of `s`
+  drags `z_s·F` of charge.  Imposing `qel = z·F·n` makes the
+  conjugate to `n_s` at free potential the electrochemical
+  potential `μ̃_s = μ_s + z_s·F·Ue` — pure chain rule.  The
+  alternative reading (neutral species + free charge) is exactly
+  stage 1's conductor.
+- **Nernst falls out** as the equilibrium limit of the
+  `μ̃`-driven transport law: at zero flux `μ̃` is continuous
+  across the boundary, i.e. `Δμ = −z·F·ΔUe`.
+- **`Pel = Ue·fe` is mandatory bookkeeping, not a diagnostic.**
+  Charge transport is work crossing the boundary — the electric
+  transfer term in the energy balance, same role `fKin`/`fP`
+  play for convection.  A charged lump's energy balance gains an
+  `Ue·fe` term; stage 2 cannot defer it.
+
+### The conductivity question (user, 2026-11-25)
+
+"Derived the conductivity from the base relation — does the same
+apply to electrical conductivity?" — **Yes, same Onsager status,
+no guessing.**  `fe = kEl·(−∇Ue)` is the diagonal linear law —
+the *form* derives from near-equilibrium NET; `kEl`'s *value* is
+material data, exactly like the thermal/mechanical coefficients.
+Two refinements worth recording:
+
+- **Electron conductor** (stage-1 metal): `kEl` is a primitive
+  lumped coefficient — what we authored.
+- **Ionic conductor**: the conductivity is *not* a separate
+  primitive — it derives from the species mobilities.  `fe =
+  Σ_s z_s·F·fnd_s`: the `μ̃`-driven diffusion law already carries
+  ion flux under a potential gradient, i.e. ionic electrical
+  conduction *is* electrochemical diffusion read on the charge
+  token.  `kEl_electrolyte ~ Σ_s z_s²·F²·mobility_s` — the
+  Nernst–Einstein relation, again a consequence not an axiom.
+
+### Not derivable (declared data / axioms)
+
+- `z_s` — species valence: species data, lives on the species
+  line (S-indexed, value-cell filled like `ν`).
+- `F` — Faraday constant: universal constant, bound once.
+- **Electrode kinetics** (Butler–Volmer): rate laws of the
+  interfacial dynamics — not equilibrium thermodynamics; they
+  enter as transport-law alternatives at the electrode etype
+  when it is authored (§32 pairing consumer).
+
+### Var/expr implementation (this landing)
+
+- `z` [S], physical — species valence, parameter-class
+  (value-cell bound like `ν`).
+- `const_F` [], physical — Faraday constant, bound value.
+- `mu_el` [N,S] — electrochemical potential effort,
+  `E_mu_el: mu_el := mu + z·const_F·Ue`.
+- `E_qel_species` alternative on `qel` —
+  `qel := reduceSum(z·const_F·n, S)` — charge content from
+  species for charged lumps (the `qel = z·F·n` bookkeeping).
+- `E_fnd_el` alternative on `fnd` — the `σ·mu_el` driven
+  species-flux law (electrochemical diffusion).
+- `Pel` [A_el,N] port — `E_Pel: Pel := Ue·fe` — the electric
+  transfer term ready for the charged-lump energy balance.
+
+### Open token-semantics question
+
+`μ̃` is a genuinely mixed-family effort — `mu` carries
+`component_mass`, the `z_el·F·Ue` term carries `charge`.  Two
+readings of `z_el`: neutral species property (then the sum is
+heterogeneous) or the declared conversion bridge
+`{charge:+1, component_mass:−1}` (then `qel := z_el·F·n` is
+signature-clean but `μ̃`'s second term is not).  **Observed
+(2026-11-25):** the checker accepts the heterogeneous sum —
+`E_mu_el` reports consistent with derived `[N,S]`/J·mol⁻¹ —
+and `mu_el` carries declared membership
+`{component_mass, charge}` with no derived `tokenVector`
+(the write path stores no signature yet; untracked = §4
+"absorbs/loud" interim reading).  The signature algebra for
+mixed-family sums remains an open §4 question.
+
+(Landed naming note: the valence is `z_el`, **not** `z` —
+`library#V_127` already owns the `z` label as the spatial
+coordinate; the first authoring pass silently resolved
+`physical!z` to it and the consistency checker's UnitError
+caught the collision.  Label namespaces are flat per network.)
+
+### §32 consequence
+
+An electrode boundary carries species flux *and* charge flux on
+one contact — the `port-domain-ambiguous` problem in the wild.
+The electrode remains the pairing resolver's first real
+consumer; the var/expr layer above is ready for it.

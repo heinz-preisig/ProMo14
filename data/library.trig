@@ -710,21 +710,19 @@
         promo:hasOperation promolg:SumOverIndex .
 
     <https://w3id.org/promo/library#E_41> a promo:Equation ;
-        promo:created "2026-11-12T13:47:49.114Z" ;
-        promo:doc "diffusive species flow per contact = diffusivity * area * chemical-potential effort (Fick form in thermodynamic driving force)" ;
+        promo:doc "diffusive species flow — chemical-potential driven (existing)" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:incidenceList "[\"https://w3id.org/promo/library#V_35\", \"https://w3id.org/promo/library#V_42\", \"https://w3id.org/promo/library#V_54\", \"https://w3id.org/promo/ontology#sigma\"]" ;
         promo:internalID "E_41" ;
         promo:lhs <https://w3id.org/promo/library#V_79> ;
-        promo:modified "2026-11-12T14:01:45.266Z" ;
         promo:network "macroscopic" ;
         promo:rhs "( ( kDiffX * geometry!Ayz ) * reduceSum( ( physical!sigma * physical!mu ), X ) )" ;
         promo:rhsExpression <https://w3id.org/promo/library#E_41/expression> ;
         promo:rhsLatex "\\left( \\left( {k^d}_{x,N,S} \\circ A_{yz,N} \\right) \\circ \\sum_{X} \\left( {\\sigma}_{X} \\circ {\\mu}_{N,S} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_41/expression> a promo:Expression ;
-        promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b32 ;
+        promo:hasArguments _:N1c0be66fe60d478583d9cc31248ebd2a ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_42> a promo:Equation ;
@@ -1115,6 +1113,22 @@
         promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b54 ;
         promo:hasOperation promolg:DefiniteIntegral .
 
+    <https://w3id.org/promo/library#E_Pel> a promo:Equation ;
+        promo:doc "electric transfer term — effort × flow on the contact (§57)" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_132\", \"https://w3id.org/promo/library#V_133\"]" ;
+        promo:internalID "E_Pel" ;
+        promo:lhs <https://w3id.org/promo/library#V_140> ;
+        promo:network "macroscopic" ;
+        promo:rhs "( Ue * fe )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_Pel/expression> ;
+        promo:rhsLatex "\\left( {{U}^{e}}_{N} \\circ {{I}^{e}}_{A\\_el,N} \\right)" .
+
+    <https://w3id.org/promo/library#E_Pel/expression> a promo:Expression ;
+        promo:hasArguments _:N4169ac7aec11493f94229dee0e76e986 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
     <https://w3id.org/promo/library#E_Ue_cap> a promo:Equation ;
         promo:doc "capacitance effort — Ue = qel/Cel" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
@@ -1419,6 +1433,22 @@
         promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b69 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
+    <https://w3id.org/promo/library#E_fnd_el> a promo:Equation ;
+        promo:doc "electrochemical diffusion — mu_el driven; subsumes ionic conduction (§57)" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_139\", \"https://w3id.org/promo/library#V_42\", \"https://w3id.org/promo/library#V_54\", \"https://w3id.org/promo/ontology#sigma\"]" ;
+        promo:internalID "E_fnd_el" ;
+        promo:lhs <https://w3id.org/promo/library#V_79> ;
+        promo:network "macroscopic" ;
+        promo:rhs "( ( kDiffX * geometry!Ayz ) * reduceSum( ( physical!sigma * mu_el ), X ) )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_fnd_el/expression> ;
+        promo:rhsLatex "\\left( \\left( {k^d}_{x,N,S} \\circ A_{yz,N} \\right) \\circ \\sum_{X} \\left( {\\sigma}_{X} \\circ {\\tilde{\\mu}}_{N,S} \\right) \\right)" .
+
+    <https://w3id.org/promo/library#E_fnd_el/expression> a promo:Expression ;
+        promo:hasArguments _:N552459355dfb4efb8a87f5a8bc3c8a16 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
     <https://w3id.org/promo/library#E_m_def> a promo:Equation ;
         promo:doc "the lumps mass content = running integral of the dmdt state - the content-of-state alias (BL-48): the ODE accumulator already carries this integral, so emit binds the slot rather than quadrature; lets mass-consuming equations (F_g, P) bind the live state" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
@@ -1435,6 +1465,22 @@
         promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b70 ;
         promo:hasOperation promolg:DefiniteIntegral .
 
+    <https://w3id.org/promo/library#E_mu_el> a promo:Equation ;
+        promo:doc "electrochemical potential — chain rule of the species-charge coupling (§57)" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_133\", \"https://w3id.org/promo/library#V_137\", \"https://w3id.org/promo/library#V_138\", \"https://w3id.org/promo/library#V_35\"]" ;
+        promo:internalID "E_mu_el" ;
+        promo:lhs <https://w3id.org/promo/library#V_139> ;
+        promo:network "macroscopic" ;
+        promo:rhs "( physical!mu + ( physical!z_el * physical!const_F * Ue ) )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_mu_el/expression> ;
+        promo:rhsLatex "\\left( {\\mu}_{N,S} + \\left( {{z}_{s}^{el}}_{S} \\circ \\mathcal{F} \\circ {{U}^{e}}_{N} \\right) \\right)" .
+
+    <https://w3id.org/promo/library#E_mu_el/expression> a promo:Expression ;
+        promo:hasArguments _:N5e11f8de208b4e1da23d45c6ac478bd9 ;
+        promo:hasOperation promolg:Add .
+
     <https://w3id.org/promo/library#E_qel_def> a promo:Equation ;
         promo:doc "content-of-state integral — qel slot carries dqeldt (§48)" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
@@ -1448,8 +1494,24 @@
         promo:rhsLatex "\\int_{t^o}^{t} {\\dot{q}^{el}}_{N} \\, dt" .
 
     <https://w3id.org/promo/library#E_qel_def/expression> a promo:Expression ;
-        promo:hasArguments _:Nd3cb99da2b7f4f73bd6eb55947ba32ff ;
+        promo:hasArguments _:N1083ff8ccf814df988fdb5d4eae99d1c ;
         promo:hasOperation promolg:DefiniteIntegral .
+
+    <https://w3id.org/promo/library#E_qel_species> a promo:Equation ;
+        promo:doc "charge content from species — electroneutral bookkeeping qel = z·F·n for charged lumps (§57)" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_137\", \"https://w3id.org/promo/library#V_138\", \"https://w3id.org/promo/library#V_6\"]" ;
+        promo:internalID "E_qel_species" ;
+        promo:lhs <https://w3id.org/promo/library#V_130> ;
+        promo:network "macroscopic" ;
+        promo:rhs "reduceSum( ( physical!z_el * physical!const_F * physical!n ), S )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_qel_species/expression> ;
+        promo:rhsLatex "\\sum_{S} \\left( {{z}_{s}^{el}}_{S} \\circ \\mathcal{F} \\circ {n}_{N,S} \\right)" .
+
+    <https://w3id.org/promo/library#E_qel_species/expression> a promo:Expression ;
+        promo:hasArguments _:N5789ebe826c4474f9f3e81890b473ddb ;
+        promo:hasOperation promolg:SumOverIndex .
 
     <https://w3id.org/promo/library#E_v> a promo:Equation ;
         promo:doc "kinematic definition: velocity = dr/dt" ;
@@ -1691,6 +1753,27 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:unitVector "[-3, 2, 0, 1, 0, -2, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_140> a promo:Variable ;
+        rdfs:label "Pel" ;
+        promo:aliases "{\"latex\": \"{P}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_140\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_flow>,
+            <https://w3id.org/promo/ontology#term_info_role_output> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_energy> ;
+        promo:doc "electric power transfer on a charge contact — the work term Ue·fe entering the charged lump's energy balance; mandatory bookkeeping, not a diagnostic (§57)." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_Pel> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_140" ;
+        promo:latex "{P}^{el}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_40> a promo:Variable ;
         rdfs:label "kCnovY" ;
@@ -2281,25 +2364,6 @@
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_130> a promo:Variable ;
-        rdfs:label "qel" ;
-        promo:aliases "{\"latex\": \"{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_130\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_state> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "charge content of a capacitive lump — the conserved charge state; slot bound through the running Integral (§48)." ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_qel_def> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_130" ;
-        promo:latex "{q}^{el}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[1, 0, 0, 0, 0, 1, 0, 0]" .
-
     <https://w3id.org/promo/library#V_131> a promo:Variable ;
         rdfs:label "dqeldt" ;
         promo:aliases "{\"latex\": \"\\\\dot{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_131\"}" ;
@@ -2319,24 +2383,60 @@
         promo:portVariable false ;
         promo:unitVector "[0, 0, 0, 0, 0, 1, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_42> a promo:Variable ;
-        rdfs:label "kDiffX" ;
-        promo:aliases "{\"latex\": \"{{k^d}_x}\", \"global_ID\": \"https://w3id.org/promo/library#V_42\"}" ;
+    <https://w3id.org/promo/library#V_137> a promo:Variable ;
+        rdfs:label "z_el" ;
+        promo:aliases "{\"latex\": \"{z}_{s}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_137\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_coefficient>,
+            <https://w3id.org/promo/ontology#term_function_parameter>,
             <https://w3id.org/promo/ontology#term_info_role_parameter> ;
-        promo:doc "diffusivity in z-direction" ;
+        promo:doc "species valence — charge carried per mole of species s. Species data, value-cell bound on the S axis like nu.  The species↔charge coupling coefficient of U(S,V,n,qel) (§57): appears both in qel := z·F·n and in mu_el := mu + z·F·Ue." ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_15> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_137" ;
+        promo:latex "{z}_{s}^{el}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_138> a promo:Variable ;
+        rdfs:label "const_F" ;
+        promo:aliases "{\"latex\": \"\\\\mathcal{F}\", \"global_ID\": \"https://w3id.org/promo/library#V_138\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "Faraday constant F — C per mol of charge; universal constant, bound here.  Bridges the charge and component_mass content families (§57)." ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:internalID "V_138" ;
+        promo:latex "\\mathcal{F}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[1, 0, -1, 0, 0, 1, 0, 0]" ;
+        promo:value "96485.33212" .
+
+    <https://w3id.org/promo/library#V_139> a promo:Variable ;
+        rdfs:label "mu_el" ;
+        promo:aliases "{\"latex\": \"{\\\\tilde{\\\\mu}}\", \"global_ID\": \"https://w3id.org/promo/library#V_139\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_intensive>,
+            <https://w3id.org/promo/ontology#term_function_effort> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_charge>,
+            <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:doc "electrochemical potential — derived effort (mu + z·F·Ue), NOT a declared primitive: the species-coupled conjugate when qel = z·F·n is imposed on U(S,V,n,qel) (§57).  The driving effort for electrochemical species transport." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_mu_el> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
             <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_42" ;
-        promo:latex "{{k^d}_x}" ;
+        promo:internalID "V_139" ;
+        promo:latex "{\\tilde{\\mu}}" ;
         promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[1, -4, 2, -1, 0, 0, 0, 0]" .
+        promo:portVariable true ;
+        promo:unitVector "[-2, 2, -1, 1, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_50> a promo:Variable ;
         rdfs:label "kQX" ;
@@ -2879,44 +2979,25 @@
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_132> a promo:Variable ;
-        rdfs:label "fe" ;
-        promo:aliases "{\"latex\": \"{I}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_132\"}" ;
+    <https://w3id.org/promo/library#V_130> a promo:Variable ;
+        rdfs:label "qel" ;
+        promo:aliases "{\"latex\": \"{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_130\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_flow> ;
+            <https://w3id.org/promo/ontology#term_function_state> ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "electric current on a conduction contact — arc-bound charge flow (the structural upgrade over old-ProMo Ie, which was node-internal dC/dt).  Port export gathered [A_el,N] by the peer lump; driven by the voltage through-drop." ;
+        promo:doc "charge content of a capacitive lump — the conserved charge state; slot bound through the running Integral (§48)." ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_fe_ohm>,
-            <https://w3id.org/promo/library#E_fe_res> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge>,
-            <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_132" ;
-        promo:latex "{I}^{e}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable true ;
-        promo:unitVector "[0, 0, 0, 0, 0, 1, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_133> a promo:Variable ;
-        rdfs:label "Ue" ;
-        promo:aliases "{\"latex\": \"{U}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_133\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_function_effort> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "voltage — effort conjugate to charge (energy per charge).  On the conductor lump: state-driven via the capacitance law; exported at contacts for the transport's σ gather." ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_Ue_cap> ;
+        promo:hasEquation <https://w3id.org/promo/library#E_qel_def>,
+            <https://w3id.org/promo/library#E_qel_species> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_133" ;
-        promo:latex "{U}^{e}" ;
+        promo:internalID "V_130" ;
+        promo:latex "{q}^{el}" ;
         promo:network "macroscopic" ;
-        promo:portVariable true ;
-        promo:unitVector "[-3, 2, 0, 1, 0, -1, 0, 0]" .
+        promo:portVariable false ;
+        promo:unitVector "[1, 0, 0, 0, 0, 1, 0, 0]" .
 
     <https://w3id.org/promo/library#V_26> a promo:Variable ;
         rdfs:label "d" ;
@@ -2952,6 +3033,25 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:unitVector "[1, -1, 0, 0, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_42> a promo:Variable ;
+        rdfs:label "kDiffX" ;
+        promo:aliases "{\"latex\": \"{{k^d}_x}\", \"global_ID\": \"https://w3id.org/promo/library#V_42\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_coefficient>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "diffusivity in z-direction" ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_15> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_42" ;
+        promo:latex "{{k^d}_x}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
+        promo:unitVector "[1, -4, 2, -1, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_45> a promo:Variable ;
         rdfs:label "H" ;
@@ -3015,28 +3115,6 @@
         promo:portVariable true ;
         promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_79> a promo:Variable ;
-        rdfs:label "fnd" ;
-        promo:aliases "{\"latex\": \"{\\\\hat{n}^d}\", \"global_ID\": \"https://w3id.org/promo/library#V_79\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_flow>,
-            <https://w3id.org/promo/ontology#term_info_role_output> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
-        promo:doc "diffusive species flow on a diffusion contact (chemical-potential driven)" ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_41> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_diffusion>,
-            <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_79" ;
-        promo:latex "{\\hat{n}^d}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable true ;
-        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" .
-
     <https://w3id.org/promo/library#V_96> a promo:Variable ;
         rdfs:label "h" ;
         promo:aliases "{\"latex\": \"h\", \"global_ID\": \"https://w3id.org/promo/library#V_96\"}" ;
@@ -3089,6 +3167,27 @@
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
 
+    <https://w3id.org/promo/library#V_132> a promo:Variable ;
+        rdfs:label "fe" ;
+        promo:aliases "{\"latex\": \"{I}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_132\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_flow> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
+        promo:doc "electric current on a conduction contact — arc-bound charge flow (the structural upgrade over old-ProMo Ie, which was node-internal dC/dt).  Port export gathered [A_el,N] by the peer lump; driven by the voltage through-drop." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_fe_ohm>,
+            <https://w3id.org/promo/library#E_fe_res> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_132" ;
+        promo:latex "{I}^{e}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, 0, 0, 0, 1, 0, 0]" .
+
     <https://w3id.org/promo/library#V_48> a promo:Variable ;
         rdfs:label "Cp" ;
         promo:aliases "{\"latex\": \"{C_p}\", \"global_ID\": \"https://w3id.org/promo/library#V_48\"}" ;
@@ -3109,6 +3208,47 @@
         promo:tokenVector "{\"token_entropy\": 1}" ;
         promo:unitVector "[-2, 2, 0, 1, -1, 0, 0, 0]" .
 
+    <https://w3id.org/promo/library#V_79> a promo:Variable ;
+        rdfs:label "fnd" ;
+        promo:aliases "{\"latex\": \"{\\\\hat{n}^d}\", \"global_ID\": \"https://w3id.org/promo/library#V_79\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_flow>,
+            <https://w3id.org/promo/ontology#term_info_role_output> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:doc "diffusive species flow on a diffusion contact (chemical-potential driven)" ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_41>,
+            <https://w3id.org/promo/library#E_fnd_el> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_diffusion>,
+            <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_79" ;
+        promo:latex "{\\hat{n}^d}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:unitVector "[-1, 0, 1, 0, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_133> a promo:Variable ;
+        rdfs:label "Ue" ;
+        promo:aliases "{\"latex\": \"{U}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_133\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_function_effort> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
+        promo:doc "voltage — effort conjugate to charge (energy per charge).  On the conductor lump: state-driven via the capacitance law; exported at contacts for the transport's σ gather." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_Ue_cap> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_133" ;
+        promo:latex "{U}^{e}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:unitVector "[-3, 2, 0, 1, 0, -1, 0, 0]" .
+
     <https://w3id.org/promo/library#V_10> a promo:Variable ;
         rdfs:label "p_term" ;
         promo:aliases "{\"latex\": \"p\", \"global_ID\": \"https://w3id.org/promo/library#V_10\"}" ;
@@ -3126,23 +3266,6 @@
         promo:portVariable false ;
         promo:tokenVector "{\"energy\": 1}" ;
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_54> a promo:Variable ;
-        rdfs:label "Ayz" ;
-        promo:aliases "{\"latex\": \"{A_yz}\", \"global_ID\": \"https://w3id.org/promo/library#V_54\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_geometry> ;
-        promo:doc "contact area in y-z plane" ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_27> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_geometry> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_54" ;
-        promo:latex "{A_yz}" ;
-        promo:network "geometry" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 2, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_58> a promo:Variable ;
         rdfs:label "m" ;
@@ -3205,24 +3328,22 @@
         promo:portVariable true ;
         promo:unitVector "[-1, 1, 0, 0, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_6> a promo:Variable ;
-        rdfs:label "n" ;
-        promo:aliases "{\"latex\": \"n\", \"global_ID\": \"https://w3id.org/promo/library#V_6\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_function_fundamental_state> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
-        promo:doc "species in mole" ;
+    <https://w3id.org/promo/library#V_54> a promo:Variable ;
+        rdfs:label "Ayz" ;
+        promo:aliases "{\"latex\": \"{A_yz}\", \"global_ID\": \"https://w3id.org/promo/library#V_54\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_geometry> ;
+        promo:doc "contact area in y-z plane" ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_51> ;
+        promo:hasEquation <https://w3id.org/promo/library#E_27> ;
         promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_6" ;
-        promo:latex "n" ;
-        promo:network "physical" ;
-        promo:portVariable true ;
-        promo:tokenVector "{\"token_component_mass\": 1}" ;
-        promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" .
+        promo:inDomain <https://w3id.org/promo/ontology#domain_geometry> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_54" ;
+        promo:latex "{A_yz}" ;
+        promo:network "geometry" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 2, 0, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_73> a promo:Variable ;
         rdfs:label "rho" ;
@@ -3243,6 +3364,25 @@
         promo:portVariable false ;
         promo:tokenVector "{\"https://w3id.org/promo/ontology#token_mass\": 1}" ;
         promo:unitVector "[0, -3, 0, 1, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_6> a promo:Variable ;
+        rdfs:label "n" ;
+        promo:aliases "{\"latex\": \"n\", \"global_ID\": \"https://w3id.org/promo/library#V_6\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_function_fundamental_state> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:doc "species in mole" ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_51> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_6" ;
+        promo:latex "n" ;
+        promo:network "physical" ;
+        promo:portVariable true ;
+        promo:tokenVector "{\"token_component_mass\": 1}" ;
+        promo:unitVector "[0, 0, 1, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_56> a promo:Variable ;
         rdfs:label "fmc" ;
@@ -3266,27 +3406,6 @@
         promo:tokenVector "{\"energy\": 1, \"momentum\": -1}" ;
         promo:unitVector "[-1, 0, 0, 1, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_35> a promo:Variable ;
-        rdfs:label "mu" ;
-        promo:aliases "{\"latex\": \"\\\\mu\", \"global_ID\": \"https://w3id.org/promo/library#V_35\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_intensive>,
-            <https://w3id.org/promo/ontology#term_function_effort> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
-        promo:doc "chemical potential" ;
-        promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_5> ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
-            <https://w3id.org/promo/ontology#idx_species> ;
-        promo:internalID "V_35" ;
-        promo:latex "\\mu" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:tokenVector "{\"token_energy\": 1, \"token_component_mass\": -1}" ;
-        promo:unitVector "[-2, 2, -1, 1, 0, 0, 0, 0]" .
-
     <https://w3id.org/promo/library#V_116> a promo:Variable ;
         rdfs:label "v" ;
         promo:aliases "{\"latex\": \"{v}\", \"global_ID\": \"https://w3id.org/promo/library#V_116\"}" ;
@@ -3308,6 +3427,27 @@
         promo:portVariable false ;
         promo:unitVector "[-1, 1, 0, 0, 0, 0, 0, 0]" .
 
+    <https://w3id.org/promo/library#V_35> a promo:Variable ;
+        rdfs:label "mu" ;
+        promo:aliases "{\"latex\": \"\\\\mu\", \"global_ID\": \"https://w3id.org/promo/library#V_35\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_intensive>,
+            <https://w3id.org/promo/ontology#term_function_effort> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_component_mass> ;
+        promo:doc "chemical potential" ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_5> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node>,
+            <https://w3id.org/promo/ontology#idx_species> ;
+        promo:internalID "V_35" ;
+        promo:latex "\\mu" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:tokenVector "{\"token_energy\": 1, \"token_component_mass\": -1}" ;
+        promo:unitVector "[-2, 2, -1, 1, 0, 0, 0, 0]" .
+
     <https://w3id.org/promo/library#V_23> a promo:Variable ;
         rdfs:label "V" ;
         promo:aliases "{\"latex\": \"V\", \"global_ID\": \"https://w3id.org/promo/library#V_23\"}" ;
@@ -3327,9 +3467,6 @@
         promo:tokenVector "{}" ;
         promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
 
-    _:N018edee0e08d4f7d97bf2d06f66f80d9 rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest () .
-
     _:N02e606614fa5407abe392091205e6de1 a promo:Expression ;
         promo:hasArguments _:N8abda9ab67004ece877a610625cd35ae ;
         promo:hasOperation promolg:inv .
@@ -3337,15 +3474,43 @@
     _:N09823ae148c94b339387e65ce55a8583 rdf:first _:N4a25feae46dc4c5eb1e057e64b15db0e ;
         rdf:rest () .
 
+    _:N0bf30f2b9595440da97296b0f5a98cc8 rdf:first <https://w3id.org/promo/library#V_54> ;
+        rdf:rest () .
+
+    _:N0df2667ebf0f4608ba8b02217ef536a5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:N0edbe31b9dc74ea4bd643d7dd763c2d4 a promo:Expression ;
+        promo:hasArguments _:N6e85c9d5802d4eff9e5ef54fe245f931 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
     _:N0fe0b5a2da624d758973c1b5cf6128b1 rdf:first <https://w3id.org/promo/library#V_136> ;
         rdf:rest () .
+
+    _:N103aa02c7d6d48a18e828a5df8dbd455 rdf:first <https://w3id.org/promo/ontology#sigma> ;
+        rdf:rest _:Nfae1e16bec8c41b0a5d0d35d8ac4a32f .
+
+    _:N1083ff8ccf814df988fdb5d4eae99d1c rdf:first <https://w3id.org/promo/library#V_131> ;
+        rdf:rest _:N99371cff6f3e4821887457aeb726e8bd .
 
     _:N174f3eeaae564333b875a12ae1da84fe a promo:Expression ;
         promo:hasArguments _:N81ce040c630e4fbb8da056bf6d58c034 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
+    _:N17a89aa38fd34684b5a31c07ec577e32 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
+        rdf:rest () .
+
     _:N18a45e15f66f45ce9ee2ab25d1b161c9 rdf:first _:N02e606614fa5407abe392091205e6de1 ;
         rdf:rest _:N86c4c19147e642e2971df617426ae466 .
+
+    _:N18f94d949b2148b98dcfb37892ca8b02 rdf:first _:N779870d8db114304905c0ef3ea229f45 ;
+        rdf:rest () .
+
+    _:N1c0be66fe60d478583d9cc31248ebd2a rdf:first _:Nbc61067655704f1189758af6bcd5021b ;
+        rdf:rest _:N307d7596af7345fca55b4d0c6dbfd480 .
+
+    _:N223b42bb54944a69971b8fd6efcad5e5 rdf:first <https://w3id.org/promo/library#V_138> ;
+        rdf:rest () .
 
     _:N2ae72ffdd7e949e9a326158a38cff171 a promo:Expression ;
         promo:hasArguments _:Ncca3b778bec446088039ba7d87594a8e ;
@@ -3354,15 +3519,41 @@
     _:N2e2794be13bf43d88eed4ac187c9c88b rdf:first <https://w3id.org/promo/ontology#idx_arc_charge> ;
         rdf:rest () .
 
-    _:N394950eb431542babf56f00eaa95f1ac rdf:first <https://w3id.org/promo/ontology#V_21> ;
-        rdf:rest _:N018edee0e08d4f7d97bf2d06f66f80d9 .
+    _:N307d7596af7345fca55b4d0c6dbfd480 rdf:first _:Nc3976af5fc0c4044aa15f848e7bd3cd4 ;
+        rdf:rest () .
+
+    _:N3f1c6b9a2ff74df396f5900573debbd6 a promo:Expression ;
+        promo:hasArguments _:N103aa02c7d6d48a18e828a5df8dbd455 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N40d9b07fd8a64e08bf29279dff29e5b2 a promo:Expression ;
+        promo:hasArguments _:N5ae6f3ccaf3d48d8a1b64e3210612955 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N4169ac7aec11493f94229dee0e76e986 rdf:first <https://w3id.org/promo/library#V_133> ;
+        rdf:rest _:N7916fe9fa1654f25b4931bcc45fab98e .
 
     _:N4a25feae46dc4c5eb1e057e64b15db0e a promo:Expression ;
         promo:hasArguments _:Nec495b4712fb41c491a49885a9734a31 ;
         promo:hasOperation promolg:SumOverIndex .
 
-    _:N53111e3e9002445f98cb8ad41e69ec0a rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest _:N394950eb431542babf56f00eaa95f1ac .
+    _:N4e1182a0d24a4f7cae6ea957f0e9e207 rdf:first <https://w3id.org/promo/library#V_138> ;
+        rdf:rest () .
+
+    _:N51c6f23d463c447c9e50db0705126f8f rdf:first <https://w3id.org/promo/ontology#V_21> ;
+        rdf:rest _:N0df2667ebf0f4608ba8b02217ef536a5 .
+
+    _:N552459355dfb4efb8a87f5a8bc3c8a16 rdf:first _:N0edbe31b9dc74ea4bd643d7dd763c2d4 ;
+        rdf:rest _:Nd0a8e32123774c6e95bea9c3fcc79b05 .
+
+    _:N5789ebe826c4474f9f3e81890b473ddb rdf:first _:N601bccb8aa4449dab61381bcd5eae492 ;
+        rdf:rest _:Nd0c6bba1e0f0442dbc717dfe6950efd9 .
+
+    _:N5a3d38474950465dab9477df2b79e032 rdf:first <https://w3id.org/promo/library#V_42> ;
+        rdf:rest _:N0bf30f2b9595440da97296b0f5a98cc8 .
+
+    _:N5ae6f3ccaf3d48d8a1b64e3210612955 rdf:first <https://w3id.org/promo/library#V_137> ;
+        rdf:rest _:N4e1182a0d24a4f7cae6ea957f0e9e207 .
 
     _:N5bdd10f417394398ab9b3ac6071e596b a promo:Expression ;
         promo:hasArguments _:N0fe0b5a2da624d758973c1b5cf6128b1 ;
@@ -3371,8 +3562,32 @@
     _:N5c9e7052701544c8b158cf423690c327 rdf:first <https://w3id.org/promo/ontology#sigma> ;
         rdf:rest _:Nb48c0824a29c4921953d5175355aa20a .
 
+    _:N5e11f8de208b4e1da23d45c6ac478bd9 rdf:first <https://w3id.org/promo/library#V_35> ;
+        rdf:rest _:N18f94d949b2148b98dcfb37892ca8b02 .
+
+    _:N601bccb8aa4449dab61381bcd5eae492 a promo:Expression ;
+        promo:hasArguments _:Nd7fe9a1cabf84208b98e688576d03bcc ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N6925524618a1440fa1f7f52e5b641863 a promo:Expression ;
+        promo:hasArguments _:Ned544bce20714ad8a7706317f5c97251 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N6e85c9d5802d4eff9e5ef54fe245f931 rdf:first <https://w3id.org/promo/library#V_42> ;
+        rdf:rest _:Ne4a947124a4c4ad6952ceb87014121f8 .
+
+    _:N779870d8db114304905c0ef3ea229f45 a promo:Expression ;
+        promo:hasArguments _:Ne2a4ae8216ca49a2a017f3f4c406a393 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N7916fe9fa1654f25b4931bcc45fab98e rdf:first <https://w3id.org/promo/library#V_132> ;
+        rdf:rest () .
+
     _:N81ce040c630e4fbb8da056bf6d58c034 rdf:first <https://w3id.org/promo/ontology#F_el> ;
         rdf:rest _:Nd8ece0610f904d4587476388441abf51 .
+
+    _:N85a8156aee1b48da8ad0847fbbe24b24 rdf:first <https://w3id.org/promo/library#V_139> ;
+        rdf:rest () .
 
     _:N86c4c19147e642e2971df617426ae466 rdf:first <https://w3id.org/promo/library#V_130> ;
         rdf:rest () .
@@ -3383,6 +3598,9 @@
     _:N8abda9ab67004ece877a610625cd35ae rdf:first <https://w3id.org/promo/library#V_134> ;
         rdf:rest () .
 
+    _:N8b80aa57c73242c2a718f8452e958a06 rdf:first _:N3f1c6b9a2ff74df396f5900573debbd6 ;
+        rdf:rest _:N17a89aa38fd34684b5a31c07ec577e32 .
+
     _:N8b95fae832dc458082c7c174637e78dc rdf:first <https://w3id.org/promo/ontology#idx_x> ;
         rdf:rest () .
 
@@ -3391,6 +3609,9 @@
 
     _:N98e44c8a49dd4e2e962d9d8d541e5e46 rdf:first _:Na51cd41454ca4216a302ba862087dbfd ;
         rdf:rest () .
+
+    _:N99371cff6f3e4821887457aeb726e8bd rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest _:N51c6f23d463c447c9e50db0705126f8f .
 
     _:Na51cd41454ca4216a302ba862087dbfd a promo:Expression ;
         promo:hasArguments _:Nc996b4a5f247488884161594199d09f2 ;
@@ -3402,8 +3623,22 @@
     _:Nb586152732e348298f6dd8d3d20d9c92 rdf:first <https://w3id.org/promo/library#V_135> ;
         rdf:rest _:N98e44c8a49dd4e2e962d9d8d541e5e46 .
 
+    _:Nb604d00780904cb6bb5f416371671bd5 rdf:first <https://w3id.org/promo/library#V_137> ;
+        rdf:rest _:N223b42bb54944a69971b8fd6efcad5e5 .
+
     _:Nb6aa3bfb358d421faa92cd35f70759f6 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
         rdf:rest () .
+
+    _:Nbbdfeb8e64b1438d960de1daf39da693 rdf:first <https://w3id.org/promo/library#V_6> ;
+        rdf:rest () .
+
+    _:Nbc61067655704f1189758af6bcd5021b a promo:Expression ;
+        promo:hasArguments _:N5a3d38474950465dab9477df2b79e032 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Nc3976af5fc0c4044aa15f848e7bd3cd4 a promo:Expression ;
+        promo:hasArguments _:N8b80aa57c73242c2a718f8452e958a06 ;
+        promo:hasOperation promolg:SumOverIndex .
 
     _:Nc996b4a5f247488884161594199d09f2 rdf:first _:N2ae72ffdd7e949e9a326158a38cff171 ;
         rdf:rest _:N8b95fae832dc458082c7c174637e78dc .
@@ -3411,18 +3646,53 @@
     _:Ncca3b778bec446088039ba7d87594a8e rdf:first <https://w3id.org/promo/ontology#sigma> ;
         rdf:rest _:N8848931d69ff4a409546ba21df33011b .
 
-    _:Nd3cb99da2b7f4f73bd6eb55947ba32ff rdf:first <https://w3id.org/promo/library#V_131> ;
-        rdf:rest _:N53111e3e9002445f98cb8ad41e69ec0a .
+    _:Nd0a8e32123774c6e95bea9c3fcc79b05 rdf:first _:Nf1533548e6124b0b98755dea8b503ac0 ;
+        rdf:rest () .
+
+    _:Nd0c6bba1e0f0442dbc717dfe6950efd9 rdf:first <https://w3id.org/promo/ontology#idx_species> ;
+        rdf:rest () .
+
+    _:Nd25e4ac8a93f456194e2ee299c989e95 rdf:first <https://w3id.org/promo/library#V_133> ;
+        rdf:rest () .
+
+    _:Nd7fe9a1cabf84208b98e688576d03bcc rdf:first _:N40d9b07fd8a64e08bf29279dff29e5b2 ;
+        rdf:rest _:Nbbdfeb8e64b1438d960de1daf39da693 .
 
     _:Nd8ece0610f904d4587476388441abf51 rdf:first <https://w3id.org/promo/library#V_132> ;
+        rdf:rest () .
+
+    _:Ne069098f58204b0d9eb3731152d3076a rdf:first _:N6925524618a1440fa1f7f52e5b641863 ;
+        rdf:rest _:Nefd26772c55a485cb08598ca659c29a6 .
+
+    _:Ne2a4ae8216ca49a2a017f3f4c406a393 rdf:first _:Ne2c61907a7b945c1a1b8f0b63b56a45e ;
+        rdf:rest _:Nd25e4ac8a93f456194e2ee299c989e95 .
+
+    _:Ne2c61907a7b945c1a1b8f0b63b56a45e a promo:Expression ;
+        promo:hasArguments _:Nb604d00780904cb6bb5f416371671bd5 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Ne4a947124a4c4ad6952ceb87014121f8 rdf:first <https://w3id.org/promo/library#V_54> ;
         rdf:rest () .
 
     _:Nec495b4712fb41c491a49885a9734a31 rdf:first _:Nf3f63f8393114592a286e71e9a9e3aee ;
         rdf:rest _:Nb6aa3bfb358d421faa92cd35f70759f6 .
 
+    _:Ned544bce20714ad8a7706317f5c97251 rdf:first <https://w3id.org/promo/ontology#sigma> ;
+        rdf:rest _:N85a8156aee1b48da8ad0847fbbe24b24 .
+
+    _:Nefd26772c55a485cb08598ca659c29a6 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
+        rdf:rest () .
+
+    _:Nf1533548e6124b0b98755dea8b503ac0 a promo:Expression ;
+        promo:hasArguments _:Ne069098f58204b0d9eb3731152d3076a ;
+        promo:hasOperation promolg:SumOverIndex .
+
     _:Nf3f63f8393114592a286e71e9a9e3aee a promo:Expression ;
         promo:hasArguments _:N5c9e7052701544c8b158cf423690c327 ;
         promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Nfae1e16bec8c41b0a5d0d35d8ac4a32f rdf:first <https://w3id.org/promo/library#V_35> ;
+        rdf:rest () .
 
     _:Nffe11e33d53a4565b8a3439f1b2bf1a4 rdf:first _:N5bdd10f417394398ab9b3ac6071e596b ;
         rdf:rest _:N09823ae148c94b339387e65ce55a8583 .
@@ -4234,9 +4504,6 @@
     _:nd840344a3ffc4df1b92dc9bb66a78699b319 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b321 ;
         rdf:rest () .
 
-    _:nd840344a3ffc4df1b92dc9bb66a78699b32 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b434 ;
-        rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b435 .
-
     _:nd840344a3ffc4df1b92dc9bb66a78699b320 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b322 ;
         rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b323 .
 
@@ -4652,22 +4919,8 @@
     _:nd840344a3ffc4df1b92dc9bb66a78699b433 rdf:first <https://w3id.org/promo/ontology#e_y> ;
         rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b436 .
 
-    _:nd840344a3ffc4df1b92dc9bb66a78699b434 a promo:Expression ;
-        promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b437 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b435 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b438 ;
-        rdf:rest () .
-
     _:nd840344a3ffc4df1b92dc9bb66a78699b436 rdf:first <https://w3id.org/promo/library#V_116> ;
         rdf:rest () .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b437 rdf:first <https://w3id.org/promo/library#V_42> ;
-        rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b467 .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b438 a promo:Expression ;
-        promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b468 ;
-        promo:hasOperation promolg:SumOverIndex .
 
     _:nd840344a3ffc4df1b92dc9bb66a78699b439 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
@@ -4770,12 +5023,6 @@
     _:nd840344a3ffc4df1b92dc9bb66a78699b466 rdf:first <https://w3id.org/promo/library#V_82> ;
         rdf:rest () .
 
-    _:nd840344a3ffc4df1b92dc9bb66a78699b467 rdf:first <https://w3id.org/promo/library#V_54> ;
-        rdf:rest () .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b468 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b472 ;
-        rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b473 .
-
     _:nd840344a3ffc4df1b92dc9bb66a78699b469 rdf:first <https://w3id.org/promo/library#V_26> ;
         rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b255 .
 
@@ -4789,20 +5036,7 @@
         promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b506 ;
         promo:hasOperation promolg:inv .
 
-    _:nd840344a3ffc4df1b92dc9bb66a78699b472 a promo:Expression ;
-        promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b474 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b473 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
-        rdf:rest () .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b474 rdf:first <https://w3id.org/promo/ontology#sigma> ;
-        rdf:rest _:nd840344a3ffc4df1b92dc9bb66a78699b476 .
-
     _:nd840344a3ffc4df1b92dc9bb66a78699b475 rdf:first <https://w3id.org/promo/library#V_79> ;
-        rdf:rest () .
-
-    _:nd840344a3ffc4df1b92dc9bb66a78699b476 rdf:first <https://w3id.org/promo/library#V_35> ;
         rdf:rest () .
 
     _:nd840344a3ffc4df1b92dc9bb66a78699b477 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b478 ;
