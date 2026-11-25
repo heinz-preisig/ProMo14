@@ -281,6 +281,9 @@ def test_seed_mechanism_drives(tmp_path):
         "heat_transport": "energy",
         "radiation_transport": "energy",
         "work_transport": "momentum",
+        # §56 (2026-11-25): electrical conduction — driven by voltage,
+        # which carries charge (energy per charge).
+        "conduction_transport": "charge",
     }
     for frag, tok in expected.items():
         et = URIRef(f"{ONTO}#etype_{frag}")
@@ -307,6 +310,36 @@ def test_seed_mechanism_drives(tmp_path):
     ont.add((sub, PROMO["drives"], URIRef(f"{ONTO}#token_energy")))
     assert mechanism_drives(store, ont.identifier, str(sub)) == {
         f"{ONTO}#token_momentum", f"{ONTO}#token_energy"}
+
+
+def test_seed_charge_transport_tree(tmp_path):
+    """§56 (2026-11-25): the charge mechanism sits beside mass/energy
+    — ``etype_charge_transport`` grouping carries ``promo:token
+    charge``, ``etype_conduction_transport`` is its driven leaf,
+    ``idx_arc_charge`` (``A_el``) selects it, and ``F_el`` derives
+    with the standard [A_el, N] shape."""
+    store = RdfStore(tmp_path)
+    store.load()
+    ont = store.ontology_graph
+
+    grp = URIRef(f"{ONTO}#etype_charge_transport")
+    leaf = URIRef(f"{ONTO}#etype_conduction_transport")
+    arc = URIRef(f"{ONTO}#idx_arc")
+    sub = URIRef(f"{ONTO}#idx_arc_charge")
+
+    assert (grp, PROMO["token"],
+            URIRef(f"{ONTO}#token_charge")) in ont
+    assert (leaf, PROMO["parent"], grp) in ont
+    assert (leaf, PROMO["drives"],
+            URIRef(f"{ONTO}#token_charge")) in ont
+    assert (sub, PROMO["subIndexOf"], arc) in ont
+    assert (sub, PROMO["selector"], leaf) in ont
+    assert str(ont.value(sub, PROMO["shortName"])) == "A_el"
+
+    f = URIRef(f"{PVAR}F_el")
+    assert (f, RDF.type, PROMO["Variable"]) in ont
+    assert set(ont.objects(f, PROMO["indexStructure"])) == {
+        sub, URIRef(f"{ONTO}#idx_node")}
 
 
 def test_seed_component_index(tmp_path):

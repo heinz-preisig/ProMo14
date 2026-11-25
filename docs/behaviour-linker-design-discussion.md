@@ -5127,3 +5127,156 @@ already recorded the split; `E_fKin` was the leftover.
 
 Both assignments `closed=True`; consistency 82 equations / 0
 problems.  Author: `scripts/author_qss_energy_wiring.py`.
+
+## 56. Charge balance — resistance first, electrochemistry staged — RULED (2026-11-25)
+
+### Context
+
+The old ProMo corpus (`CAM12/Ontology_Repository/processes_distributed_001/variables_v8.json`, 131 vars) carries exactly the minimal electrical family — surveyed 2026-11-25:
+
+- `C` charge, fundamental state `[N]` (no defining eq — the content);
+- `Ue` voltage, effort `[N]`; `E_113: Ue := inv(C)·U` (capacitance folded into U);
+- `Ie` current, `internalTransport` `[N]`; `E_114: Ie := ParDiff(C,t)` — current is the accumulation rate, **node-internal, never an arc flow**;
+- `Re` resistance `[N]`; `E_115: Re := inv(Ie)·Ue` — constitutive direction inverted (R from V/I);
+- `dUe` `[A]` "Kirchhoff's first law"; `E_116: dUe := F ⋆_A (Re·Ie)` — actually the Ohmic drop (KVL); KCL proper is only implicit in the state.
+
+No Faraday constant, no species charge number `z_s`, no Nernst term
+(`μ` is only `∂U/∂n` and `μ°+RT·ln x`), no Butler–Volmer, and charge
+was not a token — so charge could never cross a boundary.  User
+(2026-11-25): **start there — resistance + charge balance first.**
+That is deliberately *single*-mechanism work: it exercises a new
+token end-to-end on existing machinery, and the §32 pairing resolver
+stays deferred until a true electrode (charge + mass on one
+boundary) gives it its first consumer.
+
+### Already in place
+
+`token_charge` exists — `promo:Token`, `tokenKind "conserved"`, in
+`domain_physical.hasToken`, licensed by `rule_physical-same`.
+Nothing consumes it: no charge vars, no charge-transport etype, no
+arc sub-index, no equations.
+
+### Proposed stage-1 vocabulary
+
+- **Entity types** (the mass/energy transport pattern):
+  `etype_charge_transport` — grouping under `etype_transport_system`,
+  `promo:token token_charge` (the family moved); and the mechanism
+  leaf `etype_conduction_transport`, `drives token_charge` —
+  the driving effort is voltage, which *carries* charge (effort is
+  per-unit-content; convection analogously drives momentum while
+  moving mass).  For the lump: a charge-storing conductor is a new
+  sibling `etype_lumped_conductor` under `etype_lumped` — one
+  assignment per etype, so a new type like `etype_lumped_qss`.
+- **Index:** `idx_arc_charge` (internal `A_el`), `indexClass "arc"`,
+  `subIndexOf idx_arc` — the mechanism sub-index, per the
+  `idx_arc_convection`/`idx_arc_mass`/`idx_arc_energy` pattern.
+- **Variables** (names avoid the `C`/`Q`/`x` index-label collisions;
+  open to bikeshed):
+  - `qel` — charge content, state `[N]`, carriesToken `charge`;
+  - `dqeldt` — charge balance rate `[N]`, carriesToken `charge`;
+  - `Ue` — voltage, effort `[N]`, carriesToken `charge`;
+  - `fe` — current, flow `[A_el]`, carriesToken `charge` —
+    **arc-bound** (the structural upgrade over old-ProMo `Ie`, which
+    was node-internal `dC/dt`);
+  - `Cel` — capacitance `[N]`, parameter, token-neutral;
+  - `kEl` — conductance `[A_el]`, coefficient, token-neutral;
+  - `Rel` — resistance `[A_el]`, coefficient, token-neutral
+    (alternative parameterisation).
+
+### Proposed stage-1 equations (symbolic)
+
+- `dqeldt := F_el * fe` — charge balance; KCL falls out of it
+  (node ΣI = net accumulation), it is not a separate law.
+- `qel := Integral( dqeldt :: t in [ to, t ] )` — §48 rate-slot
+  binding, the `E_m_def`/`E_P_int` pattern.
+- `fe := kEl * reduceSum( σ * Ue , X )` — Ohmic constitutive on the
+  transport: current = conductance × through-drop of voltage, the
+  `fmc = k·A·reduceSum(σ·p_mech,X)` pattern (geometry folded into
+  `kEl` for stage 1).  Alternative on the same lhs:
+  `fe := inv(Rel) * reduceSum( σ * Ue , X )` — the §54
+  alternatives pattern; the assignment picks the parameterisation.
+- `Ue := inv(Cel) * qel` — capacitance effort on the conductor lump.
+
+### The effort question — the one real modelling decision
+
+`fe`'s constitutive gathers `Ue` from both contacts via `σ`.  Each
+peer lump must therefore *supply* `Ue`.  Two readings:
+
+- **Capacitive lump (recommended):** `qel` is a real state,
+  `Ue := inv(Cel)·qel` exports it — charge accumulates, voltage is
+  state-driven.  An honest conductor-with-capacitance; the pure
+  resistor is `Cel` → "small", never truly zero.
+- **Pure KCL network:** no storage; `dqeldt` is algebraic and `Ue`
+  is determined by the balance residual — a genuine algebraic loop,
+  the same question §47 dodged for `ΣF(v)=0 → v` before §54/§55
+  moved the determination onto the arc.  For charge the arc-side
+  trick does not apply (the arc *needs* both endpoint voltages), so
+  this variant wants the overdetermination/algebraic-loop machinery
+  that is still an open gap.
+
+Stage 1 takes the capacitive reading; the pure-KCL regime is
+recorded as a deferred variant, not silently claimed.
+
+### Wiring (per the §50/§55 pattern)
+
+Transport assignment: `fe` output/flow on `[A_el]`, `Ue` gathered
+via contacts (`σ[X]` supply-side port — the `reduceSum(σ·effort,X)`
+pattern), `kEl`/`Rel` instantiated.  Conductor assignment: `qel`
+state via `dqeldt`, `Ue` exported effort port, `fe` enters through
+the charge-arc port (the `fl`/`fmom`/`v_str` port channel), `Cel`
+instantiated.  Optional diagnostic output `Pel := fe · dUe`
+(dissipation reading; electric-work coupling into the energy
+balance is a later decision — §32 already notes electric work is
+normally folded into the electrochemical potential).
+
+### Stage 2 (deferred — the electrode)
+
+`z_s [S]` species charge number on the species-distribution
+machinery; `const_F` Faraday constant; electrochemical `μ`
+alternative (`μ° + RT·ln x + z·F·Ue` — another §54-style
+alternative); Butler–Volmer alternative family; the electrode etype
+hosting charge + component_mass mechanisms on one boundary → the
+§32 pairing resolver in `builder.contact_arc_domain` finally gets
+its consumer (`port-domain-ambiguous` stops terminating).
+
+### Rulings (2026-11-25)
+
+1. **Capacitive lump** — `qel` is a real state,
+   `Ue := inv(Cel)·qel`; the pure-KCL algebraic network stays
+   deferred (wants the algebraic-loop machinery, an open gap).
+2. **Names accepted** — `qel`/`Ue`/`fe`/`kEl`/`Rel`/`Cel`/`A_el`,
+   `etype_conduction_transport`, `etype_lumped_conductor`
+   (adjustable later).
+3. `Pel := fe·dUe` is the dissipation reading (Joule power —
+   current × through-drop; the energy leaving the charge domain).
+   **Deferred** — trivial to add later (`dUe` extraction is one
+   equation) and the honest energy coupling belongs with stage-2
+   electrochemical-potential work, not a standalone reading.
+
+### Landed (2026-11-25)
+
+Seed floor (`backend/core/seed.py` — migration, applies on load):
+`etype_charge_transport` grouping (`promo:token charge`) +
+`etype_conduction_transport` leaf (`drives token_charge`) under
+`etype_transport_system`; `idx_arc_charge` (`A_el`, `I_14`,
+selector → conduction); `F_el` auto-derived `[A_el,N]` —
+constant+parameter, token-neutral.
+
+Authored (`scripts/author_charge_stage1.py`, APIs only): library
+vars `V_130`–`V_136` (`qel`/`dqeldt`/`fe`/`Ue`/`Cel`/`kEl`/`Rel`),
+equations `E_dqeldt`, `E_qel_def`, `E_fe_ohm`, `E_fe_res` (§54
+alternative on `fe`), `E_Ue_cap`; `etype_lumped_conductor` sibling
+of `etype_lumped`; both assignments **closed** —
+`etype_conduction_transport` `[E_fe_ohm, E_dqeldt]` (base
+`E_dqeldt`, ports `Ue`, outputs `fe`, instantiated
+`{dqeldt,kEl,Rel,F_el}` — the peer-rate-as-datum pattern), and
+`etype_lumped_conductor` `[E_Ue_cap, E_dqeldt]` (state `dqeldt`,
+ports `fe`, outputs `Ue`, instantiated `{t,Cel}`).
+
+Notable: the closure engine pruned `E_qel_def` from the conductor
+sequence — `qel` binds through the `dqeldt` state slot directly
+(§48), so the explicit integral equation is not needed in the
+sequence.  Regression: `test_seed_charge_transport_tree` +
+`conduction_transport→charge` in `test_seed_mechanism_drives`.
+Suite 589 green; consistency clean.  First charge model not yet
+authored — modeller canvas next.

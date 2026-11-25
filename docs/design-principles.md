@@ -636,6 +636,13 @@ basis-vector projection or algebraic fragment does not.
   `conjugates` (entropy — no consumer), and the `promo:Mechanism`
   resource layer (needed only when one etype hosts two mechanisms).
   First consumer = the first multi-mechanism model.
+  *§56 progress 2026-11-25:* charge transport landed as a
+  **single** mechanism — `etype_charge_transport` +
+  `etype_conduction_transport` (`drives charge`), `idx_arc_charge`/`A_el`,
+  `F_el`, and the `qel`/`fe`/`Ue`/`Cel`/`kEl`/`Rel` family with
+  closed assignments (capacitive conductor ruled).  The electrode
+  (charge + mass on one boundary) remains the pairing resolver's
+  first real consumer.
 - Seed-derived vs ruled drift — floor migrations can silently
   re-implement superseded semantics (found 2026-11-06: F_* token
   decls resurrected post-strip).  Review audits the seed layer

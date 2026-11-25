@@ -482,6 +482,13 @@ class SeedMixin:
              None, "energy"),
             ("work_transport", "Work Transport", "energy_transport", True,
              None, "momentum"),
+            # §56 (2026-11-25): charge transport — grouping carries the
+            # token family; the electrical-conduction leaf is driven by
+            # voltage, which carries charge (energy per charge).
+            ("charge_transport", "Charge Transport", "transport_system", False,
+             "charge", None),
+            ("conduction_transport", "Electrical Conduction",
+             "charge_transport", True, None, "charge"),
         ]
         for (frag, label, parent_frag, bind_scales, token_frag,
              drive_frag) in tree:
@@ -557,6 +564,8 @@ class SeedMixin:
              "etype_radiation_transport"),
             ("idx_arc_work", "work arc", "A_work",
              "etype_work_transport"),
+            ("idx_arc_charge", "charge arc", "A_el",
+             "etype_conduction_transport"),
         ]:
             iri = self.mint_iri(base, frag)
             if (iri, RDF.type, PROMO["Index"]) in g:
