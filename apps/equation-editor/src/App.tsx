@@ -285,7 +285,13 @@ export default function App() {
           >
             .tex
           </a>
-          <button type="button" onClick={onSave} style={{ fontSize: 12 }}>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!storeDirty}
+            style={{ fontSize: 12 }}
+            title={storeDirty ? 'Persist the store to data/*.trig' : 'No unsaved changes'}
+          >
             Save
           </button>
         </div>
