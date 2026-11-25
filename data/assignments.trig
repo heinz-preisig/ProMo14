@@ -97,7 +97,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_conduction_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_dqeldt> ;
-        promo:hasEquationSequence _:Ndd08df84600d43afa4db15f43acd855a ;
+        promo:hasEquationSequence _:N028ccbbb6b2e4f268b28d932740f2ef4 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_131>,
             <https://w3id.org/promo/library#V_135>,
             <https://w3id.org/promo/library#V_136>,
@@ -152,7 +152,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped_conductor> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_dqeldt> ;
-        promo:hasEquationSequence _:Nccd073e171454b78a63d56df7bd894e3 ;
+        promo:hasEquationSequence _:Nd405e07642c84dc38fdda0d825bdd2cf ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_134>,
             <https://w3id.org/promo/ontology#V_11> ;
         promo:hasOutputVariable <https://w3id.org/promo/library#V_133> ;
@@ -177,17 +177,20 @@
             <https://w3id.org/promo/library#V_56> ;
         promo:hasStateVariable <https://w3id.org/promo/library#V_57> .
 
-    _:N49bcaab24c0643fcb878915a8b8ecc26 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
+    _:N028ccbbb6b2e4f268b28d932740f2ef4 rdf:first <https://w3id.org/promo/library#E_fe_ohm> ;
+        rdf:rest _:N1b40da94c514425cb6ec22ddce217004 .
+
+    _:N1b40da94c514425cb6ec22ddce217004 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
         rdf:rest () .
 
-    _:Nb31d1236d2f041589a61b490f112e988 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
+    _:N836342e201cd4c7481ab10c9dae3d8a6 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
         rdf:rest () .
 
-    _:Nccd073e171454b78a63d56df7bd894e3 rdf:first <https://w3id.org/promo/library#E_Ue_cap> ;
-        rdf:rest _:Nb31d1236d2f041589a61b490f112e988 .
+    _:Nc7d7388972864d8dbd0a2102a6782e4a rdf:first <https://w3id.org/promo/library#E_Ue_cap> ;
+        rdf:rest _:N836342e201cd4c7481ab10c9dae3d8a6 .
 
-    _:Ndd08df84600d43afa4db15f43acd855a rdf:first <https://w3id.org/promo/library#E_fe_ohm> ;
-        rdf:rest _:N49bcaab24c0643fcb878915a8b8ecc26 .
+    _:Nd405e07642c84dc38fdda0d825bdd2cf rdf:first <https://w3id.org/promo/library#E_qel_def> ;
+        rdf:rest _:Nc7d7388972864d8dbd0a2102a6782e4a .
 
     _:nb4f98f8220264edd87efd6106ebdfcdeb1 rdf:first <https://w3id.org/promo/library#E_4> ;
         rdf:rest _:nb4f98f8220264edd87efd6106ebdfcdeb27 .

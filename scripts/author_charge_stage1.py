@@ -245,6 +245,22 @@ def main():
         else:
             print(f"{rec['iri'].split('#')[-1]} {rec['label']}: {tag} {st}")
 
+    # Refresh pass — the charge equations reference each other's vars
+    # (qel→dqeldt→fe→Ue→qel cycles), so a first-pass POST necessarily
+    # fails the rhs check for forward references and stores no
+    # incidenceList.  Once every var exists a re-PUT lets
+    # _canonicalise_equations derive incidence/rhsExpression cleanly.
+    # Harmless when the first pass already succeeded.
+    for rec in NEW_VARS:
+        if not rec["equations"]:
+            continue
+        iri = rec["iri"]
+        st, out = req("PUT", f"{EQ}/variables/{urllib.parse.quote(iri, safe='')}?graph={g}", rec)
+        if st != 200:
+            failures.append((f"{rec['label']} refresh", f"PUT {st}: {str(out)[:300]}"))
+        else:
+            print(f"{rec['iri'].split('#')[-1]} refresh: PUT {st}")
+
     # -- 2. assignments ---------------------------------------------------
     ga = urllib.parse.quote(ASG, safe="")
     conduction = {

@@ -134,57 +134,6 @@
     <https://w3id.org/promo/library> a promo:Library ;
         promo:usesOntology <https://w3id.org/promo/ontology> .
 
-    <https://w3id.org/promo/library#V_134> a promo:Variable ;
-        rdfs:label "Cel" ;
-        promo:aliases "{\"latex\": \"{C}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_134\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_coefficient>,
-            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
-        promo:doc "capacitance — lumped charge-storage parameter [N]; the pure KCL resistor is Cel→small, never exactly zero (§56)." ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_134" ;
-        promo:latex "{C}^{el}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[4, -2, 0, -1, 0, 2, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_135> a promo:Variable ;
-        rdfs:label "kEl" ;
-        promo:aliases "{\"latex\": \"{k}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_135\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_coefficient>,
-            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
-        promo:doc "electrical conductance of a conduction leg — lumped coefficient [A_el]; geometry folded in for stage 1." ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge> ;
-        promo:internalID "V_135" ;
-        promo:latex "{k}^{el}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[3, -2, 0, -1, 0, 2, 0, 0]" .
-
-    <https://w3id.org/promo/library#V_136> a promo:Variable ;
-        rdfs:label "Rel" ;
-        promo:aliases "{\"latex\": \"{R}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_136\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_coefficient>,
-            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
-        promo:doc "electrical resistance of a conduction leg — alternative parameterisation for E_fe_res (inv(Rel) × through-drop)." ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge> ;
-        promo:internalID "V_136" ;
-        promo:latex "{R}^{el}" ;
-        promo:network "macroscopic" ;
-        promo:portVariable false ;
-        promo:unitVector "[-3, 2, 0, 1, 0, -2, 0, 0]" .
-
     <https://w3id.org/promo/library#V_85> a promo:Variable ;
         rdfs:label "N" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
@@ -1170,10 +1119,17 @@
         promo:doc "capacitance effort — Ue = qel/Cel" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_130\", \"https://w3id.org/promo/library#V_134\"]" ;
         promo:internalID "E_Ue_cap" ;
         promo:lhs <https://w3id.org/promo/library#V_133> ;
         promo:network "macroscopic" ;
-        promo:rhs "( inv( Cel ) * macroscopic!qel )" .
+        promo:rhs "( inv( Cel ) * macroscopic!qel )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_Ue_cap/expression> ;
+        promo:rhsLatex "\\left( {{{C}^{el}}_{N}}^{-1} \\circ {{q}^{el}}_{N} \\right)" .
+
+    <https://w3id.org/promo/library#E_Ue_cap/expression> a promo:Expression ;
+        promo:hasArguments _:N18a45e15f66f45ce9ee2ab25d1b161c9 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_akp> a promo:Equation ;
         promo:doc "kinetic + potential transport leg of the total-energy balance (flow work excluded — it already rides inside H)" ;
@@ -1307,10 +1263,17 @@
         promo:doc "charge balance of the conductor lump" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_132\", \"https://w3id.org/promo/ontology#F_el\"]" ;
         promo:internalID "E_dqeldt" ;
         promo:lhs <https://w3id.org/promo/library#V_131> ;
         promo:network "macroscopic" ;
-        promo:rhs "reduceSum( ( physical!F_el * fe ), A_el )" .
+        promo:rhs "reduceSum( ( physical!F_el * fe ), A_el )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_dqeldt/expression> ;
+        promo:rhsLatex "\\sum_{A\\_el} \\left( {F}_{A\\_el,N} \\circ {{I}^{e}}_{A\\_el,N} \\right)" .
+
+    <https://w3id.org/promo/library#E_dqeldt/expression> a promo:Expression ;
+        promo:hasArguments _:N9296f5f72eb54a2b839f1ff0bfe8c16c ;
+        promo:hasOperation promolg:SumOverIndex .
 
     <https://w3id.org/promo/library#E_fKin> a promo:Equation ;
         promo:doc "advected kinetic energy per contact = 1/2 * fmc * v_str^2 (v^2 = sum_C v_str^2) — stream velocity, same ruling as fl (§49/§50): the lump's bulk v is the wrong physics through a contact" ;
@@ -1380,19 +1343,33 @@
         promo:doc "Ohmic constitutive — conductance × through-drop of voltage" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_133\", \"https://w3id.org/promo/library#V_135\", \"https://w3id.org/promo/ontology#sigma\"]" ;
         promo:internalID "E_fe_ohm" ;
         promo:lhs <https://w3id.org/promo/library#V_132> ;
         promo:network "macroscopic" ;
-        promo:rhs "( kEl * reduceSum( ( physical!sigma * Ue ), X ) )" .
+        promo:rhs "( kEl * reduceSum( ( physical!sigma * Ue ), X ) )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_fe_ohm/expression> ;
+        promo:rhsLatex "\\left( {{k}^{el}}_{A\\_el} \\circ \\sum_{X} \\left( {\\sigma}_{X} \\circ {{U}^{e}}_{N} \\right) \\right)" .
+
+    <https://w3id.org/promo/library#E_fe_ohm/expression> a promo:Expression ;
+        promo:hasArguments _:Nb586152732e348298f6dd8d3d20d9c92 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_fe_res> a promo:Equation ;
         promo:doc "resistance parameterisation — §54-style alternative on the same lhs" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_133\", \"https://w3id.org/promo/library#V_136\", \"https://w3id.org/promo/ontology#sigma\"]" ;
         promo:internalID "E_fe_res" ;
         promo:lhs <https://w3id.org/promo/library#V_132> ;
         promo:network "macroscopic" ;
-        promo:rhs "( inv( Rel ) * reduceSum( ( physical!sigma * Ue ), X ) )" .
+        promo:rhs "( inv( Rel ) * reduceSum( ( physical!sigma * Ue ), X ) )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_fe_res/expression> ;
+        promo:rhsLatex "\\left( {{{R}^{el}}_{A\\_el}}^{-1} \\circ \\sum_{X} \\left( {\\sigma}_{X} \\circ {{U}^{e}}_{N} \\right) \\right)" .
+
+    <https://w3id.org/promo/library#E_fe_res/expression> a promo:Expression ;
+        promo:hasArguments _:Nffe11e33d53a4565b8a3439f1b2bf1a4 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_fl> a promo:Equation ;
         promo:doc "Darcy-Weisbach dissipated power per contact — λ·(L/d)·ṁ·v²/2 (§46 follow-up: constitutive law replacing the imposed port)." ;
@@ -1462,10 +1439,17 @@
         promo:doc "content-of-state integral — qel slot carries dqeldt (§48)" ;
         promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_131\", \"https://w3id.org/promo/ontology#V_11\", \"https://w3id.org/promo/ontology#V_21\"]" ;
         promo:internalID "E_qel_def" ;
         promo:lhs <https://w3id.org/promo/library#V_130> ;
         promo:network "macroscopic" ;
-        promo:rhs "Integral( macroscopic!dqeldt :: t in [ to, t ] )" .
+        promo:rhs "Integral( macroscopic!dqeldt :: t in [ to, t ] )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_qel_def/expression> ;
+        promo:rhsLatex "\\int_{t^o}^{t} {\\dot{q}^{el}}_{N} \\, dt" .
+
+    <https://w3id.org/promo/library#E_qel_def/expression> a promo:Expression ;
+        promo:hasArguments _:Nd3cb99da2b7f4f73bd6eb55947ba32ff ;
+        promo:hasOperation promolg:DefiniteIntegral .
 
     <https://w3id.org/promo/library#E_v> a promo:Equation ;
         promo:doc "kinematic definition: velocity = dr/dt" ;
@@ -1657,61 +1641,56 @@
         promo:tokenVector "{\"energy\": 1}" ;
         promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_130> a promo:Variable ;
-        rdfs:label "qel" ;
-        promo:aliases "{\"latex\": \"{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_130\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_state> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "charge content of a capacitive lump — the conserved charge state; slot bound through the running Integral (§48)." ;
+    <https://w3id.org/promo/library#V_134> a promo:Variable ;
+        rdfs:label "Cel" ;
+        promo:aliases "{\"latex\": \"{C}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_134\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_coefficient>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "capacitance — lumped charge-storage parameter [N]; the pure KCL resistor is Cel→small, never exactly zero (§56)." ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_qel_def> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
         promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_130" ;
-        promo:latex "{q}^{el}" ;
+        promo:internalID "V_134" ;
+        promo:latex "{C}^{el}" ;
         promo:network "macroscopic" ;
         promo:portVariable false ;
-        promo:unitVector "[1, 0, 0, 0, 0, 1, 0, 0]" .
+        promo:unitVector "[4, -2, 0, -1, 0, 2, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_131> a promo:Variable ;
-        rdfs:label "dqeldt" ;
-        promo:aliases "{\"latex\": \"\\\\dot{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_131\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_state> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "charge balance rate — net current over charge-arc contacts; KCL falls out of this balance, it is not a separate law." ;
+    <https://w3id.org/promo/library#V_135> a promo:Variable ;
+        rdfs:label "kEl" ;
+        promo:aliases "{\"latex\": \"{k}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_135\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_coefficient>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "electrical conductance of a conduction leg — lumped coefficient [A_el]; geometry folded in for stage 1." ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_dqeldt> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_131" ;
-        promo:latex "\\dot{q}^{el}" ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge> ;
+        promo:internalID "V_135" ;
+        promo:latex "{k}^{el}" ;
         promo:network "macroscopic" ;
         promo:portVariable false ;
-        promo:unitVector "[0, 0, 0, 0, 0, 1, 0, 0]" .
+        promo:unitVector "[3, -2, 0, -1, 0, 2, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_133> a promo:Variable ;
-        rdfs:label "Ue" ;
-        promo:aliases "{\"latex\": \"{U}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_133\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
-            <https://w3id.org/promo/ontology#term_function_effort> ;
-        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "voltage — effort conjugate to charge (energy per charge).  On the conductor lump: state-driven via the capacitance law; exported at contacts for the transport's σ gather." ;
+    <https://w3id.org/promo/library#V_136> a promo:Variable ;
+        rdfs:label "Rel" ;
+        promo:aliases "{\"latex\": \"{R}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_136\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_coefficient>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "electrical resistance of a conduction leg — alternative parameterisation for E_fe_res (inv(Rel) × through-drop)." ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_Ue_cap> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_133" ;
-        promo:latex "{U}^{e}" ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge> ;
+        promo:internalID "V_136" ;
+        promo:latex "{R}^{el}" ;
         promo:network "macroscopic" ;
-        promo:portVariable true ;
-        promo:unitVector "[-3, 2, 0, 1, 0, -1, 0, 0]" .
+        promo:portVariable false ;
+        promo:unitVector "[-3, 2, 0, 1, 0, -2, 0, 0]" .
 
     <https://w3id.org/promo/library#V_40> a promo:Variable ;
         rdfs:label "kCnovY" ;
@@ -2302,25 +2281,42 @@
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_132> a promo:Variable ;
-        rdfs:label "fe" ;
-        promo:aliases "{\"latex\": \"{I}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_132\"}" ;
+    <https://w3id.org/promo/library#V_130> a promo:Variable ;
+        rdfs:label "qel" ;
+        promo:aliases "{\"latex\": \"{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_130\"}" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
             <https://w3id.org/promo/ontology#term_extensity_extensive>,
-            <https://w3id.org/promo/ontology#term_function_flow> ;
+            <https://w3id.org/promo/ontology#term_function_state> ;
         promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
-        promo:doc "electric current on a conduction contact — arc-bound charge flow (the structural upgrade over old-ProMo Ie, which was node-internal dC/dt).  Port export gathered [A_el,N] by the peer lump; driven by the voltage through-drop." ;
+        promo:doc "charge content of a capacitive lump — the conserved charge state; slot bound through the running Integral (§48)." ;
         promo:frozen false ;
-        promo:hasEquation <https://w3id.org/promo/library#E_fe_ohm>,
-            <https://w3id.org/promo/library#E_fe_res> ;
+        promo:hasEquation <https://w3id.org/promo/library#E_qel_def> ;
         promo:imported false ;
         promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
-        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge>,
-            <https://w3id.org/promo/ontology#idx_node> ;
-        promo:internalID "V_132" ;
-        promo:latex "{I}^{e}" ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_130" ;
+        promo:latex "{q}^{el}" ;
         promo:network "macroscopic" ;
-        promo:portVariable true ;
+        promo:portVariable false ;
+        promo:unitVector "[1, 0, 0, 0, 0, 1, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_131> a promo:Variable ;
+        rdfs:label "dqeldt" ;
+        promo:aliases "{\"latex\": \"\\\\dot{q}^{el}\", \"global_ID\": \"https://w3id.org/promo/library#V_131\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_state> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
+        promo:doc "charge balance rate — net current over charge-arc contacts; KCL falls out of this balance, it is not a separate law." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_dqeldt> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_131" ;
+        promo:latex "\\dot{q}^{el}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable false ;
         promo:unitVector "[0, 0, 0, 0, 0, 1, 0, 0]" .
 
     <https://w3id.org/promo/library#V_42> a promo:Variable ;
@@ -2883,6 +2879,45 @@
         promo:portVariable false ;
         promo:unitVector "[0, 1, 0, 0, 0, 0, 0, 0]" .
 
+    <https://w3id.org/promo/library#V_132> a promo:Variable ;
+        rdfs:label "fe" ;
+        promo:aliases "{\"latex\": \"{I}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_132\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_extensity_extensive>,
+            <https://w3id.org/promo/ontology#term_function_flow> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
+        promo:doc "electric current on a conduction contact — arc-bound charge flow (the structural upgrade over old-ProMo Ie, which was node-internal dC/dt).  Port export gathered [A_el,N] by the peer lump; driven by the voltage through-drop." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_fe_ohm>,
+            <https://w3id.org/promo/library#E_fe_res> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_arc_charge>,
+            <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_132" ;
+        promo:latex "{I}^{e}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:unitVector "[0, 0, 0, 0, 0, 1, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_133> a promo:Variable ;
+        rdfs:label "Ue" ;
+        promo:aliases "{\"latex\": \"{U}^{e}\", \"global_ID\": \"https://w3id.org/promo/library#V_133\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_variable>,
+            <https://w3id.org/promo/ontology#term_function_effort> ;
+        promo:carriesToken <https://w3id.org/promo/ontology#token_charge> ;
+        promo:doc "voltage — effort conjugate to charge (energy per charge).  On the conductor lump: state-driven via the capacitance law; exported at contacts for the transport's σ gather." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_Ue_cap> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_macroscopic> ;
+        promo:indexStructure <https://w3id.org/promo/ontology#idx_node> ;
+        promo:internalID "V_133" ;
+        promo:latex "{U}^{e}" ;
+        promo:network "macroscopic" ;
+        promo:portVariable true ;
+        promo:unitVector "[-3, 2, 0, 1, 0, -1, 0, 0]" .
+
     <https://w3id.org/promo/library#V_26> a promo:Variable ;
         rdfs:label "d" ;
         promo:aliases "{\"latex\": \"d\", \"global_ID\": \"https://w3id.org/promo/library#V_26\"}" ;
@@ -3291,6 +3326,106 @@
         promo:portVariable true ;
         promo:tokenVector "{}" ;
         promo:unitVector "[0, 3, 0, 0, 0, 0, 0, 0]" .
+
+    _:N018edee0e08d4f7d97bf2d06f66f80d9 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:N02e606614fa5407abe392091205e6de1 a promo:Expression ;
+        promo:hasArguments _:N8abda9ab67004ece877a610625cd35ae ;
+        promo:hasOperation promolg:inv .
+
+    _:N09823ae148c94b339387e65ce55a8583 rdf:first _:N4a25feae46dc4c5eb1e057e64b15db0e ;
+        rdf:rest () .
+
+    _:N0fe0b5a2da624d758973c1b5cf6128b1 rdf:first <https://w3id.org/promo/library#V_136> ;
+        rdf:rest () .
+
+    _:N174f3eeaae564333b875a12ae1da84fe a promo:Expression ;
+        promo:hasArguments _:N81ce040c630e4fbb8da056bf6d58c034 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N18a45e15f66f45ce9ee2ab25d1b161c9 rdf:first _:N02e606614fa5407abe392091205e6de1 ;
+        rdf:rest _:N86c4c19147e642e2971df617426ae466 .
+
+    _:N2ae72ffdd7e949e9a326158a38cff171 a promo:Expression ;
+        promo:hasArguments _:Ncca3b778bec446088039ba7d87594a8e ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N2e2794be13bf43d88eed4ac187c9c88b rdf:first <https://w3id.org/promo/ontology#idx_arc_charge> ;
+        rdf:rest () .
+
+    _:N394950eb431542babf56f00eaa95f1ac rdf:first <https://w3id.org/promo/ontology#V_21> ;
+        rdf:rest _:N018edee0e08d4f7d97bf2d06f66f80d9 .
+
+    _:N4a25feae46dc4c5eb1e057e64b15db0e a promo:Expression ;
+        promo:hasArguments _:Nec495b4712fb41c491a49885a9734a31 ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:N53111e3e9002445f98cb8ad41e69ec0a rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest _:N394950eb431542babf56f00eaa95f1ac .
+
+    _:N5bdd10f417394398ab9b3ac6071e596b a promo:Expression ;
+        promo:hasArguments _:N0fe0b5a2da624d758973c1b5cf6128b1 ;
+        promo:hasOperation promolg:inv .
+
+    _:N5c9e7052701544c8b158cf423690c327 rdf:first <https://w3id.org/promo/ontology#sigma> ;
+        rdf:rest _:Nb48c0824a29c4921953d5175355aa20a .
+
+    _:N81ce040c630e4fbb8da056bf6d58c034 rdf:first <https://w3id.org/promo/ontology#F_el> ;
+        rdf:rest _:Nd8ece0610f904d4587476388441abf51 .
+
+    _:N86c4c19147e642e2971df617426ae466 rdf:first <https://w3id.org/promo/library#V_130> ;
+        rdf:rest () .
+
+    _:N8848931d69ff4a409546ba21df33011b rdf:first <https://w3id.org/promo/library#V_133> ;
+        rdf:rest () .
+
+    _:N8abda9ab67004ece877a610625cd35ae rdf:first <https://w3id.org/promo/library#V_134> ;
+        rdf:rest () .
+
+    _:N8b95fae832dc458082c7c174637e78dc rdf:first <https://w3id.org/promo/ontology#idx_x> ;
+        rdf:rest () .
+
+    _:N9296f5f72eb54a2b839f1ff0bfe8c16c rdf:first _:N174f3eeaae564333b875a12ae1da84fe ;
+        rdf:rest _:N2e2794be13bf43d88eed4ac187c9c88b .
+
+    _:N98e44c8a49dd4e2e962d9d8d541e5e46 rdf:first _:Na51cd41454ca4216a302ba862087dbfd ;
+        rdf:rest () .
+
+    _:Na51cd41454ca4216a302ba862087dbfd a promo:Expression ;
+        promo:hasArguments _:Nc996b4a5f247488884161594199d09f2 ;
+        promo:hasOperation promolg:SumOverIndex .
+
+    _:Nb48c0824a29c4921953d5175355aa20a rdf:first <https://w3id.org/promo/library#V_133> ;
+        rdf:rest () .
+
+    _:Nb586152732e348298f6dd8d3d20d9c92 rdf:first <https://w3id.org/promo/library#V_135> ;
+        rdf:rest _:N98e44c8a49dd4e2e962d9d8d541e5e46 .
+
+    _:Nb6aa3bfb358d421faa92cd35f70759f6 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
+        rdf:rest () .
+
+    _:Nc996b4a5f247488884161594199d09f2 rdf:first _:N2ae72ffdd7e949e9a326158a38cff171 ;
+        rdf:rest _:N8b95fae832dc458082c7c174637e78dc .
+
+    _:Ncca3b778bec446088039ba7d87594a8e rdf:first <https://w3id.org/promo/ontology#sigma> ;
+        rdf:rest _:N8848931d69ff4a409546ba21df33011b .
+
+    _:Nd3cb99da2b7f4f73bd6eb55947ba32ff rdf:first <https://w3id.org/promo/library#V_131> ;
+        rdf:rest _:N53111e3e9002445f98cb8ad41e69ec0a .
+
+    _:Nd8ece0610f904d4587476388441abf51 rdf:first <https://w3id.org/promo/library#V_132> ;
+        rdf:rest () .
+
+    _:Nec495b4712fb41c491a49885a9734a31 rdf:first _:Nf3f63f8393114592a286e71e9a9e3aee ;
+        rdf:rest _:Nb6aa3bfb358d421faa92cd35f70759f6 .
+
+    _:Nf3f63f8393114592a286e71e9a9e3aee a promo:Expression ;
+        promo:hasArguments _:N5c9e7052701544c8b158cf423690c327 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:Nffe11e33d53a4565b8a3439f1b2bf1a4 rdf:first _:N5bdd10f417394398ab9b3ac6071e596b ;
+        rdf:rest _:N09823ae148c94b339387e65ce55a8583 .
 
     _:nd840344a3ffc4df1b92dc9bb66a78699b1 rdf:first _:nd840344a3ffc4df1b92dc9bb66a78699b207 ;
         rdf:rest () .

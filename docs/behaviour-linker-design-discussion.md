@@ -5274,9 +5274,36 @@ of `etype_lumped`; both assignments **closed** —
 ports `fe`, outputs `Ue`, instantiated `{t,Cel}`).
 
 Notable: the closure engine pruned `E_qel_def` from the conductor
-sequence — `qel` binds through the `dqeldt` state slot directly
-(§48), so the explicit integral equation is not needed in the
-sequence.  Regression: `test_seed_charge_transport_tree` +
+sequence on first authoring — `qel` binds through the `dqeldt`
+state slot directly (§48).  After the incidence-refresh pass
+(below) `E_qel_def` parses and stays in the sequence — both forms
+close.
+
+Regression: `test_seed_charge_transport_tree` +
 `conduction_transport→charge` in `test_seed_mechanism_drives`.
-Suite 589 green; consistency clean.  First charge model not yet
-authored — modeller canvas next.
+Suite 589 green; consistency clean.
+
+### Model verification (2026-11-25 PM)
+
+`model-charge` artefact (label `charge_01`, standard model pins):
+**source** (`etype_environment`, `Ue` added to its `instantiated`
+datum set — the voltage-source boundary) → `A_el` → **resistor**
+(`etype_conduction_transport`) → `A_el` → **conductor**
+(`etype_lumped_conductor`).  `/api/instantiate/model`: **0
+problems** — arcs resolve `idx_arc_charge` membership through the
+conduction selector, `fe`/`Ue` port gathers bind.  Python emit:
+clean DAE — `F_el` matrices, `V_133_conduction_transport =
+cat(Ue_env, Ue_lump)` σ-gather, `fe` port gather, algebraic
+residuals for `qel`-slot, `E_Ue_cap`, `E_fe_ohm`.  Value cells:
+`kEl`=0.05 S, `Rel`=20 Ω, `Cel`=1 µF, `Ue`=5 V on the source,
+`dqeldt`=0 datum + IC.  `POST /initial` t=0 solve: `ok`, `y0≈0`,
+`par_needed` empty — the charge loop closes end-to-end.
+
+Authoring pitfall fixed in the script: embedded equation records
+fail `_canonicalise_equations`' rhs check when they reference
+variables authored later in the same pass (the charge family has
+an authoring-order cycle qel→dqeldt→fe→Ue→qel), silently storing
+no `incidenceList` — which surfaces downstream as §30
+`flow-uncovered` problems and empty cone inputs.  The script now
+re-PUTs every equation-bearing var in a second pass once all
+references exist.

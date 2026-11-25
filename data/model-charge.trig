@@ -1,0 +1,192 @@
+@prefix promo: <https://w3id.org/promo#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/promo/model-charge> {
+    promo:Assignment a rdfs:Class .
+
+    promo:Glass a rdfs:Class .
+
+    promo:Instantiation a rdfs:Class .
+
+    promo:Library a rdfs:Class .
+
+    promo:Model a rdfs:Class .
+
+    promo:Ontology a rdfs:Class .
+
+    promo:Species a rdfs:Class .
+
+    promo:ValueCell a rdfs:Class ;
+        promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
+
+    promo:ValueFill a rdfs:Class ;
+        promo:doc "A fill rule covering many cells of a variable's value table at once — the '*' selector mechanism for mostly-uniform tables.  The variable links it via promo:valueFill; the fill carries promo:fillPattern (JSON list of element IRIs and '*' segments in indexStructure order) and promo:value.  Resolved to concrete cells at plan() time.  See docs/value-fill.md." .
+
+    promo:Version a rdfs:Class .
+
+    promo:atIndexElement a rdf:Property ;
+        promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
+
+    promo:coordinate a rdf:Property ;
+        promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
+
+    promo:fillPattern a rdf:Property ;
+        promo:doc "On a promo:ValueFill: JSON list like promo:coordinate but with '*' allowed per segment — '*' matches every element on that axis.  The most specific matching selector wins; equal-specificity overlaps are fill-conflict problems.  See docs/value-fill.md." .
+
+    promo:generatedFrom a rdf:Property .
+
+    promo:hasSubPlan a rdf:Property .
+
+    promo:instantiates a rdf:Property .
+
+    promo:occurrencePath a rdf:Property .
+
+    promo:overrides a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
+
+    promo:seedFloor a rdf:Property .
+
+    promo:usesAssignment a rdf:Property .
+
+    promo:usesLibrary a rdf:Property .
+
+    promo:usesOntology a rdf:Property .
+
+    promo:usesSpecies a rdf:Property .
+
+    promo:usesValues a rdf:Property .
+
+    promo:valueCell a rdf:Property ;
+        promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
+
+    promo:valueFill a rdf:Property ;
+        promo:doc "Variable → promo:ValueFill: a fill rule covering a region of the variable's value table.  See docs/value-fill.md." .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/library#V_131> promo:valueCell <https://w3id.org/promo/model-charge#cell_5581b180f23e>,
+            <https://w3id.org/promo/model-charge#cell_ad5d583c3445> .
+
+    <https://w3id.org/promo/library#V_133> promo:valueCell <https://w3id.org/promo/model-charge#cell_5da43b0242cb> .
+
+    <https://w3id.org/promo/library#V_134> promo:valueCell <https://w3id.org/promo/model-charge#cell_9d73c3cfe697> .
+
+    <https://w3id.org/promo/library#V_135> promo:valueCell <https://w3id.org/promo/model-charge#cell_9122017613e8>,
+            <https://w3id.org/promo/model-charge#cell_b27bb8b2cece> .
+
+    <https://w3id.org/promo/library#V_136> promo:valueCell <https://w3id.org/promo/model-charge#cell_217a56f93c89>,
+            <https://w3id.org/promo/model-charge#cell_6f9225e090d8> .
+
+    <https://w3id.org/promo/model-charge> a promo:Model ;
+        rdfs:label "charge_01" ;
+        promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
+        promo:usesLibrary <https://w3id.org/promo/library> ;
+        promo:usesOntology <https://w3id.org/promo/ontology> .
+
+    <https://w3id.org/promo/model-charge/Model> a promo:Model ;
+        promo:arcCounter 3 ;
+        promo:nextTreeId 3 ;
+        promo:rootComposite <https://w3id.org/promo/model-charge/Composite_0> .
+
+    <https://w3id.org/promo/ontology#V_11> promo:valueCell <https://w3id.org/promo/model-charge#cell_d2270fd5abf4> .
+
+    <https://w3id.org/promo/ontology#V_21> promo:valueCell <https://w3id.org/promo/model-charge#cell_02f215ea8d8b> .
+
+    <https://w3id.org/promo/ontology#V_34> promo:valueCell <https://w3id.org/promo/model-charge#cell_e3416882d23d> .
+
+    <https://w3id.org/promo/model-charge#cell_02f215ea8d8b> a promo:ValueCell ;
+        promo:coordinate "[]" ;
+        promo:value 0e+00 .
+
+    <https://w3id.org/promo/model-charge#cell_217a56f93c89> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Arc_1> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Arc_1\"]" ;
+        promo:value 2e+01 .
+
+    <https://w3id.org/promo/model-charge#cell_5581b180f23e> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Node_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Node_2\"]" ;
+        promo:value 0e+00 .
+
+    <https://w3id.org/promo/model-charge#cell_5da43b0242cb> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Node_1> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Node_1\"]" ;
+        promo:value 5e+00 .
+
+    <https://w3id.org/promo/model-charge#cell_6f9225e090d8> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Arc_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Arc_2\"]" ;
+        promo:value 2e+01 .
+
+    <https://w3id.org/promo/model-charge#cell_9122017613e8> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Arc_1> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Arc_1\"]" ;
+        promo:value 5e-02 .
+
+    <https://w3id.org/promo/model-charge#cell_9d73c3cfe697> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Node_3> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Node_3\"]" ;
+        promo:value 1e-06 .
+
+    <https://w3id.org/promo/model-charge#cell_ad5d583c3445> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Node_3> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Node_3\"]" ;
+        promo:value 0e+00 .
+
+    <https://w3id.org/promo/model-charge#cell_b27bb8b2cece> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Arc_2> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Arc_2\"]" ;
+        promo:value 5e-02 .
+
+    <https://w3id.org/promo/model-charge#cell_d2270fd5abf4> a promo:ValueCell ;
+        promo:coordinate "[]" ;
+        promo:value 0e+00 .
+
+    <https://w3id.org/promo/model-charge#cell_e3416882d23d> a promo:ValueCell ;
+        promo:atIndexElement <https://w3id.org/promo/model-charge/Node_1> ;
+        promo:coordinate "[\"https://w3id.org/promo/model-charge/Node_1\"]" ;
+        promo:value 0e+00 .
+
+    <https://w3id.org/promo/model-charge/Composite_0> a promo:Composite ;
+        rdfs:label "Root" ;
+        promo:children "[{\"id\": 1, \"iri\": \"https://w3id.org/promo/model-charge/Node_1\"}, {\"id\": 2, \"iri\": \"https://w3id.org/promo/model-charge/Node_2\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model-charge/Node_3\"}]" ;
+        promo:internalID 0 ;
+        promo:layout "{\"1\": {\"x\": -140.0, \"y\": 0.0}, \"2\": {\"x\": 0.0, \"y\": 0.0}, \"3\": {\"x\": 140.0, \"y\": 0.0}}" .
+
+    <https://w3id.org/promo/model-charge/Arc_1> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_1" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge/Node_1> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge/Node_2> ;
+        promo:source <https://w3id.org/promo/model-charge/Node_1> ;
+        promo:target <https://w3id.org/promo/model-charge/Node_2> .
+
+    <https://w3id.org/promo/model-charge/Arc_2> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_2" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge/Node_2> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge/Node_3> ;
+        promo:source <https://w3id.org/promo/model-charge/Node_2> ;
+        promo:target <https://w3id.org/promo/model-charge/Node_3> .
+
+    <https://w3id.org/promo/model-charge/Node_1> a promo:ModelNode ;
+        rdfs:label "source" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_environment> ;
+        promo:internalID "Node_1" .
+
+    <https://w3id.org/promo/model-charge/Node_3> a promo:ModelNode ;
+        rdfs:label "conductor" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped_conductor> ;
+        promo:internalID "Node_3" .
+
+    <https://w3id.org/promo/model-charge/Node_2> a promo:ModelNode ;
+        rdfs:label "resistor" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_conduction_transport> ;
+        promo:internalID "Node_2" .
+}
+
