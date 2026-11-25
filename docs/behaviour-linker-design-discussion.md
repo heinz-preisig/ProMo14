@@ -5094,3 +5094,36 @@ Still open: the `dEmdt = 0` Bernoulli-reading promotion on
 `etype_lumped_qss` (the energy-side algebraic path §50 deferred);
 `kConvX` could later *derive* from `lam`/`Lp`/`dp` for the linear
 regime rather than being authored independently.
+
+## 55. Lump contact velocity is `v_str` — `fKin` fixed, qss energy wired — RULED & implemented (2026-11-25 PM)
+
+### Ruling
+
+The §50 deferral resolved in discussion: **the lump has a velocity at
+each convective flow connection port — that is `v_str`**, pressure-
+driven on the arc and gathered on the peer.  `v` (bulk velocity)
+leaves the energy chain: `macroscopic!v` appeared in exactly one
+place, `E_fKin`, and advected kinetic energy through a contact is
+stream physics — the same ruling §49 made for `fl`.  `V_116`'s doc
+already recorded the split; `E_fKin` was the leftover.
+
+- **`E_fKin` fixed in place** (`macroscopic!v` → `macroscopic!v_str`)
+  — an upstream fix, not an alternative: the bulk-`v` form was wrong
+  everywhere `fKin` is used.
+- **`v_str` joins `ports` on both lump assignments** — the contact
+  velocity arrives through the same port channel as `fl`/`fmom`.
+- **`E_P_int`/`E_v_fromP` dropped from `etype_lumped`'s sequence** —
+  nothing consumed `v` but `fKin`; `P` stays a state via the `dPdt`
+  slot, the aliases existed only to feed `fKin`.  The bulk-velocity
+  reading is one `mark outputs` gesture away if wanted.
+- **`etype_lumped_qss` gets the full §50 wiring** — `E_z`, `E_fKin`,
+  `E_fPot`, `E_fPflow`, `E_aw`, `E_al`, `E_amech`, `E_dEmdt` in
+  sequence; `fl`/`fWs`/`v_str` in ports; `r` in `instantiated`;
+  `dEmdt` in `outputs`.  No `v`, no `P` — qss has no bulk momentum
+  state by design.  `dPdt`/`dEmdt` remain diagnostic readings (net
+  force = support reaction; mech→thermal transfer).
+
+### Verification
+
+Both assignments `closed=True`; consistency 82 equations / 0
+problems.  Author: `scripts/author_qss_energy_wiring.py`.
