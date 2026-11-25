@@ -71,7 +71,18 @@ export function Header({
           <span style={{ fontSize: 13, color: '#c00' }}>● modified</span>
         )}
         {saveMsg && <span style={{ fontSize: 13 }}>{saveMsg}</span>}
-        <button style={btn} onClick={onSave} disabled={!entityType}>
+        <button
+          style={btn}
+          onClick={onSave}
+          disabled={!entityType || (!hasUnsavedChanges && !dirty)}
+          title={
+            !entityType
+              ? 'Select an entity type first'
+              : hasUnsavedChanges || dirty
+                ? 'Persist the assignment and store'
+                : 'No unsaved changes'
+          }
+        >
           Save
         </button>
         <button style={btn} onClick={onDelete} disabled={!entityType}>

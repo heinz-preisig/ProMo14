@@ -10,6 +10,7 @@ import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { fetchPortSatisfaction } from './api'
 import { hasCarrierArc } from './model/ModelGraph'
+import { useStoreDirty } from '@promo/ui'
 import type { PortSatisfaction } from './api'
 import { deserializeState, hasContent, refViewState, serializeState } from './modelPersistence'
 import type { ModelDocument } from './modelPersistence'
@@ -54,6 +55,7 @@ async function fetchRefStates(doc: ModelDocument): Promise<Map<string, RefViewSt
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
 
   const [draggingOpenArc, setDraggingOpenArc] = useState<{
     openArcIri: string
@@ -145,10 +147,11 @@ export default function App() {
     try {
       await saveModel(serializeState(state))
       await saveOntology()
+      refreshDirty()
     } catch (err) {
       console.error('Failed to save model:', err)
     }
-  }, [state])
+  }, [state, refreshDirty])
 
   const stageRef = useRef<Konva.Stage>(null)
   const onScreenshot = useCallback(() => {
@@ -704,7 +707,19 @@ export default function App() {
               Species aliases
             </button>
           )}
-          <button style={{ fontSize: 12 }} onClick={onSave}>Save</button>
+          {storeDirty && (
+            <span style={{ fontSize: 12, color: '#b8860b', whiteSpace: 'nowrap' }} title="Unsaved changes in the store">
+              ● unsaved
+            </span>
+          )}
+          <button
+            style={{ fontSize: 12 }}
+            onClick={onSave}
+            disabled={!storeDirty}
+            title={storeDirty ? 'Save the model and persist the store' : 'No unsaved changes'}
+          >
+            Save
+          </button>
           <button style={{ fontSize: 12 }} onClick={onScreenshot}>Screenshot</button>
         </div>
       </div>

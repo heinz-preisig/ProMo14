@@ -813,7 +813,12 @@ export default function App() {
           >
             export to project dir
           </button>
-          <button style={S.btn(false)} onClick={() => saveStore()}>
+          <button
+            style={S.btn(false)}
+            onClick={() => saveStore()}
+            disabled={!dirty}
+            title={dirty ? 'Persist the store to data/*.trig' : 'No unsaved changes'}
+          >
             Save
           </button>
         </div>

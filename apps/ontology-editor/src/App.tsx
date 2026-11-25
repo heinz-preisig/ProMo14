@@ -1028,7 +1028,12 @@ export default function App() {
             ● unsaved
           </span>
         )}
-        <button style={{ ...S.tab, background: '#0b7cbe' }} onClick={onSaveOntology}>
+        <button
+          style={{ ...S.tab, background: '#0b7cbe' }}
+          onClick={onSaveOntology}
+          disabled={!storeDirty}
+          title={storeDirty ? 'Persist the store to data/*.trig' : 'No unsaved changes'}
+        >
           Save ontology
         </button>
         <button style={{ ...S.tab, background: '#2e8b57' }} onClick={onPublish}>
