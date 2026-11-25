@@ -17,6 +17,7 @@ fallback covers expressions that no longer parse/check.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
@@ -110,6 +111,36 @@ def _rhs_latex(eq: Any, var: Any, ctx: Any) -> str:
     if cached:
         return cached
     return r"\verb|%s|" % rhs if rhs else ""
+
+
+def _breakable_math(tex: str) -> str:
+    """Make a rendered expression wrappable in its table column.
+
+    TeX cannot break a line inside ``\\left( ... \\right)`` — the
+    renderer wraps nearly every subexpression in them, so long
+    equations overflow no matter how the column is sized.  Peel the
+    whole-span outer group (top-level operators become break points),
+    then demote every remaining ``\\left(``/``\\right)`` to a plain
+    paren — grouping is preserved, only auto-sizing is lost, and every
+    operator in the formula is a legal break point."""
+    if tex.startswith(r"\verb"):
+        return tex
+    while True:
+        t = tex.strip()
+        if not (t.startswith(r"\left(") and t.endswith(r"\right)")):
+            break
+        depth = 0
+        peeled = False
+        for m in re.finditer(r"\\left\(|\\right\)", t):
+            depth += 1 if m.group() == r"\left(" else -1
+            if depth == 0:
+                if m.end() == len(t):   # opener's match closes the string
+                    tex = t[len(r"\left("):m.start()]
+                    peeled = True
+                break
+        if not peeled:
+            break                       # not whole-span or unbalanced
+    return tex.strip().replace(r"\left(", "(").replace(r"\right)", ")")
 
 
 def _inline_resources(tex: str) -> str:
@@ -279,7 +310,7 @@ def build_document(ctx: Any) -> str:
                 "num": _num(_get(eq, "internal_id", ""), "E_"),
                 "var_num": _num(var.internal_id, "V_"),
                 "lhs": _var_symbol(var, space),
-                "rhs": _rhs_latex(eq, var, ctx),
+                "rhs": _breakable_math(_rhs_latex(eq, var, ctx)),
                 "doc": (_get(eq, "doc", "") or "").replace("_", " "),
                 "eqclass": _eq_class_label(eq),
                 "network": net.replace(">>>", "-->"),

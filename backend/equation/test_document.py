@@ -13,6 +13,7 @@ from .codegen import tex_doc
 from .compile_space import Index, Variable
 from .document import (
     PdfCompileError,
+    _breakable_math,
     build_document,
     compile_pdf,
     pdf_available,
@@ -197,6 +198,23 @@ def test_tex_doc_escapes_prose_and_keeps_latex_markup():
     assert tex_doc("$E=mc^{2}$") == "$E=mc^{2}$"
     # unicode inside a math span becomes a bare command
     assert tex_doc("$E=σv$") == r"$E=\sigma v$"
+
+
+def test_breakable_math_peels_and_demotes_parens():
+    """Long rhs must wrap in the equations column: TeX can't break
+    inside \\left(..\\right), so the table copy peels the outer group
+    and demotes the rest to plain parens — grouping kept, sizing lost."""
+    assert _breakable_math(
+        r"\left( \left( a \circ b \right) \circ \left( c \circ d \right) \right)"
+    ) == r"( a \circ b ) \circ ( c \circ d )"
+    # double-wrapped peels twice, then demotes
+    assert _breakable_math(
+        r"\left( \left( \left( a \circ b \right) \circ c \right) \right)"
+    ) == r"( a \circ b ) \circ c"
+    # not whole-span: outer group stays, inner parens demote
+    assert _breakable_math(r"x + \left( a \right)") == r"x + ( a )"
+    # verbatim fallback untouched
+    assert _breakable_math(r"\verb|a\left(b|" ) == r"\verb|a\left(b|"
 
 
 def test_tex_doc_dot_above_rate_letters():

@@ -59,7 +59,7 @@
 	{\end{itemize}}
 \newenvironment{lay}{\catcode`\_=12}{\catcode`\_=8}
 \newenvironment{IND}{\catcode`\&=12\catcode`\_=12}{\catcode`\&=4\catcode`\_=8}
-\newenvironment{eq}{\begin{minipage}{15cm}$}{$\end{minipage} }
+\newenvironment{eq}{\begin{minipage}{\linewidth}\binoppenalty=0\relpenalty=0$}{$\end{minipage} }
 
 \newcolumntype{P}[1]{>{$}p{#1}<{$}}
 
@@ -115,7 +115,7 @@
 {% raw %}
 \renewcommand{\arraystretch}{2}
 
-\begin{longtable}{|p{1cm}|p{13cm}|p{6cm}|p{2.2cm}|p{3cm}|}\hline
+\begin{longtable}{|p{1cm}|p{13.5cm}|p{4.2cm}|p{2.2cm}|p{2.5cm}|}\hline
 no & equation &documentation &class &layer \\\hline\hline
 \endhead
 \hline \multicolumn{5}{r}{\textit{Continued on next page}} \\
