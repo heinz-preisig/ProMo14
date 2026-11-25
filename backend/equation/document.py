@@ -300,7 +300,7 @@ def build_document(ctx: Any) -> str:
             "type": var.type or "",
             "sig": space.pretty_index_list(
                 list(var.index_structures or [])),
-            "units": var.units.latex(),
+            "units": var.units.latex().replace(r"\,", r"$ $"),
             "eq_ids": [e for e in eq_ids if e],
         })
 
