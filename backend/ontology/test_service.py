@@ -59,6 +59,15 @@ def test_health(client):
     assert r.json()["status"] == "ok"
 
 
+def test_store_status_exposes_built_at(client):
+    r = client.get("/api/ontology/status")
+    assert r.status_code == 200
+    body = r.json()
+    # Store-construction timestamp — resets on reload; the marker for
+    # when un-saved in-memory work was last discarded.
+    assert body["built_at"] is not None
+
+
 # ---------------------------------------------------------------------------
 # Seeded default ontology
 # ---------------------------------------------------------------------------

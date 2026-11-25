@@ -82,6 +82,10 @@ class RdfStore(PersistenceMixin, SeedMixin):
         # (and directly by store-level writes); cleared by save().
         self.dirty: bool = False
         self.last_saved: Optional[datetime.datetime] = None
+        # Store construction time — resets on every uvicorn reload, so it
+        # marks the moment un-saved in-memory work was last discarded.
+        self.built_at: datetime.datetime = datetime.datetime.now(
+            datetime.timezone.utc)
 
         # Bind common prefixes so serialised TriG is readable.
         self.dataset.bind("promo", PROMO)

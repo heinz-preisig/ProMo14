@@ -1013,11 +1013,14 @@ def save_ontology(req: Optional[SaveRequest] = None) -> Dict[str, str]:
 
 @router.get("/status")
 def store_status() -> Dict[str, Any]:
-    """Persistence status: ``dirty`` = unsaved in-memory changes."""
+    """Persistence status: ``dirty`` = unsaved in-memory changes.
+    ``built_at`` = when the in-memory store was constructed — resets on
+    every reload, so it marks when un-saved work was last discarded."""
     store = get_store()
     return {
         "dirty": store.dirty,
         "last_saved": store.last_saved.isoformat() if store.last_saved else None,
+        "built_at": store.built_at.isoformat(),
     }
 
 

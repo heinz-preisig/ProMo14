@@ -244,6 +244,9 @@ cmd_status() {
         else
             echo "  Store: clean"
         fi
+        local built
+        built=$(echo "$status" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("built_at") or "")' 2>/dev/null || true)
+        [ -n "$built" ] && echo "  Store built: $built (reload discards un-saved edits before this)"
         echo ""
         echo "  Artefact lines (hub: http://localhost:$BACKEND_PORT/):"
         curl -s -m 2 "http://localhost:$BACKEND_PORT/api/catalogue" | python3 -c '
