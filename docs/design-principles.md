@@ -474,6 +474,35 @@ basis-vector projection or algebraic fragment does not.
   Leave it inline — named fragments multiply the variable count
   without adding meaning.
 
+## 19. Physical quantities derive from the base relation; only kinetic data are primitive
+
+Ruled in principle 2026-11-25 (BL §57): the library's goal is
+that **every quantity is a determination from the fundamental
+relation** `U(S, V, n, qel, …)` — conjugates (`∂U/∂x`),
+curvatures, content ratios — folded with geometry and carrier
+motion.  Transport coefficients are the showcase: they share the
+skeleton
+
+    k = (content-per-effort density — a ∂U-response, from U)
+        × (carrier speed — the kinetic datum)
+
+so `kQ := ParDiff(U,T)`, `kqx := (inv(V)·Cp)·Σ e·v`, and the
+ionic `kEl := F²·inv(R·T)·Σ z²·D·c` are all the same form.
+
+- **Why it pays:** indices and units then check *compositionally*
+  (a mis-resolved operand surfaces as a `UnitError` —
+  demonstrated by the `z`/`z_el` collision); derived coefficients
+  inherit correct state-dependence (`T`, composition) instead of
+  being flat constants; the parameter web separates into
+  structure (derived) vs. genuine data.
+- **The honest boundary:** `U` is an equilibrium object — the
+  carrier-motion factor is unreachable from it.  The
+  irreducible primitives are exactly the kinetic datums:
+  bulk `v`, diffusivity `D`, relaxation `τ`, carrier density.
+  Everything else should be a recorded derivation, including
+  the constants themselves (`R := Boltz·Avo`,
+  `F := Avo·const_e`).
+
 ## Open deviations / known gaps
 
 - Transport **interface arity** — opened 2026-11-10; ruled: derive,

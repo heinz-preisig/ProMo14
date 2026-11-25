@@ -722,7 +722,7 @@
         promo:rhsLatex "\\left( \\left( {k^d}_{x,N,S} \\circ A_{yz,N} \\right) \\circ \\sum_{X} \\left( {\\sigma}_{X} \\circ {\\mu}_{N,S} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_41/expression> a promo:Expression ;
-        promo:hasArguments _:N1c0be66fe60d478583d9cc31248ebd2a ;
+        promo:hasArguments _:Nd72d026093914b9daf1ae40428686997 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_42> a promo:Equation ;
@@ -1126,7 +1126,7 @@
         promo:rhsLatex "\\left( {{U}^{e}}_{N} \\circ {{I}^{e}}_{A\\_el,N} \\right)" .
 
     <https://w3id.org/promo/library#E_Pel/expression> a promo:Expression ;
-        promo:hasArguments _:N4169ac7aec11493f94229dee0e76e986 ;
+        promo:hasArguments _:Ne52c7507707545eab309f8f1ab5fc4df ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_Ue_cap> a promo:Equation ;
@@ -1208,6 +1208,22 @@
     <https://w3id.org/promo/library#E_aw/expression> a promo:Expression ;
         promo:hasArguments _:nd840344a3ffc4df1b92dc9bb66a78699b58 ;
         promo:hasOperation promolg:SumOverIndex .
+
+    <https://w3id.org/promo/library#E_const_F> a promo:Equation ;
+        promo:doc "F = N_A·e — derived constant, same layer as R = N_A·k_B (§57)" ;
+        promo:equationClass <https://w3id.org/promo/ontology#eqclass_generic> ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:incidenceList "[\"https://w3id.org/promo/library#V_141\", \"https://w3id.org/promo/library#V_83\"]" ;
+        promo:internalID "E_const_F" ;
+        promo:lhs <https://w3id.org/promo/library#V_138> ;
+        promo:network "physical" ;
+        promo:rhs "( Avo * const_e )" ;
+        promo:rhsExpression <https://w3id.org/promo/library#E_const_F/expression> ;
+        promo:rhsLatex "\\left( N^A \\circ {e}^{0} \\right)" .
+
+    <https://w3id.org/promo/library#E_const_F/expression> a promo:Expression ;
+        promo:hasArguments _:N8f40cfab50d84231863e20bdfcbae638 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_dEmdt> a promo:Equation ;
         promo:doc "mechanical energy balance: transport + shaft work - friction dissipation lost to the thermal leg" ;
@@ -1446,7 +1462,7 @@
         promo:rhsLatex "\\left( \\left( {k^d}_{x,N,S} \\circ A_{yz,N} \\right) \\circ \\sum_{X} \\left( {\\sigma}_{X} \\circ {\\tilde{\\mu}}_{N,S} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_fnd_el/expression> a promo:Expression ;
-        promo:hasArguments _:N552459355dfb4efb8a87f5a8bc3c8a16 ;
+        promo:hasArguments _:N810f4cea5c644b6da31ccc1b41346e5b ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/library#E_m_def> a promo:Equation ;
@@ -1478,7 +1494,7 @@
         promo:rhsLatex "\\left( {\\mu}_{N,S} + \\left( {{z}_{s}^{el}}_{S} \\circ \\mathcal{F} \\circ {{U}^{e}}_{N} \\right) \\right)" .
 
     <https://w3id.org/promo/library#E_mu_el/expression> a promo:Expression ;
-        promo:hasArguments _:N5e11f8de208b4e1da23d45c6ac478bd9 ;
+        promo:hasArguments _:N89129ed1f71b4dc4b9db5f20fe6b51a5 ;
         promo:hasOperation promolg:Add .
 
     <https://w3id.org/promo/library#E_qel_def> a promo:Equation ;
@@ -1494,7 +1510,7 @@
         promo:rhsLatex "\\int_{t^o}^{t} {\\dot{q}^{el}}_{N} \\, dt" .
 
     <https://w3id.org/promo/library#E_qel_def/expression> a promo:Expression ;
-        promo:hasArguments _:N1083ff8ccf814df988fdb5d4eae99d1c ;
+        promo:hasArguments _:N3439d969d7a648a5abf36d3b14ccb1e8 ;
         promo:hasOperation promolg:DefiniteIntegral .
 
     <https://w3id.org/promo/library#E_qel_species> a promo:Equation ;
@@ -1510,7 +1526,7 @@
         promo:rhsLatex "\\sum_{S} \\left( {{z}_{s}^{el}}_{S} \\circ \\mathcal{F} \\circ {n}_{N,S} \\right)" .
 
     <https://w3id.org/promo/library#E_qel_species/expression> a promo:Expression ;
-        promo:hasArguments _:N5789ebe826c4474f9f3e81890b473ddb ;
+        promo:hasArguments _:N450322cb552142a78cf5402f45d004e3 ;
         promo:hasOperation promolg:SumOverIndex .
 
     <https://w3id.org/promo/library#E_v> a promo:Equation ;
@@ -1774,6 +1790,23 @@
         promo:network "macroscopic" ;
         promo:portVariable true ;
         promo:unitVector "[-3, 2, 0, 1, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_141> a promo:Variable ;
+        rdfs:label "const_e" ;
+        promo:aliases "{\"latex\": \"{e}^{0}\", \"global_ID\": \"https://w3id.org/promo/library#V_141\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "elementary charge — charge of one mole... of one proton; the charge-family fundamental constant, bound exact SI value." ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:internalID "V_141" ;
+        promo:latex "{e}^{0}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[1, 0, 0, 0, 0, 1, 0, 0]" ;
+        promo:value "1.602176634e-19" .
 
     <https://w3id.org/promo/library#V_40> a promo:Variable ;
         rdfs:label "kCnovY" ;
@@ -2080,21 +2113,6 @@
         promo:portVariable false ;
         promo:unitVector "[-2, 2, 0, 1, -1, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_83> a promo:Variable ;
-        rdfs:label "Avo" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_parameter>,
-            <https://w3id.org/promo/ontology#term_info_role_output> ;
-        promo:doc "Avogadro constant" ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:internalID "V_83" ;
-        promo:latex "N^A" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[0, 0, -1, 0, 0, 0, 0, 0]" .
-
     <https://w3id.org/promo/library#V_87> a promo:Variable ;
         rdfs:label "Ko" ;
         promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
@@ -2400,23 +2418,6 @@
         promo:portVariable false ;
         promo:unitVector "[0, 0, 0, 0, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/library#V_138> a promo:Variable ;
-        rdfs:label "const_F" ;
-        promo:aliases "{\"latex\": \"\\\\mathcal{F}\", \"global_ID\": \"https://w3id.org/promo/library#V_138\"}" ;
-        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
-            <https://w3id.org/promo/ontology#term_function_parameter>,
-            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
-        promo:doc "Faraday constant F — C per mol of charge; universal constant, bound here.  Bridges the charge and component_mass content families (§57)." ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
-        promo:internalID "V_138" ;
-        promo:latex "\\mathcal{F}" ;
-        promo:network "physical" ;
-        promo:portVariable false ;
-        promo:unitVector "[1, 0, -1, 0, 0, 1, 0, 0]" ;
-        promo:value "96485.33212" .
-
     <https://w3id.org/promo/library#V_139> a promo:Variable ;
         rdfs:label "mu_el" ;
         promo:aliases "{\"latex\": \"{\\\\tilde{\\\\mu}}\", \"global_ID\": \"https://w3id.org/promo/library#V_139\"}" ;
@@ -2596,6 +2597,21 @@
         promo:network "reactions" ;
         promo:portVariable false ;
         promo:unitVector "[0, -3, 1, 0, 0, 0, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_83> a promo:Variable ;
+        rdfs:label "Avo" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter>,
+            <https://w3id.org/promo/ontology#term_info_role_output> ;
+        promo:doc "Avogadro constant" ;
+        promo:frozen false ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:internalID "V_83" ;
+        promo:latex "N^A" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[0, 0, -1, 0, 0, 0, 0, 0]" .
 
     <https://w3id.org/promo/library#V_84> a promo:Variable ;
         rdfs:label "R" ;
@@ -2998,6 +3014,23 @@
         promo:network "macroscopic" ;
         promo:portVariable false ;
         promo:unitVector "[1, 0, 0, 0, 0, 1, 0, 0]" .
+
+    <https://w3id.org/promo/library#V_138> a promo:Variable ;
+        rdfs:label "const_F" ;
+        promo:aliases "{\"latex\": \"\\\\mathcal{F}\", \"global_ID\": \"https://w3id.org/promo/library#V_138\"}" ;
+        promo:axisValue <https://w3id.org/promo/ontology#term_determination_constant>,
+            <https://w3id.org/promo/ontology#term_function_parameter>,
+            <https://w3id.org/promo/ontology#term_info_role_parameter> ;
+        promo:doc "Faraday constant F — C per mol of charge; DERIVED from the basic constants as F = N_A·e (same pattern as E_44's R = N_A·k_B).  Bridges the charge and component_mass content families (§57)." ;
+        promo:frozen false ;
+        promo:hasEquation <https://w3id.org/promo/library#E_const_F> ;
+        promo:imported false ;
+        promo:inDomain <https://w3id.org/promo/ontology#domain_physical> ;
+        promo:internalID "V_138" ;
+        promo:latex "\\mathcal{F}" ;
+        promo:network "physical" ;
+        promo:portVariable false ;
+        promo:unitVector "[1, 0, -1, 0, 0, 1, 0, 0]" .
 
     <https://w3id.org/promo/library#V_26> a promo:Variable ;
         rdfs:label "d" ;
@@ -3471,46 +3504,48 @@
         promo:hasArguments _:N8abda9ab67004ece877a610625cd35ae ;
         promo:hasOperation promolg:inv .
 
+    _:N0485cdd6df3e4f89a134d7c68e9055d6 a promo:Expression ;
+        promo:hasArguments _:N1ce654b59a7d4e75ba16cba12dc0cdef ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
     _:N09823ae148c94b339387e65ce55a8583 rdf:first _:N4a25feae46dc4c5eb1e057e64b15db0e ;
         rdf:rest () .
 
-    _:N0bf30f2b9595440da97296b0f5a98cc8 rdf:first <https://w3id.org/promo/library#V_54> ;
-        rdf:rest () .
-
-    _:N0df2667ebf0f4608ba8b02217ef536a5 rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest () .
-
-    _:N0edbe31b9dc74ea4bd643d7dd763c2d4 a promo:Expression ;
-        promo:hasArguments _:N6e85c9d5802d4eff9e5ef54fe245f931 ;
+    _:N0d170c2909934d2589b43c7d9c373fbf a promo:Expression ;
+        promo:hasArguments _:N65c4f44d168641fe9622640652f39c73 ;
         promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N0d64f93f548c4cb88d9504b951bdf6f6 rdf:first <https://w3id.org/promo/library#V_54> ;
+        rdf:rest () .
 
     _:N0fe0b5a2da624d758973c1b5cf6128b1 rdf:first <https://w3id.org/promo/library#V_136> ;
         rdf:rest () .
-
-    _:N103aa02c7d6d48a18e828a5df8dbd455 rdf:first <https://w3id.org/promo/ontology#sigma> ;
-        rdf:rest _:Nfae1e16bec8c41b0a5d0d35d8ac4a32f .
-
-    _:N1083ff8ccf814df988fdb5d4eae99d1c rdf:first <https://w3id.org/promo/library#V_131> ;
-        rdf:rest _:N99371cff6f3e4821887457aeb726e8bd .
 
     _:N174f3eeaae564333b875a12ae1da84fe a promo:Expression ;
         promo:hasArguments _:N81ce040c630e4fbb8da056bf6d58c034 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:N17a89aa38fd34684b5a31c07ec577e32 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
-        rdf:rest () .
-
     _:N18a45e15f66f45ce9ee2ab25d1b161c9 rdf:first _:N02e606614fa5407abe392091205e6de1 ;
         rdf:rest _:N86c4c19147e642e2971df617426ae466 .
 
-    _:N18f94d949b2148b98dcfb37892ca8b02 rdf:first _:N779870d8db114304905c0ef3ea229f45 ;
+    _:N1914cc38c97d4920b47ac2b8d06862c7 rdf:first <https://w3id.org/promo/library#V_138> ;
         rdf:rest () .
 
-    _:N1c0be66fe60d478583d9cc31248ebd2a rdf:first _:Nbc61067655704f1189758af6bcd5021b ;
-        rdf:rest _:N307d7596af7345fca55b4d0c6dbfd480 .
+    _:N1bd22e44834f49cca5b834c91a6e6526 rdf:first <https://w3id.org/promo/library#V_42> ;
+        rdf:rest _:N0d64f93f548c4cb88d9504b951bdf6f6 .
 
-    _:N223b42bb54944a69971b8fd6efcad5e5 rdf:first <https://w3id.org/promo/library#V_138> ;
-        rdf:rest () .
+    _:N1ce654b59a7d4e75ba16cba12dc0cdef rdf:first <https://w3id.org/promo/library#V_137> ;
+        rdf:rest _:N1914cc38c97d4920b47ac2b8d06862c7 .
+
+    _:N2878922e19ab453bb341b2f78c0358a0 rdf:first _:Nebfe85e44dd94a03a511c767784b7515 ;
+        rdf:rest _:N7544f41a260e408a9754d1b2dab00299 .
+
+    _:N28ad55baed904756929d1995ff431747 rdf:first <https://w3id.org/promo/ontology#sigma> ;
+        rdf:rest _:N69d5b9c2cf844bb8b96658fc50fc42ae .
+
+    _:N2a3687c30df6429fa04d20d8e8828eb8 a promo:Expression ;
+        promo:hasArguments _:Nd4ac2555ae5a4778b134c26ff00c2d51 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     _:N2ae72ffdd7e949e9a326158a38cff171 a promo:Expression ;
         promo:hasArguments _:Ncca3b778bec446088039ba7d87594a8e ;
@@ -3519,41 +3554,28 @@
     _:N2e2794be13bf43d88eed4ac187c9c88b rdf:first <https://w3id.org/promo/ontology#idx_arc_charge> ;
         rdf:rest () .
 
-    _:N307d7596af7345fca55b4d0c6dbfd480 rdf:first _:Nc3976af5fc0c4044aa15f848e7bd3cd4 ;
+    _:N2e675b5d20154c83a40c0b60e1a94954 rdf:first <https://w3id.org/promo/library#V_132> ;
         rdf:rest () .
 
-    _:N3f1c6b9a2ff74df396f5900573debbd6 a promo:Expression ;
-        promo:hasArguments _:N103aa02c7d6d48a18e828a5df8dbd455 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
+    _:N3439d969d7a648a5abf36d3b14ccb1e8 rdf:first <https://w3id.org/promo/library#V_131> ;
+        rdf:rest _:Ndd9ddf761de94f599b386f634b436b9d .
 
-    _:N40d9b07fd8a64e08bf29279dff29e5b2 a promo:Expression ;
-        promo:hasArguments _:N5ae6f3ccaf3d48d8a1b64e3210612955 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
+    _:N450322cb552142a78cf5402f45d004e3 rdf:first _:N2a3687c30df6429fa04d20d8e8828eb8 ;
+        rdf:rest _:N676b3f00d63e4ed298a3233eda8bd02a .
 
-    _:N4169ac7aec11493f94229dee0e76e986 rdf:first <https://w3id.org/promo/library#V_133> ;
-        rdf:rest _:N7916fe9fa1654f25b4931bcc45fab98e .
+    _:N46de64e1fec64a28851fa6331ed543bd rdf:first <https://w3id.org/promo/library#V_137> ;
+        rdf:rest _:Na41e1e7107c2419bb6877954c980bedd .
+
+    _:N47ff89d3f9fd4c6fab4565867eb982f8 rdf:first _:Nd048acaa477849459d29e19339f12b17 ;
+        rdf:rest _:N7d6bc30fe5034323b5a18496ed64d345 .
 
     _:N4a25feae46dc4c5eb1e057e64b15db0e a promo:Expression ;
         promo:hasArguments _:Nec495b4712fb41c491a49885a9734a31 ;
         promo:hasOperation promolg:SumOverIndex .
 
-    _:N4e1182a0d24a4f7cae6ea957f0e9e207 rdf:first <https://w3id.org/promo/library#V_138> ;
-        rdf:rest () .
-
-    _:N51c6f23d463c447c9e50db0705126f8f rdf:first <https://w3id.org/promo/ontology#V_21> ;
-        rdf:rest _:N0df2667ebf0f4608ba8b02217ef536a5 .
-
-    _:N552459355dfb4efb8a87f5a8bc3c8a16 rdf:first _:N0edbe31b9dc74ea4bd643d7dd763c2d4 ;
-        rdf:rest _:Nd0a8e32123774c6e95bea9c3fcc79b05 .
-
-    _:N5789ebe826c4474f9f3e81890b473ddb rdf:first _:N601bccb8aa4449dab61381bcd5eae492 ;
-        rdf:rest _:Nd0c6bba1e0f0442dbc717dfe6950efd9 .
-
-    _:N5a3d38474950465dab9477df2b79e032 rdf:first <https://w3id.org/promo/library#V_42> ;
-        rdf:rest _:N0bf30f2b9595440da97296b0f5a98cc8 .
-
-    _:N5ae6f3ccaf3d48d8a1b64e3210612955 rdf:first <https://w3id.org/promo/library#V_137> ;
-        rdf:rest _:N4e1182a0d24a4f7cae6ea957f0e9e207 .
+    _:N5a77a54d66324b299233205cd8ffdb25 a promo:Expression ;
+        promo:hasArguments _:N2878922e19ab453bb341b2f78c0358a0 ;
+        promo:hasOperation promolg:SumOverIndex .
 
     _:N5bdd10f417394398ab9b3ac6071e596b a promo:Expression ;
         promo:hasArguments _:N0fe0b5a2da624d758973c1b5cf6128b1 ;
@@ -3562,32 +3584,49 @@
     _:N5c9e7052701544c8b158cf423690c327 rdf:first <https://w3id.org/promo/ontology#sigma> ;
         rdf:rest _:Nb48c0824a29c4921953d5175355aa20a .
 
-    _:N5e11f8de208b4e1da23d45c6ac478bd9 rdf:first <https://w3id.org/promo/library#V_35> ;
-        rdf:rest _:N18f94d949b2148b98dcfb37892ca8b02 .
+    _:N5f104a6ec5f24c67a13b997e72ed0957 rdf:first _:N76335cc888864ec6a26aa8a839136c7a ;
+        rdf:rest _:Ne4fecca9bc864ccebd5ed8fd43f6f648 .
 
-    _:N601bccb8aa4449dab61381bcd5eae492 a promo:Expression ;
-        promo:hasArguments _:Nd7fe9a1cabf84208b98e688576d03bcc ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:N6925524618a1440fa1f7f52e5b641863 a promo:Expression ;
-        promo:hasArguments _:Ned544bce20714ad8a7706317f5c97251 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:N6e85c9d5802d4eff9e5ef54fe245f931 rdf:first <https://w3id.org/promo/library#V_42> ;
-        rdf:rest _:Ne4a947124a4c4ad6952ceb87014121f8 .
-
-    _:N779870d8db114304905c0ef3ea229f45 a promo:Expression ;
-        promo:hasArguments _:Ne2a4ae8216ca49a2a017f3f4c406a393 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:N7916fe9fa1654f25b4931bcc45fab98e rdf:first <https://w3id.org/promo/library#V_132> ;
+    _:N61e4d550c1a849b1ba5e8651f30f0672 rdf:first <https://w3id.org/promo/ontology#V_11> ;
         rdf:rest () .
+
+    _:N65c4f44d168641fe9622640652f39c73 rdf:first <https://w3id.org/promo/library#V_42> ;
+        rdf:rest _:N8df0531a4c444f839e271b4f51aed80d .
+
+    _:N676b3f00d63e4ed298a3233eda8bd02a rdf:first <https://w3id.org/promo/ontology#idx_species> ;
+        rdf:rest () .
+
+    _:N69d5b9c2cf844bb8b96658fc50fc42ae rdf:first <https://w3id.org/promo/library#V_35> ;
+        rdf:rest () .
+
+    _:N6eec3d508b214c399e457869247d89cc rdf:first _:N7a5a0b0040e64261a4f3311743741256 ;
+        rdf:rest () .
+
+    _:N7451c8abe0674eafa8268e01d01adda4 rdf:first <https://w3id.org/promo/ontology#sigma> ;
+        rdf:rest _:Nbc90152c08174126beff19aaa306a9fb .
+
+    _:N7544f41a260e408a9754d1b2dab00299 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
+        rdf:rest () .
+
+    _:N76335cc888864ec6a26aa8a839136c7a a promo:Expression ;
+        promo:hasArguments _:N46de64e1fec64a28851fa6331ed543bd ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N79450d9feac04a708ed918f57b9f8f65 rdf:first <https://w3id.org/promo/library#V_6> ;
+        rdf:rest () .
+
+    _:N7a5a0b0040e64261a4f3311743741256 a promo:Expression ;
+        promo:hasArguments _:N5f104a6ec5f24c67a13b997e72ed0957 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
+
+    _:N7d6bc30fe5034323b5a18496ed64d345 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
+        rdf:rest () .
+
+    _:N810f4cea5c644b6da31ccc1b41346e5b rdf:first _:N0d170c2909934d2589b43c7d9c373fbf ;
+        rdf:rest _:Ncd8284a3adb84f93b67462e0b98e9d24 .
 
     _:N81ce040c630e4fbb8da056bf6d58c034 rdf:first <https://w3id.org/promo/ontology#F_el> ;
         rdf:rest _:Nd8ece0610f904d4587476388441abf51 .
-
-    _:N85a8156aee1b48da8ad0847fbbe24b24 rdf:first <https://w3id.org/promo/library#V_139> ;
-        rdf:rest () .
 
     _:N86c4c19147e642e2971df617426ae466 rdf:first <https://w3id.org/promo/library#V_130> ;
         rdf:rest () .
@@ -3595,14 +3634,20 @@
     _:N8848931d69ff4a409546ba21df33011b rdf:first <https://w3id.org/promo/library#V_133> ;
         rdf:rest () .
 
+    _:N89129ed1f71b4dc4b9db5f20fe6b51a5 rdf:first <https://w3id.org/promo/library#V_35> ;
+        rdf:rest _:N6eec3d508b214c399e457869247d89cc .
+
     _:N8abda9ab67004ece877a610625cd35ae rdf:first <https://w3id.org/promo/library#V_134> ;
         rdf:rest () .
 
-    _:N8b80aa57c73242c2a718f8452e958a06 rdf:first _:N3f1c6b9a2ff74df396f5900573debbd6 ;
-        rdf:rest _:N17a89aa38fd34684b5a31c07ec577e32 .
-
     _:N8b95fae832dc458082c7c174637e78dc rdf:first <https://w3id.org/promo/ontology#idx_x> ;
         rdf:rest () .
+
+    _:N8df0531a4c444f839e271b4f51aed80d rdf:first <https://w3id.org/promo/library#V_54> ;
+        rdf:rest () .
+
+    _:N8f40cfab50d84231863e20bdfcbae638 rdf:first <https://w3id.org/promo/library#V_83> ;
+        rdf:rest _:Nc225b994153645cf84ecafc12f95b339 .
 
     _:N9296f5f72eb54a2b839f1ff0bfe8c16c rdf:first _:N174f3eeaae564333b875a12ae1da84fe ;
         rdf:rest _:N2e2794be13bf43d88eed4ac187c9c88b .
@@ -3610,8 +3655,12 @@
     _:N98e44c8a49dd4e2e962d9d8d541e5e46 rdf:first _:Na51cd41454ca4216a302ba862087dbfd ;
         rdf:rest () .
 
-    _:N99371cff6f3e4821887457aeb726e8bd rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest _:N51c6f23d463c447c9e50db0705126f8f .
+    _:Na41e1e7107c2419bb6877954c980bedd rdf:first <https://w3id.org/promo/library#V_138> ;
+        rdf:rest () .
+
+    _:Na4526cce25bb43328204cde02ba16baa a promo:Expression ;
+        promo:hasArguments _:N1bd22e44834f49cca5b834c91a6e6526 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     _:Na51cd41454ca4216a302ba862087dbfd a promo:Expression ;
         promo:hasArguments _:Nc996b4a5f247488884161594199d09f2 ;
@@ -3623,22 +3672,17 @@
     _:Nb586152732e348298f6dd8d3d20d9c92 rdf:first <https://w3id.org/promo/library#V_135> ;
         rdf:rest _:N98e44c8a49dd4e2e962d9d8d541e5e46 .
 
-    _:Nb604d00780904cb6bb5f416371671bd5 rdf:first <https://w3id.org/promo/library#V_137> ;
-        rdf:rest _:N223b42bb54944a69971b8fd6efcad5e5 .
+    _:Nb5ed0816f56345cfa18f4f6c47fda09d rdf:first _:N5a77a54d66324b299233205cd8ffdb25 ;
+        rdf:rest () .
 
     _:Nb6aa3bfb358d421faa92cd35f70759f6 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
         rdf:rest () .
 
-    _:Nbbdfeb8e64b1438d960de1daf39da693 rdf:first <https://w3id.org/promo/library#V_6> ;
+    _:Nbc90152c08174126beff19aaa306a9fb rdf:first <https://w3id.org/promo/library#V_139> ;
         rdf:rest () .
 
-    _:Nbc61067655704f1189758af6bcd5021b a promo:Expression ;
-        promo:hasArguments _:N5a3d38474950465dab9477df2b79e032 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:Nc3976af5fc0c4044aa15f848e7bd3cd4 a promo:Expression ;
-        promo:hasArguments _:N8b80aa57c73242c2a718f8452e958a06 ;
-        promo:hasOperation promolg:SumOverIndex .
+    _:Nc225b994153645cf84ecafc12f95b339 rdf:first <https://w3id.org/promo/library#V_141> ;
+        rdf:rest () .
 
     _:Nc996b4a5f247488884161594199d09f2 rdf:first _:N2ae72ffdd7e949e9a326158a38cff171 ;
         rdf:rest _:N8b95fae832dc458082c7c174637e78dc .
@@ -3646,53 +3690,48 @@
     _:Ncca3b778bec446088039ba7d87594a8e rdf:first <https://w3id.org/promo/ontology#sigma> ;
         rdf:rest _:N8848931d69ff4a409546ba21df33011b .
 
-    _:Nd0a8e32123774c6e95bea9c3fcc79b05 rdf:first _:Nf1533548e6124b0b98755dea8b503ac0 ;
+    _:Ncd8284a3adb84f93b67462e0b98e9d24 rdf:first _:Ncf5eb37c754245b9bbd2712795eccdd4 ;
         rdf:rest () .
 
-    _:Nd0c6bba1e0f0442dbc717dfe6950efd9 rdf:first <https://w3id.org/promo/ontology#idx_species> ;
-        rdf:rest () .
+    _:Ncf5eb37c754245b9bbd2712795eccdd4 a promo:Expression ;
+        promo:hasArguments _:N47ff89d3f9fd4c6fab4565867eb982f8 ;
+        promo:hasOperation promolg:SumOverIndex .
 
-    _:Nd25e4ac8a93f456194e2ee299c989e95 rdf:first <https://w3id.org/promo/library#V_133> ;
-        rdf:rest () .
+    _:Nd048acaa477849459d29e19339f12b17 a promo:Expression ;
+        promo:hasArguments _:N7451c8abe0674eafa8268e01d01adda4 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:Nd7fe9a1cabf84208b98e688576d03bcc rdf:first _:N40d9b07fd8a64e08bf29279dff29e5b2 ;
-        rdf:rest _:Nbbdfeb8e64b1438d960de1daf39da693 .
+    _:Nd4ac2555ae5a4778b134c26ff00c2d51 rdf:first _:N0485cdd6df3e4f89a134d7c68e9055d6 ;
+        rdf:rest _:N79450d9feac04a708ed918f57b9f8f65 .
+
+    _:Nd72d026093914b9daf1ae40428686997 rdf:first _:Na4526cce25bb43328204cde02ba16baa ;
+        rdf:rest _:Nb5ed0816f56345cfa18f4f6c47fda09d .
 
     _:Nd8ece0610f904d4587476388441abf51 rdf:first <https://w3id.org/promo/library#V_132> ;
         rdf:rest () .
 
-    _:Ne069098f58204b0d9eb3731152d3076a rdf:first _:N6925524618a1440fa1f7f52e5b641863 ;
-        rdf:rest _:Nefd26772c55a485cb08598ca659c29a6 .
+    _:Ndd9ddf761de94f599b386f634b436b9d rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest _:Nf04ab63b4d5e490db84a45ba0f4da9db .
 
-    _:Ne2a4ae8216ca49a2a017f3f4c406a393 rdf:first _:Ne2c61907a7b945c1a1b8f0b63b56a45e ;
-        rdf:rest _:Nd25e4ac8a93f456194e2ee299c989e95 .
-
-    _:Ne2c61907a7b945c1a1b8f0b63b56a45e a promo:Expression ;
-        promo:hasArguments _:Nb604d00780904cb6bb5f416371671bd5 ;
-        promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:Ne4a947124a4c4ad6952ceb87014121f8 rdf:first <https://w3id.org/promo/library#V_54> ;
+    _:Ne4fecca9bc864ccebd5ed8fd43f6f648 rdf:first <https://w3id.org/promo/library#V_133> ;
         rdf:rest () .
+
+    _:Ne52c7507707545eab309f8f1ab5fc4df rdf:first <https://w3id.org/promo/library#V_133> ;
+        rdf:rest _:N2e675b5d20154c83a40c0b60e1a94954 .
+
+    _:Nebfe85e44dd94a03a511c767784b7515 a promo:Expression ;
+        promo:hasArguments _:N28ad55baed904756929d1995ff431747 ;
+        promo:hasOperation promolg:IndexPreservingProduct .
 
     _:Nec495b4712fb41c491a49885a9734a31 rdf:first _:Nf3f63f8393114592a286e71e9a9e3aee ;
         rdf:rest _:Nb6aa3bfb358d421faa92cd35f70759f6 .
 
-    _:Ned544bce20714ad8a7706317f5c97251 rdf:first <https://w3id.org/promo/ontology#sigma> ;
-        rdf:rest _:N85a8156aee1b48da8ad0847fbbe24b24 .
-
-    _:Nefd26772c55a485cb08598ca659c29a6 rdf:first <https://w3id.org/promo/ontology#idx_x> ;
-        rdf:rest () .
-
-    _:Nf1533548e6124b0b98755dea8b503ac0 a promo:Expression ;
-        promo:hasArguments _:Ne069098f58204b0d9eb3731152d3076a ;
-        promo:hasOperation promolg:SumOverIndex .
+    _:Nf04ab63b4d5e490db84a45ba0f4da9db rdf:first <https://w3id.org/promo/ontology#V_21> ;
+        rdf:rest _:N61e4d550c1a849b1ba5e8651f30f0672 .
 
     _:Nf3f63f8393114592a286e71e9a9e3aee a promo:Expression ;
         promo:hasArguments _:N5c9e7052701544c8b158cf423690c327 ;
         promo:hasOperation promolg:IndexPreservingProduct .
-
-    _:Nfae1e16bec8c41b0a5d0d35d8ac4a32f rdf:first <https://w3id.org/promo/library#V_35> ;
-        rdf:rest () .
 
     _:Nffe11e33d53a4565b8a3439f1b2bf1a4 rdf:first _:N5bdd10f417394398ab9b3ac6071e596b ;
         rdf:rest _:N09823ae148c94b339387e65ce55a8583 .

@@ -8,7 +8,10 @@ consumer.  Lands:
 
   ``z_el``     species valence [S]          — physical param (cells)
                (not ``z`` — that label is the spatial coordinate)
-  ``const_F``  Faraday constant []          — physical constant, bound
+  ``const_F``  Faraday constant []          — physical constant,
+               DERIVED ``E_const_F: const_F := Avo·const_e``
+               (mirrors E_44's ``R := Boltz·Avo``)
+  ``const_e``  elementary charge []         — physical constant, bound
   ``mu_el``    electrochemical potential [N,S] — macroscopic effort,
                ``E_mu_el: mu_el := mu + z*const_F*Ue``
   ``Pel``      electric transfer [A_el,N]    — macroscopic port,
@@ -75,6 +78,8 @@ V_Z = f"{LIB}#V_137"
 V_CF = f"{LIB}#V_138"
 V_MUEL = f"{LIB}#V_139"
 V_PEL = f"{LIB}#V_140"
+V_CE = f"{LIB}#V_141"
+V_AVO = f"{LIB}#V_83"         # Avo — Avogadro constant (existing)
 V_FND = f"{LIB}#V_79"
 
 
@@ -139,12 +144,28 @@ NEW_VARS = [
         tokens=[], index_structures=[IDX_S],
         network="physical", equations={}),
     var("V_138", "const_F",
-        "Faraday constant F — C per mol of charge; universal "
-        "constant, bound here.  Bridges the charge and "
+        "Faraday constant F — C per mol of charge; DERIVED from "
+        "the basic constants as F = N_A·e (same pattern as "
+        "E_44's R = N_A·k_B).  Bridges the charge and "
         "component_mass content families (§57).",
         port=False, cls=CLS_PARAM, units=U_MOL_CHG, latex="\\mathcal{F}",
         tokens=[], index_structures=[],
-        network="physical", value="96485.33212",
+        network="physical",
+        equations={
+            "E_const_F": eq("E_const_F", V_CF,
+                            "( Avo * const_e )",
+                            "F = N_A·e — derived constant, same "
+                            "layer as R = N_A·k_B (§57)",
+                            network="physical"),
+        }),
+    var("V_141", "const_e",
+        "elementary charge — charge of one mole... of one "
+        "proton; the charge-family fundamental constant, bound "
+        "exact SI value.",
+        port=False, cls=CLS_PARAM,
+        units=[1, 0, 0, 0, 0, 1, 0, 0], latex="{e}^{0}",
+        tokens=[], index_structures=[],
+        network="physical", value="1.602176634e-19",
         equations={}),
     var("V_139", "mu_el",
         "electrochemical potential — derived effort "

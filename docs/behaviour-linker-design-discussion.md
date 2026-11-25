@@ -5418,3 +5418,41 @@ An electrode boundary carries species flux *and* charge flux on
 one contact — the `port-domain-ambiguous` problem in the wild.
 The electrode remains the pairing resolver's first real
 consumer; the var/expr layer above is ready for it.
+
+### The coefficient skeleton (user, 2026-11-25 — derivation program)
+
+The corpus's lumped transport coefficients are already *derived
+determinations*, not primitives — `kqx = (V⁻¹·Cp)·Σ_C(e·v)`,
+`kcx = (V⁻¹·Σ Mm·μ⁻¹·∂U/∂p)·Σ_C(e·v)`, `kQ = ParDiff(U,T)`.
+The shared skeleton:
+
+    k = (content-per-effort density — a ∂U-response or content
+         ratio, from the base relation) × (carrier speed — the
+         kinetic datum)
+
+`kEl` fits the same mould for an ionic carrier:
+`kEl = Σ_s [ V⁻¹·(z_s·F·n_s)·(z_s·F·D_s/(R·T)) ] =
+F²/(R·T)·Σ_s z_s²·D_s·c_s` (Nernst–Einstein) — content density
+`z·F·n/V` × drift speed per effort `zFD/RT`.  `D_s` plays the
+`v`/`τ` role — **the irreducible kinetic datum**.  For the
+electron conductor no species content exists for the response
+to hang on, so `kEl` stays a primitive — the skeleton explains
+*why* the cases differ.
+
+User's articulated program (ruled in principle): **derive all
+physical quantities from the base relation** — indices and units
+then check compositionally (the `z`/`z_el` collision proved it);
+the irreducible residue is exactly the kinetic-datum class
+(`v`, `D`, `τ`, carrier density).  The precise claim is
+"everything except the kinetic datum derives from `U` — and the
+derivation forces the datum into the carrier-motion slot".
+Noted for `design-principles.md`.  `E_kEl_ionic` recorded as the
+ready §54-alternative; needs `D_s` authored first.
+
+### Constants layer
+
+`R` already derives — `E_44: R := Boltz·Avo`.  `const_F` now
+mirrors it: `E_const_F: const_F := Avo·const_e`, with `const_e`
+the new bound primitive (exact SI `1.602176634e-19 C`; `e`
+itself was unavailable — control-domain label).  Consistent:
+`[1,0,-1,0,0,1,0,0]` = C/mol.
