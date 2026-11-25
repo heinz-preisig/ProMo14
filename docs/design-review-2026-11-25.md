@@ -71,7 +71,12 @@ narrative.
 - **New open item** — `kConvX` could *derive* from `lam`/`Lp`/`dp`
   for the linear regime (parked: needs a physics decision — which
   linear resistance model — plus a viscosity parameter); per-arc
-  regime mixing would need a sibling etype.
+  regime mixing would need a sibling etype.  *Withdrawn 2026-11-25:
+  wrong provenance — the `k*` coefficients are `U(S,V,n)`-derived
+  thermodynamic mobilities whose values land via instantiation;
+  `lam`/`Lp`/`dp` are arc-bound geometry for the Darcy regime.
+  The regimes coexist as alternatives precisely because their
+  parameter origins differ.*
 
 ## Proposed `design-principles.md` edits
 
