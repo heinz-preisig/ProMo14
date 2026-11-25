@@ -126,7 +126,8 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_environment> ;
         promo:hasEquationSequence [ ] ;
-        promo:hasInstantiatedVariable <https://w3id.org/promo/ontology#V_34> .
+        promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_133>,
+            <https://w3id.org/promo/ontology#V_34> .
 
     <https://w3id.org/promo/library/assignments#assignment_etype_lumped> a promo:BehaviourAssignment ;
         promo:closed true ;
