@@ -18,6 +18,10 @@ enforcement lives in the ontology and the test suite.
 
 - `data/*.trig` is serialized persistence — **APIs only, never
   hand-edit**.  In-memory store; Save/POST /save persists.
+- **Save before touching `backend/`** — any write under `backend/`
+  triggers the uvicorn reload, which rebuilds the store from `.trig`
+  and discards un-saved mutations.  Order: store mutations → save →
+  backend edits.  (Same for `dev.sh restart`/`wipe-restart`.)
 - Semantics lives in the ontology (`promo#` vocabulary = types only,
   instance IRIs under `{graphIRI}#`).  Extend the ontology, never
   special-case code.  No OWL — RDFS only.
