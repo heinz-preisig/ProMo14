@@ -579,7 +579,19 @@ basis-vector projection or algebraic fragment does not.
   balance into `etype_lumped` — `dEmdt` as diagnostic output
   (balances are readings), `E_P_int` replicating the §48
   slot-alias for `P`, `r` joining `instantiated` as per-node
-  geometric datum.
+  geometric datum.  *2026-11-25 addendum (§54/§55):* the §47
+  "ΣF(v)=0 → v" upgrade resolved differently — velocity is
+  determined pressure-driven *on the arc*: `E_v_str_darcy`/
+  `E_fmc_darcy` (quadratic `Δp ∝ v²` via `sign`/`abs`/`sqrt`
+  — explicit, no algebraic loop) sit beside the linear
+  `kConvX` laws as alternatives on the same lhs; the
+  assignment sequence picks the regime.  The lump's contact
+  velocity arrives via the `v_str` port: `E_fKin` fixed in
+  place (`v`→`v_str`, its only consumer — the §49 physics
+  ruling applied consistently), `E_P_int`/`E_v_fromP` dropped
+  from `etype_lumped` (dead cone), `v_str` joins `ports` on
+  both lump assignments, and `etype_lumped_qss` carries the
+  full energy wiring (`dEmdt` diagnostic, no `v`/`P`).
 - Overdetermination check — designed (§5), unimplemented.
   Overdetermination = **declared constraints creating algebraic
   dependencies between vars declared independently**.  Sources:
