@@ -150,6 +150,14 @@ _DOC_UNICODE_TEXT = {
 #: Superscript digits are text-only — in math spans they map below.
 _DOC_UNICODE_MATH.update({"²": "^{2}", "³": "^{3}"})
 
+#: Precomposed dot-above letters (rate notation ṁ, ṅ, Ė …) → \dot{x}.
+_DOC_UNICODE_MATH.update(
+    {ch: r"\dot{%s}" % base for ch, base in zip(
+        "ḃċḋėḟġḣṁṅṗṙṡṫżẏ"
+        "ḂĊḊĖḞĠḢṀṄṖṘṠṪŻẎ",
+        "bcdefghmnprstzy"
+        "BCDEFGHMNPRSTZY")})
+
 
 def tex_doc(text: str) -> str:
     """Escape a free-text ``doc`` string for LaTeX text mode.

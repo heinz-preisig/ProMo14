@@ -199,6 +199,16 @@ def test_tex_doc_escapes_prose_and_keeps_latex_markup():
     assert tex_doc("$E=σv$") == r"$E=\sigma v$"
 
 
+def test_tex_doc_dot_above_rate_letters():
+    """Dot-above rate notation (ṁ, ṅ, Ė …) — the Darcy-power doc's
+    literal ``ṁ`` was a reported pdflatex failure."""
+    assert tex_doc("λ·(L/d)·ṁ·v²/2") == \
+        r"$\lambda$$\cdot$(L/d)$\cdot$$\dot{m}$$\cdot$v\textsuperscript{2}/2"
+    assert tex_doc("Ṅ") == r"$\dot{N}$"
+    # inside a math span the command needs its terminator space
+    assert tex_doc("$P=ṁ$") == r"$P=\dot{m} $"
+
+
 @pytest.mark.skipif(shutil.which("pdflatex") is None,
                     reason="no TeX toolchain installed")
 def test_generated_document_compiles_to_pdf():
