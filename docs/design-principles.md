@@ -454,6 +454,26 @@ Ruled 2026-11-25, after a full audit of what `seed.py` mints silently
   stays (`token_mass` is the family anchor + bulk grain,
   `token_charge` is parked for electrochemistry).
 
+## 18. Name component extractions, not basis-vector projections
+
+Ruled 2026-11-25 (BL §53): a `reduceSum`-style contraction that
+extracts a **physical quantity** gets its own named variable; a
+basis-vector projection or algebraic fragment does not.
+
+- `x`, `y`, `z` — `e_i · r` contracted over `C` — are authored
+  geometry variables `[N]`, physical network
+  (`term_function_geometry`, token-neutral).  `E_fPot` now reads
+  `fmc·g·z`; the projected areas read `Axy = x·y`, `Ayz = y·z`,
+  `Axz = x·z`.
+- Contrast: `e_z` in `E_F_g`'s `m·g·e_z` is a **basis vector** —
+  it projects a scalar into a frame, it is not a named quantity;
+  it stays inline.
+- The test: does the subexpression denote a quantity another
+  equation would reuse (elevation, velocity components, projected
+  area)?  Name it.  Is it just how the algebra happens to group?
+  Leave it inline — named fragments multiply the variable count
+  without adding meaning.
+
 ## Open deviations / known gaps
 
 - Transport **interface arity** — opened 2026-11-10; ruled: derive,

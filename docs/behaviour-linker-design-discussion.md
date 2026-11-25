@@ -5034,3 +5034,21 @@ interpreted per token leg is the direction when that machinery lands.
 - Scale regimes (`length_*`, `time_*`) — skim-worthiness noted; the
   granularity (`time_nano`/`milli`/`macro`) deserves one pass when
   a non-trivial multi-scale model lands.
+
+## 53. Named component extractions — `x`, `y`, `z` authored — RULED & implemented (2026-11-25)
+
+Prompted by `E_fPot`'s `reduceSum((e_z·r), C)` inline contraction: the
+expression language has no `let`/alias mechanism, so an authored
+variable *is* the naming mechanism.  Ruling recorded in
+design-principles §18 — name contractions that extract a **physical
+quantity**; leave basis-vector projections and algebraic fragments
+inline.
+
+- `z` (`V_127`, `E_z`), `x` (`V_128`, `E_x`), `y` (`V_129`, `E_y`) —
+  `e_i·r` over `C`, `[N]` geometry vars, physical network.
+  `E_fPot` → `fmc·g·z`; `Axy`/`Ayz`/`Axz` → `x·y` / `y·z` / `x·z`.
+  All consistent; `y` collides with control `V_76` by label —
+  `physical!y` qualifiers keep resolution unambiguous.
+- Follow-up candidate (same ruling, not yet applied): `v_x`, `v_y`
+  velocity components — `kConvX/Y`, `kDiffX/Y`, `kQX/Y` contract
+  `e_i·v` inline.
