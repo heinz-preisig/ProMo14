@@ -5052,3 +5052,45 @@ inline.
 - Follow-up candidate (same ruling, not yet applied): `v_x`, `v_y`
   velocity components — `kConvX/Y`, `kDiffX/Y`, `kQX/Y` contract
   `e_i·v` inline.
+
+## 54. Darcy flow-law alternatives — quadratic regime beside the linear law — RULED & implemented (2026-11-25)
+
+### Context
+
+The §47 question — which quasi-steady statement determines velocity —
+resolved in discussion: pressure-driven networks.  A pressure-given
+environment pins nodal pressures; the pressure drop across the network
+determines the flow in each branch.  That direction is already the
+authored structure — `E_4`/`E_v_str` compute `fmc`/`v_str` from
+`kConvX·Δp`; `E_fP` carries the pressure force into `dPdt`.  The open
+piece was where the Darcy friction (`fl`, §49) constrains the flow.
+
+### Rulings
+
+- **Darcy-Weisbach is quadratic — an alternative, not a fold-in.**
+  `Δp = λ·(L/d)·ρ·v²/2` inverts to
+  `v = sign(Δp)·√(|Δp|·d/(λ·L·ρ·½))`, which cannot fold into the
+  linear `kConvX·Δp` conductance form.  It lands as *alternative
+  equations on the same lhs* — the assignment sequence picks the
+  regime (the `E_P_def`/`E_P_int` precedent).  No algebraic loop
+  needed: the `sqrt`/`sign`/`abs` repertoire makes the inverted law
+  explicit.
+- **`fmc` derives consistently** — `fmc = ρ·Ayz·v_darcy` (the same
+  quadratic-law velocity), so `fmom = fmc·v_str` and
+  `fl = λ·(L/d)·ṁ·v²/2 = |Δp|·ṁ` stay coherent: dissipated power
+  equals pressure drop times mass flow.
+- **Per-arc mixing → sibling etype** (the `lumped`/`lumped_qss`
+  pattern); a uniform whole-model regime is just a sequence swap in
+  the BL — nothing changes until the user picks the alternatives.
+
+### Authored records
+
+`E_v_str_darcy` (`V_122`), `E_fmc_darcy` (`V_56`) —
+`eqclass_generic`, macroscopic.  `inv(half)` carries the `2` (no
+numeric literals).  Consistency: 82 equations, 0 problems; both new
+equations check clean.  Author: `scripts/author_darcy_flow_law.py`.
+
+Still open: the `dEmdt = 0` Bernoulli-reading promotion on
+`etype_lumped_qss` (the energy-side algebraic path §50 deferred);
+`kConvX` could later *derive* from `lam`/`Lp`/`dp` for the linear
+regime rather than being authored independently.
