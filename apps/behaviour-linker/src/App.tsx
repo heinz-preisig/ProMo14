@@ -62,6 +62,7 @@ export default function App() {
                 onToggleOutput={(v) =>
                   bl.outputs.includes(v) ? bl.unmark(v) : bl.mark(v, 'outputs')
                 }
+                onPickAlt={bl.resolveWith}
                 dragIri={bl.dragIri}
                 setDragIri={bl.setDragIri}
                 dropTarget={bl.dropTarget}

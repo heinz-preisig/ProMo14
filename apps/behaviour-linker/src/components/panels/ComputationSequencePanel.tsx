@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { EqLine } from '../EqLine'
 import { btn, card } from '../../styles'
@@ -13,6 +14,9 @@ interface ComputationSequencePanelProps {
   onRemove: (iri: string) => void
   onMove: (iri: string, dir: -1 | 1) => void
   onToggleOutput: (varIri: string) => void
+  /** Pick a different definer for a slot's lhs — the engine
+   *  exchanges it and re-closes (regime alternatives, §54). */
+  onPickAlt: (varIri: string, eqIri: string) => void
   dragIri: string | null
   setDragIri: Dispatch<SetStateAction<string | null>>
   dropTarget: string | null
@@ -30,12 +34,14 @@ export function ComputationSequencePanel({
   onRemove,
   onMove,
   onToggleOutput,
+  onPickAlt,
   dragIri,
   setDragIri,
   dropTarget,
   setDropTarget,
   dropOn,
 }: ComputationSequencePanelProps) {
+  const [altFor, setAltFor] = useState<string | null>(null)
   return (
     <div style={card}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
@@ -54,9 +60,14 @@ export function ComputationSequencePanel({
       )}
       {sequence.map((eqIri, i) => {
         const e = eqs.get(eqIri)
+        const alts = e
+          ? Array.from(eqs.values()).filter(
+              (c) => c.lhs === e.lhs && c.iri !== eqIri,
+            )
+          : []
         return (
+          <div key={eqIri}>
           <div
-            key={eqIri}
             draggable
             onDragStart={() => setDragIri(eqIri)}
             onDragOver={(ev) => {
@@ -109,6 +120,20 @@ export function ComputationSequencePanel({
                 out
               </button>
             )}
+            {alts.length > 0 && (
+              <button
+                style={{
+                  ...btn,
+                  color: altFor === eqIri ? '#06c' : undefined,
+                }}
+                title={`alternatives for ${lab(e?.lhs)}`}
+                onClick={() =>
+                  setAltFor((a) => (a === eqIri ? null : eqIri))
+                }
+              >
+                ⇄{alts.length}
+              </button>
+            )}
             <button style={btn} onClick={() => onMove(eqIri, -1)}>
               ↑
             </button>
@@ -118,6 +143,32 @@ export function ComputationSequencePanel({
             <button style={btn} onClick={() => onRemove(eqIri)}>
               ✕
             </button>
+          </div>
+          {altFor === eqIri && e && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                padding: '4px 4px 4px 26px',
+                fontSize: 13,
+              }}
+            >
+              {alts.map((c) => (
+                <button
+                  key={c.iri}
+                  style={btn}
+                  title={c.rhs}
+                  onClick={() => {
+                    onPickAlt(e.lhs, c.iri)
+                    setAltFor(null)
+                  }}
+                >
+                  ⇄ <EqLine eq={c} lhsLabel={lab(c.lhs)} />
+                </button>
+              ))}
+            </div>
+          )}
           </div>
         )
       })}
