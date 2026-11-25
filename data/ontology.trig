@@ -1142,19 +1142,6 @@
         promo:tokenVector "{\"token_energy\": 1, \"token_momentum\": -1}" ;
         promo:unitVector "[-2, -1, 0, 1, 0, 0, 0, 0]" .
 
-    <https://w3id.org/promo/ontology#const_g> a promo:Variable ;
-        rdfs:label "g" ;
-        promo:aliases "{\"global_ID\": \"const_g\", \"latex\": \"g\"}" ;
-        promo:doc "Universal constant" ;
-        promo:frozen false ;
-        promo:imported false ;
-        promo:inDomain <https://w3id.org/promo/ontology#domain_universe> ;
-        promo:internalID "const_g" ;
-        promo:network "universe" ;
-        promo:portVariable false ;
-        promo:unitVector "[-2, 1, 0, 0, 0, 0, 0, 0]" ;
-        promo:value "9.81" .
-
     <https://w3id.org/promo/ontology#e_align> a promo:Variable ;
         rdfs:label "e_align" ;
         promo:aliases "{\"latex\": \"e_a\", \"global_ID\": \"https://w3id.org/promo/ontology#e_align\"}" ;
@@ -1343,7 +1330,7 @@
         promo:rhsLatex "\\frac{\\partial {U}_{N}}{\\partial {S}_{N}}" .
 
     <https://w3id.org/promo/ontology#E_1/expression> a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b1 ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db1 ;
         promo:hasOperation promolg:PartialDerivative .
 
     <https://w3id.org/promo/ontology#E_3> a promo:Equation ;
@@ -1361,7 +1348,7 @@
         promo:rhsLatex "\\left( \\sum_{C} \\left( e_{x,C} \\circ {r}_{C,N} \\right) \\circ \\sum_{C} \\left( e_{y,C} \\circ {r}_{C,N} \\right) \\right)" .
 
     <https://w3id.org/promo/ontology#E_3/expression> a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b2 ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db2 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
     <https://w3id.org/promo/ontology#E_7> a promo:Equation ;
@@ -1378,7 +1365,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_7/expression> a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b3 ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db3 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#E_8> a promo:Equation ;
@@ -1395,7 +1382,7 @@
         promo:rhsLatex "x := \\mathrm{inst}\\left( t \\right)" .
 
     <https://w3id.org/promo/ontology#E_8/expression> a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b4 ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db4 ;
         promo:hasOperation promolg:Instantiate .
 
     <https://w3id.org/promo/ontology#V_17> a promo:Variable ;
@@ -1887,7 +1874,7 @@
     <https://w3id.org/promo/ontology#versionOf> a rdf:Property .
 
     <https://w3id.org/promo/ontology> a promo:Ontology ;
-        promo:seedFloor "2026-11-24" .
+        promo:seedFloor "2026-11-25" .
 
     <https://w3id.org/promo/ontology#V_115> a promo:Variable ;
         rdfs:label "r" ;
@@ -2370,62 +2357,62 @@
         promo:name "physical" ;
         promo:parent <https://w3id.org/promo/ontology#domain_universe> .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
-        rdf:rest _:neae59c23970c4cf6877b521ed7ac0391b5 .
+    _:n28e3c5fb0fea4dde953235a981281f9db1 rdf:first <https://w3id.org/promo/ontology#V_5> ;
+        rdf:rest _:n28e3c5fb0fea4dde953235a981281f9db5 .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b10 rdf:first <https://w3id.org/promo/ontology#e_y> ;
-        rdf:rest _:neae59c23970c4cf6877b521ed7ac0391b11 .
+    _:n28e3c5fb0fea4dde953235a981281f9db10 rdf:first _:n28e3c5fb0fea4dde953235a981281f9db11 ;
+        rdf:rest _:n28e3c5fb0fea4dde953235a981281f9db12 .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b11 rdf:first <https://w3id.org/promo/ontology#V_115> ;
-        rdf:rest () .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b12 rdf:first <https://w3id.org/promo/ontology#V_115> ;
-        rdf:rest () .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b13 a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b14 ;
-        promo:hasOperation promolg:SumOverIndex .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b14 rdf:first _:neae59c23970c4cf6877b521ed7ac0391b17 ;
-        rdf:rest _:neae59c23970c4cf6877b521ed7ac0391b18 .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b15 rdf:first <https://w3id.org/promo/ontology#e_x> ;
-        rdf:rest _:neae59c23970c4cf6877b521ed7ac0391b12 .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b16 rdf:first _:neae59c23970c4cf6877b521ed7ac0391b6 ;
-        rdf:rest () .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b17 a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b15 ;
+    _:n28e3c5fb0fea4dde953235a981281f9db11 a promo:Expression ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db13 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b18 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+    _:n28e3c5fb0fea4dde953235a981281f9db12 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b2 rdf:first _:neae59c23970c4cf6877b521ed7ac0391b13 ;
-        rdf:rest _:neae59c23970c4cf6877b521ed7ac0391b16 .
+    _:n28e3c5fb0fea4dde953235a981281f9db13 rdf:first <https://w3id.org/promo/ontology#e_x> ;
+        rdf:rest _:n28e3c5fb0fea4dde953235a981281f9db8 .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b3 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+    _:n28e3c5fb0fea4dde953235a981281f9db14 rdf:first _:n28e3c5fb0fea4dde953235a981281f9db15 ;
         rdf:rest () .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
-        rdf:rest () .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b5 rdf:first <https://w3id.org/promo/ontology#V_7> ;
-        rdf:rest () .
-
-    _:neae59c23970c4cf6877b521ed7ac0391b6 a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b7 ;
+    _:n28e3c5fb0fea4dde953235a981281f9db15 a promo:Expression ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db16 ;
         promo:hasOperation promolg:SumOverIndex .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b7 rdf:first _:neae59c23970c4cf6877b521ed7ac0391b8 ;
-        rdf:rest _:neae59c23970c4cf6877b521ed7ac0391b9 .
+    _:n28e3c5fb0fea4dde953235a981281f9db16 rdf:first _:n28e3c5fb0fea4dde953235a981281f9db17 ;
+        rdf:rest _:n28e3c5fb0fea4dde953235a981281f9db18 .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b8 a promo:Expression ;
-        promo:hasArguments _:neae59c23970c4cf6877b521ed7ac0391b10 ;
+    _:n28e3c5fb0fea4dde953235a981281f9db17 a promo:Expression ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db6 ;
         promo:hasOperation promolg:IndexPreservingProduct .
 
-    _:neae59c23970c4cf6877b521ed7ac0391b9 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
+    _:n28e3c5fb0fea4dde953235a981281f9db18 rdf:first <https://w3id.org/promo/ontology#idx_component> ;
         rdf:rest () .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db2 rdf:first _:n28e3c5fb0fea4dde953235a981281f9db9 ;
+        rdf:rest _:n28e3c5fb0fea4dde953235a981281f9db14 .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db3 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db4 rdf:first <https://w3id.org/promo/ontology#V_11> ;
+        rdf:rest () .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db5 rdf:first <https://w3id.org/promo/ontology#V_7> ;
+        rdf:rest () .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db6 rdf:first <https://w3id.org/promo/ontology#e_y> ;
+        rdf:rest _:n28e3c5fb0fea4dde953235a981281f9db7 .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db7 rdf:first <https://w3id.org/promo/ontology#V_115> ;
+        rdf:rest () .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db8 rdf:first <https://w3id.org/promo/ontology#V_115> ;
+        rdf:rest () .
+
+    _:n28e3c5fb0fea4dde953235a981281f9db9 a promo:Expression ;
+        promo:hasArguments _:n28e3c5fb0fea4dde953235a981281f9db10 ;
+        promo:hasOperation promolg:SumOverIndex .
 }
 

@@ -96,20 +96,21 @@ VOCAB_DOCS = {
 # expression network via ancestor-chain resolution.  ``value`` is the
 # code-surface literal; ``latex`` is the document-surface alias.
 #   (fragment, label, value, latex alias, units — None = dimensionless)
+# Seed carries *machinery* constants only (the numerals the algebra
+# needs).  Physical constants (g, k_B …) are authored content — g was
+# moved out of the seed to the library as V_126 on 2026-11-25, matching
+# the Boltzmann precedent (authored in the equation editor).
 SEED_CONSTANTS = (
     ("const_zero", "zero", "0", "0", None),
     ("const_one", "one", "1", "1", None),
     ("const_half", "half", "0.5", r"\frac{1}{2}", None),
-    # Physical constant — standard gravity m·s⁻² (Bernoulli / potential
-    # energy); units follow the SI vector [t, l, n, m, T, I, J, -].
-    ("const_g", "g", "9.81", "g", [-2, 1, 0, 0, 0, 0, 0, 0]),
 )
 
 # Seed-floor revision stamped as ``promo:seedFloor`` on every graph the
 # migratable seed sequence (``apply_seed_floor``) has run against.
 # Bump when any ``_seed_*`` step's content changes so the catalogue can
 # flag draft ontology forks that predate the current floor.
-SEED_FLOOR = "2026-11-24"
+SEED_FLOOR = "2026-11-25"
 
 # Top-level equation-class hierarchy, seeded by
 # ``seed._seed_equation_classes``.  ``instantiate`` is auto-set for

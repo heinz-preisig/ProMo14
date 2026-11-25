@@ -421,6 +421,39 @@ targets are preserved. Frozen ontology versions are not migrated.
 rules; no separate persisted sticker is introduced. Existing controller
 memberships are not automatically migrated; user equations remain untouched.
 
+## 17. Surfaces are volumes; environment is the generic reservoir; the seed floor is machinery only
+
+Ruled 2026-11-25, after a full audit of what `seed.py` mints silently
+(BL §52):
+
+- **Surfaces are not entities.**  A surface is an abstraction of a
+  thin volume; surface reactions and phase boundaries are modelled as
+  `point` (kinetic wall, no adsorbed inventory) or `lumped` (thin
+  film *with* inventory/coverage) nodes — both already carry
+  `reaction_host`, so no `surface` etype and no
+  `surface_reaction_host` capability exist or are wanted.  A phase
+  interface is **two point volumes**, one per phase, giving the
+  interfacial state each side's diffusive flux needs; the jump
+  relation (equilibrium or kinetic) is an equation over the pair —
+  the standard sharp-interface structure, expressed with the
+  existing topology.
+- **`environment` is the generic source/sink** for tokens of any
+  form — species, bulk mass, heat, charge, work.  `species_source`
+  is only its species leg (gates `promo:speciesAllocation`); the
+  other legs arrive with the boundary-condition machinery
+  (effort-pinned ports, injected fluxes), not as N new capabilities.
+  Environment never hosts reactions — a reacting wall is a volume
+  *between* environment and bulk.
+- **The seed floor carries machinery, not physics.**  Seeded
+  constants are the algebraic numerals (`zero`, `one`, `half`).
+  Physical constants are authored content: `g` moved from the seed
+  to the library (`V_126`, constant-class, value 9.81) on
+  2026-11-25, matching the Boltzmann precedent.  Seeded vocabulary
+  is the only channel that mints resources without an authoring
+  gesture — keep it minimal and auditable; token vocabulary itself
+  stays (`token_mass` is the family anchor + bulk grain,
+  `token_charge` is parked for electrochemistry).
+
 ## Open deviations / known gaps
 
 - Transport **interface arity** — opened 2026-11-10; ruled: derive,

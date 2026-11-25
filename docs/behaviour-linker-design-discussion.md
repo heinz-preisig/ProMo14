@@ -4964,3 +4964,73 @@ needs the absent `P` slot (same §50 deferral).
   `E_66`→`#E_dEtotdt`.  Unknown IRIs drop the whole sequence field
   silently (other selection fields still apply) — verify `closed`
   after every assignment PUT.
+
+## 52. Seed inventory audit — surfaces are volumes, environment is the reservoir, seed carries machinery only — RULED (2026-11-25)
+
+The §32 union-index removal surfaced a meta-question: seeded vocabulary
+arrives silently — the `A_mass`/`A_energy` unions were minted by
+`_seed_arc_sub_indices` at load, never through an editor, which is why
+nobody noticed them for weeks.  The whole seed inventory was audited;
+the rulings below are recorded in design-principles §17.
+
+### Token rulings
+
+- **`token_mass` stays** — family anchor for the mechanism groupings
+  (`mass_transport` declares the family; grain resolves by ancestry)
+  *and* the legitimate bulk grain (`V_57`/`V_68`/`V_109` carry it).
+  Species (`component_mass`) is the default authoring grain, not the
+  only one — grain remains a model-objective choice (§5).
+- **`token_charge` stays** — parked, not dead: electrochemistry will
+  need it (migration/diffusion in electrolyte, Nernst-Planck), plus a
+  `charge_transport` grouping when that lands.
+
+### Surfaces are volumes — the phase-boundary pattern
+
+User-ruled: **a surface is an abstraction; we always deal with
+volumes.**  No `surface` etype, no `surface_reaction_host`:
+
+- kinetic wall (no adsorbed inventory) → `point` + `reaction_host`
+- thin film with coverage θ / adsorbed state → `lumped` + `reaction_host`
+- **phase interface = two point volumes**, one per phase — each
+  carries its phase's interfacial state, the jump relation
+  (equilibrium: equal chemical potentials; or kinetic transfer rate)
+  is an equation over the pair, and diffusion *to* the interface gets
+  its driving force from the near-interface node.  Standard
+  sharp-interface jump-condition topology, no new vocabulary.
+- consequence: `environment` never hosts reactions — a reacting wall
+  is a volume between environment and bulk.
+
+### Environment = generic source/sink
+
+`environment` is an unbounded reservoir for tokens of any form —
+species, bulk mass, heat, charge, work.  `species_source` is merely
+its species leg (gates `promo:speciesAllocation`).  The other legs
+arrive with the BC machinery (effort-pinned ports / injected fluxes),
+not as N parallel capabilities.  A single reservoir capability
+interpreted per token leg is the direction when that machinery lands.
+
+### Seed carries machinery only — `g` moved to the library
+
+- `const_g` removed from `SEED_CONSTANTS` → seed keeps the algebraic
+  numerals (`zero`/`one`/`half`); **physical constants are authored
+  content** (Boltzmann was already authored in the equation editor).
+- `g` re-authored as `library#V_126` — constant-class, value 9.81,
+  `universe` network, units `[-2,1,0,0,0,0,0,0]`.
+- `E_F_g` re-bound on re-save (`universe!g` resolved self-first);
+  `E_fPot`'s bare `g` still hit the ontology's `const_g` — the
+  compile-space rule takes the *last* same-network candidate in scope
+  order, and pins iterate after self.  rhs qualified to `universe!g`
+  (matching `E_F_g`'s style) → re-bound → `const_g` deleted.
+- Lesson recorded: **same-label vars across scope do not reliably
+  shadow for bare references** — qualify cross-graph references when
+  a same-name var exists in a pinned graph.  `SEED_FLOOR` →
+  2026-11-25.
+
+### Remaining audit notes (not ruled, parked)
+
+- `e_i`/`e_align`/X/C seeded geometry — machinery-justified (`plan()`
+  consumes `e_align` bindings); a geometry-pack split only pays when
+  a second geometry exists.
+- Scale regimes (`length_*`, `time_*`) — skim-worthiness noted; the
+  granularity (`time_nano`/`milli`/`macro`) deserves one pass when
+  a non-trivial multi-scale model lands.
