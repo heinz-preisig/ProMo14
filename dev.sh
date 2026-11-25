@@ -101,7 +101,14 @@ _start_backend() {
     _kill_port $BACKEND_PORT "backend" quiet
     echo "  Starting backend on :$BACKEND_PORT  (log: $BACKEND_LOG)"
     cd "$REPO"
+    # --reload watches ONLY backend/ (not the repo root): editing
+    # scripts/author_*.py, data/*.trig saves, and pytest .pyc writes
+    # would otherwise reload the server and drop unsaved triples.
     nohup uv run uvicorn backend.main:app --port $BACKEND_PORT --reload \
+        --reload-dir "$REPO/backend" \
+        --reload-exclude '*/test_*.py' \
+        --reload-exclude '*/__pycache__/*' \
+        --reload-exclude '*/.pytest_cache/*' \
         > "$BACKEND_LOG" 2>&1 &
     # Ready when the port answers /api/health — startup takes longer
     # than the old fixed sleep (store load + seed migrations).
