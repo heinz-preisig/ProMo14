@@ -216,8 +216,6 @@ def test_arc_indices_endpoint(client):
     body = r.json()
     by_arc = {a["arc"]: a for a in body["arcs"]}
     diff = _idx("idx_arc_diffusion")
-    mass = _idx("idx_arc_mass")
-    assert diff in by_arc[f"{base}/ModelArc_a1"]["sub_indices"]
-    assert mass in by_arc[f"{base}/ModelArc_a1"]["sub_indices"]
+    assert by_arc[f"{base}/ModelArc_a1"]["sub_indices"] == [diff]
     assert body["by_sub_index"][diff] == [
         f"{base}/ModelArc_a1", f"{base}/ModelArc_a2"]

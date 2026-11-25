@@ -131,6 +131,15 @@ crude total mass, or species-resolved component mass.
   closure (implicit remainder).  The check is cardinality-dependent —
   needs the species-set `S` machinery; deferred until a consumer exists.
 
+Amended 2026-11-25 (§32 follow-up): the species grain is the basic
+one — the token-level union arc sub-indices `A_mass`/`A_energy` and
+their derived `F_mass`/`F_energy` factors were removed.  Nothing
+consumed them, every balance contracts per-mechanism legs, and a
+union-typed flow var cannot be paired to a mechanism.  Bulk totals
+live on the carrier mechanism (convection carries net mass — `E_29`
+contracts `A_conv` only); arc-typed vars always declare their
+mechanism sub-index.
+
 ## 6. Everything is a named graph — artefact lines, pins, resolution scope
 
 One `rdflib.Dataset`; every artefact is a named graph (draft + frozen

@@ -533,21 +533,20 @@ class SeedMixin:
         """Add arc sub-indices partitioned by token and mechanism.
 
         Idempotent by deterministic IRI — migration for stores that
-        predate §16.  ``A_mass``/``A_energy`` select the token-level
-        grouping entity types (membership over leaf subtypes — needs
-        transitive resolution at instantiation); the rest select a
-        single mechanism leaf.  Instantiation resolves membership, the
-        checker sees plain distinct indices.  Short names use
+        predate §16.  Each sub-index selects a single mechanism leaf
+        entity type.  Instantiation resolves membership, the checker
+        sees plain distinct indices.  Short names use
         underscore — ``^`` is the power operator.
         """
         arc_iri = self.mint_iri(base, "idx_arc")
         if (arc_iri, RDF.type, PROMO["Index"]) not in g:
             return
+        # §32 follow-up (2026-11-25): the token-level union indices
+        # A_mass/A_energy were removed — nothing consumed them, every
+        # balance contracts per-mechanism legs, and a union-typed flow
+        # var cannot be paired to a mechanism.  Only mechanism-level
+        # sub-indices are seeded.
         for frag, label, short, sel_frag in [
-            ("idx_arc_mass", "mass arc", "A_mass",
-             "etype_mass_transport"),
-            ("idx_arc_energy", "energy arc", "A_energy",
-             "etype_energy_transport"),
             ("idx_arc_diffusion", "diffusion arc", "A_diff",
              "etype_diffusion_transport"),
             ("idx_arc_convection", "convection arc", "A_conv",

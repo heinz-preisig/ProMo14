@@ -475,7 +475,7 @@ def build(nodes: Dict[str, NodeInfo],
         The covering sub-index is the one whose ``selector`` is
         NEAREST the entity's own type along the ``promo:parent``
         chain — a convection transport's contacts bind under
-        ``A_conv`` rather than the ``A_mass`` union.  Several
+        ``A_conv``.  Several
         sub-indices covering at equal selector distance means the
         entity hosts several mechanisms and no var↔mechanism
         pairing exists yet (§32 stage-2) — reported upstream.

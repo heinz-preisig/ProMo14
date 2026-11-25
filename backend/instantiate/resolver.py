@@ -6,8 +6,8 @@ adapts store graphs into the plain structures this module consumes.
 An arc belongs to a sub-index iff it is a token-flow arc that touches
 a node whose entity type *is-a* the sub-index's ``selector`` (the
 ``promo:parent`` chain gives transitive subtype resolution, so an arc
-touching a ``diffusion_transport`` node lands in ``A_diff``, ``A_mass``
-and the base ``A``).
+touching a ``diffusion_transport`` node lands in ``A_diff`` and the
+base ``A``).
 
 Membership is deliberately physics-free: the selector is any entity
 type, the parent chain any taxonomy.  Only token-flow arcs participate

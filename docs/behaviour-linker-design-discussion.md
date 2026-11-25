@@ -3289,6 +3289,31 @@ silent wrong answer in the meantime).
   resource layer (needed only when one etype hosts two mechanisms
   and drives↔carries must pair per-mechanism).
 
+### Follow-up (2026-11-25): pairing derives, unions removed — RULED
+
+The `fnc`/`fnd` `ambiguous-port` on the convection peer fired the
+tripwire.  Reading the demand legs showed the pairing signal is
+already authored — twice over: the flow var's `indexStructure`
+carries its mechanism arc sub-index (`fnc`→`A_conv`, `fnd`→`A_diff`)
+and the consuming balance names the same sub-index in its `F_k`
+contraction (`E_anc`/`E_and`).  Token cannot discriminate — both
+carry `component_mass`, correctly.  Ruled: **pairing derives, it is
+never declared** — candidate's arc sub-index ↔ demand's contraction
+index; an explicit pairing predicate would double-declare what the
+index structure already says.
+
+- **Union indices removed** (`A_mass`, `A_energy`, `F_mass`,
+  `F_energy` — seed entries + stored resources).  Zero consumers:
+  `E_29` contracts `A_conv` only, builder routed around the union,
+  and a union-typed flow var is unpairable by definition.  User's
+  remark: stay on basic physical tokens — for mass that is the
+  species (`component_mass`), which a bulk-mass union didn't even
+  group.  Mechanism-level sub-indices only, from here on.
+- **Resolver split** (to implement): effort-role ports pair via
+  `drives`; arc-typed flow ports pair via `indexStructure` sub-index
+  ↔ demand contraction index; neither signal → stays ambiguous,
+  loud.
+
 ## 33. Submodel reuse — two insertion modes and the phantom port (2026-11-08)
 
 Continuation of the 11-06 copy-vs-reference discussion.  The user's
