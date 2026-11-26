@@ -5491,3 +5491,29 @@ family as the §40 implicit-contraction break.  `Pel`/`E_Pel` stay
 authored-but-unwired; a transport-side reading would want the join
 machinery or the Joule spelling `fe*reduceSum(σ·Ue,X)` (leg
 dissipation — a different quantity than the contact transfer).
+
+### Electrolyte lump + ionic diffusion (2026-11-26)
+
+Consumers for `E_qel_species`/`E_fnd_el` landed
+(`scripts/author_electrolyte.py`, all `closed=True`):
+
+- **`etype_lumped_electrolyte`** — sibling of `etype_lumped`
+  (conductor/qss family).  State = `dndt` only (species balance
+  `E_50 = anc+and+r`); the derived chain `n → qel → Ue → mu_el`
+  uses `E_qel_species` — charge carried by electroneutral
+  bookkeeping, no independent charge state.  `mu`/`r`/`no`/`Cel`/`t`
+  instantiated as EOS/reaction/IC data; `mu_el`+`Ue` exported
+  (outputs); `dqeldt` marked output so the KCL residual survives
+  cone pruning — the electroneutrality reading.
+- **`etype_diffusion_transport`** — base assignment that was
+  missing entirely on the seeded mechanism leaf: `E_41` (μ-driven
+  Fick), port `mu`, output `fnd`.
+- **`etype_diffusion_ionic`** — sibling per §47 regime convention:
+  `E_fnd_el` (μ̃-driven), port `mu_el`, output `fnd`.  The
+  `E_fnd_el` consumer; pairing the electrolyte's `mu_el` export to
+  this port is the §32 interface.
+
+**Tripwire noted:** a stateless event-dynamic transport takes
+`base_equation=null` (the §32 form) — anchoring a peer balance
+(`E_50`) pulls lump-side refs (`anc`/`and`/`r`) into the
+transport's cone and it stays open (`closed=False`).
