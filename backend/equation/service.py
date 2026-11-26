@@ -1130,14 +1130,21 @@ def _structural_changes(old, record: VariableRecord) -> List[str]:
     reader's convention), so an absent alias is not a change."""
     fragment = record.iri.split("#")[-1].split("/")[-1]
     # Additive token declarations are exempt: declaring carriesToken
-    # on a previously untracked variable adds metadata — it changes no
-    # equation semantics.  Removing or *altering* existing membership
-    # remains a locked structural change (port licensing is a real
-    # consumer).
+    # adds metadata — it changes no equation semantics.  Removing or
+    # *replacing* existing membership remains a locked structural
+    # change (port licensing is a real consumer).
     old_tokens = sorted(getattr(old, "tokens", []))
     new_tokens = sorted(record.tokens)
-    # additive: previously untracked -> declared; report as no change
-    tokens_pair = (old_tokens, new_tokens) if old_tokens else (old_tokens, old_tokens)
+    # additive: adding memberships is exempt (new ⊇ old — the
+    # previously-untracked case falls out, old being trivially
+    # contained).  A *pure* addition removes nothing — it can only
+    # widen port candidacy, which surfaces as a Problem if it
+    # ambiguates a binding, never silently.  Removing or replacing
+    # membership remains a locked structural change.
+    if set(new_tokens) >= set(old_tokens):
+        tokens_pair = (old_tokens, old_tokens)
+    else:
+        tokens_pair = (old_tokens, new_tokens)
     # ``token_vector`` is absent from the lock set (ruled 2026-11-11):
     # it feeds only advisory signatures — nothing gates on it — so a
     # signature-only edit is the sanctioned fix path for token

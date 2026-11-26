@@ -455,6 +455,28 @@ def test_altering_token_declarations_blocked_when_referenced(client):
     assert "tokens" in locked and "token_vector" not in locked
 
 
+def test_added_token_membership_exempt_when_referenced(client):
+    """Pure addition on a tracked variable is exempt too (ruled 2026-11-26,
+    charge_02 DL-metal contact): {signal} -> {signal, charge} removes
+    nothing — it can only widen port candidacy, which surfaces as a
+    Problem if it ambiguates a binding, never silently.  Replacing or
+    dropping a membership still locks."""
+    mass = "https://w3id.org/promo/ontology#token_mass"
+    charge = "https://w3id.org/promo/ontology#token_charge"
+    _post(client, _var("V_1", tokens=[mass]))
+    _post(client, _var("V_2", equations={
+        "root": _eq("E_1", f"{BASE}#V_2", "V_1 * 2"),
+    }))
+
+    r = _put(client, _var("V_1", tokens=[mass, charge]))
+    assert r.status_code == 200, r.text
+
+    # Replacing (dropping mass) is an alter — still locked.
+    r = _put(client, _var("V_1", tokens=[charge]))
+    assert r.status_code == 409
+    assert "tokens" in r.json()["detail"]["locked_fields"]
+
+
 def test_signature_only_change_exempt_when_referenced(client):
     """Ruled 2026-11-11: ``token_vector`` feeds only advisories — nothing
     gates on it — so signature-only edits pass the §18 lock on a
