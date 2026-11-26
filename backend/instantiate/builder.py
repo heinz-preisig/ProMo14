@@ -897,6 +897,18 @@ def build(nodes: Dict[str, NodeInfo],
                 arc_indexed = any(
                     _arc_like(indices.get(i), indices)
                     for i in var.index_structures)
+                if arc_indexed:
+                    # §32 pair-by-declaration: the port's declared arc
+                    # index names the mechanism it rides — a flow lives
+                    # only on arcs that index covers (fnc never sees
+                    # diffusion contacts; fnd never sees convection).
+                    # Without it every token-flow arc is a candidate.
+                    covered: Set[str] = set()
+                    for i in var.index_structures:
+                        if _arc_like(indices.get(i), indices):
+                            covered.update(
+                                arc_elements(i, t_set) or [])
+                    carrier_ok = [a for a in carrier_ok if a in covered]
 
                 def candidates_at(
                         a_iri: str) -> Tuple[List[Tuple[str, str]], bool]:

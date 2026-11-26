@@ -1123,12 +1123,15 @@ def test_plan_gathers():
     assert j.elements == ["a1", "a2"]
     assert j.map == [0, 1]            # identity over A_diff
     assert j.peer_instance == "V_3@etype_diffusion_transport"
-    # map positions index the peer bound axis carrying the contact
-    # elements — for a vector peer the whole row is taken at emit.
+    # map entries are flat positions in the peer's bound product —
+    # the contact pins the arc axis AND the peer-node axis; any
+    # remaining axes broadcast (emit takes the flat path).
     for g in (pin, j):
-        assert g.map_index in g.peer_indices
-        els = g.peer_indices[g.map_index]
-        assert all(-1 <= m < len(els) for m in g.map)
+        assert g.map_index == ""
+        flat = 1
+        for els in g.peer_indices.values():
+            flat *= max(1, len(els or []))
+        assert all(-1 <= m < flat for m in g.map)
 
 
 def test_plan_blocks_carry_rhs_and_indices():
@@ -1204,11 +1207,11 @@ def test_emit_python():
     # level 0: p = m
     assert "V_2 = V_1" in src
     # level 1: p_in gathers p at peer nodes; J = k ⊙ p_in
-    assert "V_6 = np.take(V_2, [0, 1], axis=0)" in src
+    assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     # level 2: J gather (identity over A_diff); dm = F·J
     assert ("V_3_lumped_capacity = "
-            "np.take(V_3_diffusion_transport, [0, 1], axis=0)"
+            "V_3_diffusion_transport[[0, 1]]"
             in src)
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
     assert "return dy" in src
@@ -1407,11 +1410,10 @@ def test_emit_julia():
     assert "V_1 = @view y[1:2]" in src
     assert "V_5 = par.V_5" in src
     assert "V_2 = V_1" in src
-    assert ("V_6 = reshape(selectdim(V_2, 1, [1, 2]), (2))" in src)
+    assert ("V_6 = V_2[[1, 2]]" in src)
     assert "V_3_diffusion_transport = V_5 .* V_6" in src
     assert ("V_3_lumped_capacity = "
-            "reshape(selectdim(V_3_diffusion_transport, 1, [1, 2]), "
-            "(2))" in src)
+            "V_3_diffusion_transport[[1, 2]]" in src)
     assert "dy[1:2] = V_4 * V_3_lumped_capacity" in src
     assert "return nothing" in src
 
@@ -2208,7 +2210,7 @@ def test_emit_python_instantiated_pressure():
     src = emit_python(cp, _emit_space())
     assert 'V_2 = par["V_2"]' in src      # p is a parameter now
     assert "V_2 = V_1" not in src         # no prop block
-    assert "V_6 = np.take(V_2, [0, 1], axis=0)" in src
+    assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
 
@@ -2495,7 +2497,7 @@ def test_code_endpoint(client):
     assert "def derivative(t, y, par, out=None):" in src
     assert "V_1 = y[0:2]" in src
     assert 'V_5 = par["V_5"]' in src
-    assert "V_6 = np.take(V_2, [0, 1], axis=0)" in src
+    assert "V_6 = V_2[[0, 1]]" in src
     assert "V_3_diffusion_transport = V_5 * V_6" in src
     assert ("dy[0:2] = np.ravel(_d(V_4 @ V_3_lumped_capacity))" in src)
     # §21 outputs — p (lumped, V_2) and j (transport export,

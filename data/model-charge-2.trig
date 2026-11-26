@@ -1,0 +1,211 @@
+@prefix promo: <https://w3id.org/promo#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/promo/model-charge-2> {
+    promo:Assignment a rdfs:Class .
+
+    promo:Glass a rdfs:Class .
+
+    promo:Instantiation a rdfs:Class .
+
+    promo:Library a rdfs:Class .
+
+    promo:Model a rdfs:Class .
+
+    promo:Ontology a rdfs:Class .
+
+    promo:Species a rdfs:Class .
+
+    promo:ValueCell a rdfs:Class ;
+        promo:doc "One entry of a variable's value table (§20 ν channel).  The variable links it via promo:valueCell; the cell carries promo:value (literal scalar), promo:coordinate (JSON list of index-element IRIs ordered by the variable's indexStructure) and promo:atIndexElement links.  See docs/value-cells.md." .
+
+    promo:ValueFill a rdfs:Class ;
+        promo:doc "A fill rule covering many cells of a variable's value table at once — the '*' selector mechanism for mostly-uniform tables.  The variable links it via promo:valueFill; the fill carries promo:fillPattern (JSON list of element IRIs and '*' segments in indexStructure order) and promo:value.  Resolved to concrete cells at plan() time.  See docs/value-fill.md." .
+
+    promo:Version a rdfs:Class .
+
+    promo:atIndexElement a rdf:Property ;
+        promo:doc "promo:ValueCell → index element IRI, for graph navigation.  Unordered — the authoritative element order is the cell's promo:coordinate literal." .
+
+    promo:coordinate a rdf:Property ;
+        promo:doc "On a promo:ValueCell: JSON list of index-element IRIs ordered by the variable's indexStructure — the authoritative cell coordinate.  Flat enumerations of a table walk the coordinate product last-index-fastest (C order).  See docs/value-cells.md." .
+
+    promo:fillPattern a rdf:Property ;
+        promo:doc "On a promo:ValueFill: JSON list like promo:coordinate but with '*' allowed per segment — '*' matches every element on that axis.  The most specific matching selector wins; equal-specificity overlaps are fill-conflict problems.  See docs/value-fill.md." .
+
+    promo:generatedFrom a rdf:Property .
+
+    promo:hasSubPlan a rdf:Property .
+
+    promo:instantiates a rdf:Property .
+
+    promo:occurrencePath a rdf:Property .
+
+    promo:overrides a rdf:Property .
+
+    promo:publishedOn a rdf:Property .
+
+    promo:seedFloor a rdf:Property .
+
+    promo:usesAssignment a rdf:Property .
+
+    promo:usesLibrary a rdf:Property .
+
+    promo:usesOntology a rdf:Property .
+
+    promo:usesSpecies a rdf:Property .
+
+    promo:usesValues a rdf:Property .
+
+    promo:valueCell a rdf:Property ;
+        promo:doc "Variable → promo:ValueCell: the variable's value table — ν parameter tables and initial-condition pins.  See docs/value-cells.md." .
+
+    promo:valueFill a rdf:Property ;
+        promo:doc "Variable → promo:ValueFill: a fill rule covering a region of the variable's value table.  See docs/value-fill.md." .
+
+    promo:versionInfo a rdf:Property .
+
+    promo:versionOf a rdf:Property .
+
+    <https://w3id.org/promo/model-charge-2> a promo:Model ;
+        rdfs:label "charge_02" ;
+        promo:usesAssignment <https://w3id.org/promo/library/assignments> ;
+        promo:usesLibrary <https://w3id.org/promo/library> ;
+        promo:usesOntology <https://w3id.org/promo/ontology> ;
+        promo:usesSpecies <https://w3id.org/promo/species> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_1> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_1" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_1> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_2> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_1> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_2> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_2> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_2" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_2> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_3> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_2> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_3> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_3> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_3" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_3> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_4> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_3> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_4> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_4> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_4" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_4> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_5> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_4> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_5> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_5> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_5" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_6> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_7> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_6> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_7> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_6> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_6" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_7> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_8> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_7> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_8> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_7> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/reference> ;
+        promo:internalID "Arc_7" ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_5> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_6> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_8> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_8" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_8> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_9> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_8> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_9> .
+
+    <https://w3id.org/promo/model-charge-2/Arc_9> a promo:ModelArc ;
+        promo:arcType <https://w3id.org/promo#ArcType/token-flow> ;
+        promo:internalID "Arc_9" ;
+        promo:referenceFrom <https://w3id.org/promo/model-charge-2/Node_9> ;
+        promo:referenceTo <https://w3id.org/promo/model-charge-2/Node_10> ;
+        promo:source <https://w3id.org/promo/model-charge-2/Node_9> ;
+        promo:target <https://w3id.org/promo/model-charge-2/Node_10> .
+
+    <https://w3id.org/promo/model-charge-2/Model> a promo:Model ;
+        promo:arcCounter 10 ;
+        promo:nextTreeId 11 ;
+        promo:rootComposite <https://w3id.org/promo/model-charge-2/Composite_0> .
+
+    <https://w3id.org/promo/model-charge-2/Composite_0> a promo:Composite ;
+        rdfs:label "Root" ;
+        promo:children "[{\"id\": 1, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_1\"}, {\"id\": 2, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_2\"}, {\"id\": 3, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_3\"}, {\"id\": 4, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_4\"}, {\"id\": 5, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_5\"}, {\"id\": 6, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_6\"}, {\"id\": 7, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_7\"}, {\"id\": 8, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_8\"}, {\"id\": 9, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_9\"}, {\"id\": 10, \"iri\": \"https://w3id.org/promo/model-charge-2/Node_10\"}]" ;
+        promo:internalID 0 ;
+        promo:layout "{\"1\": {\"x\": -280.0, \"y\": 0.0}, \"2\": {\"x\": -140.0, \"y\": 0.0}, \"3\": {\"x\": 0.0, \"y\": 0.0}, \"4\": {\"x\": 140.0, \"y\": 0.0}, \"5\": {\"x\": 280.0, \"y\": 0.0}, \"6\": {\"x\": 420.0, \"y\": 80.0}, \"7\": {\"x\": 560.0, \"y\": 80.0}, \"8\": {\"x\": 700.0, \"y\": 80.0}, \"9\": {\"x\": 840.0, \"y\": 80.0}, \"10\": {\"x\": 980.0, \"y\": 80.0}}" .
+
+    <https://w3id.org/promo/model-charge-2/Node_1> a promo:ModelNode ;
+        rdfs:label "source" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_environment> ;
+        promo:internalID "Node_1" .
+
+    <https://w3id.org/promo/model-charge-2/Node_10> a promo:ModelNode ;
+        rdfs:label "species feed" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_environment> ;
+        promo:internalID "Node_10" ;
+        promo:speciesAllocation <https://w3id.org/promo/species/Allocation_mufi5tl5> .
+
+    <https://w3id.org/promo/model-charge-2/Node_5> a promo:ModelNode ;
+        rdfs:label "DL-metal" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_dl_metal> ;
+        promo:internalID "Node_5" .
+
+    <https://w3id.org/promo/model-charge-2/Node_6> a promo:ModelNode ;
+        rdfs:label "DL-elyte" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_dl_elyte> ;
+        promo:internalID "Node_6" .
+
+    <https://w3id.org/promo/model-charge-2/Node_2> a promo:ModelNode ;
+        rdfs:label "lead1" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_conduction_transport> ;
+        promo:internalID "Node_2" .
+
+    <https://w3id.org/promo/model-charge-2/Node_3> a promo:ModelNode ;
+        rdfs:label "conductor" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped_conductor> ;
+        promo:internalID "Node_3" .
+
+    <https://w3id.org/promo/model-charge-2/Node_4> a promo:ModelNode ;
+        rdfs:label "lead2" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_conduction_transport> ;
+        promo:internalID "Node_4" .
+
+    <https://w3id.org/promo/model-charge-2/Node_7> a promo:ModelNode ;
+        rdfs:label "ionic diff" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_diffusion_ionic> ;
+        promo:internalID "Node_7" .
+
+    <https://w3id.org/promo/model-charge-2/Node_8> a promo:ModelNode ;
+        rdfs:label "electrolyte" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_lumped_electrolyte> ;
+        promo:internalID "Node_8" .
+
+    <https://w3id.org/promo/model-charge-2/Node_9> a promo:ModelNode ;
+        rdfs:label "feed diff" ;
+        promo:entityType <https://w3id.org/promo/ontology#etype_diffusion_ionic> ;
+        promo:internalID "Node_9" .
+}
+

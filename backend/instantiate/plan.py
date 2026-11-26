@@ -460,16 +460,44 @@ def plan(report: Instantiation, sched: Schedule,
             if not run:
                 return
             (peer_occ, peer_type), peer_vb = run_peer
-            # the map axis is the peer bound axis carrying the
-            # contact elements (the arc index for arc-indexed peers,
-            # the node index for contact-referenced ones); positions
-            # within it select the peer's rows at emit.
+            # Flat positions in the peer's bound product.  A contact
+            # pins every axis it carries an element on: the shared
+            # arc for arc-indexed peers, the peer node otherwise —
+            # and for multi-node peer instances ALSO the node axis
+            # (``b.peer_node``): a take on the arc axis alone would
+            # pull every other node's row along it.  Axes carrying
+            # neither (S, C rows) broadcast their elements.
+            axes = list(peer_vb.indices.items())
             axis_pos = {i: {el: j for j, el in enumerate(els or [])}
-                        for i, els in peer_vb.indices.items()}
-            map_index = next(
-                (i for b in run for i, pm in axis_pos.items()
-                 if (b.element or "") in pm), None)
-            mp = axis_pos.get(map_index, {})
+                        for i, els in axes}
+            strides: Dict[str, int] = {}
+            stride = 1
+            for i, els in reversed(axes):
+                strides[i] = stride
+                stride *= max(1, len(els or []))
+
+            def _positions(b) -> List[int]:
+                pinned: Dict[str, int] = {}
+                for i, pm in axis_pos.items():
+                    if (b.element or "") in pm:
+                        pinned[i] = pm[b.element]
+                    elif (b.peer_node or "") in pm:
+                        pinned[i] = pm[b.peer_node]
+                if not pinned:
+                    return [-1]
+                broad = [(i, els) for i, els in axes if i not in pinned]
+                out_pos: List[int] = []
+                for combo in product(*[range(len(els or []))
+                                       for _, els in broad]):
+                    pos = sum(pinned[i] * strides[i] for i in pinned)
+                    pos += sum(p * strides[i]
+                               for p, (i, _) in zip(combo, broad))
+                    out_pos.append(pos)
+                return out_pos or [-1]
+
+            flat_map: List[int] = []
+            for b in run:
+                flat_map.extend(_positions(b))
             out.gathers.append(Gather(
                 var=var, instance=vb.instance,
                 peer_instance=peer_vb.instance,
@@ -479,8 +507,8 @@ def plan(report: Instantiation, sched: Schedule,
                     run[0].peer_var or "", peer_vb.instance),
                 elements=[b.arc if arc_elements else (b.element or "")
                           for b in run],
-                map=[mp.get(b.element or "", -1) for b in run],
-                map_index=map_index or "",
+                map=flat_map,
+                map_index="",
                 peer_indices={i: list(els or [])
                               for i, els in peer_vb.indices.items()},
                 scalar=not vb.indices, indices=vb.indices,
@@ -509,18 +537,10 @@ def plan(report: Instantiation, sched: Schedule,
     gname: Dict[str, str] = {}
     gvar: Dict[str, str] = {}
     for g in out.gathers:
-        # each contact supplies the peer's whole row — the flat
-        # peer size minus the map axis — so a vector port's coverage
-        # counts rows × span, not contacts.
-        flat, axis_len = 1, 1
-        for i, els in (g.peer_indices or {}).items():
-            n_el = max(1, len(els or []))
-            flat *= n_el
-            if i == g.map_index:
-                axis_len = n_el
-        row = flat // axis_len if axis_len else flat
+        # Flat-position maps: every entry supplies exactly one peer
+        # element into the local bound product.
         supplied[g.instance] = (supplied.get(g.instance, 0)
-                                + len(g.map) * row)
+                                + len(g.map))
         gname[g.instance] = g.name or g.instance
         gvar[g.instance] = g.var
         n = 1

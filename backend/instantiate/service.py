@@ -605,12 +605,14 @@ def _entity_capabilities(store, model_graph) -> Dict[str, Set[str]]:
 
 
 def _species_index_iri(store, model_graph) -> Optional[str]:
-    """The index carrying the ``promo:species`` token."""
+    """The species index — discriminated by its token: species
+    enumerate chemical components, so the index carries
+    ``token_component_mass`` (the seed's declared binding)."""
     for gi in store.resolution_scope(model_graph.identifier):
         g = store.dataset.graph(gi)
         for idx in g.subjects(RDF.type, PROMO["Index"]):
-            if str(g.value(idx, PROMO["token"]) or "") == str(
-                    PROMO["species"]):
+            if str(g.value(idx, PROMO["token"]) or "").endswith(
+                    "#token_component_mass"):
                 return str(idx)
     return None
 
