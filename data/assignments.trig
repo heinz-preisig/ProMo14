@@ -97,7 +97,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_conduction_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_dqeldt> ;
-        promo:hasEquationSequence _:nc7929fbaf4834a099abae02510c41495b1 ;
+        promo:hasEquationSequence _:Nb6aaadffe5374e7fab8308478073c3ae ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_131>,
             <https://w3id.org/promo/library#V_135>,
             <https://w3id.org/promo/library#V_136>,
@@ -109,7 +109,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_convection_transport> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:nc7929fbaf4834a099abae02510c41495b2 ;
+        promo:hasEquationSequence _:nd7fb90885cfd4ed3b1bd67499a4a8c0db2 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_123>,
             <https://w3id.org/promo/library#V_124>,
             <https://w3id.org/promo/library#V_125>,
@@ -133,7 +133,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:nc7929fbaf4834a099abae02510c41495b4 ;
+        promo:hasEquationSequence _:nd7fb90885cfd4ed3b1bd67499a4a8c0db4 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/ontology#V_11>,
             <https://w3id.org/promo/ontology#V_115>,
             <https://w3id.org/promo/ontology#V_34> ;
@@ -152,10 +152,11 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped_conductor> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_dqeldt> ;
-        promo:hasEquationSequence _:nc7929fbaf4834a099abae02510c41495b5 ;
+        promo:hasEquationSequence _:N80f6e50038ef4609ab3f3d0aa62c9862 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/library#V_134>,
             <https://w3id.org/promo/ontology#V_11> ;
-        promo:hasOutputVariable <https://w3id.org/promo/library#V_133> ;
+        promo:hasOutputVariable <https://w3id.org/promo/library#V_133>,
+            <https://w3id.org/promo/library#V_145> ;
         promo:hasPortVariable <https://w3id.org/promo/library#V_132> ;
         promo:hasStateVariable <https://w3id.org/promo/library#V_131> .
 
@@ -163,7 +164,7 @@
         promo:closed true ;
         promo:forEntityType <https://w3id.org/promo/ontology#etype_lumped_qss> ;
         promo:hasBaseEquation <https://w3id.org/promo/library#E_29> ;
-        promo:hasEquationSequence _:nc7929fbaf4834a099abae02510c41495b6 ;
+        promo:hasEquationSequence _:nd7fb90885cfd4ed3b1bd67499a4a8c0db6 ;
         promo:hasInstantiatedVariable <https://w3id.org/promo/ontology#V_11>,
             <https://w3id.org/promo/ontology#V_115>,
             <https://w3id.org/promo/ontology#V_34> ;
@@ -177,109 +178,115 @@
             <https://w3id.org/promo/library#V_56> ;
         promo:hasStateVariable <https://w3id.org/promo/library#V_57> .
 
-    _:nc7929fbaf4834a099abae02510c41495b1 rdf:first <https://w3id.org/promo/library#E_fe_ohm> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b7 .
+    _:N009da5b6f0d24ade9df2d9bf6bd07932 rdf:first <https://w3id.org/promo/library#E_dUdt> ;
+        rdf:rest _:Na6a38c9ff3d84d6aabf20c293be64726 .
 
-    _:nc7929fbaf4834a099abae02510c41495b10 rdf:first <https://w3id.org/promo/library#E_fPflow> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b11 .
-
-    _:nc7929fbaf4834a099abae02510c41495b11 rdf:first <https://w3id.org/promo/library#E_aw> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b14 .
-
-    _:nc7929fbaf4834a099abae02510c41495b12 rdf:first <https://w3id.org/promo/library#E_dEmdt> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b13 .
-
-    _:nc7929fbaf4834a099abae02510c41495b13 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:N43842813ff84468789e41954c0d14090 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
         rdf:rest () .
 
-    _:nc7929fbaf4834a099abae02510c41495b14 rdf:first <https://w3id.org/promo/library#E_al> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b15 .
+    _:N510b8a613d69415c8d9e190ce6469f0f rdf:first <https://w3id.org/promo/library#E_apel> ;
+        rdf:rest _:N009da5b6f0d24ade9df2d9bf6bd07932 .
 
-    _:nc7929fbaf4834a099abae02510c41495b15 rdf:first <https://w3id.org/promo/library#E_amech> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b16 .
+    _:N80f6e50038ef4609ab3f3d0aa62c9862 rdf:first <https://w3id.org/promo/library#E_qel_def> ;
+        rdf:rest _:Na2fe67ee5603473eb407eb78f21241aa .
 
-    _:nc7929fbaf4834a099abae02510c41495b16 rdf:first <https://w3id.org/promo/library#E_dEmdt> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b18 .
+    _:Na2fe67ee5603473eb407eb78f21241aa rdf:first <https://w3id.org/promo/library#E_Ue_cap> ;
+        rdf:rest _:N510b8a613d69415c8d9e190ce6469f0f .
 
-    _:nc7929fbaf4834a099abae02510c41495b17 rdf:first <https://w3id.org/promo/library#E_amech> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b12 .
-
-    _:nc7929fbaf4834a099abae02510c41495b18 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:Na6a38c9ff3d84d6aabf20c293be64726 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
         rdf:rest () .
 
-    _:nc7929fbaf4834a099abae02510c41495b19 rdf:first <https://w3id.org/promo/library#E_v_str> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b36 .
+    _:Nb6aaadffe5374e7fab8308478073c3ae rdf:first <https://w3id.org/promo/library#E_fe_ohm> ;
+        rdf:rest _:N43842813ff84468789e41954c0d14090 .
 
-    _:nc7929fbaf4834a099abae02510c41495b2 rdf:first <https://w3id.org/promo/library#E_4> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b19 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db10 rdf:first <https://w3id.org/promo/library#E_al> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db13 .
 
-    _:nc7929fbaf4834a099abae02510c41495b20 rdf:first <https://w3id.org/promo/library#E_fPflow> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b21 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db11 rdf:first <https://w3id.org/promo/library#E_dEmdt> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db12 .
 
-    _:nc7929fbaf4834a099abae02510c41495b21 rdf:first <https://w3id.org/promo/library#E_aw> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b22 .
-
-    _:nc7929fbaf4834a099abae02510c41495b22 rdf:first <https://w3id.org/promo/library#E_al> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b17 .
-
-    _:nc7929fbaf4834a099abae02510c41495b23 rdf:first <https://w3id.org/promo/library#E_F_g> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b24 .
-
-    _:nc7929fbaf4834a099abae02510c41495b24 rdf:first <https://w3id.org/promo/library#E_dPdt> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b25 .
-
-    _:nc7929fbaf4834a099abae02510c41495b25 rdf:first <https://w3id.org/promo/library#E_z> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b8 .
-
-    _:nc7929fbaf4834a099abae02510c41495b26 rdf:first <https://w3id.org/promo/library#E_dPdt> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b27 .
-
-    _:nc7929fbaf4834a099abae02510c41495b27 rdf:first <https://w3id.org/promo/library#E_fKin> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b28 .
-
-    _:nc7929fbaf4834a099abae02510c41495b28 rdf:first <https://w3id.org/promo/library#E_z> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b29 .
-
-    _:nc7929fbaf4834a099abae02510c41495b29 rdf:first <https://w3id.org/promo/library#E_fPot> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b20 .
-
-    _:nc7929fbaf4834a099abae02510c41495b30 rdf:first <https://w3id.org/promo/library#E_F_g> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b26 .
-
-    _:nc7929fbaf4834a099abae02510c41495b31 rdf:first <https://w3id.org/promo/library#E_fP> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b32 .
-
-    _:nc7929fbaf4834a099abae02510c41495b32 rdf:first <https://w3id.org/promo/library#E_fl> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b33 .
-
-    _:nc7929fbaf4834a099abae02510c41495b33 rdf:first <https://w3id.org/promo/library#E_29> ;
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db12 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 
-    _:nc7929fbaf4834a099abae02510c41495b34 rdf:first <https://w3id.org/promo/library#E_Ue_cap> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b35 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db13 rdf:first <https://w3id.org/promo/library#E_amech> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db14 .
 
-    _:nc7929fbaf4834a099abae02510c41495b35 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db14 rdf:first <https://w3id.org/promo/library#E_dEmdt> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db15 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db15 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 
-    _:nc7929fbaf4834a099abae02510c41495b36 rdf:first <https://w3id.org/promo/library#E_fmom> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b31 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db16 rdf:first <https://w3id.org/promo/library#E_amech> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db11 .
 
-    _:nc7929fbaf4834a099abae02510c41495b4 rdf:first <https://w3id.org/promo/library#E_m_def> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b30 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db17 rdf:first <https://w3id.org/promo/library#E_v_str> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db18 .
 
-    _:nc7929fbaf4834a099abae02510c41495b5 rdf:first <https://w3id.org/promo/library#E_qel_def> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b34 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db18 rdf:first <https://w3id.org/promo/library#E_fmom> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db31 .
 
-    _:nc7929fbaf4834a099abae02510c41495b6 rdf:first <https://w3id.org/promo/library#E_m_def> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b23 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db19 rdf:first <https://w3id.org/promo/library#E_fPflow> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db20 .
 
-    _:nc7929fbaf4834a099abae02510c41495b7 rdf:first <https://w3id.org/promo/library#E_dqeldt> ;
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db2 rdf:first <https://w3id.org/promo/library#E_4> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db17 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db20 rdf:first <https://w3id.org/promo/library#E_aw> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db21 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db21 rdf:first <https://w3id.org/promo/library#E_al> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db16 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db22 rdf:first <https://w3id.org/promo/library#E_F_g> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db23 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db23 rdf:first <https://w3id.org/promo/library#E_dPdt> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db24 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db24 rdf:first <https://w3id.org/promo/library#E_z> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db25 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db25 rdf:first <https://w3id.org/promo/library#E_fKin> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db36 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db26 rdf:first <https://w3id.org/promo/library#E_dPdt> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db27 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db27 rdf:first <https://w3id.org/promo/library#E_fKin> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db28 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db28 rdf:first <https://w3id.org/promo/library#E_z> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db29 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db29 rdf:first <https://w3id.org/promo/library#E_fPot> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db19 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db30 rdf:first <https://w3id.org/promo/library#E_F_g> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db26 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db31 rdf:first <https://w3id.org/promo/library#E_fP> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db32 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db32 rdf:first <https://w3id.org/promo/library#E_fl> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db33 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db33 rdf:first <https://w3id.org/promo/library#E_29> ;
         rdf:rest () .
 
-    _:nc7929fbaf4834a099abae02510c41495b8 rdf:first <https://w3id.org/promo/library#E_fKin> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b9 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db36 rdf:first <https://w3id.org/promo/library#E_fPot> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db8 .
 
-    _:nc7929fbaf4834a099abae02510c41495b9 rdf:first <https://w3id.org/promo/library#E_fPot> ;
-        rdf:rest _:nc7929fbaf4834a099abae02510c41495b10 .
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db4 rdf:first <https://w3id.org/promo/library#E_m_def> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db30 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db6 rdf:first <https://w3id.org/promo/library#E_m_def> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db22 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db8 rdf:first <https://w3id.org/promo/library#E_fPflow> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db9 .
+
+    _:nd7fb90885cfd4ed3b1bd67499a4a8c0db9 rdf:first <https://w3id.org/promo/library#E_aw> ;
+        rdf:rest _:nd7fb90885cfd4ed3b1bd67499a4a8c0db10 .
 }
 

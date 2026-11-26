@@ -5469,3 +5469,25 @@ mirrors it: `E_const_F: const_F := Avo·const_e`, with `const_e`
 the new bound primitive (exact SI `1.602176634e-19 C`; `e`
 itself was unavailable — control-domain label).  Consistent:
 `[1,0,-1,0,0,1,0,0]` = C/mol.
+
+### Pel wired into the charged-lump energy balance (2026-11-26)
+
+The `Ue·fe` term landed on the lump side: `apel` [N]
+(`library#V_144`) gathers `reduceSum(F_el*(Ue*fe), A_el)` — the
+lump's own `Ue` × the gathered `fe` per contact, algebraically
+`Ue·dqeldt` (capacitor input power) — and `dUdt` [N]
+(`library#V_145`) reads `dUdt := apel` as a diagnostic output on
+`etype_lumped_conductor` (§50/51 shape: readings, no new state).
+`charge_01` verified: 0 problems, python emit clean.  Author:
+`scripts/author_charge_energy.py`.
+
+**Bound-scope finding — transport-side `Pel` cannot emit.**  In
+`etype_conduction_transport`'s bound scope `Ue` binds `[X]`
+(per-contact effort) while `fe` binds `[A_el,N]`, so `Ue*fe`
+produces `[X,A_el,N]` against the declared `[A_el,N]` — the emit
+rejects it (`E_Pel` index mismatch).  The per-contact effort×flow
+needs an X↔A_el join — the §32/§45 bound-scope contract gap, same
+family as the §40 implicit-contraction break.  `Pel`/`E_Pel` stay
+authored-but-unwired; a transport-side reading would want the join
+machinery or the Joule spelling `fe*reduceSum(σ·Ue,X)` (leg
+dissipation — a different quantity than the contact transfer).
