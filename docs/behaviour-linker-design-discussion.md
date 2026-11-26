@@ -5569,8 +5569,8 @@ exists.**
   (surface potential) / `i` (Faradaic current) declared
   signal-tokened binds peer→port cleanly.  Expected seam only:
   the read var must be declared reference-tokened — a charge-
-  tagged port cannot ride an access arc.  First physical→physical
-  exercise of the path; `charge_02` will prove it end-to-end.
+  tagged port cannot ride an access arc.  **Verified in
+  `test_access_arc_shared_vars_bind_by_identity`.**
 - Rate ownership leans to `DL-elyte` (+ `reaction_host`), mirroring
   "thin film with coverage → lumped + reaction_host".
   `reaction_host` is seeded vocabulary, applicable to
@@ -5618,8 +5618,15 @@ assignments closed=True, 0 problems).**
   `function:reaction`, *not* flow — §44 absent-not-unbound must
   not hide a missing access arc.
 - `charge_02` wiring (modeller): conductor —A_el— DL-metal
-  ═access═ DL-elyte —A_diff— electrolyte; two unidirectional
-  access arcs, producer→reader (`phi` metal→elyte, `i`
-  elyte→metal).  First physical→physical exercise of the
-  access-arc + identity-binding path; instantiation will prove
-  it end-to-end.
+  —access— DL-elyte —A_diff— electrolyte; **ONE access arc**
+  between the pair.  Proven by
+  `test_access_arc_shared_vars_bind_by_identity`
+  (backend/instantiate/test_builder.py): reference-carrier reads
+  are direction-blind for non-carried vars, so the single arc
+  hosts both identity binds (`phi` e→m, `i` m→e).  **Do not draw
+  two**: a second access arc to the same peer becomes a second
+  *contact* — the node-indexed port then binds the peer's var
+  twice (verified live).  First physical→physical exercise of
+  the access-arc path; the unit-level bind is proven,
+  instantiation on the real model remains to exercise it
+  end-to-end.

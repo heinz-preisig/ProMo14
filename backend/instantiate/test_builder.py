@@ -504,6 +504,117 @@ def test_event_dynamic_port_binds_contact_arcs():
     assert "broadcast" in src
 
 
+def test_access_arc_shared_vars_bind_by_identity():
+    """§57 — the DL pair's shared vars ride access arcs
+    (carrier=reference): a signal-tokened port sees only reference
+    arcs and binds the peer's exported same-IRI var — continuity
+    by identity, the phase-boundary pair's coupling.  One access
+    arc hosts BOTH reads (binding is direction-blind for
+    non-carried vars); token-flow arcs cannot host them."""
+    nodes = {
+        "m": NodeInfo("m", _et("dl_metal")),
+        "e": NodeInfo("e", _et("dl_elyte")),
+        "x": NodeInfo("x", _et("lumped_capacity")),
+    }
+    arcs = {
+        "ax": ArcInfo("ax", "m", "e", "reference"),
+        "af": ArcInfo("af", "m", "x", "token-flow"),
+    }
+    variables = {
+        _var("phi"): VarInfo(_var("phi"), "surface potential", "V_ph",
+                             index_structures=[_idx("idx_node")],
+                             tokens=[_tok("signal")],
+                             port_variable=True, effort=True),
+        _var("i"): VarInfo(_var("i"), "Faradaic current", "V_i",
+                           index_structures=[_idx("idx_node")],
+                           tokens=[_tok("signal")],
+                           port_variable=True),
+        _var("q"): VarInfo(_var("q"), "charge", "V_q",
+                           index_structures=[_idx("idx_node")],
+                           tokens=[_tok("mass")]),
+        _var("p"): VarInfo(_var("p"), "effort", "V_p",
+                           index_structures=[_idx("idx_node")],
+                           tokens=[_tok("mass")]),
+        _var("fe"): VarInfo(_var("fe"), "charge flow", "V_fe",
+                            index_structures=[_idx("idx_node")],
+                            tokens=[_tok("mass")],
+                            port_variable=True),
+        _var("s"): VarInfo(_var("s"), "stray signal", "V_s",
+                           index_structures=[_idx("idx_node")],
+                           tokens=[_tok("signal")]),
+    }
+    equations = {
+        _eq("phi"): EqInfo(_eq("phi"), _var("phi"), [_var("q")],
+                           "E_phi", rhs="V_q"),
+        _eq("i"): EqInfo(_eq("i"), _var("i"), [_var("q")],
+                         "E_i", rhs="V_q"),
+        _eq("p"): EqInfo(_eq("p"), _var("p"), [_var("q")],
+                         "E_p", rhs="V_q"),
+        _eq("s"): EqInfo(_eq("s"), _var("s"), [_var("q")],
+                         "E_s", rhs="V_q"),
+    }
+    assignments = {
+        _et("dl_metal"): AssignmentInfo(
+            entity_type=_et("dl_metal"),
+            sequence=[_eq("phi")],
+            outputs=[_var("phi")],
+            ports=[_var("i"), _var("fe")],
+            closed=True),
+        _et("dl_elyte"): AssignmentInfo(
+            entity_type=_et("dl_elyte"),
+            sequence=[_eq("i")],
+            outputs=[_var("i")],
+            ports=[_var("phi")],
+            closed=True),
+        _et("lumped_capacity"): AssignmentInfo(
+            entity_type=_et("lumped_capacity"),
+            sequence=[_eq("p"), _eq("s")],
+            closed=True),
+    }
+    rep = _build(nodes, arcs, assignments, variables, equations)
+    m_ent = _entity(rep, _et("dl_metal"))
+    e_ent = _entity(rep, _et("dl_elyte"))
+    # Declared as ports on the demanding side.
+    assert _binding(m_ent, _var("i")).binding == "port"
+    assert _binding(e_ent, _var("phi")).binding == "port"
+    ports = rep.ports
+    # i — exported by the elyte half, read by the metal as the
+    # Faradaic sink.  Identity match across the access arc, exactly
+    # once.
+    i_pbs = [p for p in ports if p.var == _var("i")]
+    assert len(i_pbs) == 1
+    i_pb = i_pbs[0]
+    assert i_pb.node == "m"
+    assert i_pb.status == "bound"
+    assert i_pb.arc == "ax"
+    assert i_pb.peer_node == "e"
+    assert i_pb.peer_var == _var("i")
+    assert i_pb.element == "e"
+    # phi — exported by the metal half, read by the elyte for eta.
+    # Same arc, opposite read direction: reference reads are
+    # direction-blind for non-carried vars.
+    phi_pbs = [p for p in ports if p.var == _var("phi")]
+    assert len(phi_pbs) == 1
+    phi_pb = phi_pbs[0]
+    assert phi_pb.node == "e"
+    assert phi_pb.status == "bound"
+    assert phi_pb.arc == "ax"
+    assert phi_pb.peer_node == "m"
+    assert phi_pb.peer_var == _var("phi")
+    assert phi_pb.element == "m"
+    # The token-flow port rides its own carrier only; the signal
+    # ports never see the token-flow arc — the stray signal var on
+    # the charge peer could otherwise steal the binding.
+    fe_pbs = [p for p in ports if p.var == _var("fe")]
+    assert len(fe_pbs) == 1
+    fe_pb = fe_pbs[0]
+    assert fe_pb.status == "bound"
+    assert fe_pb.arc == "af"
+    assert fe_pb.peer_var == _var("p")
+    assert all(p.arc != "af" for p in ports
+               if p.var in (_var("phi"), _var("i")))
+
+
 _COMPONENT_INDICES = {
     **INDICES,
     _idx("idx_component"): IndexInfo(

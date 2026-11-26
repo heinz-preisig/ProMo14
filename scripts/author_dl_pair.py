@@ -6,7 +6,10 @@ The interface decomposes into a ``DL-metal`` and a ``DL-elyte``
 volume — both children of ``etype_distributed`` (dynamic +
 distributed + reaction_host, all seeded).  The two token-flow
 networks (charge / species) each terminate on their DL node; the
-pair is knit by *access arcs* (carrier=reference).  Continuity is
+pair is knit by **one access arc** (carrier=reference) — reference
+reads are direction-blind for non-carried vars, so the single arc
+hosts both binds; a second arc would duplicate the contact
+(test_access_arc_shared_vars_bind_by_identity).  Continuity is
 algebraic: ``phi`` (surface potential, metal→elyte) and ``i``
 (Faradaic current, elyte→metal) are single library variables —
 computed on one node, bound by identity on the peer.  No
