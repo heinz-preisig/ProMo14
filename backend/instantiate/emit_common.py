@@ -350,7 +350,15 @@ class Dialect:
                     else block.alias_of
             return name
         lhs = Var(inst_name(block.lhs_instance))
-        check_space = space
+        # The stored rhs text is scope-relative to the equation's
+        # authoring network (bare labels stay local, cross-network
+        # refs carry ``net!``): re-parse under it or a same-label var
+        # in another in-scope network shadows/ambiguities the ref —
+        # same convention as the persistence regen + consistency
+        # checks, which build per-equation spaces the same way.
+        eq_network = (block.equation_network
+                      or space.expression_definition_network)
+        variables = space.variables
         if block.var_bound:
             # §32 bound-typing: vars whose bound index set differs
             # from the declared one (a node-declared port var on an
@@ -365,12 +373,12 @@ class Dialect:
                 if v is not None:
                     variables[v_iri] = replace(
                         v, index_structures=list(idxs))
-            check_space = CompileSpace(
-                variables, space.indices,
-                space.variable_definition_network,
-                space.expression_definition_network,
-                space.table, space.accessible_networks,
-                space.network_tree)
+        check_space = CompileSpace(
+            variables, space.indices,
+            space.variable_definition_network,
+            eq_network,
+            space.table, space.accessible_networks,
+            space.network_tree)
         checked = check(parse(block.rhs), check_space, lhs)
         rnd = Renderer(check_space, self.target, lhs=lhs.name,
                        names=names, sparse=self.sparse_names)

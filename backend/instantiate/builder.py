@@ -111,6 +111,10 @@ class EqInfo:
     internal_id: Optional[str] = None
     rhs: str = ""                         # expression text (codegen)
     equation_class: Optional[str] = None  # promo:equationClass IRI/label
+    #: The network the equation was authored in — bare labels in the
+    #: stored ``rhs`` text are scope-relative to it, so the emit-time
+    #: re-parse must run with it as the expression network.
+    network: str = ""
 
 
 @dataclass

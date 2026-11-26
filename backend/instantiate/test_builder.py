@@ -1191,6 +1191,34 @@ def _emit_space():
                         expression_definition_network="")
 
 
+def test_render_rhs_uses_equation_network():
+    """Stored ``promo:rhs`` text is scope-relative to the equation's
+    authoring network — bare labels stay local.  The emit path
+    re-parses each block's text, so the check space must carry the
+    equation's network or a same-label var in another in-scope
+    network ambiguities the ref (the model-charge-2 ``r`` incident:
+    ``reactions!r`` vs ``physical!r``)."""
+    space = _emit_space()
+    variables = dict(space.variables)
+    variables["v:r_react"] = Variable(
+        iri="v:r_react", internal_id="V_r_react", label="r",
+        network="reactions", type="", units=Units(),
+        index_structures=[])
+    variables["v:r_phys"] = Variable(
+        iri="v:r_phys", internal_id="V_r_phys", label="r",
+        network="physical", type="", units=Units(),
+        index_structures=[])
+    space = CompileSpace(
+        variables, space.indices,
+        variable_definition_network="",
+        expression_definition_network="",
+        accessible_networks={"reactions", "physical"})
+    block = PlanBlock(
+        entity_type="et", equation="e:x", lhs="v:x",
+        lhs_instance="v:x@et", rhs="r", equation_network="reactions")
+    assert _Python().render_rhs(block, space, {}) == "V_r_react"
+
+
 def test_emit_python():
     """The NumPy emitter: state unpack, param lookup, gathers, the
     rendered blocks in schedule order, and the balance into dy.

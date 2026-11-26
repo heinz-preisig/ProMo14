@@ -860,6 +860,7 @@ def _vars_collect(store, vars_graph: Optional[str]):
                 internal_id=eq.get("internal_id"),
                 rhs=eq.get("rhs") or "",
                 equation_class=eq.get("equation_class"),
+                network=eq.get("network") or v.network,
             )
     indices: Dict[str, IndexInfo] = {}
     for iri, idx in ctx.indices().items():
@@ -1364,7 +1365,8 @@ def _code_space(store, vars_graph: Optional[str]) -> CompileSpace:
         variables, ctx.indices(),
         variable_definition_network="",
         expression_definition_network="",
-        accessible_networks={v.network for v in variables.values()})
+        accessible_networks={v.network for v in variables.values()},
+        network_tree=ctx.tree())
 
 
 def _plan_for(graph_iri: str, vars: Optional[str],

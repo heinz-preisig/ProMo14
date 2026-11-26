@@ -155,6 +155,11 @@ class PlanBlock:
     lhs_indices: Dict[str, List[str]] = field(default_factory=dict)
     inputs: List[str] = field(default_factory=list)     # var IRIs
     rhs: str = ""
+    #: The network the equation was authored in — ``rhs`` text is
+    #: scope-relative to it (bare labels stay local, cross-network
+    #: refs carry ``net!``), so the emit-time re-parse must use it as
+    #: the expression network.  ``""`` = the plan's blank default.
+    equation_network: str = ""
     loop: int = -1
     #: The entity type's bound element extent per index IRI — lets
     #: the emitter size-check a rhs whose index set differs from the
@@ -620,6 +625,7 @@ def plan(report: Instantiation, sched: Schedule,
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else [],
                 rhs=eq.rhs if eq else "",
+                equation_network=eq.network if eq else "",
                 loop=b.loop,
                 bound=et_bound.get((b.occurrence, b.entity_type), {}),
                 var_bound=et_var_bound.get(
@@ -655,6 +661,7 @@ def plan(report: Instantiation, sched: Schedule,
                 lhs_indices=vb.indices if vb else {},
                 inputs=list(eq.inputs) if eq else list(q.inputs),
                 rhs=eq.rhs if eq else "",
+                equation_network=eq.network if eq else "",
                 bound=et_bound.get((e.occurrence, e.entity_type), {}),
                 var_bound=et_var_bound.get(
                     (e.occurrence, e.entity_type), {}),
