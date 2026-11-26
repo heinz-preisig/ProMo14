@@ -56,6 +56,13 @@ async function fetchRefStates(doc: ModelDocument): Promise<Map<string, RefViewSt
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const { dirty: storeDirty, refresh: refreshDirty } = useStoreDirty()
+  // Document-level dirty: the store flag only sees backend mutations,
+  // but canvas edits are local until Save PUTs them.  Compare the live
+  // serialization against the last loaded/saved snapshot instead.
+  const [savedJson, setSavedJson] = useState(() =>
+    JSON.stringify(serializeState(initialState)))
+  const docJson = useMemo(() => JSON.stringify(serializeState(state)), [state])
+  const docDirty = docJson !== savedJson
 
   const [draggingOpenArc, setDraggingOpenArc] = useState<{
     openArcIri: string
@@ -109,7 +116,9 @@ export default function App() {
       .then((doc) => {
         if (cancelled) return null
         if (hasContent(doc)) {
-          dispatch({ type: 'loadState', state: deserializeState(doc) })
+          const loaded = deserializeState(doc)
+          setSavedJson(JSON.stringify(serializeState(loaded)))
+          dispatch({ type: 'loadState', state: loaded })
         }
         fetchRefStates(doc)
           .then((m) => { if (!cancelled) dispatch({ type: 'setRefStates', states: m }) })
@@ -145,13 +154,24 @@ export default function App() {
 
   const onSave = useCallback(async () => {
     try {
-      await saveModel(serializeState(state))
+      const doc = serializeState(state)
+      await saveModel(doc)
       await saveOntology()
+      setSavedJson(JSON.stringify(doc))
       refreshDirty()
     } catch (err) {
       console.error('Failed to save model:', err)
     }
   }, [state, refreshDirty])
+
+  // The store hook's beforeunload warning only covers backend-flagged
+  // changes — local unsaved edits need their own.
+  useEffect(() => {
+    if (!docDirty) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [docDirty])
 
   const stageRef = useRef<Konva.Stage>(null)
   const onScreenshot = useCallback(() => {
@@ -707,16 +727,16 @@ export default function App() {
               Species aliases
             </button>
           )}
-          {storeDirty && (
-            <span style={{ fontSize: 12, color: '#b8860b', whiteSpace: 'nowrap' }} title="Unsaved changes in the store">
+          {(storeDirty || docDirty) && (
+            <span style={{ fontSize: 12, color: '#b8860b', whiteSpace: 'nowrap' }} title="Unsaved changes">
               ● unsaved
             </span>
           )}
           <button
             style={{ fontSize: 12 }}
             onClick={onSave}
-            disabled={!storeDirty}
-            title={storeDirty ? 'Save the model and persist the store' : 'No unsaved changes'}
+            disabled={!storeDirty && !docDirty}
+            title={storeDirty || docDirty ? 'Save the model and persist the store' : 'No unsaved changes'}
           >
             Save
           </button>

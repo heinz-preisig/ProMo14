@@ -82,6 +82,20 @@ stay locked.  Test: `test_added_token_membership_exempt_when_referenced`.
 3. `unfilled-cells` ×2 on test_01 (pre-existing, unrelated).
 4. Electrode etype — first real §32 pairing consumer.
 
+## Late addition — modeller save gating
+
+Save was gated solely on the backend `storeDirty` flag
+(`useStoreDirty` polls `/api/ontology/status`); canvas edits are
+local `AppState` until Save PUTs them, so rearranging nodes never
+unlocked the button.  `App.tsx` now diffs `serializeState(state)`
+against a last-loaded/saved JSON snapshot (`docDirty`): enables
+Save + `● unsaved` badge, and adds a matching `beforeunload` warn
+(the store hook only covered backend-flagged changes).  The store
+save also persisted the charge_02 node rearrangement — real
+layout/`nextTreeId` change in `model-charge-2.trig`; the
+ontology/library/assignments diffs are bnode-renumber churn only.
+tsc clean, dist rebuilt.
+
 ## Machine notes
 
 `data/*.trig` is tracked — `git pull` on the other machine,
