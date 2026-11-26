@@ -5517,3 +5517,109 @@ Consumers for `E_qel_species`/`E_fnd_el` landed
 `base_equation=null` (the §32 form) — anchoring a peer balance
 (`E_50`) pulls lump-side refs (`anc`/`and`/`r`) into the
 transport's cone and it stays open (`closed=False`).
+
+### Electrode = double-layer phase-boundary pair — RULED (2026-11-26)
+
+User-ruled: the electrode is **not a mixed-contact etype** — it is
+the §52 *surfaces-are-volumes* phase-boundary pattern applied to the
+electrochemical interface.  The double layer **is** the phase
+interface: **two volumes, one per phase, jump relation over the
+pair.**
+
+- **`DL-metal`** — compact (Stern) layer: holds the metal-side
+  interfacial charge `qel_int`; charge arcs only → single family.
+- **`DL-elyte`** — diffuse (Gouy) layer: holds ionic excess
+  (species coverage + ionic charge); species arcs only → single
+  family.
+- **Jump relation = the Faradaic law** — `i = z·F·rate` (or a
+  kinetics spelling in η = `Ue_metal − Ue_elyte`): one equation
+  over the pair.  Charge conservation = two matched sink/source
+  terms — `−i` in the metal-side balance, `−z·F·rate` in the
+  ionic balance — tied by the shared rate object.
+
+**What it dissolves.**  No node touches two token families →
+`contact_arc_domain` stays single-covering per node;
+`port-domain-ambiguous` never trips and the §32 pairing resolver
+stays deferred.  The mixed-domain problem moves from topology (a
+node) to an equation (the jump relation), which ProMo already
+handles.  The `Pel` X↔A bound-scope finding is orthogonal and
+stays open.
+
+**Layers as distributed systems (user proposal).**  The ruled
+pattern says *point* volumes; declaring the DL nodes
+`distributed` names the real spatial character (compact layer ~
+field profile, diffuse layer ~ concentration profiles —
+Nernst–Planck-flavoured).  First `dynamic + distributed` entity
+type in the suite — all existing distributed etypes are
+event-dynamic stateless transports.  Math collapses to the same
+lumped form until discretization machinery exists; the
+declaration is forward-honest.
+
+**Residual mechanics before authoring — checked, all machinery
+exists.**
+- The pair reads each other over a **non-flow arc** — no token
+  crosses the interface (Faradaic = matched sink/source, not a
+  flow).  `rule_access` is already seeded (physical→physical,
+  unidirectional, `carrier=reference`, shared `token_signal`) for
+  exactly this — "reactions, properties, geometry reading host
+  state".  `builder.py` routes a port var whose tokens are
+  reference-kind through reference arcs
+  (`_TOKEN_KIND_CARRIER`); **identity matching** (same var IRI on
+  both entities) bypasses token comparability, so a shared `phi`
+  (surface potential) / `i` (Faradaic current) declared
+  signal-tokened binds peer→port cleanly.  Expected seam only:
+  the read var must be declared reference-tokened — a charge-
+  tagged port cannot ride an access arc.  First physical→physical
+  exercise of the path; `charge_02` will prove it end-to-end.
+- Rate ownership leans to `DL-elyte` (+ `reaction_host`), mirroring
+  "thin film with coverage → lumped + reaction_host".
+  `reaction_host` is seeded vocabulary, applicable to
+  `lumped`/`distributed`/`point`.
+- `Cel` relocates — the conductor's `Ue := qel/Cel` closure was the
+  double layer folded into the lump; with the pair explicit,
+  capacitance lives DL-side and the conductor reverts to pure
+  storage.
+
+**Continuity condition (user question, 2026-11-26).**  The pair is
+built in the modeller as two nodes — the two token-flow networks
+(charge / species) are *separate components*, each terminating on
+its DL node as a boundary leaf.  `resolve-connection` can never
+offer a token-flow arc across the pair (no shared conserved token)
+— the interface has **no topological continuity; continuity is
+algebraic, by identity.**  The Faradaic `i` and the surface
+potential `phi` are each *one library variable*: computed on one
+node, bound into the peer by identity over the access arc.  There
+is no `i_electronic = i_ionic` consistency equation — the shared
+var *is* the condition; the three authored pieces (`fe − i`,
+`fnd − r`, `i = z·F·r`) together state `i_e = z·F·j_ion`.  Missing
+wiring surfaces as `unbound`-port problems; missing *physics*
+(a dropped sink term) is authored content — silent, same status
+as every conservation law.
+
+**Authored (2026-11-26, `scripts/author_dl_pair.py`, both
+assignments closed=True, 0 problems).**
+
+- Vars: `phi`=V_146 [N], `eta`=V_147 [N], `i`=V_148 [N],
+  `k_ct`=V_149 [S] physical.
+- Eqs (named IRIs are durable; server mints internal ids):
+  `E_phi` `(inv(Cel)*qel)`, `E_eta` `(phi-Ue)`,
+  `E_iF` `Σ(z·F·r,S)`, `E_r_ct` `k_ct*eta` on `r`,
+  `E_dqel_dl` `Σ(F_el·fe)−i` + `E_dqel_ion` `Σ(z·F·dndt,S)` on
+  `dqeldt` (the ionic-side KCL mirror).
+- `etype_dl_metal`/`etype_dl_elyte` — children of
+  `etype_distributed`: **first `dynamic+distributed` entity types**
+  in the suite (math collapses to lumped until discretisation
+  exists).
+- **Token design, load-bearing:** `phi`/`i` carry `token_signal`
+  *only* — a conserved-token claim would let their ports see
+  token-comparable candidates on the flow arcs (peer `Ue` would
+  bind `phi`!).  `token_vector={}` keeps them neutral (§35), so
+  `fe−i`/`phi−Ue` still signature-check.  `i` is
+  `function:reaction`, *not* flow — §44 absent-not-unbound must
+  not hide a missing access arc.
+- `charge_02` wiring (modeller): conductor —A_el— DL-metal
+  ═access═ DL-elyte —A_diff— electrolyte; two unidirectional
+  access arcs, producer→reader (`phi` metal→elyte, `i`
+  elyte→metal).  First physical→physical exercise of the
+  access-arc + identity-binding path; instantiation will prove
+  it end-to-end.
