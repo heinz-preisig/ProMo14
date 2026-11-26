@@ -5449,6 +5449,19 @@ derivation forces the datum into the carrier-motion slot".
 Noted for `design-principles.md`.  `E_kEl_ionic` recorded as the
 ready §54-alternative; needs `D_s` authored first.
 
+**Landed (2026-11-26, user-ruled fold):** `D_s` [N,S] authored
+(`library#V_142`, physical — the kinetic datum).  The recorded
+spelling derives **S/m at [N]** — the ionic conductivity κ, a
+node-bound material property — while `kEl` is declared **S at
+[A_el]** (leg conductance, geometry folded in for stage 1).  So
+`E_kEl_ionic` landed verbatim on a **new var `kel`** [N]
+(`library#V_143`, macroscopic, coefficient-class, token-neutral,
+consistent 0-error) rather than on `kEl`.  `kEl` keeps primitive
+status; the `G = κ·(Ae/L)` conversion waits on charge-leg geometry
+params (`Ae`/`Le` — none authored) plus the per-arc species binding
+— the §32 pairing surface again, aligning it with the
+electrode/electrolyte work.
+
 ### Constants layer
 
 `R` already derives — `E_44: R := Boltz·Avo`.  `const_F` now
