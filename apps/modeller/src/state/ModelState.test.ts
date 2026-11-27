@@ -338,7 +338,7 @@ describe('applyCommand', () => {
       state = applyCommand(state, { type: 'setView', viewNodeId: 4 })
       const view = computeGraphView(4, state.tree, state.modelNodes,
         state.modelArcs, state.layoutStore, state.openArcs,
-        state.knotStore, 800, 600)
+        state.knotStore)
       const leaf = view.nodes.find((n) => n.id === '5')
       expect(leaf).toMatchObject({
         type: 'leaf', treeNodeId: 5, modelNodeIri: 'host/Node_5',
@@ -497,7 +497,7 @@ describe('applyCommand', () => {
       })
       const view = computeGraphView(0, state.tree, state.modelNodes,
         state.modelArcs, state.layoutStore, state.openArcs,
-        state.knotStore, 800, 600)
+        state.knotStore)
       const stub = view.openArcs.find((a) => a.modelArcIri === 'g/oa1')
       expect(stub).toMatchObject({ terminal: true, openEndId: '1' })
     })

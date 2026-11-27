@@ -1,4 +1,5 @@
 import type { KonvaEventObject } from 'konva/lib/Node'
+import type { NodeShape } from '@promo/semantic'
 
 export type SceneObjectKind = 'node' | 'arc' | 'openArc' | 'openArcHandle' | 'knot'
 
@@ -34,6 +35,12 @@ export interface SceneNode extends SceneObjectBase {
   radius: number
   width?: number
   height?: number
+  /** Glyph to draw — from the entity type's archetype graphical
+   *  (leaves); composites render their fixed rect, margins/handles
+   *  keep the default circle. */
+  shape?: NodeShape
+  /** Dashed outline (info-domain graphicals). */
+  strokeDash?: number[]
   /** Bounding-box half-extent derived from the graphical definition
    *  (radius → {r,r}; w×h → {w/2,h/2}).  Spatial constraints read this
    *  — never a per-shape constant — so any designer graphic works.

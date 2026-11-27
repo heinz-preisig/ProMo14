@@ -4,6 +4,7 @@ import type {
   BaseEntityDefinition,
   DomainDefinition,
   GraphicalDefinition,
+  NodeGraphicalDefinition,
   SemanticAttribute,
   SemanticCatalogue,
   TokenDefinition,
@@ -26,10 +27,94 @@ import { arcTypeIri } from './iris'
 //   ``promo#ArcType/<carrier>`` — the server supplies ``arc_type_iri``
 //   on each rule record; the ``arcTypeIri()`` helper (iris.ts) is the
 //   single shape definition for offline fallback.
-// - Graphical definitions are delegated to a fallback catalogue (the
-//   ontology does not store shapes yet); entities/arc types are assigned
-//   the fallback's graphicals round-robin.
+// - Graphical definitions are still frontend data (the ontology does not
+//   store shapes yet — the future graphic-object editor will own them).
+//   They are assigned by entity-type ARCHETYPE: each entity type walks
+//   its ``promo:parent`` chain to the seeded fundamental type
+//   (environment / lumped / distributed / point / transport_system /
+//   info_*) and inherits that archetype's graphic.  Arc types map by
+//   carrier (token-flow solid, access/signal dashed).
 // ---------------------------------------------------------------------------
+
+/** Vocabulary root the archetype local names are minted under —
+ *  etype IRIs look like ``{base}#etype_<archetype>``. */
+const ETYPES: Record<string, string> = {
+  environment: 'etype_environment',
+  lumped: 'etype_lumped',
+  distributed: 'etype_distributed',
+  point: 'etype_point',
+  transport_system: 'etype_transport_system',
+  info_constant: 'etype_info_constant',
+  info_dynamic: 'etype_info_dynamic',
+  info_event: 'etype_info_event',
+}
+
+/** Archetype → node graphic.  The env glyph is an open half-circle
+ *  (dome, bottom open — "half circle left and right open").  Info
+ *  types carry dashed outlines to mark the information domain. */
+const ARCHETYPE_GRAPHICALS: Record<string, NodeGraphicalDefinition> = {
+  environment: {
+    iri: 'https://w3id.org/promo#Graphical/environment',
+    kind: 'node', shape: 'halfCircle',
+    fill: '#f4f6f7', stroke: '#5d6d7e', strokeWidth: 2, radius: 30,
+    attributes: [],
+  },
+  lumped: {
+    iri: 'https://w3id.org/promo#Graphical/lumped',
+    kind: 'node', shape: 'circle',
+    fill: '#d4edda', stroke: '#155724', strokeWidth: 2, radius: 24,
+    attributes: [],
+  },
+  distributed: {
+    iri: 'https://w3id.org/promo#Graphical/distributed',
+    kind: 'node', shape: 'ellipse',
+    fill: '#fff3cd', stroke: '#856404', strokeWidth: 2, width: 72, height: 44,
+    attributes: [],
+  },
+  point: {
+    iri: 'https://w3id.org/promo#Graphical/point',
+    kind: 'node', shape: 'circle',
+    fill: '#f8f9fa', stroke: '#616a6b', strokeWidth: 2, radius: 12,
+    attributes: [],
+  },
+  transport_system: {
+    iri: 'https://w3id.org/promo#Graphical/transport_system',
+    kind: 'node', shape: 'rectangle',
+    fill: '#e8f4fd', stroke: '#2980b9', strokeWidth: 2, width: 56, height: 40,
+    attributes: [],
+  },
+  info_constant: {
+    iri: 'https://w3id.org/promo#Graphical/info_constant',
+    kind: 'node', shape: 'circle',
+    fill: '#f8f9fa', stroke: '#616a6b', strokeWidth: 2, strokeDash: [5, 3],
+    radius: 12, attributes: [],
+  },
+  info_dynamic: {
+    iri: 'https://w3id.org/promo#Graphical/info_dynamic',
+    kind: 'node', shape: 'roundedRectangle',
+    fill: '#f8f9fa', stroke: '#616a6b', strokeWidth: 2, strokeDash: [5, 3],
+    width: 56, height: 36, attributes: [],
+  },
+  info_event: {
+    iri: 'https://w3id.org/promo#Graphical/info_event',
+    kind: 'node', shape: 'diamond',
+    fill: '#f8f9fa', stroke: '#616a6b', strokeWidth: 2, strokeDash: [5, 3],
+    width: 48, height: 32, attributes: [],
+  },
+}
+
+/** Carrier → arc line style: token-flow reads as the substance link;
+ *  access/signal arcs are dashed/dotted information links. */
+const CARRIER_STYLES: Record<string, { stroke: string; strokeWidth: number; dash?: number[] }> = {
+  'token-flow': { stroke: '#333', strokeWidth: 2 },
+  access: { stroke: '#7f8c8d', strokeWidth: 1.5, dash: [6, 4] },
+  signal: { stroke: '#7f8c8d', strokeWidth: 1.5, dash: [2, 3] },
+  reference: { stroke: '#7f8c8d', strokeWidth: 1.5, dash: [8, 4, 2, 4] },
+}
+
+function localFrag(iri: string): string {
+  return iri.split('#').pop() ?? iri
+}
 
 /** Backend record shapes (subset of fields the catalogue consumes). */
 export interface EntityTypeRecord {
@@ -85,6 +170,7 @@ export class RemoteCatalogue implements SemanticCatalogue {
   private arcTypes = new Map<Iri, ArcTypeDefinition>()
   private domains = new Map<Iri, DomainDefinition>()
   private tokens = new Map<Iri, TokenDefinition>()
+  private graphicals = new Map<Iri, GraphicalDefinition>()
 
   private constructor(private fallback: SemanticCatalogue) {}
 
@@ -132,11 +218,31 @@ export class RemoteCatalogue implements SemanticCatalogue {
       })
     }
 
-    const nodeGraphicals = fallback.getBaseEntities()
-      .map((e) => e.graphicalDefinitionIri)
-      .filter((g): g is Iri => !!g)
+    // Register archetype node graphicals locally (own map wins over
+    // the fallback in getGraphicalDefinition).
+    for (const g of Object.values(ARCHETYPE_GRAPHICALS)) {
+      cat.graphicals.set(g.iri, g)
+    }
 
-    entityTypes.forEach((e, i) => {
+    // parent chain for the archetype walk
+    const parentOf = new Map<Iri, Iri | undefined>(
+      entityTypes.map((e) => [e.iri, e.parent ?? undefined]),
+    )
+    const archetypeOf = (iri: string): string | undefined => {
+      let cur: string | undefined = iri
+      const seen = new Set<string>()
+      while (cur && !seen.has(cur)) {
+        const frag = localFrag(cur)
+        for (const [archetype, etypeFrag] of Object.entries(ETYPES)) {
+          if (frag === etypeFrag) return archetype
+        }
+        seen.add(cur)
+        cur = parentOf.get(cur)
+      }
+      return undefined
+    }
+
+    entityTypes.forEach((e) => {
       const attributes: SemanticAttribute[] = []
       if (e.temporal_type) {
         attributes.push({ predicateIri: 'https://w3id.org/promo#temporalType', value: e.temporal_type })
@@ -154,31 +260,37 @@ export class RemoteCatalogue implements SemanticCatalogue {
         typeIris: [e.iri],
         domainTypeIris: domainIri ? [domainIri] : [],
         parentIri: e.parent ?? undefined,
-        graphicalDefinitionIri: nodeGraphicals.length
-          ? nodeGraphicals[i % nodeGraphicals.length]
-          : undefined,
+        graphicalDefinitionIri:
+          ARCHETYPE_GRAPHICALS[archetypeOf(e.iri) ?? '']?.iri,
         classifications: [],
         attributes,
       })
     })
 
     // Arc types from rule carriers: promo#ArcType/<carrier>
-    const arcGraphicals = fallback.getArcTypes()
-      .map((a) => a.graphicalDefinitionIri)
-      .filter((g): g is Iri => !!g)
     const carriers = [...new Set(rules.map((r) => r.carrier).filter((c): c is string => !!c))]
     const carrierIris = new Map(
       rules.map((r) => [r.carrier, r.arc_type_iri]),
     )
-    carriers.forEach((carrier, i) => {
+    carriers.forEach((carrier) => {
       const iri = carrierIris.get(carrier) ?? arcTypeIri(carrier)
+      const style = CARRIER_STYLES[carrier] ?? { stroke: '#333', strokeWidth: 2 }
+      const gIri = `https://w3id.org/promo#Graphical/arc_${carrier}`
+      cat.graphicals.set(gIri, {
+        iri: gIri,
+        kind: 'arc',
+        lineStyle: style.dash ? 'dashed' : 'solid',
+        stroke: style.stroke,
+        strokeWidth: style.strokeWidth,
+        dash: style.dash,
+        arrowHead: 'triangle',
+        attributes: [],
+      })
       cat.arcTypes.set(iri, {
         iri,
         label: carrier,
         typeIris: [iri],
-        graphicalDefinitionIri: arcGraphicals.length
-          ? arcGraphicals[i % arcGraphicals.length]
-          : undefined,
+        graphicalDefinitionIri: gIri,
         attributes: [],
       })
     })
@@ -211,6 +323,6 @@ export class RemoteCatalogue implements SemanticCatalogue {
   }
 
   getGraphicalDefinition(iri: Iri): GraphicalDefinition | undefined {
-    return this.fallback.getGraphicalDefinition(iri)
+    return this.graphicals.get(iri) ?? this.fallback.getGraphicalDefinition(iri)
   }
 }

@@ -39,6 +39,9 @@ export function graphicalHalfExtent(
     return { x: g.width / 2, y: g.height / 2 }
   }
   const r = g?.radius ?? NODE_RADIUS
+  // the open dome glyph spans 2r × r — its declared radius is the
+  // underlying circle's; the bbox height is halved.
+  if (g?.shape === 'halfCircle') return { x: r, y: r / 2 }
   return { x: r, y: r }
 }
 
@@ -72,11 +75,62 @@ function arrowPoints(x: number, y: number, angleRad: number) {
   return [lx, ly, x, y, rx, ry]
 }
 
-function rimPointForNode(node: VisibleNode, towardX: number, towardY: number) {
+function rimPointEllipse(cx: number, cy: number, tx: number, ty: number, rx: number, ry: number) {
+  const dx = tx - cx
+  const dy = ty - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const scale = 1 / Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry))
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
+function rimPointDiamond(cx: number, cy: number, tx: number, ty: number, rx: number, ry: number) {
+  const dx = tx - cx
+  const dy = ty - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const scale = 1 / (Math.abs(dx) / rx + Math.abs(dy) / ry)
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
+/** Rim of the open dome (half-circle): the curve is the top half of a
+ *  circle radius r centred at (0,+he.y); below that the glyph is open.
+ *  Upper directions attach on the arc; rays into the open side land on
+ *  the chord edge (or its end-corners when outside the dome's span). */
+function rimPointHalfCircle(cx: number, cy: number, tx: number, ty: number, r: number, heY: number) {
+  const dx = tx - cx
+  const dy = ty - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const centreY = cy + heY                       // dome circle centre
+  const len = Math.hypot(dx, dy - heY) || 1
+  const px = cx + (dx / len) * r
+  const py = centreY + ((dy - heY) / len) * r
+  if (py <= centreY) return { x: px, y: py }     // on the arc
+  // open side: intersect the ray with the chord line, clamp to its ends
+  const t = dy === 0 ? Infinity : (centreY - cy) / dy
+  const ix = cx + dx * Math.min(t, len)
+  return { x: Math.max(cx - r, Math.min(cx + r, ix)), y: centreY }
+}
+
+function rimPointForNode(node: VisibleNode, towardX: number, towardY: number, catalogue: SemanticCatalogue) {
   if (node.type === 'composite') {
     return rimPointRect(node.x, node.y, towardX, towardY, COMPOSITE_WIDTH, COMPOSITE_HEIGHT)
   }
-  return rimPoint(node.x, node.y, towardX, towardY, NODE_RADIUS)
+  const g = resolveNodeGraphical(node.entityType, catalogue)
+  const he = graphicalHalfExtent(g)
+  switch (g?.shape) {
+    case 'ellipse':
+      return rimPointEllipse(node.x, node.y, towardX, towardY, he.x, he.y)
+    case 'diamond':
+      return rimPointDiamond(node.x, node.y, towardX, towardY, he.x, he.y)
+    case 'halfCircle':
+      return rimPointHalfCircle(node.x, node.y, towardX, towardY, he.x, he.y)
+    case 'rectangle':
+    case 'roundedRectangle':
+      return rimPointRect(node.x, node.y, towardX, towardY, he.x * 2, he.y * 2)
+    case 'circle':
+    case 'symbol':
+    default:
+      return rimPoint(node.x, node.y, towardX, towardY, he.x)
+  }
 }
 
 function rimPointRect(
@@ -94,7 +148,8 @@ function rimPointRect(
 
 function getArcGeometry(
   arc: { sourceId: string; targetId: string; knots: { x: number; y: number }[] },
-  nodeMap: Map<string, VisibleNode>
+  nodeMap: Map<string, VisibleNode>,
+  catalogue: SemanticCatalogue
 ) {
   const src = nodeMap.get(arc.sourceId)
   const tgt = nodeMap.get(arc.targetId)
@@ -102,7 +157,7 @@ function getArcGeometry(
 
   const pts: number[] = []
   const k0 = arc.knots.length > 0 ? arc.knots[0] : tgt
-  const pStart = rimPointForNode(src, k0.x, k0.y)
+  const pStart = rimPointForNode(src, k0.x, k0.y, catalogue)
   pts.push(pStart.x, pStart.y)
 
   for (const k of arc.knots) {
@@ -110,7 +165,7 @@ function getArcGeometry(
   }
 
   const kLast = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1] : src
-  const pEnd = rimPointForNode(tgt, kLast.x, kLast.y)
+  const pEnd = rimPointForNode(tgt, kLast.x, kLast.y, catalogue)
   pts.push(pEnd.x, pEnd.y)
 
   const prevX = arc.knots.length > 0 ? arc.knots[arc.knots.length - 1].x : src.x
@@ -174,9 +229,9 @@ function buildNodeSceneObject(
 
   let fill: string
   let stroke: string
-  let radius = g?.radius ?? NODE_RADIUS
-  let width = isComposite ? COMPOSITE_WIDTH : undefined
-  let height = isComposite ? COMPOSITE_HEIGHT : undefined
+  const radius = g?.radius ?? NODE_RADIUS
+  const width = isComposite ? COMPOSITE_WIDTH : g?.width
+  const height = isComposite ? COMPOSITE_HEIGHT : g?.height
 
   if (isSelected) {
     fill = '#3498db'
@@ -210,6 +265,8 @@ function buildNodeSceneObject(
     halfExtent: isComposite
       ? { x: COMPOSITE_WIDTH / 2, y: COMPOSITE_HEIGHT / 2 }
       : graphicalHalfExtent(g),
+    shape: isComposite ? 'rectangle' : g?.shape,
+    strokeDash: g?.strokeDash,
     entityType: node.entityType,
     treeNodeId: node.treeNodeId,
     modelNodeIri: node.modelNodeIri,
@@ -261,7 +318,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
 
   // --- Arcs (bottom layer) ---
   for (const arc of graphView.arcs) {
-    const geom = getArcGeometry(arc, nodeMap)
+    const geom = getArcGeometry(arc, nodeMap, catalogue)
     if (!geom) continue
     const isSelected = arc.modelArcIri === selectedArcIri
     const g = resolveArcGraphical(arc.modelArcType, catalogue)
@@ -306,7 +363,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
       const comp = nodeMap.get(arc.openEndId!)
       if (!comp) continue
       const g = resolveArcGraphical(arc.modelArcType, catalogue)
-      const rim = rimPointForNode(comp, arc.freeEnd.x, arc.freeEnd.y)
+      const rim = rimPointForNode(comp, arc.freeEnd.x, arc.freeEnd.y, catalogue)
       // isSource: the submodel end is the source → stub points outward.
       // referenceReversed flags ref-vs-draw disagreement on the stub.
       const points = [rim.x, rim.y, arc.freeEnd.x, arc.freeEnd.y]
@@ -336,7 +393,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
       objects.push(obj)
       continue
     }
-    const geom = getArcGeometry(arc, nodeMap)
+    const geom = getArcGeometry(arc, nodeMap, catalogue)
     if (!geom) continue
     const g = resolveArcGraphical(arc.modelArcType, catalogue)
     const obj: SceneOpenArc = {
@@ -403,7 +460,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
     if (arc.terminal && arc.freeEnd) {
       const comp = nodeMap.get(arc.openEndId!)
       if (!comp) continue
-      const rim = rimPointForNode(comp, arc.freeEnd.x, arc.freeEnd.y)
+      const rim = rimPointForNode(comp, arc.freeEnd.x, arc.freeEnd.y, catalogue)
       const isDraggingThis = draggingOpenArc?.openArcIri === arc.modelArcIri
       const handleX = isDraggingThis ? draggingOpenArc.currentX : arc.freeEnd.x
       const handleY = isDraggingThis ? draggingOpenArc.currentY : arc.freeEnd.y
@@ -430,7 +487,7 @@ export function buildScene(options: BuildSceneOptions): SceneObject[] {
       } as SceneHandle)
       continue
     }
-    const geom = getArcGeometry(arc, nodeMap)
+    const geom = getArcGeometry(arc, nodeMap, catalogue)
     if (!geom) continue
     const isOpenEndSource = arc.sourceId === arc.openEndId
     const openX = isOpenEndSource ? geom.points[0] : geom.points[geom.points.length - 2]

@@ -50,7 +50,14 @@ export interface ArcTypeDefinition {
   attributes: SemanticAttribute[]
 }
 
-export type NodeShape = 'circle' | 'rectangle' | 'roundedRectangle' | 'diamond' | 'symbol'
+export type NodeShape =
+  | 'circle'
+  | 'ellipse'
+  | 'rectangle'
+  | 'roundedRectangle'
+  | 'diamond'
+  | 'halfCircle'
+  | 'symbol'
 export type ArcLineStyle = 'solid' | 'dashed' | 'dotted'
 export type ArrowHead = 'none' | 'triangle' | 'diamond' | 'circle'
 
@@ -61,6 +68,8 @@ export interface NodeGraphicalDefinition {
   fill: string
   stroke: string
   strokeWidth: number
+  /** Dashed outline (e.g. information-domain graphicals). */
+  strokeDash?: number[]
   width?: number
   height?: number
   radius?: number

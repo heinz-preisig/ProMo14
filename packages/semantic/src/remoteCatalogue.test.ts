@@ -80,11 +80,42 @@ describe('RemoteCatalogue', () => {
     expect(cat.getToken('promo:Token/mass')?.label).toBe('mass')
   })
 
-  it('delegates graphical definitions to the fallback', async () => {
+  it('assigns node graphicals by entity-type archetype', async () => {
+    const cat = await RemoteCatalogue.load({
+      ...fetchers,
+      entityTypes: async () => [
+        { iri: 'https://w3id.org/promo/ontology#etype_lumped', label: 'lumped' },
+        { iri: 'https://w3id.org/promo/ontology#etype_transport_system', label: 'transport' },
+        { iri: 'x#etype_convection', label: 'convection',
+          parent: 'https://w3id.org/promo/ontology#etype_transport_system' },
+        { iri: 'x#type_mystery', label: 'mystery' },
+      ],
+    }, placeholderCatalogue)
+
+    // seed archetype → its own graphic
+    const lumped = cat.getBaseEntity('https://w3id.org/promo/ontology#etype_lumped')
+    expect(lumped?.graphicalDefinitionIri).toBe('https://w3id.org/promo#Graphical/lumped')
+    const lg = cat.getGraphicalDefinition(lumped!.graphicalDefinitionIri!)
+    expect(lg?.kind === 'node' && lg.shape).toBe('circle')
+
+    // subtype inherits the archetype's graphic through promo:parent
+    const conv = cat.getBaseEntity('x#etype_convection')
+    expect(conv?.graphicalDefinitionIri).toBe('https://w3id.org/promo#Graphical/transport_system')
+    const cg = cat.getGraphicalDefinition(conv!.graphicalDefinitionIri!)
+    expect(cg?.kind === 'node' && cg.shape).toBe('rectangle')
+
+    // no archetype ancestor → no graphic (renderer falls back to default)
+    expect(cat.getBaseEntity('x#type_mystery')?.graphicalDefinitionIri).toBeUndefined()
+  })
+
+  it('maps arc carriers to line styles', async () => {
     const cat = await load()
-    const cap = cat.getBaseEntity('promo:EntityType/capacity')
-    expect(cap?.graphicalDefinitionIri).toBeTruthy()
-    expect(cat.getGraphicalDefinition(cap!.graphicalDefinitionIri!)).toBeTruthy()
+    const tf = cat.getArcType('https://w3id.org/promo#ArcType/token-flow')
+    const ref = cat.getArcType('https://w3id.org/promo#ArcType/reference')
+    const gtf = cat.getGraphicalDefinition(tf!.graphicalDefinitionIri!)
+    const gref = cat.getGraphicalDefinition(ref!.graphicalDefinitionIri!)
+    expect(gtf?.kind === 'arc' && gtf.dash).toBeUndefined()
+    expect(gref?.kind === 'arc' && gref.dash).toEqual([8, 4, 2, 4])
   })
 
   it('returns the fallback catalogue when the backend is down', async () => {

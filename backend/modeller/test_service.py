@@ -677,3 +677,19 @@ def test_port_satisfaction_endpoint(client):
     p = next(p for p in r.json()["source"]["ports"]
              if p["var"] == f"{ONTO}#var_p")
     assert p["status"] == "unlicensed"
+
+
+def test_put_clamps_layout_to_panel(client):
+    """Canonical panel: stored child positions outside the centre box are
+    clamped on PUT (apps/modeller/src/scene/panel.ts PANEL ±620/±320,
+    STORED_INSET 40).  Margin ids aren't panel space and stay free."""
+    doc = _doc()
+    doc["composites"][0]["layout"] = {
+        "1": {"x": 5000.0, "y": -9999.0},   # child → clamped
+        "ancestor-9": {"x": -700.0, "y": 0.0},  # margin id → untouched
+    }
+    assert client.put("/api/modeller/model", json=doc).status_code == 200
+    got = client.get(f"/api/modeller/model?graph={MODEL}").json()
+    root = next(c for c in got["composites"] if c["treeId"] == 0)
+    assert root["layout"]["1"] == {"x": 580.0, "y": -280.0}
+    assert root["layout"]["ancestor-9"] == {"x": -700.0, "y": 0.0}

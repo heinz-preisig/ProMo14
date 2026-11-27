@@ -1,5 +1,6 @@
 import type { Tree, ModelNode, ModelArc, GraphView, VisibleNode, VisibleArc, VisibleArcType, OpenArc, Knot } from '../types'
 import { TreeOps } from './Tree'
+import { MARGIN_X_LEFT, MARGIN_X_RIGHT, MARGIN_TOP, CONNECTOR_Y } from '../scene/panel'
 
 /**
  * Compute a GraphView for the given tree node.
@@ -15,9 +16,7 @@ export function computeGraphView(
   modelArcs: Map<string, ModelArc>,
   layoutStore: Map<number, Map<string, { x: number; y: number }>>,
   openArcs: Map<number, OpenArc[]>,
-  knotStore: Map<number, Map<string, Knot[]>>,
-  stageWidth: number,
-  stageHeight: number
+  knotStore: Map<number, Map<string, Knot[]>>
 ): GraphView {
   const ops = new TreeOps(tree)
   const viewNode = tree.nodes.get(viewNodeId)
@@ -28,9 +27,11 @@ export function computeGraphView(
   const openArcsOut: VisibleArc[] = []
   const nodeMap = new Map<string, VisibleNode>() // id -> VisibleNode
 
-  const leftEdge = -stageWidth / 2 + 40
-  const rightEdge = stageWidth / 2 - 40
-  const topEdge = -stageHeight / 2 + 40
+  // Margin strips sit OUTSIDE the canonical panel — fixed scene
+  // coordinates, independent of the viewport (see scene/panel.ts).
+  const leftEdge = MARGIN_X_LEFT
+  const rightEdge = MARGIN_X_RIGHT
+  const topEdge = MARGIN_TOP
 
   // Helper to get position from layout store or auto-layout
   function getPosition(viewId: number, entityId: string, defaultX: number, defaultY: number) {
@@ -108,7 +109,7 @@ export function computeGraphView(
   // --- Connector node (top center) ---
   if (viewNodeId !== tree.rootId) {
     const id = `connector-${viewNodeId}`
-    const pos = getPosition(viewNodeId, id, 0, topEdge)
+    const pos = getPosition(viewNodeId, id, 0, CONNECTOR_Y)
     const visibleNode: VisibleNode = {
       id,
       type: 'connector',

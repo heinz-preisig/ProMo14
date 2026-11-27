@@ -5,6 +5,7 @@
 
 import type { AppState, RefViewState } from './state/ModelState'
 import type { CompositeRef, Knot, ModelArc, ModelNode, OpenArc, Tree, TreeNode } from './types'
+import { clampStoredPoint } from './scene/panel'
 
 export interface ModelNodeDoc {
   iri: string
@@ -180,8 +181,20 @@ export function deserializeState(doc: ModelDocument): AppState {
   }
   const tree: Tree = { rootId: doc.rootTreeId, nodes: treeNodes, nextId: doc.nextTreeId }
 
+  // Stored positions are canonical panel coordinates; clamp on load —
+  // documents authored before the clamp (or on another screen) can't
+  // spill into the margins.  Numeric keys are child positions; margin
+  // ids ('ancestor-N', 'sibling-N', 'connector-N') aren't panel space.
   const layoutStore = new Map<number, Map<string, { x: number; y: number }>>(
-    doc.composites.map((c) => [c.treeId, new Map(Object.entries(c.layout))]),
+    doc.composites.map((c) => [
+      c.treeId,
+      new Map(
+        Object.entries(c.layout).map(([k, p]) => [
+          k,
+          /^\d+$/.test(k) ? clampStoredPoint(p.x, p.y) : p,
+        ]),
+      ),
+    ]),
   )
   const openArcs = new Map<number, OpenArc[]>(
     doc.composites.filter((c) => c.openArcs.length > 0).map((c) => [c.treeId, c.openArcs]),

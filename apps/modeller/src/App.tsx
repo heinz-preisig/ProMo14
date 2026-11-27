@@ -10,6 +10,7 @@ import { SpeciesPanel } from './SpeciesPanel'
 import { SpeciesAliasDialog } from './SpeciesAliasDialog'
 import { fetchPortSatisfaction } from './api'
 import { hasCarrierArc } from './model/ModelGraph'
+import { PANEL, SCENE, SCENE_WIDTH, SCENE_HEIGHT } from './scene/panel'
 import { useStoreDirty } from '@promo/ui'
 import type { PortSatisfaction } from './api'
 import { deserializeState, hasContent, refViewState, serializeState } from './modelPersistence'
@@ -305,7 +306,7 @@ export default function App() {
     .filter((entity) => behaviourEntityTypes.has(entity.iri))
     .map((entity) => {
       const g = catalogue.getGraphicalDefinition(entity.graphicalDefinitionIri!) as NodeGraphicalDefinition | undefined
-      return { id: entity.iri, label: entity.label, fill: g?.fill ?? '#eee', stroke: g?.stroke ?? '#333' }
+      return { id: entity.iri, label: entity.label, fill: g?.fill ?? '#eee', stroke: g?.stroke ?? '#333', shape: g?.shape, dash: g?.strokeDash }
     }), [catalogue, behaviourEntityTypes])
 
   const ARC_TYPES = useMemo(() => catalogue.getArcTypes().map((arcType) => {
@@ -342,6 +343,15 @@ export default function App() {
   // --- View transform (pan / zoom) ---
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
+
+  // Fit-to-view: the scene is canonical (panel + fixed margins), so the
+  // view adapts to the screen — never the stored layout.  Resize refits;
+  // wheel zoom / middle-drag pan still override afterwards.
+  useEffect(() => {
+    setScale(Math.min(stageSize.width / SCENE_WIDTH,
+                      stageSize.height / SCENE_HEIGHT))
+    setPan({ x: 0, y: 0 })
+  }, [stageSize.width, stageSize.height])
 
   // --- Hovered node for connection feedback ---
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
@@ -392,9 +402,8 @@ export default function App() {
       refScope?.modelArcs ?? state.modelArcs,
       refScope?.layoutStore ?? state.layoutStore,
       refScope?.openArcs ?? state.openArcs,
-      refScope?.knotStore ?? state.knotStore,
-      stageSize.width, stageSize.height),
-    [state.currentViewNodeId, refScope, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore, stageSize.width, stageSize.height]
+      refScope?.knotStore ?? state.knotStore),
+    [state.currentViewNodeId, refScope, state.tree, state.modelNodes, state.modelArcs, state.layoutStore, state.openArcs, state.knotStore]
   )
 
   // ADR-008 fix picker: the selected leaf's assignment variables.
@@ -532,11 +541,11 @@ export default function App() {
   }, [gestureHasSource, gestureSourceEt, gestureTargetEt, hoveredLeaf,
       pendingConnection, activeArcType, validConnections])
 
-  // --- Three-panel zone boundaries ---
-  const leftZoneX = -stageSize.width / 2 + 80
-  const rightZoneX = stageSize.width / 2 - 80
-  const zoneTop = -stageSize.height / 2
-  const zoneBottom = stageSize.height / 2
+  // --- Three-panel zone boundaries (canonical scene coords) ---
+  const leftZoneX = PANEL.left
+  const rightZoneX = PANEL.right
+  const zoneTop = SCENE.top
+  const zoneBottom = SCENE.bottom
 
   // --- Build unified scene object list ---
   const selectedNodeIds = useMemo(
@@ -780,11 +789,15 @@ export default function App() {
                 <span
                   style={{
                     display: 'inline-block',
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
+                    width: t.shape === 'ellipse' || t.shape === 'halfCircle' ? 14 : 10,
+                    height: t.shape === 'halfCircle' ? 7 : 10,
+                    borderRadius: t.shape === 'diamond' || t.shape === 'rectangle' ? 1
+                      : t.shape === 'halfCircle' ? '7px 7px 0 0'
+                      : t.shape === 'roundedRectangle' ? 3 : '50%',
+                    transform: t.shape === 'diamond' ? 'rotate(45deg)' : undefined,
                     background: t.fill,
-                    border: `1.5px solid ${t.stroke}`,
+                    border: `1.5px ${t.dash ? 'dashed' : 'solid'} ${t.stroke}`,
+                    borderBottom: t.shape === 'halfCircle' ? 'none' : undefined,
                     marginRight: 6,
                     verticalAlign: 'middle',
                   }}

@@ -1,7 +1,7 @@
 # Modeller — Implementation Status
 
 **Last updated:** 2026-09-10 — **realigned to rulings through
-2026-11-10** (edit rules: `docs/README.md` tier map).
+2026-11-27** (edit rules: `docs/README.md` tier map).
 
 ## Current state
 
@@ -11,8 +11,33 @@ catalogue/rules (`RemoteCatalogue`/`RemoteRuleResolver`) are live;
 §20 species gestures and §13/§14 port-satisfaction adjudication
 (2026-10-29) are in; November added referenced composites
 (`refersTo`, copy/reference insert, extract/dissolve, strict §33
-boundary — amended 2026-11-10).  35 unit tests passing.  TypeScript
-compiles clean.
+boundary — amended 2026-11-10).  TypeScript compiles clean.
+
+### Archetype glyphs + canonical panel (2026-11-27)
+
+- **Per-archetype node graphics** (`remoteCatalogue.ts`): each entity
+  type walks its `promo:parent` chain to the seeded fundamental type
+  and inherits that archetype's graphic — subtypes for free.
+  environment → open half-circle dome, lumped → circle,
+  distributed → oval, point → small circle,
+  transport_system → rectangle, info_* → small circle / rounded rect /
+  diamond with dashed outlines.  Arc carriers map to line styles
+  (token-flow solid, access dashed, signal dotted, reference
+  dash-dot).  `NodeShape` gained `ellipse`/`halfCircle`;
+  `NodeGraphicalDefinition` gained `strokeDash`.  Scene nodes render
+  the resolved glyph; arc rim attachment is shape-aware (ellipse /
+  diamond / rect ray-intersection, dome arc-or-chord hybrid — the
+  hot-point contract the graphic-object editor will reuse).
+- **Canonical panel** (`apps/modeller/src/scene/panel.ts`): the
+  centre region is a fixed scene-space box (x ±620, y ±320);
+  ancestors/siblings/connector render in fixed margin strips outside
+  it.  Stored layout positions are canonical — same document renders
+  identically on any screen; the view adapts via fit-scale on
+  resize, never the layout.  Placement/drag clamp, load-time clamp
+  (`deserializeState`), and backend PUT clamp
+  (`service.py _clamp_layout`, constants kept in sync) all enforce
+  the same box; margin ids (`ancestor-N` …) aren't panel space.
+- 101 frontend + 19 backend tests pass.
 
 ## Feature checklist
 
@@ -160,6 +185,10 @@ Or via the orchestrator: `./dev.sh start modeller` (ensures backend too)
 - Default dev server port: 3004 (amended 2026-11-10)
 - `NODE_RADIUS = 24`, `STROKE_WIDTH = 2`, `ARROW_SIZE = 10`
 - Palette width: 140px
+- Canonical panel (`scene/panel.ts`, 2026-11-27): `PANEL` x ±620 /
+  y ±320 scene coords; `MARGIN_DEPTH = 80` outside it;
+  `STORED_INSET = 40` for load/PUT clamps — backend `service.py`
+  `PANEL_X/PANEL_Y/PANEL_INSET` must stay in sync.
 
 ## §13/§14 Port satisfaction at connect time (2026-10-29)
 

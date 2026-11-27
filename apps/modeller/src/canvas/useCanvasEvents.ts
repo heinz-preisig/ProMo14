@@ -8,6 +8,7 @@ import { resolveConnectionAsync, pickArcType, modelNodeIri } from '@promo/semant
 import type { ConnectionRuleResolver, SemanticCatalogue } from '@promo/semantic'
 import { arcCarrier, defaultOrientation, hasCarrierArc } from '../model/ModelGraph'
 import { NODE_RADIUS, entityHalfExtent } from '../scene/buildScene'
+import { clampToPanelBox } from '../scene/panel'
 import { GRAPH_IRI, loadModelDoc } from '../api'
 import { refViewState } from '../modelPersistence'
 import { transition, editableTarget } from './interaction'
@@ -234,16 +235,13 @@ export function useCanvasEvents(
 
   /** Margins are render zones (ancestors | siblings) — user nodes live
    *  in the centre panel only.  Applies to placement clicks AND drags.
-   *  halfW/halfH = the node's own half-extent so the whole body stays
-   *  inside, not just its centre point. */
-  const clampToPanel = (x: number, y: number, halfW = NODE_RADIUS, halfH = NODE_RADIUS) => {
-    const halfStageW = stageSize.width / 2
-    const halfStageH = stageSize.height / 2
-    return {
-      x: Math.max(-halfStageW + 80 + halfW, Math.min(halfStageW - 80 - halfW, x)),
-      y: Math.max(-halfStageH + 80 + halfH, Math.min(halfStageH - 40 - halfH, y)),
-    }
-  }
+   *  The panel is a CANONICAL scene-space box (scene/panel.ts): stored
+   *  positions are viewport-independent, so a model authored on one
+   *  screen renders identically on another.  halfW/halfH = the node's
+   *  own half-extent so the whole body stays inside, not just its
+   *  centre point. */
+  const clampToPanel = (x: number, y: number, halfW = NODE_RADIUS, halfH = NODE_RADIUS) =>
+    clampToPanelBox(x, y, halfW, halfH)
 
   const insertNodeAt = (x: number, y: number) => {
     const id = state.tree.nextId + 1

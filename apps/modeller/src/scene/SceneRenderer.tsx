@@ -1,4 +1,4 @@
-import { Circle, Line, Text, Group, Rect } from 'react-konva'
+import { Circle, Ellipse, Line, Text, Group, Rect, Shape } from 'react-konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { SceneObject, SceneInteractionHandlers } from './types'
 import { arrowPoints } from './buildScene'
@@ -63,6 +63,100 @@ function renderNode(
   }
 
   const opacity = obj.dimmed ? 0.3 : 1
+
+  // Leaf glyph geometry from the node's bounding box — the shape is
+  // declared by the archetype graphical; the renderer only knows the
+  // half-extent + shape tag (designer graphics reuse this path).
+  const he = obj.halfExtent ?? { x: obj.radius, y: obj.radius }
+  const shape = obj.shape ?? 'circle'
+  const dash = obj.strokeDash
+
+  const glyph = () => {
+    switch (shape) {
+      case 'ellipse':
+        return (
+          <Ellipse
+            radiusX={he.x}
+            radiusY={he.y}
+            fill={obj.fill}
+            stroke={obj.stroke}
+            strokeWidth={2}
+            dash={dash}
+          />
+        )
+      case 'rectangle':
+      case 'roundedRectangle':
+        return (
+          <Rect
+            width={he.x * 2}
+            height={he.y * 2}
+            x={-he.x}
+            y={-he.y}
+            fill={obj.fill}
+            stroke={obj.stroke}
+            strokeWidth={2}
+            dash={dash}
+            cornerRadius={shape === 'roundedRectangle' ? 6 : 0}
+          />
+        )
+      case 'diamond':
+        return (
+          <Line
+            points={[0, -he.y, he.x, 0, 0, he.y, -he.x, 0]}
+            closed
+            fill={obj.fill}
+            stroke={obj.stroke}
+            strokeWidth={2}
+            dash={dash}
+          />
+        )
+      case 'halfCircle':
+        // Open dome: top half of a circle, bottom chord left open.
+        // The bounding box is r×r/2 — the arc's circle centre sits at
+        // (0, he.y) so the dome fills [-he.x..he.x] × [-he.y..he.y].
+        return (
+          <Shape
+            sceneFunc={(ctx, shp) => {
+              const r = he.x
+              ctx.beginPath()
+              ctx.arc(0, he.y, r, Math.PI, 2 * Math.PI, false)
+              ctx.closePath()
+              ctx.fillShape(shp)
+              if (dash) {
+                // stroke the arc only (open ends) — dash on the chord
+                // would fake a closed boundary.
+                ctx.beginPath()
+                ctx.arc(0, he.y, r, Math.PI, 2 * Math.PI, false)
+                ctx.strokeShape(shp)
+              } else {
+                ctx.strokeShape(shp)
+              }
+            }}
+            fill={obj.fill}
+            stroke={obj.stroke}
+            strokeWidth={2}
+            dash={dash}
+          />
+        )
+      case 'circle':
+      case 'symbol':
+      default:
+        return (
+          <Circle
+            radius={he.x}
+            fill={obj.fill}
+            stroke={obj.stroke}
+            strokeWidth={2}
+            dash={dash}
+          />
+        )
+    }
+  }
+
+  // Label: the dome is half-height — its name sits under the open side.
+  const labelY = shape === 'halfCircle' ? he.y + 4 : -6
+  const labelW = Math.max(he.x * 2, obj.radius * 2)
+
   if (isComposite) {
     return (
       <Group
@@ -117,28 +211,38 @@ function renderNode(
       {...eventProps}
     >
       {obj.highlight && (
-        <Circle
-          radius={obj.radius + 4}
-          fill="transparent"
-          stroke={obj.highlight === 'valid' ? '#2ecc71' : '#e74c3c'}
-          strokeWidth={3}
-          listening={false}
-        />
+        he.x === he.y ? (
+          <Circle
+            radius={he.x + 4}
+            fill="transparent"
+            stroke={obj.highlight === 'valid' ? '#2ecc71' : '#e74c3c'}
+            strokeWidth={3}
+            listening={false}
+          />
+        ) : (
+          <Rect
+            width={he.x * 2 + 8}
+            height={he.y * 2 + 8}
+            x={-he.x - 4}
+            y={-he.y - 4}
+            fill="transparent"
+            stroke={obj.highlight === 'valid' ? '#2ecc71' : '#e74c3c'}
+            strokeWidth={3}
+            cornerRadius={6}
+            listening={false}
+          />
+        )
       )}
-      <Circle
-        radius={obj.radius}
-        fill={obj.fill}
-        stroke={obj.stroke}
-        strokeWidth={2}
-      />
+      {glyph()}
       <Text
         text={obj.label}
         fontSize={12}
         fill={obj.fill === '#3498db' ? '#fff' : '#333'}
         align="center"
-        width={obj.radius * 2}
-        x={-obj.radius}
-        y={-6}
+        width={labelW}
+        x={-labelW / 2}
+        y={labelY}
+        listening={false}
       />
     </Group>
   )

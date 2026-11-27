@@ -434,12 +434,35 @@ def get_model(graph_iri: Optional[str] = Depends(graph_param)) -> ModelDocument:
     return doc
 
 
+# Canonical centre panel (scene coordinates) — MUST stay in sync with
+# apps/modeller/src/scene/panel.ts.  Stored layout positions are canonical:
+# the same document renders identically on every screen.
+PANEL_X = 620.0   # |x| bound of the centre panel
+PANEL_Y = 320.0   # |y| bound of the centre panel
+PANEL_INSET = 40.0  # margin for node half-extents on stored positions
+
+
+def _clamp_layout(composites: List["CompositeDoc"]) -> None:
+    """Clamp stored child positions into the canonical panel so a document
+    written by any client can't spill model objects into the margins.
+    Numeric keys are child positions; 'ancestor-N'/'sibling-N' ids aren't
+    panel space and stay untouched."""
+    xb, yb = PANEL_X - PANEL_INSET, PANEL_Y - PANEL_INSET
+    for c in composites:
+        for k, p in c.layout.items():
+            if not str(k).isdigit():
+                continue
+            p["x"] = max(-xb, min(xb, p.get("x", 0.0)))
+            p["y"] = max(-yb, min(yb, p.get("y", 0.0)))
+
+
 @router.put("/model", response_model=ModelDocument)
 def put_model(
     doc: ModelDocument,
     graph_iri: Optional[str] = Depends(editable_param),
 ) -> ModelDocument:
     """Replace the artefact graph's model content with ``doc``."""
+    _clamp_layout(doc.composites)
     store = get_store()
     graph = resolve_graph(store, graph_iri)
 
