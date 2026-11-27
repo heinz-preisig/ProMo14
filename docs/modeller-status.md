@@ -18,16 +18,17 @@ boundary — amended 2026-11-10).  TypeScript compiles clean.
 - **Per-archetype node graphics** (`remoteCatalogue.ts`): each entity
   type walks its `promo:parent` chain to the seeded fundamental type
   and inherits that archetype's graphic — subtypes for free.
-  environment → open half-circle dome, lumped → circle,
+  environment → ring (boundary shell), lumped → circle,
   distributed → oval, point → small circle,
   transport_system → rectangle, info_* → small circle / rounded rect /
   diamond with dashed outlines.  Arc carriers map to line styles
   (token-flow solid, access dashed, signal dotted, reference
-  dash-dot).  `NodeShape` gained `ellipse`/`halfCircle`;
-  `NodeGraphicalDefinition` gained `strokeDash`.  Scene nodes render
-  the resolved glyph; arc rim attachment is shape-aware (ellipse /
-  diamond / rect ray-intersection, dome arc-or-chord hybrid — the
-  hot-point contract the graphic-object editor will reuse).
+  dash-dot).  `NodeShape` gained `ellipse`/`halfCircle`/`ring`;
+  `NodeGraphicalDefinition` gained `strokeDash`/`innerRadius`.
+  Scene nodes render the resolved glyph; arc rim attachment is
+  shape-aware (ellipse / diamond / rect ray-intersection, dome
+  arc-or-chord hybrid, ring = circle — the hot-point contract the
+  graphic-object editor will reuse).
 - **Canonical panel** (`apps/modeller/src/scene/panel.ts`): the
   centre region is a fixed scene-space box (x ±620, y ±320);
   ancestors/siblings/connector render in fixed margin strips outside

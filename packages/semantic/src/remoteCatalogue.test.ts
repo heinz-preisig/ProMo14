@@ -84,6 +84,7 @@ describe('RemoteCatalogue', () => {
     const cat = await RemoteCatalogue.load({
       ...fetchers,
       entityTypes: async () => [
+        { iri: 'https://w3id.org/promo/ontology#etype_environment', label: 'env' },
         { iri: 'https://w3id.org/promo/ontology#etype_lumped', label: 'lumped' },
         { iri: 'https://w3id.org/promo/ontology#etype_transport_system', label: 'transport' },
         { iri: 'x#etype_convection', label: 'convection',
@@ -103,6 +104,11 @@ describe('RemoteCatalogue', () => {
     expect(conv?.graphicalDefinitionIri).toBe('https://w3id.org/promo#Graphical/transport_system')
     const cg = cat.getGraphicalDefinition(conv!.graphicalDefinitionIri!)
     expect(cg?.kind === 'node' && cg.shape).toBe('rectangle')
+
+    // environment → boundary-shell ring
+    const env = cat.getBaseEntity('https://w3id.org/promo/ontology#etype_environment')
+    const eg = cat.getGraphicalDefinition(env!.graphicalDefinitionIri!)
+    expect(eg?.kind === 'node' && eg.shape).toBe('ring')
 
     // no archetype ancestor → no graphic (renderer falls back to default)
     expect(cat.getBaseEntity('x#type_mystery')?.graphicalDefinitionIri).toBeUndefined()

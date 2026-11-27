@@ -795,8 +795,10 @@ export default function App() {
                       : t.shape === 'halfCircle' ? '7px 7px 0 0'
                       : t.shape === 'roundedRectangle' ? 3 : '50%',
                     transform: t.shape === 'diamond' ? 'rotate(45deg)' : undefined,
-                    background: t.fill,
-                    border: `1.5px ${t.dash ? 'dashed' : 'solid'} ${t.stroke}`,
+                    background: t.shape === 'ring' ? 'transparent' : t.fill,
+                    border: t.shape === 'ring'
+                      ? `3px ${t.dash ? 'dashed' : 'solid'} ${t.stroke}`
+                      : `1.5px ${t.dash ? 'dashed' : 'solid'} ${t.stroke}`,
                     borderBottom: t.shape === 'halfCircle' ? 'none' : undefined,
                     marginRight: 6,
                     verticalAlign: 'middle',

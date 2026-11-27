@@ -49,15 +49,15 @@ const ETYPES: Record<string, string> = {
   info_event: 'etype_info_event',
 }
 
-/** Archetype → node graphic.  The env glyph is an open half-circle
- *  (dome, bottom open — "half circle left and right open").  Info
- *  types carry dashed outlines to mark the information domain. */
+/** Archetype → node graphic.  The env glyph is a ring — a boundary
+ *  shell around the model.  Info types carry dashed outlines to mark
+ *  the information domain. */
 const ARCHETYPE_GRAPHICALS: Record<string, NodeGraphicalDefinition> = {
   environment: {
     iri: 'https://w3id.org/promo#Graphical/environment',
-    kind: 'node', shape: 'halfCircle',
-    fill: '#f4f6f7', stroke: '#5d6d7e', strokeWidth: 2, radius: 30,
-    attributes: [],
+    kind: 'node', shape: 'ring',
+    fill: '#f4f6f7', stroke: '#5d6d7e', strokeWidth: 2, radius: 32,
+    innerRadius: 28, attributes: [],
   },
   lumped: {
     iri: 'https://w3id.org/promo#Graphical/lumped',

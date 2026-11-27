@@ -57,6 +57,7 @@ export type NodeShape =
   | 'roundedRectangle'
   | 'diamond'
   | 'halfCircle'
+  | 'ring'
   | 'symbol'
 export type ArcLineStyle = 'solid' | 'dashed' | 'dotted'
 export type ArrowHead = 'none' | 'triangle' | 'diamond' | 'circle'
@@ -73,6 +74,8 @@ export interface NodeGraphicalDefinition {
   width?: number
   height?: number
   radius?: number
+  /** Ring shapes: inner hole radius (defaults to ~2/3 of `radius`). */
+  innerRadius?: number
   symbolIri?: Iri
   attributes: SemanticAttribute[]
 }

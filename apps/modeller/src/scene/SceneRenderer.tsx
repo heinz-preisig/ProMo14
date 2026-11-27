@@ -1,4 +1,4 @@
-import { Circle, Ellipse, Line, Text, Group, Rect, Shape } from 'react-konva'
+import { Circle, Ellipse, Line, Text, Group, Rect, Shape, Ring } from 'react-konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { SceneObject, SceneInteractionHandlers } from './types'
 import { arrowPoints } from './buildScene'
@@ -132,6 +132,19 @@ function renderNode(
                 ctx.strokeShape(shp)
               }
             }}
+            fill={obj.fill}
+            stroke={obj.stroke}
+            strokeWidth={2}
+            dash={dash}
+          />
+        )
+      case 'ring':
+        // Annulus — boundary shell.  The label sits in the hole;
+        // arcs attach to the outer circle (default rim math).
+        return (
+          <Ring
+            outerRadius={he.x}
+            innerRadius={obj.innerRadius ?? he.x * 0.6}
             fill={obj.fill}
             stroke={obj.stroke}
             strokeWidth={2}

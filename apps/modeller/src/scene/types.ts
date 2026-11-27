@@ -41,6 +41,8 @@ export interface SceneNode extends SceneObjectBase {
   shape?: NodeShape
   /** Dashed outline (info-domain graphicals). */
   strokeDash?: number[]
+  /** Ring glyphs: inner hole radius. */
+  innerRadius?: number
   /** Bounding-box half-extent derived from the graphical definition
    *  (radius → {r,r}; w×h → {w/2,h/2}).  Spatial constraints read this
    *  — never a per-shape constant — so any designer graphic works.

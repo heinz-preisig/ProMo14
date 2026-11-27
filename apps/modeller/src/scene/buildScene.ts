@@ -267,6 +267,7 @@ function buildNodeSceneObject(
       : graphicalHalfExtent(g),
     shape: isComposite ? 'rectangle' : g?.shape,
     strokeDash: g?.strokeDash,
+    innerRadius: isComposite ? undefined : g?.innerRadius,
     entityType: node.entityType,
     treeNodeId: node.treeNodeId,
     modelNodeIri: node.modelNodeIri,
